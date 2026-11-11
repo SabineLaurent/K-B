@@ -771,7 +771,8 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
    contenu ou résumé, date de collecte, chemin du brut d'origine. Une date absente reste vide. Toutes les dates sont en UTC, avec fuseau. Une ligne
    illisible est rejetée et journalisée, pas devinée.
 3. **Normalisation** des items lus (`normalize_item`, `src/k_b/etl/normalize.py`) :
-   - dates ramenées en UTC ;
+   - dates gardées telles quelles : elles sont déjà en UTC, converties à la lecture par le type
+     `UtcDatetime` de l'item (`src/k_b/items.py`) ;
    - URL normalisées : les paramètres `utm_*` sont retirés, les autres restent tels quels et
      dans leur ordre.
 
