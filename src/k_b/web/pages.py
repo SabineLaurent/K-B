@@ -8,6 +8,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi.responses import HTMLResponse
 
 from k_b.core.api_request_log import read_request_id
+from k_b.core.config import DATA_API_MAX_SEARCH_LENGTH
 from k_b.web.data_api_client import FEED_KINDS, DataApiError, list_feed_items
 from k_b.web.errors import render_error_page, render_server_error_page
 from k_b.web.feed import (
@@ -23,6 +24,7 @@ from k_b.web.feed import (
     build_query,
     count_pages,
     find_api_field_error,
+    fits_in_search_field,
     read_feed_form,
     read_page_number,
 )
@@ -77,6 +79,10 @@ def render_feed(
             "form": form,
             "errors": errors,
             "error_by_field": {error.field: error.message for error in errors},
+            # None: the value received is longer than the field allows, which it shows again.
+            "search_maxlength": DATA_API_MAX_SEARCH_LENGTH
+            if fits_in_search_field(form.q)
+            else None,
             "feed_kinds": FEED_KINDS,
             "labels_by_kind": LABELS_BY_KIND,
             "periods": PERIODS,

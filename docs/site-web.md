@@ -30,22 +30,24 @@ Chaque page fait un seul `GET /items` (`web/data_api_client.py`), avec `kind` to
 | Champ | Dans l'adresse | Règle |
 |---|---|---|
 | Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus, sans caractère de contrôle (les règles de `q` de l'API) |
-| Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq ; une autre valeur est refusée, sans appel à l'API |
+| Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq, ce que dit l'aide du groupe ; une autre valeur est refusée, sans appel à l'API |
 | Depuis | `period` : `1`, `3`, `7` ou `date` | `1` par défaut (D3, Sabine, 2026-11-11) ; N jours donne minuit UTC du jour J−N : « 1 jour » prend hier et aujourd'hui |
-| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi) ; son propre minuit UTC |
+| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC |
 | page | `page` | `[1-9][0-9]{0,2}`, 501 au plus (l'`offset` 10 000 de l'API) ; absente, la page 1 |
 
 La route lit `request.query_params` brut, jamais des paramètres typés par FastAPI : un `page=abc` partirait
 sinon dans le 422 JSON de FastAPI, qui recopie la valeur reçue.
 
 **La carte** d'un item donne sa sorte, sa date au mois en lettres (`<time>`), la pastille « Exploitée (KEV) »
-(une faille toujours, une alerte dont la CVE est au catalogue), ses identifiants, son titre et le lien vers la
+(lue dans `exploited` : une faille, une alerte dont la CVE est au catalogue ; une faille retirée du catalogue
+n'a que la ligne « retirée du catalogue le … », décision de Sabine du 2026-11-11), ses identifiants, son titre et le lien vers la
 source, « (en anglais, site externe) » ou, pour une newsletter, « (site externe) ». Une URL qui n'est pas en
 `https` vers un hôte ne devient jamais un lien. Le titre n'est pas encore un lien : le détail vient avec
 #564. Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
-**Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; au-delà de 10 020 items, une phrase dit d'affiner
+**Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
+M et les 20 items par page (Opquast 13) ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page gardent les
 filtres. Le fil vide propose « Élargir à 7 jours ».
 

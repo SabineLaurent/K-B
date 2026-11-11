@@ -263,6 +263,13 @@ def find_search_error(q: str) -> FieldError | None:
     return None
 
 
+def fits_in_search_field(q: str) -> bool:
+    """Whether q holds in the maxlength of its field, which counts the units of UTF-16, not the
+    characters: a value beyond it is no valid HTML (WHATWG, RGAA 8.2)."""
+    units = len(q.encode("utf-16-le", errors="surrogatepass")) // 2
+    return units <= DATA_API_MAX_SEARCH_LENGTH
+
+
 def build_query(form: FeedForm, now: datetime, page: int) -> FeedQuery:
     """The query of a form without error; a search empty is no search, as the form always sends
     q."""
@@ -349,7 +356,7 @@ def write_results_line(total: int, since_day: date, page: int, pages: int) -> st
     items = "1 item" if total == 1 else f"{total} items"
     return (
         f"{items} depuis le {day}, du plus récent au plus ancien."
-        f" Page {page} sur {pages}."
+        f" Page {page} sur {pages}, {FEED_PAGE_SIZE} items par page."
     )
 
 
@@ -378,9 +385,10 @@ def build_card(item: FeedItem) -> FeedCard:
 
 def is_exploited(item: FeedItem) -> bool:
     """By the field exploited of the data API: a vulnerability, always true, being in the CISA KEV
-    catalog; an advisory when its CVE is in it, withdrawn since or not."""
+    catalog; an advisory when its CVE is in it, withdrawn since or not. Withdrawn, the card drops the
+    mark, which its line of the withdrawal would contradict (Sabine, 2026-11-11)."""
     if isinstance(item, FeedVulnerability | FeedAdvisory):
-        return item.exploited is True
+        return item.exploited is True and item.withdrawn_at is None
     return False
 
 

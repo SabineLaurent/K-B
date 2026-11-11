@@ -244,7 +244,7 @@ def test_the_link_of_a_page_drops_a_start_date_the_radio_ignores():
             1,
             (
                 "14 items depuis le 10 novembre 2026, du plus récent au plus ancien."
-                " Page 1 sur 1."
+                " Page 1 sur 1, 20 items par page."
             ),
         ),
         (
@@ -253,7 +253,7 @@ def test_the_link_of_a_page_drops_a_start_date_the_radio_ignores():
             1,
             (
                 "1 item depuis le 10 novembre 2026, du plus récent au plus ancien."
-                " Page 1 sur 1."
+                " Page 1 sur 1, 20 items par page."
             ),
         ),
         (
@@ -262,7 +262,7 @@ def test_the_link_of_a_page_drops_a_start_date_the_radio_ignores():
             3,
             (
                 "41 items depuis le 10 novembre 2026, du plus récent au plus ancien."
-                " Page 3 sur 3."
+                " Page 3 sur 3, 20 items par page."
             ),
         ),
     ],
@@ -325,7 +325,9 @@ def test_the_mark_of_a_vulnerability_follows_the_field_exploited_of_the_api():
     assert build_card(item).is_exploited is False
 
 
-def test_the_card_of_a_vulnerability_is_always_exploited_and_says_its_withdrawal():
+def test_the_card_of_a_vulnerability_is_exploited_until_withdrawn_and_says_its_withdrawal():
+    """Sabine, 2026-11-11: withdrawn, the card drops the mark Exploitée (KEV), which the line of the
+    withdrawal would contradict, and keeps that line."""
     current, withdrawn = build_card(ITEMS[3]), build_card(ITEMS[5])
 
     assert current.kind_label == "Faille"
@@ -333,7 +335,7 @@ def test_the_card_of_a_vulnerability_is_always_exploited_and_says_its_withdrawal
     assert current.identifiers == "CVE-2026-86950"
     assert current.withdrawn_text is None
     assert current.link_label == "Voir la fiche sur nvd.nist.gov"
-    assert withdrawn.is_exploited is True
+    assert withdrawn.is_exploited is False
     assert withdrawn.withdrawn_text == "retirée du catalogue le 6 octobre 2026"
 
 

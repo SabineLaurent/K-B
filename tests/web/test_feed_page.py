@@ -50,7 +50,7 @@ def test_the_feed_shows_twenty_cards_the_results_and_the_page():
     assert response.text.count('<li class="card">') == 20
     assert (
         "45 items depuis le 10 novembre 2026, du plus récent au plus ancien."
-        " Page 1 sur 3." in response.text
+        " Page 1 sur 3, 20 items par page." in response.text
     )
     assert "<title>Quoi de neuf, page 1 sur 3 · K-B</title>" in response.text
 
@@ -138,7 +138,10 @@ def test_a_kind_out_of_the_five_is_refused_in_html_without_asking_the_api():
     assert response.status_code == 422
     assert response.headers["Content-Type"] == "text/html; charset=utf-8"
     assert api.requests == []
-    assert '<fieldset id="kinds" aria-describedby="kinds-error">' in response.text
+    assert (
+        '<fieldset id="kinds" aria-describedby="kinds-error kinds-help">'
+        in response.text
+    )
     assert '<p id="kinds-error" class="field-error">Sorte inconnue' in response.text
     assert '<li class="card">' not in response.text
 
@@ -154,10 +157,25 @@ def test_a_search_too_long_is_refused_on_its_field_its_value_kept():
     field = find_input(response.text, "q")
     assert f'value="{search}"' in field
     assert 'aria-invalid="true"' in field
-    assert 'aria-describedby="q-help q-error"' in field
+    assert 'aria-describedby="q-error q-help"' in field
+    # A value longer than maxlength is no valid HTML (WHATWG, RGAA 8.2).
+    assert "maxlength" not in field
     assert '<p id="q-error" class="field-error">' in response.text
     assert '<a href="#q">La recherche fait 201 caractères' in response.text
     assert "<title>Quoi de neuf, filtre à corriger · K-B</title>" in response.text
+
+
+def test_the_search_field_keeps_its_maxlength_when_its_value_holds_in_it():
+    assert 'maxlength="200"' in find_input(get_feed().text, "q")
+    assert 'maxlength="200"' in find_input(get_feed("q=" + "a" * 200).text, "q")
+
+
+def test_a_search_of_200_characters_beyond_200_units_of_the_browser_drops_maxlength():
+    """maxlength counts the units of UTF-16, the site the characters: 150 emoji make 300 units."""
+    response = get_feed("q=" + chr(0x1F600) * 150)
+
+    assert response.status_code == 200
+    assert "maxlength" not in find_input(response.text, "q")
 
 
 def test_date_checked_without_date_is_refused_on_the_start_field():

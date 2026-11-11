@@ -400,9 +400,10 @@ def test_each_field_refused_says_why_under_it_and_in_the_summary():
 
     assert summary_links == ["#q", "#kinds", "#start"]
     assert all(link[1:] in ids for link in summary_links)
-    assert "q-error" in tied["q"]
-    assert tied["kinds"] == ["kinds-error"]
-    assert tied["start"] == ["start-error"]
+    # The error first, then the help: the reason of the refusal is heard first.
+    assert tied["q"] == ["q-error", "q-help"]
+    assert tied["kinds"] == ["kinds-error", "kinds-help"]
+    assert tied["start"] == ["start-error", "start-help"]
     invalid = [
         attributes["id"]
         for _, attributes in page.tags
@@ -448,8 +449,9 @@ def test_the_dates_of_the_cards_are_time_elements_with_their_month_in_letters():
 
 
 def test_the_exploited_mark_is_a_word_not_a_colour():
-    """RGAA 3.1: the state is written."""
-    assert PAGES["/"].count('<span class="badge">Exploitée (KEV)</span>') == 4
+    """RGAA 3.1: the state is written; three items of the fixture are in the catalog, a fourth was
+    withdrawn from it."""
+    assert PAGES["/"].count('<span class="badge">Exploitée (KEV)</span>') == 3
 
 
 def test_the_pagination_is_named_and_gives_the_page():
@@ -460,3 +462,23 @@ def test_the_pagination_is_named_and_gives_the_page():
         "Pagination",
     ]
     assert "Page 2 sur 3" in page.text
+
+
+def test_the_rules_of_a_field_are_written_before_sending():
+    """WCAG 3.3.2 (A), RGAA 11.10.1, Opquast 70 and 71: the start date is required with Date only,
+    and no kind checked is the five; neither can be said by required without a script."""
+    page = outline(PAGES["/"])
+    described = {
+        attributes["id"]: attributes.get("aria-describedby")
+        for tag, attributes in page.tags
+        if tag in ("input", "fieldset")
+    }
+    helps = dict(
+        re.findall(r'<p id="([a-z]+-help)" class="field-help">([^<]+)</p>', PAGES["/"])
+    )
+
+    assert described["q"] == "q-help"
+    assert described["kinds"] == "kinds-help"
+    assert described["start"] == "start-help"
+    assert "Obligatoire avec « Date »" in helps["start-help"]
+    assert "les cinq sortes" in helps["kinds-help"]

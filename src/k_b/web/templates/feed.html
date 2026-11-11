@@ -28,10 +28,11 @@
 <label for="q">Rechercher</label>
 <p id="q-help" class="field-help">Un morceau du titre ou du résumé, en 200 caractères au plus. Les majuscules ne comptent pas, sauf sur une lettre accentuée.</p>
 {{ field_error("q") }}
-<input id="q" name="q" type="search" maxlength="200" value="{{ form.q }}" aria-describedby="q-help{% if 'q' in error_by_field %} q-error{% endif %}"{{ invalid("q") }}>
+<input id="q" name="q" type="search"{% if search_maxlength %} maxlength="{{ search_maxlength }}"{% endif %} value="{{ form.q }}" aria-describedby="{% if 'q' in error_by_field %}q-error {% endif %}q-help"{{ invalid("q") }}>
 </div>
-<fieldset id="kinds"{% if "kinds" in error_by_field %} aria-describedby="kinds-error"{% endif %}>
+<fieldset id="kinds" aria-describedby="{% if 'kinds' in error_by_field %}kinds-error {% endif %}kinds-help">
 <legend>Sortes</legend>
+<p id="kinds-help" class="field-help">Sans case cochée, le fil montre les cinq sortes.</p>
 {{ field_error("kinds") }}
 <div class="choices">
 {% for kind in feed_kinds %}
@@ -56,8 +57,9 @@
 </div>
 <div class="field">
 <label for="start">Date de début</label>
+<p id="start-help" class="field-help">Obligatoire avec « Date », sans effet avec 1, 3 ou 7 jours.</p>
 {{ field_error("start") }}
-<input id="start" name="start" type="date" value="{{ form.start }}"{% if "start" in error_by_field %} aria-describedby="start-error"{% endif %}{{ invalid("start") }}>
+<input id="start" name="start" type="date" value="{{ form.start }}" aria-describedby="{% if 'start' in error_by_field %}start-error {% endif %}start-help"{{ invalid("start") }}>
 </div>
 </fieldset>
 <div class="form-actions">
