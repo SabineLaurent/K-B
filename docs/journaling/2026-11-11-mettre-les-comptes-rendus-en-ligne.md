@@ -9,9 +9,10 @@
 - **Série** : suit [Mettre la routine quotidienne en ligne](2026-11-10-mettre-la-routine-quotidienne-en-ligne.md)
   (#330), dont ce job reprend le modèle.
 
-Tous les commits de la branche sont couverts. `76cec19` écrit le job, et `bb46932`, `29e6680`, `2a8006e` et `8a0ec2a`
-le documentent (README d'infra, autres docs, registre, ADR). `6cc878e` applique le tri des revues, `36968d5` corrige
-une référence de ligne, et `18aa222` écrit les faits de la première exécution. Les docs se retrouvent dans « Choix
+Tous les commits de la branche sont couverts (hachages après le rebase sur `main` à 94e7b2d). `b673ea8` écrit le job,
+et `5fd1989`, `b561f33`, `a6c7e6e` et `f129348` le documentent (README d'infra, autres docs, registre, ADR). `0a5b5e1`
+applique le tri des revues, `adcaf64` corrige une référence de ligne, `eef1848` écrit les faits de la première
+exécution, et la note vient en dernier. Les docs se retrouvent dans « Choix
 faits » et « Preuve ».
 
 ## Le pourquoi
