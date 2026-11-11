@@ -89,7 +89,10 @@ Une exception : une requête dont le `Host` n'est pas dans `KB_WEB_ALLOWED_HOSTS
 brut de `TrustedHostMiddleware`, avant le site ; il ne vise qu'une sonde ou un réglage faux. Il ne redirige
 jamais vers le `www.` d'un hôte permis (`www_redirect=False`) : la redirection prendrait le schéma vu, `http`. Une
 exception imprévue rend la page 500, avec l'heure UTC et l'identifiant de la demande (`X-Request-ID`). Le
-journal en écrit le type, `internal_error: <Type> request_id=…`, jamais le message ni la pile. Le lien
+journal en écrit le type, `internal_error: <Type> request_id=…`, jamais le message ni la pile. Si le
+gabarit de la page 500 échoue lui aussi, une page écrite sans gabarit répond (`FALLBACK_SERVER_ERROR_PAGE`),
+et le journal écrit une seconde ligne `internal_error` : l'exception ne remonte jamais à Starlette, qui
+répondrait en texte, ni à uvicorn, qui en écrirait la pile. Le lien
 « Réessayer » pointe vers la page elle-même (`href=""`), jamais vers un chemin reçu.
 
 ## Gabarits

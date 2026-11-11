@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from jinja2 import StrictUndefined
 from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_client
 
+from k_b.web import errors
 from k_b.web.app import create_app
 from k_b.web.errors import write_moment
 from k_b.web.rendering import templates
@@ -19,6 +20,7 @@ CONTENT_SECURITY_POLICY = (
     " base-uri 'none'; frame-ancestors 'none'"
 )
 EXCEPTION_DETAIL = "a detail the exception holds"
+RENDERING_DETAIL = "a detail the failure of a template holds"
 
 
 @pytest.fixture
@@ -141,6 +143,33 @@ def test_every_answer_has_its_security_headers_and_its_cache(
     assert response.headers["X-Content-Type-Options"] == "nosniff"
     assert response.headers["Referrer-Policy"] == "no-referrer"
     assert response.headers["Cache-Control"] == cache_control
+
+
+def test_the_page_500_without_its_template_is_a_page_still_never_a_stack(
+    failing_client, monkeypatch, caplog
+):
+    """The template of the page 500 failing too, Starlette would send its text and uvicorn would
+    log the stack, which may quote a value received (.claude/rules/poc.md, rule 5)."""
+
+    def fail_to_render(*args, **kwargs):
+        raise RuntimeError(RENDERING_DETAIL)
+
+    monkeypatch.setattr(errors, "render_page", fail_to_render)
+    with caplog.at_level(logging.INFO, logger="k_b"):
+        response = failing_client.get("/failing")
+
+    assert response.status_code == 500
+    assert response.headers["Content-Type"] == "text/html; charset=utf-8"
+    assert "Erreur 500" in response.text
+    assert response.headers["Content-Security-Policy"] == CONTENT_SECURITY_POLICY
+    assert response.headers["Cache-Control"] == "no-store"
+    lines = [record.getMessage() for record in caplog.records]
+    request_id = response.headers["X-Request-ID"]
+    assert lines.count(f"internal_error: RuntimeError request_id={request_id}") == 2
+    assert not any(
+        EXCEPTION_DETAIL in line or RENDERING_DETAIL in line for line in lines
+    )
+    assert all(record.exc_info is None for record in caplog.records)
 
 
 def test_the_page_500_has_its_security_headers_and_is_not_kept(failing_client):
