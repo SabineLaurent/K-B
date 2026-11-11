@@ -143,7 +143,18 @@ def test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_conf
         "port": 8000,
         "log_config": None,
         "access_log": False,
+        "server_header": False,
     }
+
+
+def test_serve_data_sends_no_server_header(monkeypatch, data_dir, uvicorn_calls):
+    """uvicorn names itself in a header Server by default (Opquast 2025, rule 213)."""
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+
+    cli.main(["serve-data"])
+
+    [(_, options)] = uvicorn_calls
+    assert options["server_header"] is False
 
 
 def test_serve_listens_on_the_host_and_port_of_the_environment(

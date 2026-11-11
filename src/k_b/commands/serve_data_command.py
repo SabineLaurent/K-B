@@ -54,6 +54,8 @@ def run_serve_data(data_dir: Path, environ: Mapping[str, str]) -> int:
                 port=settings.port,
                 log_config=None,
                 access_log=False,
+                # No header Server: uvicorn, which names the software (Opquast 2025, rule 213).
+                server_header=False,
             )
     except UnreadableDatabaseUrlError as error:
         logger.error("%s", error)
