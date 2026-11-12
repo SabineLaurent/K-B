@@ -29,6 +29,57 @@ base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_a
 est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
+## Pourquoi un SGBD relationnel
+
+Le modèle de données de K-B est relationnel dès sa conception : le MLD se déduit du MCD par les
+règles de passage de Merise, et le MPD, `schema.sql`, en est tiré, à deux dénormalisations voulues
+près (« MCD et MLD », ci-dessous). Un SGBD relationnel tient lui-même, à chaque écriture, les règles
+que ce modèle pose ; sans lui, chacune serait à coder et à tester dans K-B.
+
+- **Les clés étrangères relient ce que le modèle associe.** Un fichier brut vise sa source, un item
+  le fichier brut qui l'a apporté (`src/k_b/database/schema.sql:30`, `:47`) ; une release vise son
+  dépôt suivi (`:178`), un surlignage et un tag leur item (`:97`, `:337-338`). La base refuse une
+  ligne qui viserait une ligne absente ; en SQLite, à condition que la connexion l'active, ce que
+  K-B fait à chaque ouverture (« Clés étrangères », ci-dessous).
+- **La clé `(item_id, kind)` tient l'exclusion des sous-types.** `item` porte la sorte de chaque
+  item et la rend visable par `UNIQUE (id, kind)` (`schema.sql:42-50`). Chacun des cinq sous-types,
+  `release`, `advisory`, `newsletter_article`, `zotero_entry` et `clip`, fixe sa sorte par un
+  `CHECK` (`kind = 'release'`…), a un `item_id` unique et vise `item` par la clé étrangère composée
+  `(item_id, kind)` (`schema.sql:176-177` et `:192`, `:201-202` et `:219`, `:229-230` et `:250`,
+  `:262-263` et `:284`, `:295-296` et `:319`). Un item a donc un sous-type au plus, celui de sa
+  sorte : la base refuse tout autre rattachement. `kind` y est `NOT NULL` : un `kind` nul passerait
+  son `CHECK` et échapperait à la clé étrangère (`schema.sql:173`). C'est l'option D du journal ADR
+  (2026-10-07).
+- **Les contraintes `CHECK` refusent ce que le modèle ne permet pas** : une valeur hors de sa liste
+  (`source_type`, `acquisition_mode`, `kind` : `schema.sql:21`, `:23`, `:45-46`), une date hors de
+  la forme `AAAA-MM-JJTHH:MM:SSZ` (`:34`), un texte trop long (« Longueurs maximales »,
+  ci-dessous), une liste JSON qui n'est pas un tableau ou qui dépasse son nombre d'éléments
+  (`:64-66`). L'item refuse les mêmes valeurs avant la base, un test par type (règle 4 de
+  `.claude/rules/conventions.md`) ; ce que l'item laisse passer et que la base refuse devient un
+  rejet du journal d'import (règle 1).
+- **La transaction de l'import.** `kb import` écrit les dépôts suivis, chaque fichier lu, ses items
+  et leur registre (`raw_data`) dans une seule transaction, sous le verrou des écrivains
+  (`src/k_b/etl/load.py:60-88`). Une erreur du système ou une interruption (Ctrl-C, SIGTERM) avant
+  le `commit` annule tout l'import (`load.py:80-85`, `:138`) : la base ne garde jamais un import à
+  moitié écrit. Dans cette transaction, chaque item s'écrit dans un `SAVEPOINT` : une entrée que la
+  base refuse est annulée seule, et l'import continue (`src/k_b/database/savepoint.py:19-40`).
+
+Ce que la base ne tient pas :
+
+- les deux dénormalisations voulues du MPD, le classement dans `trend` et les listes JSON (« MCD et
+  MLD », ci-dessous) : la base tient la forme d'une liste et son nombre d'éléments, pas chaque
+  élément ;
+- `publication` et `vulnerability` sont des tables de référence, pas des sous-types : elles visent
+  leur item par une clé étrangère simple (`schema.sql:59`, `:134`), et la base ne vérifie pas la
+  sorte de l'item visé ;
+- un surlignage vise `item`, pas l'entrée Zotero : son rattachement à une entrée Zotero est tenu par
+  le code (« MCD et MLD », ci-dessous).
+
+Le choix du moteur vient ensuite : SQLite et PostgreSQL sont tous deux relationnels, et
+`schema_postgresql.sql` garde les mêmes clés étrangères (17 `REFERENCES` dans chaque script, dont
+les cinq clés `(item_id, kind)`, et `UNIQUE (id, kind)`) ; ce que chaque schéma écrit à sa façon
+est listé dans « Ce qui est propre à SQLite ».
+
 ## Le SGBD : SQLite en local, PostgreSQL en ligne
 
 La variable `KB_DATABASE_URL` choisit le moteur (journal ADR, 2026-11-06, « Base : PostgreSQL en
