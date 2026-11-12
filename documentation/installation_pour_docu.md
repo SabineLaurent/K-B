@@ -47,7 +47,7 @@ uv run kb --help
   `uv lock --check` a répondu `Resolved 96 packages` et est sorti en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv, « Automatic lock
   and sync »): après un `git pull` qui change `uv.lock`, `uv run kb …` installe d'abord les nouvelles versions.
-- `uv run kb --help` contrôle l'installation. Il liste les 13 commandes de `kb` et leurs codes de sortie, sans lire
+- `uv run kb --help` contrôle l'installation. Il liste les 16 commandes de `kb` et leurs codes de sortie, sans lire
   l'environnement: `main` lit la ligne de commande (`read_command`) avant l'environnement (`read_environment`,
   `cli.py`). `kb` est le point d'entrée que déclare `[project.scripts]` (`kb = "k_b.cli:main"`, `pyproject.toml`).
 
@@ -69,8 +69,8 @@ KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 base est ce fichier SQLite; avec elle, `kb create-db` crée les tables dans la base PostgreSQL de l'URL, qui doit déjà
 exister, en UTF8 et en collation C ([docs/stockage.md](../docs/stockage.md), « Le SGBD »).
 
-Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log` et
-`kb-serve-ai.log` pour les deux API (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et
+Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log`,
+`kb-serve-ai.log` et `kb-serve-web.log` pour les deux API et le site (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et
 `--dry-run` de `kb daily-routine` et `kb digest-watch`, qui affiche les étapes sans en lancer aucune (`main`,
 `cli.py`). Avec `KB_LOG_TO_FILE=false`, le journal ne va que sur la
 sortie d'erreur.
@@ -114,7 +114,10 @@ avec `--dry-run`, ils ne lisent que `KB_DATA_DIR` et `KB_LOG_TO_FILE` (`main`, `
 | `KB_LLM_BASE_URL`, `KB_LLM_MODEL`, `KB_LLM_API_KEY` | `kb serve-ai` | oui avec `KB_LLM_PROVIDER=openai_compatible` |
 | `KB_LLM_REPLAY_FILE` | `kb serve-ai` | oui avec `KB_LLM_PROVIDER=replay`, qui répond par les réponses d'un fichier, sans réseau ni clé |
 | `KB_LLM_REASONING_EFFORT`, `KB_AI_API_HOST`, `KB_AI_API_PORT`, `KB_DIGEST_WINDOW_DAYS` | `kb serve-ai` | non |
-| `KB_DATA_API_URL` | `kb serve-ai`, `kb smoke-test`, `kb digest-watch` | non |
+| `KB_DATA_API_URL` | `kb serve-ai`, `kb serve-web`, `kb smoke-test`, `kb digest-watch` | non |
+| `KB_DATA_API_KEY_WEB` | `kb serve-web`, la clé de son client `WEB` de l'API de données (`web/settings.py`) | oui |
+| `KB_WEB_HOST`, `KB_WEB_PORT`, `KB_WEB_ALLOWED_HOSTS` | `kb serve-web` | non |
+| `KB_WEB_AUTH`, `KB_WEB_OPERATOR_ID` | `kb serve-web`: `entra` par défaut, chaque requête sauf `/health` porte l'identifiant d'objet de l'opératrice; `off`, aucun en-tête vérifié (`web/settings.py`) | `KB_WEB_OPERATOR_ID` oui, sauf avec `KB_WEB_AUTH=off`, que `kb serve-web` refuse hors de `127.0.0.1` ou dans Azure (`web/settings.py`) |
 | `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS`, `KB_TRACE_CONTENT` | `kb serve-ai` | non: sans les deux premières, rien n'est exporté, et `kb serve-ai` refuse de démarrer avec `KB_TRACE_CONTENT` autre que `none` (`find_content_without_export_refusal`, `ai_api/connectors/metrics_export.py`) |
 | `KB_DEPLOYMENT_ENVIRONMENT` | `kb serve-data`, `kb serve-ai`; les commandes qui lisent `KB_AI_API_URL` ou `KB_DATA_API_URL`, pour une URL `http` vers un service de compose (`find_internal_api_url_refusal`, `core/outbound.py`) | non, sauf avec l'export (`sandbox` ou `production`). Seul `sandbox` sert `/docs` et `/openapi.json` (`read_openapi_url`, `core/api_settings.py`) |
 | `KB_AI_API_URL` | `kb digest`, `kb trend-report`, `kb smoke-test`, `kb digest-watch` | non |
