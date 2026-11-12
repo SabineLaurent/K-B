@@ -769,8 +769,8 @@
     {
       "id": 10,
       "type": "table",
-      "title": "Appels sur 24 h, par étape et par issue",
-      "description": "Le nombre d'appels au modèle par étape (classify, write, select, write_trends) et par issue (ok, ou l'état llm_* de l'appel).",
+      "title": "Appels sur 24 h, par étape et par résultat",
+      "description": "Le nombre d'appels au modèle sur 24 h, par étape et par résultat. Les étapes: classify, le classement des items dans les sujets de la veille; write, la rédaction de la fiche d'un sujet; select, le choix des dépôts du compte rendu des tendances, 5 au plus; write_trends, la rédaction du texte d'un dépôt choisi. Le résultat: ok, ou l'état de l'échec, après la nouvelle tentative quand il y en a une: llm_invalid_output, une sortie hors du schéma ou refusée par un contrôle; llm_truncated, une sortie coupée à sa longueur maximale; llm_content_filtered, une entrée ou une sortie retenue par le filtre de contenu du fournisseur; llm_rate_limited, trop de demandes au fournisseur; llm_unavailable, un fournisseur injoignable ou une réponse illisible; llm_timeout, un délai dépassé.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -804,7 +804,7 @@
             },
             "renameByName": {
               "k_b_stage": "Étape",
-              "k_b_outcome": "Issue",
+              "k_b_outcome": "Résultat",
               "Value": "Appels sur 24 h"
             }
           }
