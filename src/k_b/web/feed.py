@@ -31,7 +31,7 @@ from k_b.web.data_api_client import (
     FeedVulnerability,
 )
 from k_b.web.french_dates import write_day
-from k_b.web.received_text import clean_received_text
+from k_b.web.received_text import clean_received_text, clean_received_value
 
 FEED_PATH = "/"
 # The detail of an item, the target of the title of its card.
@@ -397,7 +397,7 @@ def write_results_line(total: int, since_day: date, page: int, pages: int) -> st
 
 def build_card(item: FeedItem) -> FeedCard:
     labels = LABELS_BY_KIND[item.kind]
-    title = write_title(item.title)
+    title = clean_received_value(item.title)
     return FeedCard(
         kind_label=labels.card_label,
         kind_lang=labels.label_lang,
@@ -408,20 +408,14 @@ def build_card(item: FeedItem) -> FeedCard:
         withdrawn_text=None
         if item.withdrawn_at is None
         else f"retirée du catalogue le {write_day(item.withdrawn_at)}",
-        title=title,
-        title_lang=None if title == NO_TITLE else labels.title_lang,
+        title=title or NO_TITLE,
+        title_lang=labels.title_lang if title else None,
         detail_link=ITEM_PATH.format(item_id=item.id),
         link=keep_https_link(item.url),
         link_label=labels.link_label,
         link_note=write_link_note(labels),
         link_lang=labels.link_lang,
     )
-
-
-def write_title(title: str) -> str:
-    """The title cleaned, or Sans titre, in French, when the cleaning leaves only blanks."""
-    cleaned = clean_received_text(title)
-    return cleaned if cleaned.strip() else NO_TITLE
 
 
 def write_link_note(labels: KindLabels) -> str:

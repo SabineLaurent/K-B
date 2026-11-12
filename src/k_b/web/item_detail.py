@@ -21,16 +21,17 @@ from k_b.web.feed import (
     keep_https_link,
     write_link_note,
     write_newsletter_name,
-    write_title,
 )
 from k_b.web.french_dates import write_day
-from k_b.web.received_text import clean_received_text
+from k_b.web.received_text import clean_received_text, clean_received_value
 
 # Digits of ASCII only, without a zero first: one address for each item (Opquast 2025, rule 169).
 # The one form of the id of an item in the site: #403 changes it here alone.
 ITEM_ID = re.compile(r"[1-9][0-9]{0,18}")
-# A line of blanks counts as empty: it ends a paragraph.
-BLANK_LINES = re.compile(r"\n(?:[ \t]*\n)+")
+# A line of blanks, any space of Unicode, counts as empty: it ends a paragraph, and goes at the start
+# or the end of one; the indent of a line not blank is kept (D3).
+BLANK_LINES = re.compile(r"\n(?:[^\S\n]*\n)+")
+EDGE_BLANK_LINES = re.compile(r"^(?:[^\S\n]*\n)+|(?:\n[^\S\n]*)+$")
 
 type Banner = Literal[
     "vulnerability_in_catalog",
@@ -44,6 +45,8 @@ RANSOMWARE_USE_LABELS = {"Known": "Connu", "Unknown": "Inconnu"}
 CVE_MEANING = "Common Vulnerabilities and Exposures"
 NO_CVE = "Aucune"
 NO_PACKAGE = "Aucun"
+NOT_GIVEN = "Non renseigné"
+NO_TAG = "sans nom"
 # What the page says of a long text empty or blank; an advisory has none.
 EMPTY_TEXT_BY_KIND = {
     "paper": "Aucun résumé.",
@@ -127,19 +130,20 @@ def read_item_id(text: str) -> int | None:
 
 def build_item_page(detail: ItemDetail) -> ItemPage:
     labels = LABELS_BY_KIND[detail.kind]
-    title = write_title(detail.title)
+    title = clean_received_value(detail.title)
+    banner = find_banner(detail)
     texts = build_texts(detail)
     return ItemPage(
         page_title=write_page_title(detail),
         kind_label=labels.card_label,
         kind_lang=labels.label_lang,
         line=build_line(detail),
-        title=title,
-        title_lang=None if title == NO_TITLE else labels.title_lang,
+        title=title or NO_TITLE,
+        title_lang=labels.title_lang if title else None,
         authors=write_authors(detail) if isinstance(detail, PaperDetail) else None,
-        banner=find_banner(detail),
+        banner=banner,
         banner_day=to_day(detail.withdrawn_at)
-        if isinstance(detail, VulnerabilityDetail) and detail.withdrawn_at
+        if banner == "vulnerability_withdrawn" and detail.withdrawn_at
         else None,
         facts=build_facts(detail),
         texts=texts,
@@ -162,7 +166,7 @@ def write_page_title(detail: ItemDetail) -> str:
         case AdvisoryDetail():
             return f"Alerte {clean_received_text(detail.ghsa_id)}"
         case ReleaseDetail():
-            tag = clean_received_text(detail.tag_name)
+            tag = clean_received_value(detail.tag_name) or NO_TAG
             return f"Version {tag} de {detail.repository_name}"
         case NewsletterArticleDetail():
             name = write_newsletter_name(detail.edition)
@@ -198,7 +202,7 @@ def build_line(detail: ItemDetail) -> tuple[LinePart, ...]:
         case ReleaseDetail():
             return (
                 LinePart(detail.repository_name, is_code=True),
-                LinePart(clean_received_text(detail.tag_name), is_code=True),
+                write_tag(detail.tag_name),
                 LinePart("Publiée le", day=published),
             )
         case NewsletterArticleDetail():
@@ -215,9 +219,17 @@ def to_day(moment: datetime) -> Day:
     return Day(moment.date().isoformat(), write_day(moment))
 
 
-def write_authors(paper: PaperDetail) -> str:
-    """The authors in the order of arXiv, after a visible label (C17)."""
-    return "Auteurs: " + ", ".join(map(clean_received_text, paper.authors))
+def write_tag(tag_name: str) -> LinePart:
+    """The version, in the font of the code; sans nom, in French, when the cleaning leaves none."""
+    tag = clean_received_value(tag_name)
+    return LinePart(tag, is_code=True) if tag else LinePart(NO_TAG)
+
+
+def write_authors(paper: PaperDetail) -> str | None:
+    """The authors in the order of arXiv, after a visible label (C17); an author left empty by the
+    cleaning left out, and no line without author."""
+    names = [name for name in map(clean_received_value, paper.authors) if name]
+    return "Auteurs: " + ", ".join(names) if names else None
 
 
 def find_banner(detail: ItemDetail) -> Banner | None:
@@ -244,8 +256,8 @@ def build_facts(detail: ItemDetail) -> tuple[Fact, ...]:
                 "Usage par des rançongiciels",
                 (RANSOMWARE_USE_LABELS[detail.ransomware_use],),
             ),
-            Fact("Éditeur", (clean_received_text(detail.vendor),), lang="en"),
-            Fact("Produit", (clean_received_text(detail.product),), lang="en"),
+            write_english_fact("Éditeur", detail.vendor),
+            write_english_fact("Produit", detail.product),
         )
     if isinstance(detail, AdvisoryDetail):
         return (
@@ -289,7 +301,14 @@ def build_texts(detail: ItemDetail) -> tuple[ItemText, ...]:
     return (ItemText(heading, text_id, paragraphs, "en"),) if paragraphs else ()
 
 
+def write_english_fact(term: str, text: str) -> Fact:
+    """A fact the source writes in English; Non renseigné, in French, when the base holds none."""
+    value = clean_received_value(text)
+    return Fact(term, (value,), lang="en") if value else Fact(term, (NOT_GIVEN,))
+
+
 def split_paragraphs(text: str) -> tuple[str, ...]:
-    """The text cleaned, cut at its blank lines, each paragraph keeping its lines."""
+    """The text cleaned, cut at its blank lines, each paragraph keeping its lines but the blank
+    ones at its start or its end."""
     blocks = BLANK_LINES.split(clean_received_text(text))
-    return tuple(block.strip("\n") for block in blocks if block.strip())
+    return tuple(EDGE_BLANK_LINES.sub("", block) for block in blocks if block.strip())

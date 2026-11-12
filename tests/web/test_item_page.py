@@ -411,3 +411,11 @@ def test_a_card_whose_title_is_left_empty_by_the_cleaning_is_said_without_title(
     assert re.search(
         r'<h2 class="card-title"><a href="/items/[0-9]+">Sans titre</a></h2>', text
     )
+
+
+def test_a_bidirectional_override_received_never_reaches_the_page():
+    override = chr(0x202E)
+
+    text = show(RELEASE, tag_name="v1.0" + override, title="T" + override).text
+
+    assert override not in text

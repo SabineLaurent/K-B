@@ -17,6 +17,7 @@ from item_fixture import (
     make_detail,
 )
 
+from k_b.core.config import BIDI_CONTROLS
 from k_b.web.data_api_client import DETAIL
 from k_b.web.item_detail import (
     Day,
@@ -299,15 +300,53 @@ def test_a_summary_or_a_description_empty_or_blank_says_so(
     assert page.empty_text == empty_text
 
 
-def test_an_empty_vendor_product_or_author_is_read():
-    page = build(VULNERABILITY, vendor="", product="")
-
-    assert Fact("Éditeur", ("",), lang="en") in page.facts
-    assert build(PAPER, authors=["", "Lena Marsh"]).authors == "Auteurs: , Lena Marsh"
-
-
 def test_a_title_left_empty_by_the_cleaning_is_said_without_title_in_french():
     """NonEmptyText lets through a title of control characters alone."""
     page = build(PAPER, title=chr(0x85) + chr(0xFFFE))
 
     assert (page.title, page.title_lang) == ("Sans titre", None)
+
+
+def test_a_real_title_sans_titre_keeps_its_language():
+    page = build(PAPER, title="Sans titre")
+
+    assert (page.title, page.title_lang) == ("Sans titre", "en")
+
+
+@pytest.mark.parametrize("control", sorted(BIDI_CONTROLS))
+def test_a_text_received_loses_its_bidirectional_controls(control):
+    """Never closed, an override would reorder the text after it in its line (U+202E)."""
+    assert clean_received_text("v1.0" + control + " date") == "v1.0 date"
+
+
+def test_an_empty_vendor_or_product_is_said_not_given():
+    page = build(VULNERABILITY, vendor="", product=chr(0x07))
+
+    assert Fact("Éditeur", ("Non renseigné",)) in page.facts
+    assert Fact("Produit", ("Non renseigné",)) in page.facts
+
+
+def test_a_tag_left_empty_by_the_cleaning_is_said_without_name():
+    page = build(RELEASE, tag_name=chr(0x01))
+
+    assert page.page_title == "Version sans nom de anthropics/claude-code"
+    assert page.line[1] == LinePart("sans nom")
+
+
+@pytest.mark.parametrize(
+    ("authors", "line"),
+    [
+        (["", chr(0x07), "Lena Marsh"], "Auteurs: Lena Marsh"),
+        ([""], None),
+        ([], None),
+    ],
+)
+def test_an_author_left_empty_is_left_out_and_no_author_no_line(authors, line):
+    assert build(PAPER, authors=authors).authors == line
+
+
+def test_a_line_of_unicode_blanks_ends_a_paragraph_and_blank_lines_around_go():
+    """A no-break space or an ideographic space is a blank; the indent of a line is kept (D3)."""
+    text = "   \nFixes bug\n\u00a0\nMore\n\u3000\n  indented line\n"
+
+    assert split_paragraphs(text) == ("Fixes bug", "More", "  indented line")
