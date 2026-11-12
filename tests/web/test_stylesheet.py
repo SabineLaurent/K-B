@@ -169,9 +169,13 @@ def read_rule(selector, media=None):
         (".site-logout", None, "margin-inline-start: auto;"),
         # The title of a card clear of the line above and of the link below: its padding of 44 px
         # and its focus ring (relecteur d'accessibilité de #564).
-        (".card-title", None, "margin-block: 0.625rem;"),
+        (".card-title", None, "margin-block: 0.75rem;"),
         # Framed when Windows forces its colours, as the badge and the buttons.
         (".package", None, "border: 1px solid transparent;"),
+        # The column of the detail and of its facts never wider than the page, whatever the
+        # longest word at 200 % text (WCAG 1.4.10).
+        (".item", None, "grid-template-columns: minmax(0, 1fr);"),
+        (".item-facts", None, "grid-template-columns: minmax(0, 1fr);"),
     ],
 )
 def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declaration):
