@@ -69,8 +69,9 @@ base refuse est annulée seule ». Le code dit autre chose (`src/k_b/database/er
 # refused is not due to the entry: its writer chose the rows it points to, its key and the types
 ```
 
-Un `CHECK`, un `UNIQUE` hors clé primaire ou un `NOT NULL` refusé vient de la valeur reçue : le
-`SAVEPOINT` de l'item l'annule seul (`src/k_b/database/savepoint.py:30-40`), l'entrée devient un
+Un `CHECK`, un `UNIQUE` hors clé primaire ou un `NOT NULL` refusé vient de la valeur reçue, comme
+une valeur que Python ne peut pas passer à la base (un entier au-delà de 64 bits, un surrogate
+isolé) : le `SAVEPOINT` de l'item l'annule seul (`src/k_b/database/savepoint.py:30-40`), l'entrée devient un
 rejet du journal d'import. Une clé étrangère, une clé primaire ou un type refusé vient de
 l'écrivain ou du schéma, donc d'un défaut de K-B : l'import s'arrête, et la transaction entière est
 annulée (`src/k_b/etl/load.py:80-85`).

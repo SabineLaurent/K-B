@@ -33,17 +33,18 @@ est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal A
 
 Le modèle de données de K-B est relationnel : le MCD et le MLD de [`docs/merise/`](merise/) et
 `schema.sql`, le MPD, décrivent le même modèle, aux écarts près que liste « MCD et MLD »,
-ci-dessous ; `schema.sql` fait foi pour le code. Un SGBD relationnel tient lui-même, à chaque
-écriture, les clés, l'exclusion des sous-types, les `CHECK` et la transaction de l'import ; sans
-lui, ils seraient à coder et à tester dans K-B, et les contrôles de l'item perdraient leur second
-filet. Ce qu'il ne tient pas est listé à la fin de cette section.
+ci-dessous ; `schema.sql` fait foi pour le code. Un SGBD relationnel tient lui-même les clés,
+l'exclusion des sous-types et les `CHECK` à chaque écriture, et l'import entier par sa
+transaction ; sans lui, ils seraient à coder et à tester dans K-B, et les contrôles de l'item
+perdraient leur second filet. Ce qu'il ne tient pas est listé plus bas (« Ce que la base ne tient
+pas »).
 
 - **Les clés étrangères relient ce que le modèle associe.** Un fichier brut vise sa source, un item
   le fichier brut de sa version actuelle (`src/k_b/database/schema.sql:30`, `:47`) ; une release
   vise son dépôt suivi (`:178`), un surlignage son item (`:97`), et la liaison `item_has_tag` un
   item et un tag (`:337-338`). La base refuse une ligne qui viserait une ligne absente ; en SQLite,
   à condition que la connexion l'active, ce que K-B fait à chaque ouverture (« Spécifications de
-  stockage », « Clés étrangères », ci-dessous ; test : `tests/test_database.py:29`).
+  stockage », « Clés étrangères », ci-dessous ; test : `tests/test_database.py:31`).
 - **La clé `(item_id, kind)` tient l'exclusion des sous-types.** `item` porte la sorte de chaque
   item, et `UNIQUE (id, kind)` fait de ce couple la cible d'une clé étrangère (`schema.sql:42-50`).
   Chacun des cinq sous-types, `release`, `advisory`, `newsletter_article`, `zotero_entry` et
@@ -60,14 +61,15 @@ filet. Ce qu'il ne tient pas est listé à la fin de cette section.
   la forme `AAAA-MM-JJTHH:MM:SSZ` (`release.published_at`, `:186-187` ; les dates de `clip` sont
   l'exception, « Spécifications de stockage », ci-dessous), un texte trop long (« Longueurs
   maximales », ci-dessous), une liste JSON qui n'est pas un tableau non vide ou qui dépasse son
-  nombre maximal d'éléments (`:64-66`). Pour ce qu'une source écrit, l'item refuse au moins ces
-  valeurs avant la base, un test par type (règle 4 de `.claude/rules/conventions.md`).
+  nombre maximal d'éléments (`:64-66`). Un test compare chaque type de l'item à son `CHECK`
+  (règle 4 de `.claude/rules/conventions.md`).
 - **La transaction de l'import.** `kb import` écrit les dépôts suivis, puis inscrit chaque fichier
   lu au registre (`raw_data`) et écrit ses items, dans une seule transaction, sous le verrou des
   écrivains (`src/k_b/etl/load.py:60-88`). Chaque item s'y écrit dans un `SAVEPOINT`
   (`src/k_b/database/savepoint.py:19-40`) : une entrée que la base refuse pour ses propres valeurs
-  (`CHECK`, `UNIQUE` hors clé primaire, `NOT NULL`, un entier au-delà de 64 bits) est annulée seule
-  et devient un rejet du journal d'import, et l'import continue (règle 1). Une clé étrangère, une
+  (`CHECK`, `UNIQUE` hors clé primaire, `NOT NULL`), ou que Python ne peut pas lui passer (un entier
+  au-delà de 64 bits, un surrogate isolé), est annulée seule et devient un rejet du journal
+  d'import, et l'import continue (règle 1). Une clé étrangère, une
   clé primaire ou un type refusés viennent de l'écrivain ou du schéma : ils arrêtent l'import,
   comme une erreur du système (`src/k_b/database/errors.py:17-28`). Une erreur qui arrête l'import,
   ou une interruption (Ctrl-C, SIGTERM) avant le `commit`, annule l'import entier
@@ -87,9 +89,9 @@ Ce que la base ne tient pas :
 
 Le choix du moteur vient ensuite : SQLite et PostgreSQL sont tous deux relationnels, et
 `schema_postgresql.sql` garde les mêmes clés étrangères (17 `REFERENCES` dans chaque script, dont
-les cinq clés `(item_id, kind)`) et la même cible `UNIQUE (id, kind)`, que
-`tests/test_schema_structures.py` compare table par table ; ce que chaque schéma écrit à sa façon
-est listé dans « Ce qui est propre à SQLite », ci-dessous.
+les cinq clés `(item_id, kind)`) et la même cible `UNIQUE (id, kind)` ;
+`tests/test_schema_structures.py` compare les deux structures table par table. Ce que chaque schéma
+écrit à sa façon est listé dans « Ce qui est propre à SQLite », ci-dessous.
 
 ## Le SGBD : SQLite en local, PostgreSQL en ligne
 
@@ -303,8 +305,8 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
     2026-10-13) ; les autres sortes exigent `https`, sauf `clip` (Web Clipper garde l'URL de la
     page, `http` ou `https`).
-  - Un texte de surlignage n'est pas contrôlé pour le caractère NUL, comme les autres textes
-    (« Limite de SQLite » ci-dessus).
+  - Un texte ou un commentaire de surlignage qui contient un NUL est refusé par l'item
+    (`src/k_b/items.py:372-387`), comme les autres textes (« Limite de SQLite » ci-dessus).
 - **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
   `description` ; ils restent dans la copie brute. Les `tags` y vont depuis #260 (journal ADR,
