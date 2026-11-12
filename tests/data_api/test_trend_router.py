@@ -2,9 +2,9 @@
 one of 2026-10-09."""
 
 import pytest
+from database.connected_readers import open_connected_readers
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
-from k_b.database.engine import open_readers
 
 LATEST_WINDOW = {
     "window_end": "2026-10-10",
@@ -89,7 +89,7 @@ def test_an_unknown_window_gives_404(client, authorization):
 
 
 def test_a_base_without_trend_gives_404(make_client, new_base, api_keys, authorization):
-    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
         response = make_client(readers, api_keys).get("/trends", headers=authorization)
 
     assert response.status_code == 404

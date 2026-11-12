@@ -10,6 +10,7 @@ from datetime import UTC, datetime
 import psycopg
 import pytest
 from commands.cli_helpers import make_clock
+from database.connected_readers import open_connected_readers
 from load_helpers import (
     ADVISORIES_DIR,
     ARXIV_DIR,
@@ -38,7 +39,7 @@ from k_b.commands.exit_codes import ExitCode
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.database import writing
 from k_b.database.creation import DATABASE_SCRIPTS
-from k_b.database.engine import connect_reader, open_readers
+from k_b.database.engine import connect_reader
 from k_b.database.location import DATABASE_URL_VARIABLE, PostgresUrl
 from k_b.database.reading import DetailBounds, read_item_detail, read_items
 
@@ -180,7 +181,7 @@ def read_listing(data_dir, database_url):
         data_dir / "k-b.sqlite" if database_url is None else PostgresUrl(database_url)
     )
     with (
-        open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
+        open_connected_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
         connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
     ):
         pages = {search: read_every_page(connection, search) for search in SEARCHES}

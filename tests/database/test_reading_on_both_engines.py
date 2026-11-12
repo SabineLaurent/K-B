@@ -5,9 +5,10 @@ detail of each item and the trends (criterion of #418)."""
 from datetime import UTC, date, datetime, timedelta, timezone
 
 import pytest
+from database.connected_readers import open_connected_readers
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
-from k_b.database.engine import connect_reader, open_readers
+from k_b.database.engine import connect_reader
 from k_b.database.reading import (
     DetailBounds,
     read_highlights,
@@ -78,7 +79,7 @@ TREND_WINDOWS = [None, date(2026, 10, 9), date(2026, 10, 10), date(2026, 1, 1)]
 def read_everything(location):
     """The result of each reading compared, through the connection of the data API."""
     with (
-        open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
+        open_connected_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
         connect_reader(readers, DATA_API_QUERY_TIMEOUT_SECONDS) as connection,
     ):
         return {
