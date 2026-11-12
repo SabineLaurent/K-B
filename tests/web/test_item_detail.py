@@ -278,3 +278,36 @@ def test_every_text_of_a_detail_is_cleaned():
     assert page.title == "Title"
     assert page.texts[0].paragraphs == ("Notes", "More")
     assert page.page_title == "Version v1 de anthropics/claude-code"
+
+
+@pytest.mark.parametrize(
+    ("item_id", "field", "empty_text"),
+    [
+        (PAPER, "summary", "Aucun résumé."),
+        (NEWSLETTER_ARTICLE, "summary", "Aucun résumé."),
+        (VULNERABILITY, "description", "Aucune description."),
+    ],
+)
+@pytest.mark.parametrize("text", ["", "  \n\n "])
+def test_a_summary_or_a_description_empty_or_blank_says_so(
+    item_id, field, empty_text, text
+):
+    """The base bounds their length only (schema.sql): an empty text is a value it holds."""
+    page = build(item_id, **{field: text})
+
+    assert page.texts == ()
+    assert page.empty_text == empty_text
+
+
+def test_an_empty_vendor_product_or_author_is_read():
+    page = build(VULNERABILITY, vendor="", product="")
+
+    assert Fact("Éditeur", ("",), lang="en") in page.facts
+    assert build(PAPER, authors=["", "Lena Marsh"]).authors == "Auteurs: , Lena Marsh"
+
+
+def test_a_title_left_empty_by_the_cleaning_is_said_without_title_in_french():
+    """NonEmptyText lets through a title of control characters alone."""
+    page = build(PAPER, title=chr(0x85) + chr(0xFFFE))
+
+    assert (page.title, page.title_lang) == ("Sans titre", None)

@@ -17,9 +17,11 @@ from k_b.web.data_api_client import (
 )
 from k_b.web.feed import (
     LABELS_BY_KIND,
+    NO_TITLE,
     keep_https_link,
     write_link_note,
     write_newsletter_name,
+    write_title,
 )
 from k_b.web.french_dates import write_day
 from k_b.web.received_text import clean_received_text
@@ -42,7 +44,13 @@ RANSOMWARE_USE_LABELS = {"Known": "Connu", "Unknown": "Inconnu"}
 CVE_MEANING = "Common Vulnerabilities and Exposures"
 NO_CVE = "Aucune"
 NO_PACKAGE = "Aucun"
-NO_RELEASE_NOTES = "Aucune note de version."
+# What the page says of a long text empty or blank; an advisory has none.
+EMPTY_TEXT_BY_KIND = {
+    "paper": "Aucun résumé.",
+    "newsletter_article": "Aucun résumé.",
+    "vulnerability": "Aucune description.",
+    "release": "Aucune note de version.",
+}
 
 
 @dataclass(frozen=True)
@@ -119,23 +127,23 @@ def read_item_id(text: str) -> int | None:
 
 def build_item_page(detail: ItemDetail) -> ItemPage:
     labels = LABELS_BY_KIND[detail.kind]
+    title = write_title(detail.title)
+    texts = build_texts(detail)
     return ItemPage(
         page_title=write_page_title(detail),
         kind_label=labels.card_label,
         kind_lang=labels.label_lang,
         line=build_line(detail),
-        title=clean_received_text(detail.title),
-        title_lang=labels.title_lang,
+        title=title,
+        title_lang=None if title == NO_TITLE else labels.title_lang,
         authors=write_authors(detail) if isinstance(detail, PaperDetail) else None,
         banner=find_banner(detail),
         banner_day=to_day(detail.withdrawn_at)
         if isinstance(detail, VulnerabilityDetail) and detail.withdrawn_at
         else None,
         facts=build_facts(detail),
-        texts=build_texts(detail),
-        empty_text=NO_RELEASE_NOTES
-        if isinstance(detail, ReleaseDetail) and not build_texts(detail)
-        else None,
+        texts=texts,
+        empty_text=None if texts else EMPTY_TEXT_BY_KIND.get(detail.kind),
         link=keep_https_link(detail.url),
         link_label=labels.link_label,
         link_note=write_link_note(labels),
@@ -262,25 +270,23 @@ def build_facts(detail: ItemDetail) -> tuple[Fact, ...]:
 
 
 def build_texts(detail: ItemDetail) -> tuple[ItemText, ...]:
-    """The long texts of the source, in English by hypothesis, as the titles of the feed."""
+    """The long text of the source under its heading, in English by hypothesis, as the titles of
+    the feed; none when it is empty or blank."""
     match detail:
         case PaperDetail() | NewsletterArticleDetail():
-            return (
-                ItemText("Résumé", "resume", split_paragraphs(detail.summary), "en"),
-            )
+            heading, text_id, text = "Résumé", "resume", detail.summary
         case VulnerabilityDetail():
-            paragraphs = split_paragraphs(detail.description)
-            return (ItemText("Description", "description", paragraphs, "en"),)
+            heading, text_id, text = "Description", "description", detail.description
         case ReleaseDetail():
             # Plain text, never Markdown rendered (D3, Sabine, 2026-11-11).
-            notes = split_paragraphs(detail.body or "")
-            if not notes:
-                return ()
-            return (ItemText("Notes de version, texte brut", "notes", notes, "en"),)
+            heading, text_id = "Notes de version, texte brut", "notes"
+            text = detail.body or ""
         case AdvisoryDetail():
             return ()
         case _:
             assert_never(detail)
+    paragraphs = split_paragraphs(text)
+    return (ItemText(heading, text_id, paragraphs, "en"),) if paragraphs else ()
 
 
 def split_paragraphs(text: str) -> tuple[str, ...]:

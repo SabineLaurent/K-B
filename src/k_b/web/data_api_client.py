@@ -134,17 +134,18 @@ class FeedItemPage(DataApiModel):
 
 
 # The detail of each kind: the item of the feed, then what its page shows of the detail, never
-# more (RGESN 1.6).
+# more (RGESN 1.6). A text the base bounds by its length only may be empty (schema.sql): str, its
+# NUL and lone surrogates dropped by clean_received_text before it is shown.
 class PaperDetail(FeedPaper):
-    authors: list[NonEmptyText]
-    summary: NonEmptyText
+    authors: list[str]
+    summary: str
     arxiv_updated_at: UtcDatetime
 
 
 class VulnerabilityDetail(FeedVulnerability):
-    description: NonEmptyText
-    vendor: NonEmptyText
-    product: NonEmptyText
+    description: str
+    vendor: str
+    product: str
     ransomware_use: RansomwareUse
     revised_at: UtcDatetime | None
 
@@ -160,7 +161,7 @@ class ReleaseDetail(FeedRelease):
 
 class NewsletterArticleDetail(FeedNewsletterArticle):
     rank: Annotated[int, Field(ge=1)]
-    summary: NonEmptyText
+    summary: str
 
 
 class ExcludedItem(DataApiModel):
@@ -170,7 +171,8 @@ class ExcludedItem(DataApiModel):
     kind: Literal["zotero_entry", "clip"]
 
 
-type ItemDetail = (
+# A plain alias, not a type statement: pydantic reads the discriminator of each of its models.
+ItemDetail = (
     PaperDetail
     | VulnerabilityDetail
     | AdvisoryDetail
@@ -189,17 +191,8 @@ class ItemNotFoundBody(DataApiModel):
 
 
 PAGE = TypeAdapter(FeedItemPage)
-# The kinds written out: pydantic reads the discriminator of each model, not of an alias.
 DETAIL: TypeAdapter[ItemDetail | ExcludedItem] = TypeAdapter(
-    Annotated[
-        PaperDetail
-        | VulnerabilityDetail
-        | AdvisoryDetail
-        | ReleaseDetail
-        | NewsletterArticleDetail
-        | ExcludedItem,
-        Field(discriminator="kind"),
-    ]
+    Annotated[ItemDetail | ExcludedItem, Field(discriminator="kind")]
 )
 INVALID_PARAMETER = TypeAdapter(InvalidParameterBody)
 ITEM_NOT_FOUND = TypeAdapter(ItemNotFoundBody)

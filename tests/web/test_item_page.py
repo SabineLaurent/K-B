@@ -391,3 +391,23 @@ def test_the_screen_of_a_detail_holds_three_requests_and_30_kb_at_most(
         client.get(path, headers=headers).num_bytes_downloaded for path in paths
     ]
     assert sum(weights) <= 30_000
+
+
+def test_a_detail_whose_summary_is_empty_is_served():
+    response = show(PAPER, summary="")
+
+    assert response.status_code == 200
+    assert "Aucun résumé." in response.text
+    assert '<h2 id="resume">' not in response.text
+
+
+def test_a_card_whose_title_is_left_empty_by_the_cleaning_is_said_without_title():
+    page = make_page(1)
+    page["items"][0]["title"] = chr(0x85)
+    client = make_client(handler=serve(page))
+
+    text = client.get("/", headers=OPERATOR_HEADERS).text
+
+    assert re.search(
+        r'<h2 class="card-title"><a href="/items/[0-9]+">Sans titre</a></h2>', text
+    )

@@ -45,6 +45,9 @@ PAGE_FIELD = "page"
 # A link to another site opens in a new tab, which its text says (Opquast 2025, rule 146; Sabine,
 # 2026-11-11).
 NEW_TAB_NOTE = "site externe, nouvel onglet"
+# A title the cleaning leaves without a letter: NonEmptyText lets through one of control
+# characters alone, which would make a link without a name (RGAA 6.2).
+NO_TITLE = "Sans titre"
 # The line of the results, where a link to another page lands (Sabine, 2026-11-11): the form, sent
 # again, starts at the top of the page.
 RESULTS_ID = "resultats"
@@ -394,6 +397,7 @@ def write_results_line(total: int, since_day: date, page: int, pages: int) -> st
 
 def build_card(item: FeedItem) -> FeedCard:
     labels = LABELS_BY_KIND[item.kind]
+    title = write_title(item.title)
     return FeedCard(
         kind_label=labels.card_label,
         kind_lang=labels.label_lang,
@@ -404,14 +408,20 @@ def build_card(item: FeedItem) -> FeedCard:
         withdrawn_text=None
         if item.withdrawn_at is None
         else f"retirée du catalogue le {write_day(item.withdrawn_at)}",
-        title=clean_received_text(item.title),
-        title_lang=labels.title_lang,
+        title=title,
+        title_lang=None if title == NO_TITLE else labels.title_lang,
         detail_link=ITEM_PATH.format(item_id=item.id),
         link=keep_https_link(item.url),
         link_label=labels.link_label,
         link_note=write_link_note(labels),
         link_lang=labels.link_lang,
     )
+
+
+def write_title(title: str) -> str:
+    """The title cleaned, or Sans titre, in French, when the cleaning leaves only blanks."""
+    cleaned = clean_received_text(title)
+    return cleaned if cleaned.strip() else NO_TITLE
 
 
 def write_link_note(labels: KindLabels) -> str:
