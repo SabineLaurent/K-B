@@ -7011,6 +7011,81 @@ validé par Sabine le même jour ; points de revue tranchés par time-knight sou
   large. Option écartée : élargir au-delà de 1280 px, qui allongerait les lignes de l'intro et des titres au-delà
   d'une longueur lisible. — PR de #587
 
+## 2026-11-12
+
+### Site : le détail d'un item (#564)
+
+Plan validé par Sabine le 2026-11-11 (D1 à D4), puis le 2026-11-12 avec deux ajouts de time-knight ; choix de
+la session C1 à C17 et points de revue tranchés par time-knight, sous la délégation de Sabine du 15/10.
+
+- **#564 est coupée en deux PR : le détail des cinq sortes et le lien du titre d'une carte (#564, M), puis les
+  tendances et la navigation (#596, S).** Décision de Sabine (D1). Pourquoi : le détail est prêt plus tôt, chaque
+  revue est plus courte, et si le temps manque avant l'oral blanc, c'est la seconde qui attend. Option écartée :
+  une PR L, un seul tour de revues, mais rien de prêt avant la fin. — PR de #564
+- **Les notes d'une *release* s'affichent en texte brut, échappé : un paragraphe par bloc séparé d'une ligne
+  vide, les retours à la ligne et le retrait des lignes gardés, aucun lien rendu ; la section s'intitule « Notes
+  de version, texte brut ».** Décision de Sabine (D3). Option écartée : rendre le Markdown, qui demande une
+  dépendance que la mission n'accorde pas, et dont le réglage par défaut laissait passer le HTML brut
+  (`.claude/rules/code.md`, « Pratiques à jour »). Limite assumée : les titres et les listes Markdown n'ont pas de
+  structure (RGAA 9.1 et 9.3), ce que dit la déclaration d'accessibilité. — PR de #564
+- **Un écran de détail tient le budget du fil, 3 requêtes et 30 Ko transférés, cache vide, gzip compris, son
+  résumé ou sa description à sa borne de 5 000 caractères ; les notes d'une *release* (125 000 caractères au
+  plus) et les auteurs d'un papier (1 000 au plus) sont hors budget.** Décision de Sabine (D4, RGESN 6.1).
+  Pourquoi hors budget : l'API les sert entiers. Option écartée : aucun budget sur le détail. — PR de #564
+- **L'identifiant d'un item est lu dans l'adresse comme une chaîne, par une seule fonction, `read_item_id` :
+  `[1-9][0-9]{0,18}` en chiffres ASCII, au plus 2⁶³ − 1 ; hors de cette forme, la page 404 sans appel à l'API.**
+  Pourquoi : FastAPI, sur un paramètre typé `int`, rendrait un 422 en JSON qui cite la valeur reçue ; une seule
+  adresse par item (Opquast 169) ; et #403, qui passera l'identifiant en UUID, ne changera que cette fonction
+  (ajout de time-knight, validé par Sabine). Limite assumée : Starlette route sur le chemin décodé (spécification
+  ASGI), si bien que `/items/%39` sert aussi l'item 9. — PR de #564
+- **Le client du site ne prend pour « item absent » que le 404 dont le corps dit `item_not_found` ; tout autre 404
+  de l'API (`route_not_found`, un 404 sans JSON de l'entrée d'Azure) rend la page 500.** Pourquoi : un état par
+  route ; un 404 d'une route inconnue n'est pas un item absent, et le confondre cacherait une panne. — PR de #564
+- **Une entrée Zotero ou un clip est lu par sa sorte seule (`ExcludedItem`), et la route rend la page 404 ; son
+  texte n'est jamais modélisé, montré ni journalisé.** Pourquoi : le site ne les montre pas (mission du 11/11).
+  Limite assumée, relevée par la revue de code et tranchée par time-knight le 2026-11-12 : la clé `WEB` lit tous
+  les items, si bien que leur texte arrive au conteneur du site avant d'être jeté. C'est un défaut déjà présent
+  sur `main` (API1, « tout client authentifié lit tous les items ») : il revient à une issue, pas à cette PR. Pour
+  réduire le risque : réserver au client `WEB` les sortes que le site montre, côté API de données (#597). Écrit au
+  registre des traitements. — PR de #564
+- **Tout texte reçu de l'API et rendu passe par une seule fonction, `clean_received_text`, au fil comme au
+  détail : elle retire les contrôles (`Cc`) sauf la tabulation et le retour à la ligne, les demi-paires isolées
+  (`Cs`), les non-caractères, et les douze contrôles bidirectionnels de `BIDI_CONTROLS` (`core/config.py`), et
+  ramène `\r\n` et `\r` à `\n`.** Pourquoi : ces caractères sont des erreurs d'analyse HTML (RGAA 8.2), que
+  l'échappement de Jinja2 ne retire pas ; `NonEmptyText` ne refuse que le NUL et la demi-paire isolée ; jamais
+  fermé, un contrôle bidirectionnel (U+202E) renverserait l'affichage de la date qui suit dans la même ligne
+  (seconde revue de code, constat de sécurité relu par un sous-agent neuf : la liste est celle des points
+  `Bidi_Control` de PropList 18.0.0 et de l'UAX #9). Une liste par sujet : `BIDI_CONTROLS` sert déjà le coffre.
+  Options écartées : retirer tout `Cf`, qui ôterait U+200D des emojis composés ; envelopper chaque texte dans un
+  `<bdi>`, un complément jugé non nécessaire. — PR de #564
+- **Les textes longs du détail (résumé, description, éditeur, produit, auteurs) sont lus en `str`, et un texte
+  vide ou fait de blancs se dit : « Aucun résumé. », « Aucune description. », « Non renseigné », un auteur vide
+  retiré ; un titre que le nettoyage vide devient « Sans titre », en français, au fil et au détail ; une version
+  vide, « sans nom ».** Pourquoi (revue de code, tranché par time-knight) : la base ne borne que leur longueur
+  (`schema.sql`), si bien qu'un résumé vide y est une valeur valide. `NonEmptyText` en aurait fait une page 500,
+  et un titre vidé un lien sans nom (RGAA 6.2). Option écartée : refuser ces items, alors que la base les tient.
+  — PR de #564
+- **Le bandeau d'une faille ou d'une alerte est un état nommé, calculé depuis `exploited` et `withdrawn_at` sans
+  rien supposer, dont le texte est écrit dans le gabarit ; seul un item au catalogue KEV prend le style d'alerte.
+  Une alerte dont la CVE est au catalogue dit « Entrée au catalogue KEV », avec sa limite ; une faille retirée a
+  le bandeau de son retrait, jamais « Exploitée ».** Pourquoi : le mot porte l'état, la couleur ne fait que suivre
+  (RGAA 3.1, C4). Le texte est dans le gabarit, parce qu'il porte le sens des sigles en HTML (`<i lang="en">`) et
+  qu'aucun gabarit n'écrit `|safe`. `exploited` vrai veut dire « entrée au catalogue, retirée depuis ou non »
+  (`specs-api.md`), et l'API ne relie pas encore une alerte à sa faille (C5). Option écartée : « Exploitée
+  activement: oui » ou « non » pour une alerte, comme la maquette, alors que faux veut dire « absente du
+  catalogue », pas « non exploitée ». — PR de #564
+- **La couleur des liens visités ne va que sur le titre d'une carte.** Tranché par time-knight le 2026-11-12, un
+  écart mineur au plan. Pourquoi : Opquast 141 vise les liens dans un texte ; un bouton plein vers la source
+  perdrait son contraste en ardoise ; « ← Retour au fil » mène à `/`, toujours visité, où la couleur ne dirait
+  rien. — PR de #564
+- **Un test sert le site sur la vraie API de données de la base de test, en mémoire, sans réseau : il refuse une
+  date du formulaire du fil, accepte un filtre, puis suit le titre d'une carte jusqu'au détail.** Ajout de
+  time-knight, validé par Sabine le 2026-11-12. Pourquoi : c'est la preuve qu'attend C17.3 de la certification
+  (une saisie validée et un second écran) ; jusque-là, aucun test n'allait de la page à la vraie API. Il n'est
+  pas marqué `e2e`, réservé aux sources réelles et écarté de la CI : il tourne en CI. Limite : écrit après la
+  route, il n'a jamais été rouge avant le code ; son rouge a été montré par deux mutations sur une copie (lien du
+  titre retiré, route cassée). — PR de #564
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
