@@ -7093,6 +7093,52 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   route, il n'a jamais été rouge avant le code ; son rouge a été montré par deux mutations sur une copie (lien du
   titre retiré, route cassée). — PR de #564
 
+### API de données : les tops servis au site, du jumeau JSON de leur fiche dans `watch` (#559)
+
+Plan de la session K-B validé par Sabine le 2026-11-11 ; les écarts et les points de revue, tranchés par time-knight
+sous la délégation de Sabine du 15/10.
+
+- **L'API de données lit aussi le conteneur `watch` : `GET /tops/{top}` et `GET /tops/{top}/days` servent au site,
+  au seul client `WEB`, les tops GitHub du jour et leurs jours passés. Elle les lit dans un jumeau JSON que
+  `kb write-tops` écrit une fois à côté de chaque fiche (`tops/<top>/<jour>.json`), relu par un schéma fermé commun à
+  l'écrivain et au lecteur (`TopProduction`, `items.py`).** Décision de Sabine du 2026-11-11 : c'est la forme du
+  POC, et la cible reste un index en base des productions (#531). **Étend la décision du 2026-10-14 (« API de
+  données »)** : l'API servait jusqu'ici la seule base (items, tendances) ; elle sert désormais aussi ce que les jobs
+  publient dans `watch`, en lecture seule, par l'identité que lui donne #571. Pourquoi le jumeau plutôt que relire
+  la fiche Markdown : le site ne lit que l'API de données et ne rend plus aucun Markdown (`markdown-it-py` et `nh3`
+  retirées : ni dépendance ni risque XSS d'un rendu), et les fiches sont échappées pour Obsidian (`neutralize_text`,
+  `post/vault_files.py`), donc illisibles brutes. Conséquence : le jumeau se revalide à la lecture par un schéma
+  fermé, comme toute sortie que K-B sert (règle 8 de `poc.md`). Limites assumées, chacune avec sa parade écrite
+  dans `docs/specs-api.md` (« Lecture de `watch` ») : (a) une requête froide peut dépasser les 30 s de lecture du
+  site ; (b) des requêtes froides simultanées vont chacune au stockage ; (c) sur le Mac, sans `AZURE_CLIENT_ID`, les
+  tops répondent 503 ; (d) l'historique commence au premier jumeau ; (e) une fiche écrite avant #559 peut recevoir
+  le jumeau d'un relevé plus tardif du même jour, une fois, pour le dernier jour de chaque top. — PR de #559
+- **Le marqueur d'une page de liste coupée court est suivi : 5 000 noms au plus, sur 2 pages au plus
+  (`MAX_WATCH_FOLDER_NAMES`, `MAX_WATCH_FOLDER_PAGES`), au-delà 502 `watch_listing_too_long`.** Tranché par
+  time-knight le 2026-11-12. Pourquoi : List Blobs peut rendre une page de moins de noms que demandé avec un
+  `NextMarker` (Microsoft Learn, « List Blobs », « Remarks », lu le 2026-11-12). **Modifie le plan validé**, qui
+  répondait 502 à tout marqueur : il aurait refusé une liste légitime. — PR de #559
+- **L'heure d'un jumeau se nomme `ranked_at`, dans le jumeau comme dans la réponse ; l'en-tête Markdown de la fiche
+  garde `collected_at`.** Tranché par time-knight le 2026-11-12 (option B). Pourquoi : l'API ne sert jamais une date
+  de collecte (OWASP API3, `test_no_route_documents_a_raw_file_path_or_a_collection_date`), et ce test reste tel
+  quel. Option écartée : servir `collected_at` en exemptant les tops du test, ce qui affaiblirait une preuve d'API3
+  « Tenue » (`docs/specs-api.md`) pour sauver un nom, et donnerait deux sens à un même nom dans une API qui écrit
+  `collected_at` « jamais servi ». Conséquence : l'exemption se serait ouverte à chaque production suivante (#560,
+  #561). — PR de #559
+- **Ce que le jumeau refuse, la collecte des plus étoilés et des plus forkés le refuse avant, par la page entière :
+  un compte hors de 0 à 2^63 − 1, un nom de plus de 255 caractères.** Tranché par time-knight le 2026-11-12 (revue de
+  #559). Pourquoi : un relevé que la source acceptait et que le jumeau refusait n'avait plus de fiche, et
+  `kb write-tops` échouait à chaque passage en gardant le relevé ; la page entière, car retirer un dépôt décalerait
+  les rangs du top (exception de la règle 1 de `conventions.md`). Le refus du jumeau reste un filet, tenu par son
+  test. Prolonge la règle 4 de `conventions.md` (« Tout ce que la base refuse, l'item le refuse avant ») au jumeau.
+  — PR de #559
+- **Pendant une requête de l'API de données, tout échec du jeton de l'identité est 502 `exchange_storage_no_token`,
+  la règle de `check_identity` des jobs ; jamais un 500, ni l'état d'un stockage qui n'a pas été joint.** Tranché
+  par time-knight le 2026-11-12 (revue de #559). Pourquoi : l'API demande son jeton au milieu d'une requête, non
+  avant comme un job, et azure-identity 1.27.0 laisse passer un `ValueError` ou un `AttributeError` sur une réponse
+  qui n'est pas du JSON. Limite assumée : un délai de l'identité est aussi `exchange_storage_no_token`, et non
+  `exchange_storage_timeout`. — PR de #559
+
 ## 2026-11-13
 
 ### Dépendances : `soupsieve` et OpenTelemetry montés pour des vulnérabilités publiées (#606)
