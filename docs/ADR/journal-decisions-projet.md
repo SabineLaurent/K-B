@@ -6874,7 +6874,102 @@ points de revue tranchés par time-knight sous la délégation de Sabine du 15/1
   l'envoi. Limite assumée (constat 7, gardé) : le lien d'un article de newsletter ne dit pas sa langue, que
   K-B ne connaît pas ; « souvent en anglais » serait une supposition. — PR de #563
 
+### Site en ligne : `ca-kb-web` derrière la connexion Entra de la plateforme (#571)
+
+Décisions de Sabine du 2026-11-11 (mission de la piste B), puis plan de la session validé par Sabine le même
+jour, avec ses quatre points ; relu par time-knight et par un sous-agent sans contexte. Le détail et les gestes :
+`infra/README.md`, « Le site privé ».
+
+- **Le site est une 3e app de `cae-kb`, `ca-kb-web`, depuis l'image de K-B, derrière la connexion Microsoft Entra
+  de la plateforme (Easy Auth) : un seul tenant, `RedirectToLoginPage`, et `allowedPrincipals.identities` réduit à
+  l'object ID de Sabine ; le secret client de l'inscription « K-B site » vit dans le coffre, référencé par l'app,
+  jamais variable du conteneur, et expire le 2027-05-11.** Décisions de Sabine du 2026-11-11 : un site entièrement
+  privé, où elle seule entre ; la connexion par la plateforme, doublée dans le code (#562) ; un secret client.
+  Pourquoi la plateforme : elle seule retire les en-têtes `X-MS-CLIENT-PRINCIPAL-*` qu'envoie un client (Microsoft
+  Learn, « Authentication and authorization in Azure Container Apps », lu le 2026-11-11), et K-B ne code ni OAuth 2
+  ni session. Options écartées :
+  - l'inscription par l'extension Microsoft Graph de Bicep : un outil de plus (`bicepconfig.json`, la CI) pour un
+    objet créé une fois. Elle se crée à la main, par les commandes `az ad` de Learn ;
+  - l'« affectation requise » : elle impose le consentement d'un administrateur (verdict de tn-codeur, lu par
+    Sabine le 2026-11-11) ;
+  - un secret remplacé par l'identité managée (MI as FIC) : décrit sur Learn pour App Service seulement ;
+  - `authConfigs` en `2026-07-01` : elle n'ajoute que le magasin de jetons, et `2026-01-01` est celle de l'app.
+
+  6 mois de validité pour le secret : au-delà du rendu du 25/11 et de la soutenance. Limites assumées :
+  - le consentement et l'accès conditionnel du tenant de l'école ne se voient qu'à la première connexion : un refus
+    mène au repli par mot de passe, au choix de Sabine ;
+  - le 403 de `allowedPrincipals` pour un autre compte du tenant ne se constate qu'avec un second compte. Sans lui,
+    le contrôle du code tient seul la vérification du compte. — PR de #571
+- **Le site naît fermé et ne s'ouvre qu'une fois sa connexion lue : le module refuse une entrée externe sans
+  connexion (`external && entraSignIn != null`), et la première création se fait en deux passes, la passe A en
+  ingress interne, la connexion lue par `az containerapp auth show`, puis la passe B par `exposeWeb=true`.**
+  Décision de Sabine du 2026-11-11, sur la recommandation de la session. Pourquoi : un sous-agent sans contexte
+  l'a relevé, sans connexion rien ne retire un en-tête forgé. Le contrôle du code (#562) croirait alors un
+  visiteur qui pose l'object ID de Sabine, que l'annuaire ne tient pas secret. ARM crée l'app avant son
+  `authConfigs`, et un `authConfigs` qui échoue laisserait l'app ouverte. Un `exposeWeb` oublié ferme le site au lieu
+  de l'ouvrir. Revues de la PR (tri de time-knight du 2026-11-11) : chaque passe tire `exposeWeb` de la connexion en
+  ligne (`az containerapp auth show`), si bien qu'une recréation du site le crée fermé ; et sans ID d'inscription,
+  le module ne pose ni connexion ni entrée externe (`hasSignIn` exige `clientId`). Option écartée : une seule passe, avec le site sans connexion le temps de sa création. **Précise
+  l'entrée de #562 du même jour** : « l'authentification part dans le même déploiement que l'entrée externe »
+  devient « avant l'entrée externe ». Règle d'arrêt : un `curl` qui rend 200 sans session, avec l'en-tête forgé ou
+  non, ferme l'entrée (`az containerapp ingress disable`). — PR de #571
+- **Microsoft Entra est le seul fournisseur d'identité de `ca-kb-web`.** Pourquoi : le code du site ne vérifie pas
+  `X-MS-CLIENT-PRINCIPAL-IDP` (revue de sécurité de #562, relayée par time-knight le 2026-11-11). Un autre
+  fournisseur pourrait donner le même en-tête d'identité. C'est une contrainte de l'infra : ajouter un fournisseur
+  demande d'abord de revoir ce contrôle. — PR de #571
+- **`id-kb-web`, identité propre du site, en `identityLifecycle: None` : la plateforme tire l'image et lit les deux
+  secrets ; le code n'obtient aucun jeton.** Pourquoi : « le site n'a aucun droit Azure » (décision de Sabine du
+  2026-11-11). Avec `Main`, le code pourrait obtenir un jeton d'`id-kb-web` et lire le secret client (time-knight,
+  le 2026-11-11). Option écartée : partager `id-kb-data-api`, qui ouvre la base. — PR de #571
+- **`api-container-app.bicep` porte aussi le site, par deux paramètres facultatifs (`external`, `entraSignIn`) dont
+  les défauts gardent les deux API telles quelles ; pas de magasin de jetons, aucun chemin exclu de la connexion,
+  `/health` compris ; 0,5 vCPU et 1 Gio, de 0 à 1 réplique.** Pourquoi :
+  - un seul module par app, sans une 5e copie de la boucle des variables (#554) ;
+  - le code ne reçoit que les en-têtes d'identité, et rien n'est servi sans connexion ;
+  - le réveil des API, à la même taille, est mesuré : 20 à 26 s.
+
+  Options écartées :
+  - un module `web-container-app.bicep`, qui recopierait sondes, registre et identité ;
+  - 0,25 vCPU, dont le réveil n'est pas mesuré ;
+  - `excludedPaths: ['/health']`, gardé en repli sur l'accord de Sabine, si la révision n'est pas `Healthy` parce que
+    les sondes passeraient par la connexion. Learn ne le dit pas. Une sonde envoie `Accept: */*` (kubernetes.io) :
+    elle y recevrait le 401 constaté le 2026-11-11 pour un client sans `Accept: text/html` (une déduction).
+
+  Coût estimé au cours de l'API des prix du 2026-11-11 : ≈ 25,7 à 27,2 € par mois pour tout K-B, sous les 30 € du
+  budget (accepté par Sabine). Limite assumée : une requête sans connexion réveille la réplique (déduction, non
+  vérifiée). Un robot qui la tiendrait éveillée coûterait ≈ 39 $ de plus. Pour réduire le risque : les alertes du
+  budget, en place ; `ipSecurityRestrictions` reste possible, mais n'est pas retenu, car l'adresse de Sabine change.
+  — PR de #571
+- **`id-kb-deploy` reçoit Container Apps Contributor sur `ca-kb-web`, qui entre dans `deployment.json`.** Pourquoi :
+  le Deploy met chaque app à l'image du tag. Limite assumée (plan validé par Sabine le 2026-11-11) : il peut lire le
+  secret client et la clé `WEB` (`listSecrets`), et retirer la connexion, ce qui rendrait le site public ; le rôle
+  porte `containerApps/*/write` et `*/action`, sans exclusion (Learn, « Azure built-in roles for Containers », mise
+  à jour le 2026-07-01). Il n'y gagne aucune donnée : il tient déjà `ca-kb-data-api`. Pour réduire
+  le risque : les rulesets des tags et l'environnement `production` ; une alerte gratuite du journal d'activité sur
+  `Microsoft.App/containerApps/authConfigs/write`, faisable, non posée (registre, « Déploiement continu »). — PR de
+  #571
+
+### API de données : la lecture de `watch` pour le site (#571)
+
+- **`id-kb-data-api` reçoit Storage Blob Data Reader sur le conteneur `watch` seul, et `ca-kb-data-api` reçoit
+  `KB_EXCHANGE_BLOB_URL`.** Décision de Sabine du 2026-11-11 (option A de l'architecte) : l'API de données est la
+  seule porte du site, qu'elle sert en JSON, et le site n'a aucun droit Azure. **Modifie la décision 4 du
+  2026-11-06**, tenue par #420 (« les API et `id-kb-migrate-database` n'ont rien ») : l'API de données lit
+  désormais `watch` ; l'API IA et `id-kb-migrate-database` n'ont toujours rien. Le sens tient : un rôle de lecture,
+  sur un conteneur, aucun sur le compte. Le verrou `CanNotDelete` n'empêche pas d'ajouter un rôle. Option écartée :
+  le site qui lit `watch` lui-même, avec un rôle Azure pour son code. Limite assumée (consigne de time-knight du
+  2026-11-11, écart au moindre privilège accepté) : le rôle, `KB_EXCHANGE_BLOB_URL` et la clé `WEB` sont posés avant
+  leur code (#559 à #561, #563), pour éviter une seconde passe avant le fil. Pour réduire le risque : ils restent
+  sans code quelques jours, et #559 et #563 les utilisent ; le rôle ne permet que la lecture de `watch`. Depuis #563,
+  fusionnée le même jour, le site lit la clé `WEB` : seuls le rôle et `KB_EXCHANGE_BLOB_URL` précèdent encore leur code
+  (#559 à #561). Suit l'entrée de #558 du même jour, qui ouvre
+  le client du stockage d'échange à l'API de données. — PR de #571
+
 ## Décisions encore ouvertes
+
+- **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
+  du site ses chiffres de fonctionnement sans Grafana (architecte du 11/11). Pas encore décidé par Sabine, hors du
+  1er passage d'infra du site.
 
 - **Le tri du fil** (2026-11-11, #550) : choisir l'ordre de `GET /items`, aujourd'hui du plus
   récent au plus ancien par la date de la source ; à préciser par Sabine, hors de #550.

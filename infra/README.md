@@ -5,23 +5,23 @@ ressources (`modules/`). Les ressources portent l'étiquette `project=k-b` et so
 de ressources ; le budget, qui n'a ni étiquette ni région, compte les coûts de cette étiquette.
 
 `main.bicep` se déploie en **deux passes**. Sans `imageTag`, il pose le socle, dont le serveur PostgreSQL (#421). Avec
-`imageTag`, il ajoute les deux API, les jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine`,
-`caj-kb-digest-watch`) et les rôles sur les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
+`imageTag`, il ajoute les deux API, le site (#571), les jobs (`caj-kb-smoke-test`, `caj-kb-migrate-database`,
+`caj-kb-daily-routine`, `caj-kb-digest-watch`) et les rôles sur les secrets. Chaque passe repose le socle, le serveur et l'identité de `caj-kb-migrate-database` compris. Entre les
 deux passes, l'image est poussée dans le registre et les secrets sont posés dans le coffre (« Appliquer »).
 
 | Module | Ressource | Passe | Issue |
 |---|---|---|---|
 | `log-analytics.bicep` | espace Log Analytics `log-kb` : 30 jours de rétention, plafond de 0,2 Go par jour | 1 | #414 |
 | `container-apps-environment.bicep` | environnement Container Apps `cae-kb` : profil Consumption seul, sans VNet ; journaux vers `log-kb` par Azure Monitor, sans clé ; trafic chiffré entre les apps ; identité système, qui monte `job-data` | 1 | #411, #414, #420 |
-| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs planifiés) | 1 | #414, #415, #420 |
-| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les identités des deux API, de la sonde et des deux jobs planifiés | 1 | #414, #330, #423 |
+| `identities.bicep` | identités managées `id-kb-ai-api`, `id-kb-data-api`, `id-kb-smoke-test`, `id-kb-deploy` (le déploiement continu), `id-kb-daily-routine` et `id-kb-digest-watch` (les jobs planifiés), `id-kb-web` (le site) | 1 | #414, #415, #420, #571 |
+| `container-registry.bicep` | registre `crkb…` (ACR Basic), sans utilisateur admin ; AcrPull pour les identités des apps et des jobs | 1 | #414, #330, #423, #571 |
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
-| `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420 |
+| `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420, #571 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
 | `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
-| `api-container-app.bicep` | `ca-kb-data-api` et `ca-kb-ai-api` : ingress interne seul, HTTPS, 0 à 1 réplique, sondes `GET /health` | 2 | #414 |
+| `api-container-app.bicep` | `ca-kb-data-api`, `ca-kb-ai-api` et `ca-kb-web` : HTTPS, 0 à 1 réplique, sondes `GET /health` ; ingress interne, sauf le site, ouvert par `exposeWeb` derrière la connexion Microsoft Entra (« Le site privé ») | 2 | #414, #571 |
 | `smoke-test-job.bicep` | job manuel `caj-kb-smoke-test`, qui lance `kb smoke-test` | 2 | #414 |
 | `migrate-database-job.bicep` | identité `id-kb-migrate-database` et son AcrPull ; job manuel `caj-kb-migrate-database`, qui lance `kb migrate-database` | 1 (l'identité), 2 (le job) | #421 |
 | `daily-routine-job.bicep` | job planifié `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour à 08:00 UTC, sur `job-data` (« La routine quotidienne ») | 2 | #330 |
@@ -208,6 +208,8 @@ az keyvault secret list --vault-name "$KV" --query "[].name" -o tsv    # les 6 n
 | `kb-llm-api-key` | clé du modèle (Azure AI Foundry) | `ca-kb-ai-api` |
 | `kb-ai-github-token` | jeton GitHub des comptes rendus des tendances | `ca-kb-ai-api` |
 | `kb-otlp-headers` | en-tête OTLP de Grafana Cloud (`KB_OTLP_HEADERS`) | `ca-kb-ai-api` |
+| `kb-data-api-key-web` | clé du site vers l'API de données, client `WEB` (généré, « Le site privé ») | `ca-kb-data-api`, `ca-kb-web` |
+| `kb-web-auth-client-secret` | secret client de l'inscription « K-B site », lu par la connexion Entra, jamais par le code (« Le site privé ») | `ca-kb-web` |
 
 Ce que dit chaque cas :
 - **Rien ne s'affiche** : le secret est posé.
@@ -236,35 +238,52 @@ Limite : `kb-data-api-key-ai-digest` est lu par les deux API. Tant qu'elles n'on
 valeur, jusqu'à 30 minutes, l'API IA reçoit 401 de l'API de données. Si les 401 continuent après le redémarrage,
 redémarrer de nouveau une fois les 30 minutes passées.
 
-### 5. Seconde passe : les API et le job
+### 5. Seconde passe : les API, le site et les jobs
 
 Les trois valeurs sont celles du `.env` de l'opératrice : `KB_LLM_BASE_URL`, `KB_LLM_MODEL` et `KB_OTLP_ENDPOINT`
-(l'adresse de base, sans `/v1/metrics`). Ce ne sont pas des secrets.
+(l'adresse de base, sans `/v1/metrics`). Ce ne sont pas des secrets. `WEB_APP_ID` est l'ID de l'inscription
+« K-B site » (#571), pas un secret non plus. S'il n'y a pas exactement une inscription de ce nom, `WEB_APP_ID` est
+vidé, et `kb_check` refuse la passe.
 
 ```sh
 LLM_URL=<KB_LLM_BASE_URL>
 LLM_MODEL=<KB_LLM_MODEL>
 OTLP=<KB_OTLP_ENDPOINT>
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group what-if \
+WEB_APP_ID=$(az ad app list --display-name "K-B site" --query "[].appId" -o tsv)
+[ "$(az ad app list --display-name "K-B site" --query "length(@)" -o tsv)" = 1 ] || WEB_APP_ID=''
+# Ouvert seulement si sa connexion est déjà posée en ligne : un site à créer, ou sans connexion, reste fermé.
+[ "$(az containerapp auth show -n ca-kb-web -g "$RG" --query platform.enabled -o tsv 2>/dev/null)" = true ] \
+  && EXPOSE_WEB=true || EXPOSE_WEB=false
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group what-if \
   -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
-     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP"
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" && az deployment group create \
+     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb="$EXPOSE_WEB"
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group create \
   -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
-     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" \
+     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb="$EXPOSE_WEB" \
   --query "{state:properties.provisioningState}"
 ```
 
-Le Bicep ne refuse pas ces valeurs vides : la passe 1 les laisse vides. Le contrôle vient donc de `kb_check`. Sans
-lui, un `TAG` vide referait la passe 1 sans erreur, et une adresse vide déploierait une API IA qui refuse de démarrer
-(`KB_OTLP_ENDPOINT: not set, while KB_OTLP_HEADERS is`).
+`EXPOSE_WEB` vaut `true` seulement si la connexion du site est déjà posée en ligne. Une passe qui crée ou recrée le
+site le crée donc fermé, en ingress interne ; il ne s'ouvre qu'à la passe suivante, une fois sa connexion lue (« Le
+site privé »). `exposeWeb` oublié ferme le site au lieu de l'ouvrir.
 
-L'aperçu attendu :
+Le Bicep ne refuse pas ces valeurs vides : la passe 1 les laisse vides. Le contrôle vient donc de `kb_check`. Sans
+lui, un `TAG` vide referait la passe 1 sans erreur, une adresse vide déploierait une API IA qui refuse de démarrer
+(`KB_OTLP_ENDPOINT: not set, while KB_OTLP_HEADERS is`). Un `WEB_APP_ID` vide, s'il passait, ôterait la connexion du
+gabarit et laisserait le site en ingress interne (`api-container-app.bicep`, `hasSignIn`).
+
+L'aperçu attendu à la première passe 2, le 2026-11-06 (#414) :
 - **à créer** : `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, et 7 rôles Key Vault Secrets User, un par
   secret et par identité (`kb-data-api-key-ai-digest` en reçoit deux) ;
 - **à modifier** : du bruit. L'aperçu ne résout pas les `reference(…)` (identifiants des identités, URL du coffre),
   et il liste les valeurs par défaut qu'Azure renvoie sans que le Bicep les écrive.
+
+Une passe qui ajoute une pièce a son aperçu dans la section de la pièce : « Appliquer #420 sur le squelette en
+ligne », « La seconde passe, avec le tag » (#330), « La passe A : le site fermé » (#571). Une passe qui n'ajoute
+rien ne montre que ce bruit, et l'image des apps et des jobs : après un déploiement par tag, `k-b@sha256:…` devient
+`k-b:<TAG>`, la même image si `TAG` est la version en ligne.
 
 Les rôles sur les secrets se créent dans le même déploiement que les apps. Si une app échoue sur
 « unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
@@ -287,16 +306,17 @@ prochain déploiement par tag la repinne par digest. L'outil des passes (#455) p
 
 ### 6. Vérifier la mise en ligne
 
-Les deux apps sont internes, et leur révision est saine :
+Les deux API sont internes, le site est externe (#571), et chaque révision est saine :
 
 ```sh
-for app in ca-kb-data-api ca-kb-ai-api; do
+for app in ca-kb-data-api ca-kb-ai-api ca-kb-web; do
   az containerapp show -n "$app" -g "$RG" --query "{external:properties.configuration.ingress.external,fqdn:properties.configuration.ingress.fqdn}"
   az containerapp revision list -n "$app" -g "$RG" --query "[].{health:properties.healthState,replicas:properties.replicas}"
 done
 ```
 
-Attendu : `external: false`, et `Healthy`. Pour l'API de données, une révision saine montre aussi que ses sondes
+Attendu : `external: false` pour les deux API, `true` pour `ca-kb-web` une fois ouvert, et `Healthy`. Pour
+`ca-kb-web`, `Healthy` ne prouve pas que le site répond (« Le site privé », « Les constats »). Pour l'API de données, une révision saine montre aussi que ses sondes
 portent le bon `Host` : sans lui, elle répond 400 à `/health`.
 
 Le job d'essai (critère de #414) :
@@ -706,12 +726,12 @@ que le Mac ne touche jamais (décisions 3 à 8 du 06/11, journal ADR).
 |---|---|---|
 | `stkbexchange…` (Blob) | `clippings` | `id-kb-daily-routine` lit ; l'opératrice écrit (`make upload-library`, #424) |
 | | `zotero` | `id-kb-daily-routine` lit ; l'opératrice écrit |
-| | `watch` | `id-kb-daily-routine` et `id-kb-digest-watch` écrivent ; l'opératrice lit (`make download-watch-sheets`) |
+| | `watch` | `id-kb-daily-routine` et `id-kb-digest-watch` écrivent ; l'opératrice lit (`make download-watch-sheets`) ; `id-kb-data-api` lit, pour le site (#571) |
 | | `smoke-test` | `id-kb-smoke-test` lit |
 | `stkbjobfiles…` (Files) | `job-data` | l'identité système de `cae-kb` (Storage File Data SMB MI Admin, sur le compte) |
 
-- **Le sens est tenu par les rôles**, un par identité et par conteneur, aucun sur le compte. Les API et
-  `id-kb-migrate-database` n'en ont aucun. Écrire à contresens répond 403 (`AuthorizationPermissionMismatch`).
+- **Le sens est tenu par les rôles**, un par identité et par conteneur, aucun sur le compte. L'API de données lit
+  `watch` seul (#571) ; l'API IA et `id-kb-migrate-database` n'en ont aucun. Écrire à contresens répond 403 (`AuthorizationPermissionMismatch`).
 - **`job-data` est tenu par le Bicep, pas par une identité** : le rôle appartient à l'environnement. Toute app ou
   tout job de `cae-kb` qui déclare un volume `job-data` monte le partage. Seuls `caj-kb-daily-routine` (#330) et `caj-kb-digest-watch` (#423) le déclarent : c'est une convention, pas un contrôle. `id-kb-deploy`, qui met à jour les apps et les jobs de `deployment.json`, peut passer outre (registre des traitements, ligne « Déploiement continu »).
 - **Protections de `stkbexchange`** : versions ; suppression réversible des blobs et des conteneurs, 30 jours ;
@@ -1293,3 +1313,295 @@ retry limit to at least 1 » pour la maintenance de la plateforme, rôles qui li
 managing secrets » : les rôles Contributor des apps et des jobs couvrent `listSecrets`),
 [dépannage d'Azure RBAC](https://learn.microsoft.com/en-us/azure/role-based-access-control/troubleshooting) (« it can
 take up to 10 minutes for changes to take effect »).
+
+## Le site privé (#571)
+
+`ca-kb-web` lance `kb serve-web` (#562) depuis l'image de K-B. Sabine seule y entre (décision du 11/11). Le site ne
+lit que l'API de données, par la clé du client `WEB`, et l'API de données lit `watch` pour lui (option A, décision du
+11/11).
+
+Trois verrous, dans l'ordre où une requête les rencontre :
+1. **La connexion Microsoft Entra de la plateforme** (Easy Auth, `authConfigs`). Elle tourne à côté du conteneur, dans
+   chaque réplique. Sans session, elle renvoie un navigateur (`Accept: text/html`) tout droit vers la page de
+   connexion d'Entra, `login.microsoftonline.com/<tenant>` (302), et répond `401` à tout autre client (constaté le
+   2026-11-11, « Les constats »). Elle n'admet que les comptes du tenant (`openIdIssuer`), et parmi eux le seul
+   object ID de Sabine (`allowedPrincipals.identities`). Elle seule pose les en-têtes `X-MS-CLIENT-PRINCIPAL-*`,
+   et elle retire ceux qu'envoie un client.
+2. **Le contrôle du code** (#562) : chaque requête, sauf `/health`, porte `X-MS-CLIENT-PRINCIPAL-ID`, égal à
+   `KB_WEB_OPERATOR_ID` ; sinon, 403.
+3. **Le module refuse une entrée externe sans connexion** : `external` n'est suivi que si `entraSignIn` est posé avec
+   l'ID de son inscription (`api-container-app.bicep`, `hasSignIn`). Le site naît fermé, en ingress interne, et ne
+   s'ouvre que par `exposeWeb=true`, à une passe qui trouve sa connexion déjà posée en ligne.
+
+Le contrôle du code ne tient pas seul : sans la connexion, rien ne retire un en-tête forgé. C'est pourquoi le site ne
+s'ouvre qu'après la lecture de `authConfigs`.
+
+**Un seul fournisseur d'identité, Microsoft Entra.** Le code ne vérifie pas `X-MS-CLIENT-PRINCIPAL-IDP`. Ajouter un
+autre fournisseur à `ca-kb-web` demande d'abord de revoir ce contrôle.
+
+| Réglage | Valeur |
+|---|---|
+| Commande, port | `serve-web`, 8002 ; 0,5 vCPU, 1 Gio, 0 à 1 réplique, comme les API |
+| Identité | `id-kb-web` : AcrPull et ses deux secrets. `identityLifecycle` reste `None` : le code n'obtient aucun jeton, et n'a aucun droit dans Azure |
+| Variables | `KB_DATA_DIR`, `KB_WEB_HOST=0.0.0.0`, `KB_WEB_PORT=8002`, `KB_WEB_ALLOWED_HOSTS` (le nom du site, aussi le `Host` des sondes), `KB_WEB_OPERATOR_ID` (`operatorObjectId`), `KB_DATA_API_URL` (le nom interne de l'API de données), `KB_DEPLOYMENT_ENVIRONMENT=production` ; `KB_WEB_AUTH` n'est pas posée (`entra` par défaut) |
+| Secrets | `KB_DATA_API_KEY_WEB` ← `kb-data-api-key-web`. `kb-web-auth-client-secret` est un secret de l'app, que lit la connexion ; il n'est jamais une variable du conteneur |
+| Connexion | `RedirectToLoginPage` ; HTTPS seul ; pas de magasin de jetons, donc le code ne reçoit que les en-têtes d'identité ; aucun chemin exclu, `/health` compris |
+| Inscription d'application | « K-B site », un seul tenant (`AzureADMyOrg`), jetons d'identité permis, adresse de retour `https://ca-kb-web.<domaine>/.auth/login/aad/callback` ; sans « affectation requise », qui imposerait le consentement d'un administrateur |
+| Secret client | expire le **2027-05-11** (« La rotation du secret client ») |
+| API de données | `KB_EXCHANGE_BLOB_URL` et `KB_DATA_API_KEY_WEB` ; Storage Blob Data Reader sur `watch` seul |
+
+Dans l'ordre, une écriture dans Azure ou dans Entra à la fois, et jamais pendant une exécution d'un cron (« La règle
+des heures ») : **aucune passe entre 08:00 et 09:05 UTC, ni, le lundi et le jeudi, entre 10:00 et 10:35 UTC**. Une
+passe change les apps et les jobs au milieu d'une exécution, comme un tag.
+1. Le critère rouge.
+2. L'inscription d'application, puis son principal.
+3. Les deux secrets.
+4. La passe A : le site fermé.
+5. La lecture de la connexion.
+6. La passe B : le site ouvert.
+7. Les constats.
+8. La fusion de la PR.
+
+Jusqu'à la fusion, toute passe part de la branche de #571 : une passe depuis `main` retirerait les variables de
+l'API de données. Le Deploy lit `deployment.json` au commit du tag : un tag posé avant la fusion ne touche pas le
+site ; un tag posé après exige que `ca-kb-web` existe, sans quoi le Deploy échoue. La fusion vient donc après la
+passe B.
+
+### Le critère rouge
+
+```sh
+az containerapp show -n ca-kb-web -g "$RG" --query name -o tsv    # ResourceNotFound
+az role assignment list --assignee "$(az identity show -g "$RG" -n id-kb-data-api --query principalId -o tsv)" --all \
+  --query "[].{role:roleDefinitionName,scope:scope}" -o table    # rien sur …/containers/watch
+az containerapp show -n ca-kb-data-api -g "$RG" --query "properties.template.containers[0].env[].name" -o tsv
+```
+
+La dernière commande ne doit montrer ni `KB_EXCHANGE_BLOB_URL` ni `KB_DATA_API_KEY_WEB`. Constaté par Sabine le
+2026-11-11.
+
+### L'inscription d'application et son principal
+
+Par le compte de l'opératrice, qui peut créer une application dans le tenant (`allowedToCreateApps`, lu le 11/11) :
+
+```sh
+DOMAIN=$(az containerapp env show -n cae-kb -g "$RG" --query properties.defaultDomain -o tsv)
+kb_check "$DOMAIN" && az ad app create --display-name "K-B site" --sign-in-audience AzureADMyOrg \
+  --enable-id-token-issuance true --web-redirect-uris "https://ca-kb-web.$DOMAIN/.auth/login/aad/callback" \
+  --query appId -o tsv
+WEB_APP_ID=<le GUID rendu>
+kb_check "$WEB_APP_ID" && az ad sp create --id "$WEB_APP_ID" \
+  --query "{id:id,appId:appId,assignmentRequired:appRoleAssignmentRequired}" -o json
+```
+
+Attendu : un GUID, puis `assignmentRequired: false`. Fait le 2026-11-11.
+
+### Les deux secrets du site
+
+Dans son propre terminal, comme à l'étape 4 d'« Appliquer ». La clé du site est générée. Le secret client vient
+d'Entra : il passe de la sortie de `az ad` au coffre par une variable, sans être affiché.
+
+```sh
+az keyvault secret set --vault-name "$KV" --name kb-data-api-key-web \
+  --file <(python3 -c 'import secrets; print(secrets.token_urlsafe(32), end="")') -o none
+WEB_SECRET=$(az ad app credential reset --id "$WEB_APP_ID" --display-name kb-web-easy-auth --end-date 2027-05-11 \
+  --query password -o tsv) \
+  && az keyvault secret set --vault-name "$KV" --name kb-web-auth-client-secret --file <(printf '%s' "$WEB_SECRET") -o none
+unset WEB_SECRET
+az ad app credential list --id "$WEB_APP_ID" --query "[].{name:displayName,end:endDateTime}" -o table
+az keyvault secret list --vault-name "$KV" --query "[].name" -o tsv    # les noms, jamais les valeurs
+```
+
+`az ad app credential reset` sans `--append` remplace tous les secrets de l'application : c'est voulu la première
+fois, pas à la rotation. Les deux secrets doivent exister avant la passe A, qui donne un rôle sur chacun.
+
+### La passe A : le site fermé
+
+Depuis la branche de #571, avec un `TAG` qui contient `kb serve-web` (#562), et `exposeWeb=false` :
+
+```sh
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group what-if \
+  -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
+     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb=false
+```
+
+Puis `create`, avec les mêmes paramètres.
+
+Aperçu attendu :
+- **à créer** :
+  - `id-kb-web` et son AcrPull ;
+  - `ca-kb-web`, en ingress interne (`external: false`), avec `identitySettings` en `None`, et son `authConfigs`
+    `current` ;
+  - 3 rôles Key Vault Secrets User : `kb-data-api-key-web` pour `id-kb-web` et pour `id-kb-data-api`,
+    `kb-web-auth-client-secret` pour `id-kb-web` ;
+  - Storage Blob Data Reader sur `watch` pour `id-kb-data-api` ;
+  - Container Apps Contributor d'`id-kb-deploy` sur `ca-kb-web`.
+- **à modifier** :
+  - `ca-kb-data-api` : 2 variables (`KB_EXCHANGE_BLOB_URL`, `KB_DATA_API_KEY_WEB`) et 1 secret ;
+  - l'image de `ca-kb-data-api`, de `ca-kb-ai-api` et des 4 jobs (`k-b@sha256:…` devient `k-b:<TAG>`, la même
+    image), même avec `TAG` = la version en ligne ;
+  - le bruit de l'étape 5.
+- Tout autre écart arrête la passe, en particulier sur `cae-kb`, le stockage, les verrous, ou `ca-kb-ai-api` hors de
+  son image.
+
+AcrPull et les rôles du coffre d'`id-kb-web` naissent dans la même passe que l'app. Si l'app échoue sur « unable to
+fetch secret », ou si le tirage de l'image est refusé, relancer la même commande 10 minutes plus tard.
+
+### Lire la connexion, avant d'ouvrir
+
+```sh
+az containerapp auth show -n ca-kb-web -g "$RG" --query "{platform:platform.enabled,action:globalValidation.unauthenticatedClientAction,https:httpSettings.requireHttps,clientId:identityProviders.azureActiveDirectory.registration.clientId,secret:identityProviders.azureActiveDirectory.registration.clientSecretSettingName,issuer:identityProviders.azureActiveDirectory.registration.openIdIssuer,allowed:identityProviders.azureActiveDirectory.validation.defaultAuthorizationPolicy.allowedPrincipals.identities}" -o json
+for app in ca-kb-web ca-kb-data-api; do
+  az containerapp show -n "$app" -g "$RG" --query "{latest:properties.latestRevisionName,ready:properties.latestReadyRevisionName}" -o json
+  az containerapp revision list -n "$app" -g "$RG" --query "[?properties.active].{name:name,health:properties.healthState}" -o table
+done
+az containerapp show -n ca-kb-data-api -g "$RG" --query "properties.template.containers[0].env[].name" -o tsv
+az containerapp show -n ca-kb-web -g "$RG" --query "{external:properties.configuration.ingress.external,lifecycle:properties.configuration.identitySettings[0].lifecycle}" -o json
+```
+
+Attendu :
+- `platform: true`, `RedirectToLoginPage`, `https: true` ;
+- l'ID de « K-B site », `kb-web-auth-client-secret`, et `https://login.microsoftonline.com/<tenant>/v2.0` ;
+- `allowed` : le seul object ID de Sabine ;
+- pour chaque app, `latest` égal à `ready`, et cette révision `Healthy`. Une app dont la nouvelle révision a échoué
+  (par exemple sur « unable to fetch secret ») garde l'ancienne, saine : sans cette égalité, le contrôle passerait à
+  tort ;
+- `KB_EXCHANGE_BLOB_URL` et `KB_DATA_API_KEY_WEB` parmi les variables de l'API de données ;
+- `external: false` et `lifecycle: None`.
+
+Un champ vide ou absent arrête la suite : le site reste fermé.
+
+Les sondes visent le port 8002 du conteneur ; Microsoft Learn ne dit pas si elles passent par la connexion
+(« Health probes in Azure Container Apps », lu le 2026-11-11). Une sonde envoie `Accept: */*`, comme `curl` par
+défaut (page des sondes de kubernetes.io, lue le 2026-11-11) : si elle passait par la connexion, elle recevrait son
+`401`, et la révision ne serait pas `Healthy`. C'est une déduction du constat de « Les constats », non vérifiée.
+Le repli serait alors `excludedPaths: ['/health']`, qui sert `/health` sans connexion (un texte fixe, sans donnée),
+sur l'accord de Sabine seulement. `Healthy` ne prouve que `/health` : c'est l'accueil affiché à Sabine (« Les
+constats ») qui prouve que le site répond.
+
+### La passe B : le site ouvert
+
+Les mêmes commandes, avec `exposeWeb=true`, une fois la connexion lue. Aperçu attendu : seule l'entrée de
+`ca-kb-web` change (`external`), avec `KB_WEB_ALLOWED_HOSTS` et le `Host` des sondes, qui passent du nom interne au
+nom du site. Ensuite, chaque passe tire `exposeWeb` de la connexion en ligne (étape 5 d'« Appliquer »).
+
+### Les constats
+
+```sh
+SITE=$(az deployment group show -g "$RG" -n main --query properties.outputs.webAddress.value -o tsv)
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" "$SITE/"
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" \
+  -H "X-MS-CLIENT-PRINCIPAL-ID: $OPERATOR" "$SITE/"
+curl -s -o /dev/null -w '%{http_code} %{redirect_url}\n' -H "Accept: text/html" "$SITE/health"
+```
+
+Attendu : trois fois `302` vers `https://login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize?…`, **jamais
+`200`**. Le renvoi va tout droit à Entra, sans passer par `/.auth/login/aad`, car la connexion n'a qu'un fournisseur.
+
+La connexion ne renvoie vers la page de connexion qu'un navigateur, qui demande du HTML. Les mêmes `curl` sans
+`-H "Accept: text/html"` reçoivent `401`, avec un en-tête `WWW-Authenticate: Bearer` qui nomme le tenant et l'ID
+de l'inscription : là aussi, **jamais `200`**. Les deux comportements ont été constatés le 2026-11-11, après la
+passe B.
+
+Le deuxième essai forge l'en-tête de Sabine sans session : il ne change rien. Son `302` prouve que la connexion
+répond avant le code, même à un en-tête forgé ; il ne prouve pas que l'en-tête est retiré. Ce retrait tient à la
+plateforme (Learn : « External requests aren't allowed to set these headers »), et au code, qui refuse un en-tête
+répété (#562). Puis Sabine ouvre `$SITE` dans son navigateur, se connecte, consent à la première connexion, et voit
+l'accueil.
+
+Ce que tranche la première connexion :
+- **le consentement** : une application inscrite dans l'organisation reçoit le consentement de l'utilisateur pour les
+  permissions « à faible impact », avec le réglage recommandé. Le réglage du tenant n'a pas été lu ;
+- **l'accès conditionnel du tenant**, illisible avec nos droits ;
+- **le chemin de l'en-tête** : il porte bien l'object ID, la connexion lit le secret référencé au coffre, et le
+  `Host` passe jusqu'au code.
+
+Un refus « Need admin approval », ou une erreur AADSTS, arrête l'essai. Le repli par mot de passe est alors au choix
+de Sabine.
+
+**Règle d'arrêt.** Si un `curl` sans connexion rend `200`, avec ou sans `Accept: text/html`, ou si la connexion n'est
+plus posée, fermer l'entrée tout de suite :
+
+```sh
+az containerapp ingress disable -n ca-kb-web -g "$RG"
+```
+
+Le 403 de `allowedPrincipals` pour un autre compte du tenant ne se constate qu'avec un second compte. Sans lui, il
+reste non constaté, et le contrôle du code tient seul la vérification du compte.
+
+### La rotation du secret client
+
+Le secret expire le **2027-05-11**, et time-knight rappelle la date. Après elle, la connexion échoue, et le site n'est
+plus joignable. La rotation ne coupe pas la connexion : l'ancien secret reste valide jusqu'à ce que la plateforme
+lise le nouveau.
+
+```sh
+WEB_APP_ID=$(az ad app list --display-name "K-B site" --query "[].appId" -o tsv)
+[ "$(az ad app list --display-name "K-B site" --query "length(@)" -o tsv)" = 1 ] || WEB_APP_ID=''
+END_DATE=<AAAA-MM-JJ>
+OLD_KEY=$(az ad app credential list --id "$WEB_APP_ID" --query "[?displayName=='kb-web-easy-auth'].keyId" -o tsv)
+kb_check "$WEB_APP_ID" "$END_DATE" "$OLD_KEY" && WEB_SECRET=$(az ad app credential reset --id "$WEB_APP_ID" --append \
+  --display-name kb-web-easy-auth --end-date "$END_DATE" --query password -o tsv) \
+  && az keyvault secret set --vault-name "$KV" --name kb-web-auth-client-secret --file <(printf '%s' "$WEB_SECRET") -o none
+unset WEB_SECRET
+```
+
+Puis, dans l'ordre :
+1. attendre 30 minutes : la plateforme lit la dernière version d'un secret dans les 30 minutes (étape 4
+   d'« Appliquer ») ;
+2. redémarrer la révision active de `ca-kb-web`, comme à l'étape 4 ;
+3. vérifier que Sabine se connecte. Avant ces 30 minutes, ce constat passerait encore avec l'ancien secret ;
+4. retirer l'ancien secret : `az ad app credential delete --id "$WEB_APP_ID" --key-id "$OLD_KEY"` ;
+5. reporter la date nouvelle ici, au registre et dans `MEMORY.md`.
+
+### Limites
+
+- **`id-kb-deploy` reçoit Container Apps Contributor sur `ca-kb-web`** (`deployment.json`). Les actions du rôle
+  sont `Microsoft.App/containerApps/*/read`, `*/write`, `*/delete` et `*/action`, sans exclusion (Learn, « Azure
+  built-in roles for Containers », mise à jour le 2026-07-01). Il peut donc changer l'image, les réglages et la
+  connexion du site (`authConfigs/write`), et lire en clair son secret client et la clé `WEB` (`listSecrets`, Learn,
+  « Manage secrets in Azure Container Apps »). Retirer la connexion rendrait le site public : sans elle, un en-tête
+  d'identité se forge, et le contrôle du code ne tient plus. Il n'y gagne aucune donnée : il tient déjà
+  `ca-kb-data-api`.
+  Pour réduire le risque :
+  - les rulesets des tags et l'environnement `production` (« Déployer une version ») ;
+  - une alerte du journal d'activité, gratuite, sur `Microsoft.App/containerApps/authConfigs/write`, qui détecte sans
+    empêcher (faisable avec nos droits, non posée).
+- **Le coût d'un réveil sans connexion.** Le sidecar tourne dans la réplique : une requête sans connexion réveille
+  donc le site. C'est une déduction, non vérifiée à la source. Un robot qui le tiendrait éveillé tout le mois
+  coûterait environ 39 $ de plus.
+  Pour réduire le risque :
+  - les alertes du budget, à 50 % et à 100 % : faisable, déjà en place ;
+  - `ipSecurityRestrictions` sur l'entrée : faisable avec nos droits, mais non retenu, car l'adresse de Sabine change.
+- **Le réveil en chaîne**, le site puis l'API de données : environ 50 s. Ouvrir le site quelques minutes avant d'en
+  avoir besoin.
+- **Un appel direct au port du conteneur, depuis une autre charge de `cae-kb`.** Il passerait à côté de la connexion,
+  avec un en-tête forgé. Learn ne décrit d'appel entre apps que par leur entrée (« Communicate between container
+  apps ») ; un mainteneur de Microsoft écrit que l'accès à une réplique par son IP n'est pas pris en charge
+  (microsoft/azure-container-apps #531, 2022-12-20), mais « non pris en charge » ne veut pas dire « bloqué » ; et
+  les apps d'un environnement partagent le même réseau (Architecture Center, « Container Apps » multitenant, mise à
+  jour le 2026-10-13). Ni démontré, ni exclu. Il faut d'abord exécuter du code dans une autre pièce de K-B, et
+  l'attaquant n'y gagne que ce que lit la clé `WEB`, que `ca-kb-data-api` tient déjà. **Risque accepté par Sabine le
+  2026-11-11.**
+  Pour réduire le risque : une lecture du site à chaque Deploy, avec le `curl` à l'en-tête forgé, est une issue à
+  ouvrir après #571 (faisable, du workflow seulement) ; vérifier dans le site le jeton signé par Entra au lieu de
+  l'en-tête d'identité, ce qui ne se forge pas sans la clé d'Entra (issue à ouvrir après l'oral blanc, demandée par
+  Sabine ; une dépendance de plus, sur son accord) ; un environnement à part pour le site couperait le réseau commun
+  (faisable avec nos droits, non retenu pour le 13/11).
+- **Des droits posés avant leur code** (consigne de time-knight du 2026-11-11, pour éviter une seconde passe). Depuis
+  #563 (fusionnée le 2026-11-11), le site lit `KB_DATA_API_URL` et la clé `WEB`. Seuls le rôle de lecture sur `watch` et
+  `KB_EXCHANGE_BLOB_URL` existent encore avant que l'API de données les lise (#559 à #561). Pour réduire le risque :
+  ils restent sans code quelques jours, et #559 les utilise ; le rôle ne donne que la lecture de `watch`.
+
+Sources (lues le 2026-11-11) :
+- Microsoft Learn :
+  - [Authentication and authorization in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/authentication),
+    mise à jour le 2026-07-08 : le sidecar, les en-têtes que seule la plateforme pose, `allowInsecure` désactivé, les
+    commandes `az ad` ;
+  - [`Microsoft.App/containerApps/authConfigs`](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/containerapps/authconfigs)
+    et [son journal des versions](https://learn.microsoft.com/en-us/azure/templates/microsoft.app/change-log/containerapps/authconfigs)
+    (`2026-07-01` n'ajoute que le magasin de jetons) ;
+  - [`az ad app credential`](https://learn.microsoft.com/en-us/cli/azure/ad/app/credential) ;
+  - [consentement de l'utilisateur](https://learn.microsoft.com/en-gb/entra/identity/enterprise-apps/configure-user-consent) ;
+- [sondes de Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/probes/) ;
+- [Azure Retail Prices](https://prices.azure.com/api/retail/prices), France Central, en USD et en EUR.
