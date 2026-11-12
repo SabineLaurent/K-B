@@ -265,7 +265,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   communs : un classement refuse sa page entière (règle 1 de `.claude/rules/conventions.md`) :
   pas du JSON ; pas une réponse de recherche avec une liste `items` ; `incomplete_results` autre
   que `false` ; un nombre de dépôts autre que 100 ; un dépôt invalide (nom qui n'est pas
-  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…).
+  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…). Ce
+  que le jumeau de la fiche refuse (`TopProduction`, #559), la collecte le refuse avant : un nom de
+  plus de 255 caractères, un nombre hors de 0 à 2^63 − 1. Toute la page, car retirer un dépôt
+  décalerait les rangs du top.
   Sans fenêtre de dates, un échec ne retarde rien : la collecte suivante prend un nouvel
   instantané, et celui du jour manqué est perdu.
 - **En cas de panne :** dépôts les plus forkés (`github_most_forked`) : les refus des plus

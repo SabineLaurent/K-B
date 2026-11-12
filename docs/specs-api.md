@@ -508,13 +508,17 @@ Les jours qui ont un jumeau, du plus récent au plus ancien, et leur nombre. Un 
 - **Le stockage** : par l'identité managée de l'API (`AZURE_CLIENT_ID`), connexion 5 s, lecture 10 s
   (`DATA_API_STORAGE_*`), aucune nouvelle tentative du pipeline, ni pour le stockage ni pour l'identité. Son échec
   rend son état : 504 `exchange_storage_timeout`, 503 `exchange_storage_not_found` (conteneur absent), 502 sinon.
-  Ni la réponse ni le journal ne nomment un blob.
+  Le jeton est demandé pendant la requête : tout échec de l'identité est 502 `exchange_storage_no_token`, comme
+  pour un job (`check_identity`), jamais un 500 ni l'état d'un stockage qui n'a pas été joint
+  (`test_a_token_refused_during_a_request_answers_502_no_token`). Ni la réponse ni le journal ne nomment un blob.
 - **Le cache**, en mémoire, sous un verrou jamais tenu pendant une requête au stockage : la liste de chaque dossier
   60 s (`WATCH_CACHE_SECONDS`), et les 8 dernières productions lues, par nom et etag, refus compris
   (`WATCH_CACHED_PRODUCTIONS`, 32 Mo au plus). Un redémarrage le vide.
 - **Sans réglage** : sans `KB_EXCHANGE_BLOB_URL` ou sans `AZURE_CLIENT_ID`, `kb serve-data` démarre et le dit au
-  journal ; les tops répondent 503 `watch_unconfigured`, les items restent servis. Une URL ou un `AZURE_CLIENT_ID`
-  mal formé : `kb serve-data` ne démarre pas (code 2).
+  journal ; les tops répondent 503 `watch_unconfigured`, les items restent servis. `KB_EXCHANGE_BLOB_URL` sans
+  `AZURE_CLIENT_ID`, un réglage à moitié fait, est une ligne ERROR, `watch_client_id_missing` ; `AZURE_CLIENT_ID`
+  seul, qui est aussi l'identité de la base (`KB_DATABASE_AUTH=entra`), une ligne INFO. Une URL ou un
+  `AZURE_CLIENT_ID` mal formé : `kb serve-data` ne démarre pas (code 2).
 - **La taille** : un top de 100 dépôts aux descriptions les plus longues (1 000 caractères de 4 octets en UTF-8)
   pèse moins de 0,5 Mo, sous le 1 Mo que le site lit (`MAX_WEB_DATA_API_BODY_BYTES` ;
   `test_a_top_of_100_with_the_longest_descriptions_stays_under_the_bound_of_the_site`).
@@ -531,6 +535,12 @@ Les jours qui ont un jumeau, du plus récent au plus ancien, et leur nombre. Un 
 - (d) L'historique commence au premier jumeau : une fiche publiée avant n'est pas servie. Pour réduire le risque :
   écrire une seule fois, depuis son Markdown, le jumeau des fiches passées ; faisable en code, et le lancer en ligne
   serait un geste de tn-codeur. Non planifié.
+- (e) Une fiche écrite avant #559 depuis le premier relevé d'un jour, dont `kb write-tops` a ensuite supprimé ce
+  relevé, reçoit son jumeau du dernier relevé de ce jour, gardé dans `raw/` : le site et la fiche montrent alors
+  deux relevés du même jour (rangs, comptes, heure). Cela n'arrive qu'une fois, au premier passage après #559, pour
+  le dernier jour de chaque top, et seulement si ce jour a eu plusieurs collectes. Pour réduire le risque : lire
+  le `collected_at` de la fiche qui existe et n'écrire le jumeau que s'il est celui du relevé ; faisable en code,
+  non planifié.
 
 ## Erreurs
 

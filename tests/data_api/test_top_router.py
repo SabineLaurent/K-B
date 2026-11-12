@@ -11,6 +11,7 @@ from pathlib import Path
 import pytest
 import requests
 from exchange.storage_fakes import (
+    FORGED_LOG_LINE,
     SPOTTED_BLOB_NAME,
     TEST_ACCOUNT_URL,
     TEST_CLIENT_ID,
@@ -20,6 +21,8 @@ from exchange.storage_fakes import (
     FakeCredential,
     FakeTransport,
     answer_error,
+    answer_identity_refusal,
+    answer_identity_with,
     answer_token,
     names_the_spotted_blob,
     remove_online_variables,
@@ -765,3 +768,56 @@ def test_the_reader_of_kb_serve_data_waits_its_timeouts_and_sends_a_request_once
         * 2
     )
     assert len(storage_requests) == 1
+
+
+@pytest.mark.parametrize(
+    "answer_identity",
+    [
+        answer_identity_with(500, "text/html", b"<html>Internal Server Error</html>"),
+        answer_identity_with(200, "application/json", b"[]"),
+        answer_identity_with(500, "application/json", b'{"error": "unavailable"}'),
+        answer_identity_refusal,
+    ],
+    ids=["html_500", "json_list", "json_500", "refusal_400"],
+)
+def test_a_token_refused_during_a_request_answers_502_no_token(
+    monkeypatch, items_database, web_keys, web_headers, caplog, answer_identity
+):
+    # The data API asks its token in the middle of a request, never by check_identity: the
+    # failure of the identity keeps its rule there, never a 500, nor a state of the storage.
+    remove_online_variables(monkeypatch)
+    set_identity_endpoint(monkeypatch)
+
+    def answer(request):
+        if request.url.startswith(TEST_IDENTITY_ENDPOINT):
+            return answer_identity(request)
+        return answer_error(404, "BlobNotFound", f"Not found {SPOTTED_BLOB_NAME}")(
+            request
+        )
+
+    monkeypatch.setattr(
+        watch_reading, "build_transport", lambda **waits: FakeTransport(answer)
+    )
+
+    with (
+        open_watch_reader(
+            ExchangeStorageSettings(TEST_ACCOUNT_URL, TEST_CLIENT_ID)
+        ) as reader,
+        caplog.at_level(logging.INFO, logger="k_b"),
+    ):
+        client = TestClient(
+            create_app(
+                items_database, web_keys, openapi_url=OPENAPI_PATH, watch=reader
+            ),
+            base_url="http://localhost",
+            raise_server_exceptions=False,
+        )
+        response = client.get("/tops/most_starred", headers=web_headers)
+
+    assert (response.status_code, response.json()) == (
+        502,
+        {"error": "exchange_storage_no_token"},
+    )
+    assert "exchange_storage_no_token" in caplog.text
+    assert FORGED_LOG_LINE not in caplog.text
+    assert not names_the_spotted_blob(caplog.text)

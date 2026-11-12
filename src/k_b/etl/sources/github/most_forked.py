@@ -12,8 +12,12 @@ from k_b.core.config import GITHUB_MOST_FORKED_SEARCH_QUERY, GITHUB_RANKING_SIZE
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources.github.api import get_from_github_api
-from k_b.etl.tops import TopEntry
-from k_b.items import REPOSITORY_URL_PREFIX, is_repository_name
+from k_b.etl.tops import TopEntry, read_ranking_count
+from k_b.items import (
+    REPOSITORY_URL_PREFIX,
+    TREND_REPOSITORY_NAME_MAX_LENGTH,
+    is_repository_name,
+)
 
 # The name of its raw folders, written once: its instance and its kind use it.
 FOLDER_PREFIX = "github_most_forked"
@@ -84,6 +88,13 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
         raise PageRefusedError(
             f"repository {rank}: not an owner/name, length {len(full_name)}"
         )
+    # What the twin of the sheet refuses (TopProduction), the collection refuses before: the whole
+    # page, as a repository left out would shift the ranks.
+    if len(full_name) > TREND_REPOSITORY_NAME_MAX_LENGTH:
+        raise PageRefusedError(
+            f"repository {rank}: name of length {len(full_name)},"
+            f" maximum {TREND_REPOSITORY_NAME_MAX_LENGTH}"
+        )
     # Checked, not kept: the URL of a repository is built from its name.
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):
@@ -93,10 +104,7 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
     description = item.get("description")
     if not isinstance(description, str | None):
         raise PageRefusedError(f"repository {rank}: description is not a string")
-    forks = item.get("forks_count")
-    # bool is a subclass of int in Python: refuse it explicitly.
-    if not isinstance(forks, int) or isinstance(forks, bool):
-        raise PageRefusedError(f"repository {rank}: forks_count is not an integer")
+    forks = read_ranking_count(item, "forks_count", rank)
     return ForkedRepository(
         rank=rank, full_name=full_name, description=description, forks=forks
     )

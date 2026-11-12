@@ -13,6 +13,7 @@ from k_b.etl.sources.github.most_starred import (
     read_most_starred,
 )
 from k_b.etl.tops import TopEntry
+from k_b.items import MAX_INT64, TREND_REPOSITORY_NAME_MAX_LENGTH
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -147,6 +148,10 @@ def test_a_response_without_a_list_of_items_is_refused():
         {"html_url": "https://evil.example.com/codecrafters-io/build-your-own-x"},
         {"stargazers_count": "many"},
         {"stargazers_count": True},
+        # What the twin of the sheet refuses (TopProduction), the collection refuses before.
+        {"stargazers_count": -1},
+        {"stargazers_count": MAX_INT64 + 1},
+        {"full_name": "owner/" + "a" * (TREND_REPOSITORY_NAME_MAX_LENGTH - 5)},
         {"topics": "awesome-list"},
         {"created_at": "2018-05-09T12:03:18"},
     ],

@@ -180,16 +180,13 @@ def test_serve_listens_on_the_host_and_port_of_the_environment(
 
 
 @pytest.mark.parametrize(
-    ("variables", "missing"),
-    [
-        ({}, "KB_EXCHANGE_BLOB_URL"),
-        ({"KB_EXCHANGE_BLOB_URL": TEST_ACCOUNT_URL}, "AZURE_CLIENT_ID"),
-        ({"AZURE_CLIENT_ID": TEST_CLIENT_ID}, "KB_EXCHANGE_BLOB_URL"),
-    ],
+    "variables",
+    [{}, {"AZURE_CLIENT_ID": TEST_CLIENT_ID}],
 )
-def test_serve_without_a_setting_of_the_storage_starts_and_says_the_tops_unconfigured(
-    monkeypatch, capsys, data_dir, uvicorn_calls, variables, missing
+def test_serve_without_the_url_of_the_storage_starts_and_says_the_tops_unconfigured(
+    monkeypatch, capsys, data_dir, uvicorn_calls, variables
 ):
+    # AZURE_CLIENT_ID alone is the identity of the base (KB_DATABASE_AUTH=entra): no error.
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     for name, value in variables.items():
         monkeypatch.setenv(name, value)
@@ -199,7 +196,27 @@ def test_serve_without_a_setting_of_the_storage_starts_and_says_the_tops_unconfi
     [(app, _)] = uvicorn_calls
     assert exit_code == 0
     assert app.state.watch is None
-    assert f"watch unconfigured: {missing} not set" in capsys.readouterr().err
+    assert " INFO k_b.cli: watch unconfigured: KB_EXCHANGE_BLOB_URL not set" in (
+        capsys.readouterr().err
+    )
+
+
+def test_serve_with_the_url_of_the_storage_without_its_identity_starts_and_logs_an_error(
+    monkeypatch, capsys, data_dir, uvicorn_calls
+):
+    # A half-made setting of the tops does not stop /items, which needs no watch; it is said.
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_EXCHANGE_BLOB_URL", TEST_ACCOUNT_URL)
+
+    exit_code = cli.main(["serve-data"])
+
+    [(app, _)] = uvicorn_calls
+    assert exit_code == 0
+    assert app.state.watch is None
+    assert (
+        " ERROR k_b.cli: watch_client_id_missing: KB_EXCHANGE_BLOB_URL set without"
+        " AZURE_CLIENT_ID; the tops answer 503 watch_unconfigured"
+    ) in capsys.readouterr().err
 
 
 @pytest.mark.parametrize(

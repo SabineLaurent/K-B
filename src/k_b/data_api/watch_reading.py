@@ -34,6 +34,7 @@ from k_b.core.config import (
 from k_b.core.quoting import locate_first_error
 from k_b.exchange.storage import (
     ExchangeStorageSettings,
+    NamedFailureCredential,
     build_managed_identity_credential,
     build_transport,
     download_listed_version,
@@ -265,7 +266,7 @@ def open_watch_reader(settings: ExchangeStorageSettings) -> Iterator[WatchReader
         open_container_client(
             settings.account_url,
             WATCH_CONTAINER,
-            credential,
+            NamedFailureCredential(credential),
             transport=build_transport(
                 connect_timeout_seconds=DATA_API_STORAGE_CONNECT_TIMEOUT_SECONDS,
                 read_timeout_seconds=DATA_API_STORAGE_READ_TIMEOUT_SECONDS,

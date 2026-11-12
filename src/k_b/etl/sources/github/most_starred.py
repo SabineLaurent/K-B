@@ -10,9 +10,10 @@ from k_b.core.config import GITHUB_MOST_STARRED_SEARCH_QUERY, GITHUB_RANKING_SIZ
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources.github.api import get_from_github_api
-from k_b.etl.tops import TopEntry
+from k_b.etl.tops import TopEntry, read_ranking_count
 from k_b.items import (
     REPOSITORY_URL_PREFIX,
+    TREND_REPOSITORY_NAME_MAX_LENGTH,
     is_repository_name,
     parse_aware_datetime,
 )
@@ -93,6 +94,13 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
         raise PageRefusedError(
             f"repository {rank}: not an owner/name, length {len(full_name)}"
         )
+    # What the twin of the sheet refuses (TopProduction), the collection refuses before: the whole
+    # page, as a repository left out would shift the ranks.
+    if len(full_name) > TREND_REPOSITORY_NAME_MAX_LENGTH:
+        raise PageRefusedError(
+            f"repository {rank}: name of length {len(full_name)},"
+            f" maximum {TREND_REPOSITORY_NAME_MAX_LENGTH}"
+        )
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):
         raise PageRefusedError(
@@ -101,10 +109,7 @@ def parse_repository(item: object, rank: int) -> StarredRepository:
     description = item.get("description")
     if not isinstance(description, str | None):
         raise PageRefusedError(f"repository {rank}: description is not a string")
-    stars = item.get("stargazers_count")
-    # bool is a subclass of int in Python: refuse it explicitly.
-    if not isinstance(stars, int) or isinstance(stars, bool):
-        raise PageRefusedError(f"repository {rank}: stargazers_count is not an integer")
+    stars = read_ranking_count(item, "stargazers_count", rank)
     topics = item.get("topics")
     if not isinstance(topics, list) or not all(
         isinstance(topic, str) for topic in topics

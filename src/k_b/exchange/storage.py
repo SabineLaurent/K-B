@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Any, Literal
 
 from azure.core import MatchConditions
-from azure.core.credentials import TokenCredential
+from azure.core.credentials import AccessToken, TokenCredential
 from azure.core.exceptions import (
     AzureError,
     HttpResponseError,
@@ -194,8 +194,29 @@ def check_identity(credential: TokenCredential) -> None:
     an outage (a 500 in JSON is CredentialUnavailableError, as a client id it does not know), and
     none carries the HTTP status of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on
     2026-11-06; review of #412)."""
-    try:
+    with naming_token_failures():
         credential.get_token(STORAGE_SCOPE)
+
+
+class NamedFailureCredential:
+    """A credential whose failure to give a token is exchange_storage_no_token, as in
+    check_identity: the data API asks its token during a request, never before."""
+
+    def __init__(self, credential: TokenCredential) -> None:
+        self.credential = credential
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
+        """The token of the credential, or exchange_storage_no_token."""
+        with naming_token_failures():
+            return self.credential.get_token(*scopes, **kwargs)
+
+
+@contextmanager
+def naming_token_failures() -> Iterator[None]:
+    """Turn any failure of an identity to give a token into exchange_storage_no_token; nothing of
+    azure-identity is chained."""
+    try:
+        yield
     # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
     # which azure-identity does not turn into an AzureError.
     except (AzureError, ValueError, AttributeError):

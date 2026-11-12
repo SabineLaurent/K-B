@@ -1,3 +1,4 @@
+import dataclasses
 import json
 import logging
 import re
@@ -813,11 +814,12 @@ def test_a_description_longer_than_its_bound_is_cut_and_the_twin_says_so(
         ),
     ],
 )
-def test_a_ranking_whose_twin_its_schema_refuses_is_kept_without_its_values(
+def test_a_ranking_its_source_refuses_as_its_twin_would_is_kept_without_its_values(
     data_dir, vault_dir, caplog, changes, spotted
 ):
-    """The source reads what the schema of the twin refuses: the ranking is kept unread, without
-    a sheet nor a twin, and never deleted, whatever ranking comes after it."""
+    """What the schema of the twin refuses, the reader of the source refuses before: the ranking
+    is kept unread, without a sheet nor a twin, and never deleted, whatever ranking comes after
+    it."""
     refused = write_ranking(
         data_dir,
         STARRED_TOP,
@@ -840,6 +842,71 @@ def test_a_ranking_whose_twin_its_schema_refuses_is_kept_without_its_values(
     assert (refused.exists(), middle.exists(), last.exists()) == (True, False, True)
     assert not find_sheet(vault_dir, STARRED_TOP, "2026-10-05").exists()
     assert not find_twin(vault_dir, STARRED_TOP, "2026-10-05").exists()
+    assert (
+        "most_starred ranking of 2026-10-05: ranking_unreadable, kept: PageRefusedError"
+        in caplog.text
+    )
+    assert spotted not in caplog.text
+
+
+# The description of the first repository of a ranking whose entries a test changes after its
+# source read them.
+CHANGED_RANKING_MARK = "A ranking whose entries the test changes"
+
+
+def read_entries_changed(changes, raw_response):
+    """The entries of the recorded ranking, the first one changed when it carries the mark."""
+    entries = github_most_starred.read_top_entries(raw_response, expected_size=3)
+    if entries[0].description != CHANGED_RANKING_MARK:
+        return entries
+    return [dataclasses.replace(entries[0], **changes), *entries[1:]]
+
+
+@pytest.mark.parametrize(
+    ("changes", "spotted"),
+    [
+        pytest.param({"count": -987654}, "987654", id="count negative"),
+        pytest.param({"count": 2**63 + 987654}, "987654", id="count beyond 64 bits"),
+        pytest.param(
+            {
+                "full_name": "spotted/" + "b" * 300,
+                "url": "https://github.com/spotted/" + "b" * 300,
+            },
+            "spotted",
+            id="name too long",
+        ),
+    ],
+)
+def test_a_ranking_whose_twin_its_schema_refuses_is_kept_without_its_values(
+    data_dir, vault_dir, caplog, changes, spotted
+):
+    """The net behind the source: entries its reader would give and the twin refuses keep the
+    ranking unread, without a sheet nor a twin, and never deleted."""
+    top = dataclasses.replace(
+        STARRED_TOP, read_entries=partial(read_entries_changed, changes)
+    )
+    refused = write_ranking(
+        data_dir,
+        top,
+        "2026-10-05T093000Z",
+        response_with(STARRED_RESPONSE, description=CHANGED_RANKING_MARK),
+    )
+    middle = write_ranking(data_dir, top, "2026-10-06T093000Z")
+    last = write_ranking(data_dir, top, "2026-10-07T093000Z")
+
+    with caplog.at_level(logging.INFO, logger=top_sheets.__name__):
+        outcome = write_top_sheets(RawStore(data_dir), vault_dir, top)
+
+    assert outcome == TopSheetsOutcome(
+        written_count=2,
+        twins_written_count=2,
+        skipped_count=0,
+        deleted_count=1,
+        unreadable_count=1,
+    )
+    assert (refused.exists(), middle.exists(), last.exists()) == (True, False, True)
+    assert not find_sheet(vault_dir, top, "2026-10-05").exists()
+    assert not find_twin(vault_dir, top, "2026-10-05").exists()
     assert re.search(
         r"most_starred ranking of 2026-10-05: ranking_unreadable, kept: twin_refused:"
         r" repositories\.0\.[a-z_]+ \([a-z_]+\)\n",

@@ -65,8 +65,10 @@ def read_watch_settings_or_refusal(
 ) -> ExchangeStorageSettings | WatchUnconfigured | str:
     """The settings of the exchange storage that watch is read in; unconfigured when a variable is
     not set, the tops then answering 503 and the items still served (the Mac, a sandbox); a
-    refusal when both are set and one is malformed."""
-    for variable in (EXCHANGE_BLOB_URL_VARIABLE, CLIENT_ID_VARIABLE):
-        if not environ.get(variable):
-            return WatchUnconfigured(variable)
+    refusal when both are set and one is malformed. The URL is looked at first: AZURE_CLIENT_ID
+    alone is also the identity of the base (KB_DATABASE_AUTH=entra)."""
+    if not environ.get(EXCHANGE_BLOB_URL_VARIABLE):
+        return WatchUnconfigured(EXCHANGE_BLOB_URL_VARIABLE)
+    if not environ.get(CLIENT_ID_VARIABLE):
+        return WatchUnconfigured(CLIENT_ID_VARIABLE)
     return read_exchange_storage_settings_or_refusal(environ)
