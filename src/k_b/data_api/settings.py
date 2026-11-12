@@ -55,9 +55,9 @@ def read_serve_settings_or_refusal(environ: Mapping[str, str]) -> ServeSettings 
 
 @dataclass(frozen=True)
 class WatchUnconfigured:
-    """kb serve-data reads no watch: the variable not set."""
+    """kb serve-data reads no watch: the variables not set."""
 
-    variable: str
+    variables: tuple[str, ...]
 
 
 def read_watch_settings_or_refusal(
@@ -65,10 +65,12 @@ def read_watch_settings_or_refusal(
 ) -> ExchangeStorageSettings | WatchUnconfigured | str:
     """The settings of the exchange storage that watch is read in; unconfigured when a variable is
     not set, the tops then answering 503 and the items still served (the Mac, a sandbox); a
-    refusal when both are set and one is malformed. The URL is looked at first: AZURE_CLIENT_ID
-    alone is also the identity of the base (KB_DATABASE_AUTH=entra)."""
-    if not environ.get(EXCHANGE_BLOB_URL_VARIABLE):
-        return WatchUnconfigured(EXCHANGE_BLOB_URL_VARIABLE)
-    if not environ.get(CLIENT_ID_VARIABLE):
-        return WatchUnconfigured(CLIENT_ID_VARIABLE)
+    refusal when both are set and one is malformed."""
+    not_set = tuple(
+        variable
+        for variable in (EXCHANGE_BLOB_URL_VARIABLE, CLIENT_ID_VARIABLE)
+        if not environ.get(variable)
+    )
+    if not_set:
+        return WatchUnconfigured(not_set)
     return read_exchange_storage_settings_or_refusal(environ)

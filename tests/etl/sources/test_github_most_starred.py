@@ -161,6 +161,17 @@ def test_an_invalid_repository_is_refused_with_its_rank(changes):
         read_most_starred(response_with(**changes), expected_size=3)
 
 
+@pytest.mark.parametrize(
+    ("count", "crossed"),
+    [(-1, "below 0"), (MAX_INT64 + 1, f"above {MAX_INT64}")],
+)
+def test_a_count_out_of_its_bounds_names_the_bound_it_crossed(count, crossed):
+    with pytest.raises(PageRefusedError) as refusal:
+        read_most_starred(response_with(stargazers_count=count), expected_size=3)
+
+    assert str(refusal.value) == f"repository 1: stargazers_count {crossed}"
+
+
 def test_a_refused_name_is_quoted_by_its_length_only():
     # The name carries the owner's login (register of processing activities).
     with pytest.raises(PageRefusedError) as refusal:

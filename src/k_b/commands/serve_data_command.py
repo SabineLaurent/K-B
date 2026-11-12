@@ -25,11 +25,7 @@ from k_b.database.location import (
     UnreadableDatabaseUrlError,
     read_database_location_or_refusal,
 )
-from k_b.exchange.storage import (
-    CLIENT_ID_VARIABLE,
-    EXCHANGE_BLOB_URL_VARIABLE,
-    ExchangeStorageSettings,
-)
+from k_b.exchange.storage import ExchangeStorageSettings
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -57,7 +53,12 @@ def run_serve_data(data_dir: Path, environ: Mapping[str, str]) -> int:
     logger.info("API clients loaded: %s", ", ".join(sorted(api_keys)))
     logger.info("API allowed hosts: %s", ", ".join(settings.allowed_hosts))
     if isinstance(watch_settings, WatchUnconfigured):
-        log_watch_unconfigured(watch_settings)
+        # INFO whatever is missing: the URL alone is the Mac (kb download-watch-sheets through az
+        # login), AZURE_CLIENT_ID alone the identity of the base (KB_DATABASE_AUTH=entra).
+        logger.info(
+            "watch unconfigured: %s not set; the tops answer 503 watch_unconfigured",
+            ", ".join(watch_settings.variables),
+        )
     try:
         with (
             open_readers(location, DATA_API_QUERY_TIMEOUT_SECONDS) as readers,
@@ -83,22 +84,6 @@ def run_serve_data(data_dir: Path, environ: Mapping[str, str]) -> int:
         logger.error("%s", error)
         return ExitCode.NOT_STARTED
     return ExitCode.SUCCEEDED
-
-
-def log_watch_unconfigured(settings: WatchUnconfigured) -> None:
-    """Say that the tops answer 503; an error when the URL of the storage is set without the
-    identity that reads it, a setting left half made."""
-    if settings.variable == CLIENT_ID_VARIABLE:
-        logger.error(
-            "watch_client_id_missing: %s set without %s; the tops answer 503 watch_unconfigured",
-            EXCHANGE_BLOB_URL_VARIABLE,
-            CLIENT_ID_VARIABLE,
-        )
-        return
-    logger.info(
-        "watch unconfigured: %s not set; the tops answer 503 watch_unconfigured",
-        settings.variable,
-    )
 
 
 def open_watch(

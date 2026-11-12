@@ -12,12 +12,8 @@ from k_b.core.config import GITHUB_MOST_FORKED_SEARCH_QUERY, GITHUB_RANKING_SIZE
 from k_b.etl.raw_store import AUTOMATED_WATCH_DIR_NAME
 from k_b.etl.source_contract import PageRefusedError
 from k_b.etl.sources.github.api import get_from_github_api
-from k_b.etl.tops import TopEntry, read_ranking_count
-from k_b.items import (
-    REPOSITORY_URL_PREFIX,
-    TREND_REPOSITORY_NAME_MAX_LENGTH,
-    is_repository_name,
-)
+from k_b.etl.tops import TopEntry, read_ranking_count, read_ranking_name
+from k_b.items import REPOSITORY_URL_PREFIX
 
 # The name of its raw folders, written once: its instance and its kind use it.
 FOLDER_PREFIX = "github_most_forked"
@@ -80,21 +76,7 @@ def parse_repository(item: object, rank: int) -> ForkedRepository:
     """Read one repository of the ranking, refusing a malformed one."""
     if not isinstance(item, dict):
         raise PageRefusedError(f"repository {rank}: not an object")
-    full_name = item.get("full_name")
-    if not isinstance(full_name, str):
-        raise PageRefusedError(f"repository {rank}: full_name is not a string")
-    # Its length only: the name carries the owner's login.
-    if not is_repository_name(full_name):
-        raise PageRefusedError(
-            f"repository {rank}: not an owner/name, length {len(full_name)}"
-        )
-    # What the twin of the sheet refuses (TopProduction), the collection refuses before: the whole
-    # page, as a repository left out would shift the ranks.
-    if len(full_name) > TREND_REPOSITORY_NAME_MAX_LENGTH:
-        raise PageRefusedError(
-            f"repository {rank}: name of length {len(full_name)},"
-            f" maximum {TREND_REPOSITORY_NAME_MAX_LENGTH}"
-        )
+    full_name = read_ranking_name(item, rank)
     # Checked, not kept: the URL of a repository is built from its name.
     url = item.get("html_url")
     if not isinstance(url, str) or not url.startswith(REPOSITORY_URL_PREFIX):

@@ -172,6 +172,17 @@ def test_an_invalid_repository_is_refused_with_its_rank(changes):
         read_most_forked(response_with(**changes), expected_size=3)
 
 
+@pytest.mark.parametrize(
+    ("count", "crossed"),
+    [(-1, "below 0"), (MAX_INT64 + 1, f"above {MAX_INT64}")],
+)
+def test_a_count_out_of_its_bounds_names_the_bound_it_crossed(count, crossed):
+    with pytest.raises(PageRefusedError) as refusal:
+        read_most_forked(response_with(forks_count=count), expected_size=3)
+
+    assert str(refusal.value) == f"repository 1: forks_count {crossed}"
+
+
 def test_a_repository_that_is_not_an_object_is_refused_with_its_rank():
     response = json.loads(RECORDED_RESPONSE)
     response["items"][1] = "firstcontributions/first-contributions"

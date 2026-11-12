@@ -515,10 +515,10 @@ Les jours qui ont un jumeau, du plus récent au plus ancien, et leur nombre. Un 
   60 s (`WATCH_CACHE_SECONDS`), et les 8 dernières productions lues, par nom et etag, refus compris
   (`WATCH_CACHED_PRODUCTIONS`, 32 Mo au plus). Un redémarrage le vide.
 - **Sans réglage** : sans `KB_EXCHANGE_BLOB_URL` ou sans `AZURE_CLIENT_ID`, `kb serve-data` démarre et le dit au
-  journal ; les tops répondent 503 `watch_unconfigured`, les items restent servis. `KB_EXCHANGE_BLOB_URL` sans
-  `AZURE_CLIENT_ID`, un réglage à moitié fait, est une ligne ERROR, `watch_client_id_missing` ; `AZURE_CLIENT_ID`
-  seul, qui est aussi l'identité de la base (`KB_DATABASE_AUTH=entra`), une ligne INFO. Une URL ou un
-  `AZURE_CLIENT_ID` mal formé : `kb serve-data` ne démarre pas (code 2).
+  journal, une ligne INFO qui nomme les variables absentes ; les tops répondent 503 `watch_unconfigured`, les items
+  restent servis. INFO dans tous les cas : l'URL seule est le réglage du Mac (`kb download-watch-sheets` par
+  `az login`, `.env.example`), et `AZURE_CLIENT_ID` seul l'identité de la base (`KB_DATABASE_AUTH=entra`). Une URL
+  ou un `AZURE_CLIENT_ID` mal formé : `kb serve-data` ne démarre pas (code 2).
 - **La taille** : un top de 100 dépôts aux descriptions les plus longues (1 000 caractères de 4 octets en UTF-8)
   pèse moins de 0,5 Mo, sous le 1 Mo que le site lit (`MAX_WEB_DATA_API_BODY_BYTES` ;
   `test_a_top_of_100_with_the_longest_descriptions_stays_under_the_bound_of_the_site`).
