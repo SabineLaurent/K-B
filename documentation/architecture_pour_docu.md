@@ -6,8 +6,8 @@ Cette fiche décrit l'architecture applicative de K-B en entier: le flux des don
 détail, les couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après le
 code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`, et la purge, sortie
 de `kb import` par #540, d'après le code de sa PR, et les jobs planifiés en ligne et le stockage qu'ils utilisent
-(#420, #330, #423), d'après le code de la PR de #423, et la fenêtre par sujet, par #565, d'après le code de sa PR.
-Les chemins du
+(#420, #330, #423), d'après le code de la PR de #423, et la fenêtre par sujet, par #565, d'après le code de sa PR,
+et le site privé (#562, #563, #571, #587), d'après `main` au commit `1b6e0b8` (2026-11-12). Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -16,6 +16,14 @@ L'installation de l'environnement de développement, les dépendances et leur co
 de la livraison sur Azure dans [la fiche de la livraison continue](livraison_continue_pour_docu.md).
 
 ## Le flux en bref
+
+K-B collecte les sources de veille (GitHub, arXiv, la CISA, tldr.tech, GH Archive) et la lecture choisie (les clips du
+coffre et la bibliothèque Zotero), garde ce qu'il reçoit tel quel dans des fichiers bruts, puis les range dans la base.
+L'API de données sert la base à deux clients. L'API IA fait rédiger par le modèle de langage les comptes rendus de la
+veille et des tendances, que K-B écrit dans la base de connaissance (coffre Obsidian), avec les fiches des dépôts les
+plus étoilés et les plus forkés, tirées directement des fichiers bruts. Le site, `kb serve-web`, montre le fil de
+veille dans le navigateur de sa seule opératrice, derrière la connexion Microsoft Entra de Container Apps. Le schéma
+qui suit dit la même chose.
 
 ```mermaid
 flowchart LR
@@ -29,6 +37,8 @@ flowchart LR
     model("Modèle de langage")
     reports["Comptes rendus"]
     vault[("Base de connaissance<br>(coffre Obsidian)")]
+    web["Site<br>(kb serve-web)"]
+    browser("Navigateur de l'opératrice")
     sources -->|"collecte"| collect
     choice -->|"collecte"| collect
     collect -->|"garde tel quel"| raw
@@ -39,13 +49,9 @@ flowchart LR
     aiApi <-->|"rédige"| model
     aiApi -->|"rédige"| reports
     reports -->|"écrit"| vault
+    dataApi -->|"sert les items"| web
+    web -->|"montre le fil,<br>derrière la connexion Entra"| browser
 ```
-
-K-B collecte les sources de veille (GitHub, arXiv, la CISA, tldr.tech, GH Archive) et la lecture choisie (les clips du
-coffre et la bibliothèque Zotero), garde ce qu'il reçoit tel quel dans des fichiers bruts, puis les range dans la base,
-que l'API de données sert à l'API IA, qui fait rédiger par le modèle de langage les comptes rendus de la veille et des
-tendances, que K-B écrit dans la base de connaissance (coffre Obsidian), avec les fiches des dépôts les plus étoilés et
-les plus forkés, tirées directement des fichiers bruts.
 
 ## Le flux des données, en détail
 
@@ -248,7 +254,7 @@ joint pas le modèle: elle rejoue les réponses du fichier `KB_LLM_REPLAY_FILE` 
 ## Les couches du code
 
 Le code de K-B est rangé en trois couches (`.claude/rules/conventions.md`, règle 5): la présentation (`cli.py`,
-`commands/` et les routes des deux API), le métier et l'ETL (`etl/`), l'accès aux données (`database/`). Une couche
+`commands/`, les routes des deux API et les pages du site), le métier et l'ETL (`etl/`), l'accès aux données (`database/`). Une couche
 n'appelle que celle du dessous. `items.py` et `core/` sont le vocabulaire commun: chaque couche peut les importer.
 Les tests de `tests/architecture/` lisent les imports de chaque module et tiennent ces règles.
 
@@ -263,6 +269,7 @@ Les tests de `tests/architecture/` lisent les imports de chaque module et tienne
 | `exchange/` | le client du stockage d'échange, Azure Blob Storage, par l'identité managée ou, sur le Mac, le compte d'`az login`: réglages, transport, erreurs nommées, téléchargement d'une version listée | importer autre chose que `core`, ou `core/atomic_write.py` (`test_layers.py:411`); être importé par un autre paquet que `jobs`, `commands` et `data_api` (`:417`) |
 | `database/` | tout le SQL de la base de K-B: création, lecture, écriture (`writers/`, une sorte d'item par module), purge, moteurs | importer autre chose que `database`, `items` et `core` (`test_layers.py:28`); hors de `database/`, atteindre `database/writers` (`:45`). Seul `database/` importe un pilote de base, avec `etl/sources/zotero.py` pour la base de Zotero (`tests/architecture/test_engine_imports.py:36`) |
 | `data_api/` | l'API de données | importer autre chose que `data_api`, `database`, `items`, `core` et `exchange`, ou les écrivains, la purge et l'écriture d'un fichier (`tests/architecture/test_apis.py:42`) |
+| `web/` | le site, rendu par le serveur avec Jinja2, sans JavaScript; il lit l'API de données par HTTP, par la clé du client `WEB`, et ne touche pas la base | importer autre chose que `web`, `core` et `items`, ou `core/atomic_write.py` (`test_layers.py:489`); être importé par un autre paquet que `commands` (`:495`) |
 | `ai_api/` | l'API IA, rangée en 16 couches internes | importer autre chose que `ai_api`, `items` et `core` (`test_apis.py:120`); importer sa couche ou celles du dessus (`:226`) |
 | `items.py`, `core/` | les types communs des items, les réglages par défaut, la citation d'une valeur au journal, le code commun des deux API | `core` n'importe rien de K-B (`test_layers.py:20`) |
 
@@ -358,7 +365,8 @@ K-B tourne de deux façons, par le même code.
 
 **Sur le Mac**, sans conteneur: chaque commande se lance par `uv run kb …`. Les données sont dans le dossier de
 `KB_DATA_DIR`: le brut, l'état de la collecte, la base SQLite, les journaux d'import, les journaux de fonctionnement
-(`logs/`) et le registre des tendances. Les deux API écoutent sur `127.0.0.1`, la machine seule.
+(`logs/`) et le registre des tendances. Les deux API et le site écoutent sur `127.0.0.1`, la machine seule; le site
+sur le port 8002 (`core/config.py:304-305`).
 
 **En ligne, sur Azure**, depuis l'image de K-B, dans l'environnement Azure Container Apps `cae-kb`. Le Bicep
 d'`infra/` décrit chaque ressource ([`infra/README.md`](../infra/README.md), tableau des modules); voici les
@@ -368,6 +376,7 @@ principales:
 |---|---|---|
 | `ca-kb-data-api` | lance `kb serve-data`, sur la base PostgreSQL en ligne, ouverte par l'identité managée (`KB_DATABASE_AUTH=entra`) | `infra/main.bicep:165-199` |
 | `ca-kb-ai-api` | lance `kb serve-ai`, qui lit `ca-kb-data-api` en HTTPS | `infra/main.bicep:200-235` |
+| `ca-kb-web` | lance `kb serve-web`, le site privé, qui lit `ca-kb-data-api` en HTTPS. La connexion Microsoft Entra de Container Apps n'admet que l'identifiant d'objet de l'opératrice, que le code vérifie aussi à chaque requête (`KB_WEB_OPERATOR_ID`, `web/operator_check.py:45`) | `infra/main.bicep:320-352`, au commit `1b6e0b8` |
 | `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test` | `infra/main.bicep:237`, `commands/smoke_test_command.py:68-81` |
 | `caj-kb-migrate-database` | job manuel, lance `kb migrate-database` | `infra/main.bicep:277` |
 | `pgsql-kb-…` | le serveur PostgreSQL 18 flexible, par Entra ID seul | `infra/main.bicep:265` |
@@ -375,8 +384,10 @@ principales:
 | `crkb…`, `kv-kb-…`, `log-kb` | le registre de l'image, le coffre des secrets, l'espace des journaux | `infra/main.bicep:58-104` |
 
 Les deux API n'ont qu'une entrée interne, en HTTPS: elles n'ont pas d'adresse publique
-(`infra/modules/api-container-app.bicep:74-81`). Les apps et les jobs déclarés en ligne sont ceux
-d'`infra/deployment.json`: `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, `caj-kb-migrate-database`,
+(`infra/modules/api-container-app.bicep:74-81`). Le site n'a une adresse publique qu'une fois sa connexion en place,
+quand `exposeWeb` l'ouvre (`infra/main.bicep:345`; [`infra/README.md`](../infra/README.md), « Le site privé
+(#571) »). Les apps et les jobs déclarés en ligne sont ceux d'`infra/deployment.json`: `ca-kb-data-api`,
+`ca-kb-ai-api`, `ca-kb-web`, `caj-kb-smoke-test`, `caj-kb-migrate-database`,
 `caj-kb-daily-routine` et `caj-kb-digest-watch`. Un
 tag de version sur `main` les met à jour ([la fiche de la livraison continue](livraison_continue_pour_docu.md)).
 
@@ -501,8 +512,9 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   routine à l'écart, pas le job des comptes rendus, qui ne touche pas la base.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
-- **L'interface web n'existe pas encore**: la fiche décrit `main`, où K-B se lit dans Obsidian et se lance dans le
-  terminal.
+- **Le site ne montre encore que le fil de veille**, avec `/sources` et `/accessibilite` (`web/pages.py:44`, `:109`,
+  `:114`): le détail d'un item (#564) et les tendances (#596) viennent ensuite. Les comptes rendus se lisent dans
+  Obsidian, et K-B se lance dans le terminal.
 
 ## Vérifier cette fiche
 
@@ -520,6 +532,9 @@ uv run kb --help
 grep -n "SourceKind(" src/k_b/etl/source_kinds.py
 # Les routes des deux API.
 grep -nE "@router\.(get|post)|APIRouter\(" src/k_b/data_api/routers/*.py src/k_b/ai_api/routers/*.py
+# Les pages du site et son app en ligne, au commit 1b6e0b8.
+git show 1b6e0b8:src/k_b/web/pages.py | grep -n "@router.get"
+git show 1b6e0b8:infra/main.bicep | sed -n '320,352p'
 # Les 15 tables de chaque schéma.
 grep -c "^CREATE TABLE" src/k_b/database/schema.sql src/k_b/database/schema_postgresql.sql
 # Les apps et les jobs déclarés en ligne, puis le seul conteneur du stockage d'échange.

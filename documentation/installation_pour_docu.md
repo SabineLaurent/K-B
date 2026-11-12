@@ -123,7 +123,7 @@ avec `--dry-run`, ils ne lisent que `KB_DATA_DIR` et `KB_LOG_TO_FILE` (`main`, `
 
 ## Les dépendances
 
-`pyproject.toml` déclare les 16 dépendances de K-B (`[project]`, `dependencies`) et le groupe `dev`
+`pyproject.toml` déclare les 17 dépendances de K-B (`[project]`, `dependencies`) et le groupe `dev`
 (`[dependency-groups]`), qui ne sert qu'au développement et aux tests. `uv.lock` fixe la version exacte de chaque
 paquet, dépendances indirectes comprises: 96 paquets, K-B compris. Chacun porte l'empreinte `sha256` de ses fichiers,
 sauf K-B, installé depuis le dépôt (`source = { editable = "." }`).
@@ -135,16 +135,17 @@ L'image n'installe pas le groupe `dev`: ses deux `uv sync` portent `--no-dev` (`
 | `azure-storage-blob` | 12.31.1 | — | 12.31.1 | le stockage d'échange des jobs: le miroir des clips, la publication de `veille/`, la liste de `kb smoke-test` (`jobs/`) |
 | `beautifulsoup4` | 4.15.0 | — | 4.15.0 | la lecture des pages HTML de TLDR (`etl/sources/tldr.py`) |
 | `defusedxml` | 0.7.1 | — | 0.7.1 | la lecture du flux Atom d'arXiv, sans développer une entité déclarée dans le flux (`etl/sources/arxiv.py`) |
-| `fastapi` | 0.122 | — | 0.143.1 | les deux API, leurs routes et leurs dépendances (`data_api/`, `ai_api/`, `core/api_*.py`) |
+| `fastapi` | 0.122 | — | 0.143.1 | les deux API et le site, leurs routes et leurs dépendances (`data_api/`, `ai_api/`, `web/`, `core/api_*.py`) |
 | `google-cloud-bigquery` | 3.46 | < 4 | 3.46.1 | la requête de GH Archive sur BigQuery (`etl/sources/gh_archive.py`) |
-| `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), les `/health` des jobs (`jobs/api_health.py`) |
+| `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), le site vers l'API de données (`web/data_api_client.py`), les `/health` des jobs (`jobs/api_health.py`) |
+| `jinja2` | 3.1.6 | — | 3.1.6 | les gabarits des pages du site, rendus par le serveur, chaque valeur échappée (`autoescape=True`, `web/rendering.py`) |
 | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | < 1.46 | 1.45.2 | l'export des mesures, des traces et des journaux de l'API IA en OTLP (`ai_api/connectors/metrics_export.py`, `ai_api/connectors/trace_export.py`, `ai_api/tracing.py`, `ai_api/observability/metric_instruments.py`). La borne: `trace_export.py` importe des modules privés du SDK et de son exportateur, qui changent d'une version à l'autre |
 | `psycopg[binary]` | 3.3.8 | — | 3.3.8, avec `psycopg-binary` 3.3.8 | la connexion à PostgreSQL (`database/postgresql.py`, `database/errors.py`). L'option `binary` apporte libpq: la machine n'a pas à l'installer (documentation de psycopg, « Installation », lue par Context7 le 2026-11-08) |
 | `psycopg-pool` | 3.3.3 | — | 3.3.3 | le pool des connexions de lecture de l'API de données sur PostgreSQL (`database/postgresql.py`) |
 | `pydantic` | 2.13.5 | — | 2.13.5 | la validation des entrées: les items des sources (`items.py`, `etl/sources/`), les schémas et les réglages des API (`data_api/`, `ai_api/`), les réponses que lisent `kb digest` et `kb trend-report` (`post/`) |
 | `pyyaml` | 6.0.3 | — | 6.0.3 | la lecture du frontmatter des clips (`etl/sources/clipping.py`) |
 | `requests` | 2.34.2 | — | 2.34.2 | la session HTTP des exportateurs OTLP, qui ne lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`build_session`, `ai_api/connectors/metrics_export.py`) |
-| `uvicorn` | 0.54.0 | — | 0.54.0 | le serveur des deux API (`commands/serve_data_command.py`, `commands/serve_ai_command.py`) |
+| `uvicorn` | 0.54.0 | — | 0.54.0 | le serveur des deux API et du site (`commands/serve_data_command.py`, `commands/serve_ai_command.py`, `commands/serve_web_command.py`) |
 
 Les paquets du groupe `dev` (pytest, ruff, mypy…) et leur rôle sont dans [la fiche des tests](tests_pour_docu.md),
 « Les dépendances installées ».
