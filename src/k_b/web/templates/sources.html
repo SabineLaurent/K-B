@@ -1,3 +1,4 @@
+{%- from "links.html" import external_link -%}
 {% extends "base.html" %}
 {% block title %}Sources et conditions d’utilisation{% endblock %}
 {% block main_class %}page prose{% endblock %}
@@ -5,9 +6,9 @@
 <h1>Sources et conditions d’utilisation</h1>
 <h2>Sources</h2>
 <ul>
-<li>Papiers: l’API (interface de programmation) d’arXiv; ses métadonnées sont sous CC0 1.0. <a href="https://info.arxiv.org/help/api/tou.html" hreflang="en">Conditions d’utilisation de l’API d’arXiv (en anglais, site externe)</a>.</li>
+<li>Papiers: l’API (interface de programmation) d’arXiv; ses métadonnées sont sous CC0 1.0. {{ external_link("https://info.arxiv.org/help/api/tou.html", "Conditions d’utilisation de l’API d’arXiv", "en anglais, site externe, nouvel onglet", "en") }}.</li>
 <li>Failles: le catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>), sous CC0 1.0.</li>
-<li>Alertes: la <i lang="en">GitHub Advisory Database</i>, sous <a href="https://creativecommons.org/licenses/by/4.0/deed.fr">licence CC BY 4.0 (site externe)</a>.</li>
+<li>Alertes: la <i lang="en">GitHub Advisory Database</i>, sous {{ external_link("https://creativecommons.org/licenses/by/4.0/deed.fr", "licence CC BY 4.0", "site externe, nouvel onglet") }}.</li>
 <li><span lang="en">Releases</span>: les dépôts GitHub suivis; chaque note de version reste sous la licence de son dépôt.</li>
 <li>Articles de newsletters: tldr.tech, lu sur le web; les textes restent à leur éditeur.</li>
 </ul>

@@ -40,18 +40,31 @@ sinon dans le 422 JSON de FastAPI, qui recopie la valeur reçue. Limite : `q`, `
 sa dernière valeur, alors qu'une `page` répétée rend la 404 ; seule une adresse écrite à la main répète un
 champ.
 
-**La carte** d'un item donne sa sorte, sa date au mois en lettres (`<time>`), la pastille « Exploitée (KEV) »
-(lue dans `exploited` : une faille, une alerte dont la CVE est au catalogue ; une faille retirée du catalogue
-n'a que la ligne « retirée du catalogue le … », décision de Sabine du 2026-11-11), ses identifiants, son titre et le lien vers la
-source, « (en anglais, site externe) » ou, pour une newsletter, « (site externe) ». Une URL qui n'est pas en
+**La carte** d'un item donne, sur une ligne qui passe à la ligne sur un téléphone, sa sorte encadrée, sa date
+au mois en lettres (`<time>`), ses identifiants et la pastille « Exploitée (KEV) » (lue dans `exploited` : une
+faille, une alerte dont la CVE est au catalogue ; une faille retirée du catalogue n'a que la ligne « retirée du
+catalogue le … », décision de Sabine du 2026-11-11) ; puis son titre et le lien vers la source, court et petit
+comme les maquettes (« Lire sur arxiv.org ↗ »). Ce lien s'ouvre dans un nouvel onglet (`target="_blank"`,
+`rel="noopener noreferrer"` : la page ouverte n'atteint ni la page de K-B ni son adresse), que son texte annonce,
+en plus petit : « (en anglais, site externe, nouvel onglet) » ou, pour une newsletter, « (site externe, nouvel
+onglet) » (Opquast 2025, règle 146 ; demande de Sabine du 2026-11-11, pour rester dans K-B). Les liens de
+`/sources` font de même : tout lien vers un autre site s'écrit par la macro `external_link`
+(`web/templates/links.html`), seule à poser `target="_blank"` (`tests/web/test_templates.py`) ; un lien du site ne
+s'ouvre jamais ailleurs (règle 138). Une URL qui n'est pas en
 `https` vers un hôte ne devient jamais un lien. Le titre n'est pas encore un lien : le détail vient avec
 #564. Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
 M et les 20 items par page (Opquast 13) ; au-delà de 10 020 items, une phrase dit d'affiner
-les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page gardent les
-filtres. Le fil vide propose « Élargir à 7 jours ».
+les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page, des boutons
+encadrés comme les maquettes, « Page suivante » à droite même quand la ligne se replie, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
+du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Cette ligne porte
+`tabindex="-1"` : en suivant l'ancre, le navigateur lui donne le focus (WHATWG, « Scrolling to a fragment » :
+les étapes de focus sur la cible, le *viewport* sinon), et le clavier comme un lecteur d'écran repartent des
+résultats (tranché par time-knight, deuxième revue de code ; non essayé dans un navigateur). Le formulaire envoyé
+et « Élargir à 7 jours », une nouvelle recherche, s'ouvrent en haut de la page. Le fil vide propose « Élargir
+à 7 jours ».
 
 **Les erreurs** : un champ refusé par le site, ou `q` refusé par l'API (422 `invalid_parameter` sur `q`
 seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ. Tout autre
@@ -91,7 +104,13 @@ Le code le vérifie aussi, sur chaque requête sauf `/health` (`web/operator_che
 est celui que suit le routeur, décodé (`scope["path"]`) : `request.url.path` lit `/health` dans
 `/health%3F`. L'en-tête doit être
 présent une seule fois, être un GUID, et valoir `KB_WEB_OPERATOR_ID`, sans tenir compte de la casse. Sinon,
-la page 403 « Accès réservé » répond, avec un lien « Se déconnecter » (`/.auth/logout`). Le journal dit
+la page 403 « Accès réservé » répond, avec un lien « Se déconnecter » (`/.auth/logout`). Avec le contrôle,
+chaque autre page porte « Se déconnecter » à la fin de son en-tête (Sabine, 2026-11-11) ; la page 403 ne le
+répète pas, son bouton suffit. La plateforme sert `/.auth/logout` : elle efface les cookies de la session,
+supprime les jetons de l'utilisatrice du magasin de jetons, la déconnecte côté serveur de Microsoft Entra, puis
+renvoie vers `/.auth/logout/done` ([Microsoft Learn, « Authentication and authorization in Azure Container
+Apps »](https://learn.microsoft.com/en-us/azure/container-apps/authentication), « Sign out of a session », page
+mise à jour le 2026-07-08, lue le 2026-11-11). Le journal dit
 `operator_refused: header_absent|header_repeated|header_malformed|header_other request_id=…`, jamais la
 valeur reçue.
 
@@ -121,7 +140,10 @@ du réseau pourrait poser l'en-tête.
 | `KB_LOG_TO_FILE` | `true` par défaut : `logs/kb-serve-web.log` | `false` (image) : la sortie d'erreur |
 
 En ligne, l'app sert `serve-web` par une entrée externe en HTTPS seulement, avec l'authentification Entra
-en « Require authentication » (redirection vers `/.auth/login/aad`). Sa sonde est `GET /health`.
+en « Require authentication » : sans session, un navigateur reçoit un 302 vers la connexion de Microsoft Entra
+(`login.microsoftonline.com/<tenant>/oauth2/v2.0/authorize`, seul fournisseur), et un client qui n'accepte pas
+`text/html` un 401 avec `WWW-Authenticate: Bearer` (constat en ligne de time-knight, 2026-11-11). Sa sonde est
+`GET /health`.
 
 ## En-têtes
 
@@ -179,8 +201,12 @@ Les gabarits sont lus dans le paquet. `tests/web/test_templates.py` vérifie qu'
 3.45.0, lues le 2026-11-11) : l'imbrication, les couches (`@layer`), les propriétés logiques, `:where()`,
 les unités `dvb` et la syntaxe d'intervalle des media queries. `text-wrap: balance`, « Newly available »,
 ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. Les trois largeurs des maquettes
-(390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Une page s'imprime sans en-tête, pied
-de page ni boutons (`@media print`).
+(390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Le formulaire du fil suit chacune
+(Sabine, 2026-11-11) : sur un téléphone, les sortes et les boutons radio en deux colonnes ; sur une tablette,
+les sortes en trois, et « Date de début » à droite des boutons radio ; sur un ordinateur, les sortes sur une
+ligne, et le champ de date après son libellé, sur la ligne des boutons radio. Les aides restent collées à leur
+libellé. Mesuré dans Chrome le 2026-11-11, il passe de 585 à 409 px de haut à 1280 px (334 px pour la
+maquette, sans les trois aides). Une page s'imprime sans en-tête, pied de page ni boutons (`@media print`).
 
 ## Accessibilité
 
@@ -194,7 +220,9 @@ qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 - le lien courant, et les liens du pied de page en liste ;
 - les SVG décoratifs ;
 - l'absence de script ;
-- un lien vers un autre site dit « site externe », et sa langue quand elle n'est pas le français ;
+- un lien vers un autre site dit « site externe » et « nouvel onglet », s'ouvre dans un nouvel onglet
+  (`target="_blank"`, `rel="noopener noreferrer"`) et donne sa langue quand elle n'est pas le français ; un lien
+  du site s'ouvre dans le même onglet ;
 - la première abréviation d'une page suivie de son sens, une date au mois écrit en lettres ;
 - aucune espace avant « : » ni « ; » dans le texte (règle de Sabine).
 
