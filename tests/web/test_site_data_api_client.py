@@ -380,3 +380,16 @@ def test_an_advisory_without_package_is_read():
     assert (
         read_item(make_client(answer(200, body)), ADVISORY_WITHOUT_CVE).packages == []
     )
+
+
+@pytest.mark.parametrize(
+    "ghsa_id",
+    [chr(0x01), "GHSA-0000-0000-0000", "ghsa-fjqc-hq36-qh5p", "GHSA-fjqc-hq36"],
+)
+def test_an_advisory_id_out_of_the_form_the_base_holds_is_an_invalid_answer(ghsa_id):
+    """The base holds GHSA_ID by its GLOB (items.py): another form is no answer of the data API."""
+    body = make_detail(ADVISORY_WITHOUT_CVE, ghsa_id=ghsa_id)
+
+    error = read_item_state(make_client(answer(200, body)), ADVISORY_WITHOUT_CVE)
+
+    assert error.state == "data_api_invalid_response"

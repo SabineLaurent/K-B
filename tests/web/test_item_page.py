@@ -203,7 +203,8 @@ def test_a_release_without_notes_says_so():
     [
         (PAPER, ("title", "summary")),
         (VULNERABILITY, ("title", "description", "vendor", "product")),
-        (ADVISORY_IN_CATALOG, ("title", "ghsa_id")),
+        # ghsa_id is GhsaId: a mark out of its form is an invalid answer, the page 500.
+        (ADVISORY_IN_CATALOG, ("title",)),
         (RELEASE, ("title", "tag_name", "body")),
         (NEWSLETTER_ARTICLE, ("title", "summary")),
     ],

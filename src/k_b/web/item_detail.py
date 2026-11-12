@@ -23,7 +23,11 @@ from k_b.web.feed import (
     write_newsletter_name,
 )
 from k_b.web.french_dates import write_day
-from k_b.web.received_text import clean_received_text, clean_received_value
+from k_b.web.received_text import (
+    clean_received_text,
+    clean_received_value,
+    is_blank,
+)
 
 # Digits of ASCII only, without a zero first: one address for each item (Opquast 2025, rule 169).
 # The one form of the id of an item in the site: #403 changes it here alone.
@@ -164,7 +168,7 @@ def write_page_title(detail: ItemDetail) -> str:
         case VulnerabilityDetail():
             return f"Faille {detail.cve_id}"
         case AdvisoryDetail():
-            return f"Alerte {clean_received_text(detail.ghsa_id)}"
+            return f"Alerte {detail.ghsa_id}"
         case ReleaseDetail():
             tag = clean_received_value(detail.tag_name) or NO_TAG
             return f"Version {tag} de {detail.repository_name}"
@@ -263,22 +267,26 @@ def build_facts(detail: ItemDetail) -> tuple[Fact, ...]:
         return (
             Fact(
                 "Identifiant GitHub",
-                (clean_received_text(detail.ghsa_id),),
+                (detail.ghsa_id,),
                 is_code=True,
             ),
             Fact("CVE", (detail.cve_id,), is_code=True)
             if detail.cve_id
             else Fact("CVE", (NO_CVE,)),
-            Fact(
-                "Paquets touchés",
-                tuple(map(clean_received_text, detail.packages)),
-                is_code=True,
-                is_list=True,
-            )
-            if detail.packages
-            else Fact("Paquets touchés", (NO_PACKAGE,)),
+            write_packages(detail),
         )
     return ()
+
+
+def write_packages(advisory: AdvisoryDetail) -> Fact:
+    """The packages of an advisory, a package left empty by the cleaning left out; Aucun when none
+    is left."""
+    packages = tuple(
+        package for package in map(clean_received_value, advisory.packages) if package
+    )
+    if not packages:
+        return Fact("Paquets touchés", (NO_PACKAGE,))
+    return Fact("Paquets touchés", packages, is_code=True, is_list=True)
 
 
 def build_texts(detail: ItemDetail) -> tuple[ItemText, ...]:
@@ -311,4 +319,6 @@ def split_paragraphs(text: str) -> tuple[str, ...]:
     """The text cleaned, cut at its blank lines, each paragraph keeping its lines but the blank
     ones at its start or its end."""
     blocks = BLANK_LINES.split(clean_received_text(text))
-    return tuple(EDGE_BLANK_LINES.sub("", block) for block in blocks if block.strip())
+    return tuple(
+        EDGE_BLANK_LINES.sub("", block) for block in blocks if not is_blank(block)
+    )

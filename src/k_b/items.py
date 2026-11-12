@@ -192,6 +192,7 @@ WebUrl = Annotated[
 ]
 # The ASCII patterns below refuse a NUL and a surrogate already.
 CveId = Annotated[str, StringConstraints(pattern=f"^{CVE_ID}$")]
+GhsaId = Annotated[str, StringConstraints(pattern=f"^{GHSA_ID}$")]
 # Narrower than the GLOB '?*/?*' of tracked_repository and trend in schema.sql.
 RepositoryName = Annotated[str, StringConstraints(pattern=f"^{REPOSITORY_NAME}$")]
 # The CHECK of newsletter_article.edition in schema.sql. Anchored, and given as text: pydantic

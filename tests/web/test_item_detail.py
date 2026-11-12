@@ -28,7 +28,7 @@ from k_b.web.item_detail import (
     read_item_id,
     split_paragraphs,
 )
-from k_b.web.received_text import clean_received_text
+from k_b.web.received_text import clean_received_text, clean_received_value
 
 
 def build(item_id, **changes):
@@ -350,3 +350,44 @@ def test_a_line_of_unicode_blanks_ends_a_paragraph_and_blank_lines_around_go():
     text = "   \nFixes bug\n\u00a0\nMore\n\u3000\n  indented line\n"
 
     assert split_paragraphs(text) == ("Fixes bug", "More", "  indented line")
+
+
+@pytest.mark.parametrize(
+    "invisible", ["\u200b", "\ufeff", "\u2060", "\u00ad", " \u200b\n"]
+)
+def test_a_text_of_blanks_and_format_characters_alone_is_empty(invisible):
+    """Nothing is drawn: a heading or a chip would be empty."""
+    assert clean_received_value(invisible) is None
+
+
+def test_a_combining_grapheme_joiner_alone_is_kept():
+    """U+034F is a mark (Mn), not a format character."""
+    assert clean_received_value("\u034f") == "\u034f"
+
+
+def test_a_title_or_a_tag_of_format_characters_alone_is_said_without_title_or_name():
+    page = build(RELEASE, title="\u200b", tag_name="\ufeff")
+
+    assert (page.title, page.title_lang) == ("Sans titre", None)
+    assert page.line[1] == LinePart("sans nom")
+
+
+def test_a_package_left_empty_by_the_cleaning_is_left_out():
+    page = build(ADVISORY_WITHOUT_CVE, packages=[chr(0x07), "langchain", "\u200b"])
+
+    assert (
+        Fact("Paquets touchés", ("langchain",), is_code=True, is_list=True)
+        in page.facts
+    )
+
+
+def test_packages_all_left_empty_say_none():
+    page = build(ADVISORY_WITHOUT_CVE, packages=[chr(0x07)])
+
+    assert Fact("Paquets touchés", ("Aucun",)) in page.facts
+
+
+def test_a_paragraph_of_format_characters_alone_is_no_paragraph():
+    assert split_paragraphs("Notes\n\n\u200b\n") == ("Notes",)
+    page = build(RELEASE, body="\u200b")
+    assert (page.texts, page.empty_text) == ((), "Aucune note de version.")

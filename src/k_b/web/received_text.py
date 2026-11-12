@@ -9,6 +9,7 @@ from k_b.core.config import BIDI_CONTROLS
 
 KEPT_CONTROLS = frozenset("\t\n")
 DROPPED_CATEGORIES = frozenset({"Cc", "Cs"})
+FORMAT_CATEGORY = "Cf"
 # U+FDD0 to U+FDEF, and the last two code points of each plane: U+FFFE, U+FFFF, U+1FFFE...
 FIRST_NONCHARACTER = 0xFDD0
 LAST_NONCHARACTER = 0xFDEF
@@ -23,9 +24,17 @@ def clean_received_text(text: str) -> str:
 
 
 def clean_received_value(text: str) -> str | None:
-    """The text cleaned; None when the cleaning leaves only blanks, for the caller to say so."""
+    """The text cleaned; None when the cleaning leaves nothing drawn, for the caller to say so."""
     cleaned = clean_received_text(text)
-    return cleaned if cleaned.strip() else None
+    return None if is_blank(cleaned) else cleaned
+
+
+def is_blank(text: str) -> bool:
+    """Whether the text draws nothing: blanks and format characters (Cf, U+200B or U+FEFF) only."""
+    return all(
+        character.isspace() or unicodedata.category(character) == FORMAT_CATEGORY
+        for character in text
+    )
 
 
 def is_kept(character: str) -> bool:

@@ -410,7 +410,7 @@ def test_the_sources_name_the_author_of_the_site():
 
 
 def test_the_accessibility_statement_gives_its_date():
-    """Opquast 2025, rule 6: established, then updated with #564."""
+    """Opquast 2025, rule 6: established, then updated."""
     assert outline(PAGES["/accessibilite"]).find_all("time") == [
         {"datetime": "2026-11-11"},
         {"datetime": "2026-11-12"},
@@ -638,3 +638,4 @@ def test_the_statement_says_its_limits_of_the_detail():
     assert "texte brut" in text
     assert "hypothèse" in text
     assert "le sens de chaque sigle" not in text
+    assert "TLDR, nom de la newsletter, n’est pas développé" in text

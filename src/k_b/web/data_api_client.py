@@ -31,6 +31,7 @@ from k_b.items import (
     MAX_INT64,
     ArxivId,
     CveId,
+    GhsaId,
     NewsletterEdition,
     NonEmptyText,
     RansomwareUse,
@@ -104,7 +105,7 @@ class FeedVulnerability(FeedItemBase):
 
 class FeedAdvisory(FeedItemBase):
     kind: Literal["advisory"]
-    ghsa_id: NonEmptyText
+    ghsa_id: GhsaId
     cve_id: CveId | None
     # True: the CVE is in the CISA KEV catalog; false: absent from it; null: no CVE.
     exploited: bool | None
