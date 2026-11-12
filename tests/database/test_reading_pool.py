@@ -8,6 +8,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from database.connected_readers import open_connected_readers
 
 from k_b.database import reading
 from k_b.database.creation import create_database
@@ -53,7 +54,7 @@ def test_a_url_libpq_cannot_read_is_refused_before_the_pool_without_its_text():
 @pytest.fixture
 def readers(items_postgresql_base):
     """A pool of the test, its deadline short."""
-    with open_readers(items_postgresql_base, TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(items_postgresql_base, TIMEOUT_SECONDS) as readers:
         yield readers
 
 
@@ -260,7 +261,7 @@ def test_the_detail_reads_one_state_of_the_base_while_a_writer_commits(
     monkeypatch.setattr(reading, "read_highlights", withdraw_every_highlight_first)
     try:
         with (
-            open_readers(postgresql_base, TIMEOUT_SECONDS) as readers,
+            open_connected_readers(postgresql_base, TIMEOUT_SECONDS) as readers,
             connect_reader(readers, TIMEOUT_SECONDS) as connection,
         ):
             detail = read_item_detail(connection, 14, BOUNDS)
@@ -284,7 +285,7 @@ def test_the_pool_lends_no_connection_beyond_its_wait(
 
     monkeypatch.setattr(postgresql, "READING_POOL_MAX_SIZE", 1)
     monkeypatch.setattr(postgresql, "READING_POOL_WAIT_SECONDS", 0.2)
-    with open_readers(items_postgresql_base, TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(items_postgresql_base, TIMEOUT_SECONDS) as readers:
         lent = threading.Event()
         release = threading.Event()
 

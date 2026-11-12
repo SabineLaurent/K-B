@@ -6,10 +6,11 @@ from pathlib import Path
 from typing import get_args
 
 import pytest
+from database.connected_readers import open_connected_readers
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
 from k_b.data_api.routers import item_router
-from k_b.database.engine import connect_database, open_readers
+from k_b.database.engine import connect_database
 from k_b.database.reading import ItemPage, read_item_detail
 from k_b.items import MAX_INT64, MAX_LENGTH_BY_KIND, MIN_INT64, ItemKind
 
@@ -481,7 +482,7 @@ def client_beyond_the_detail_bounds(engine, new_base, make_client, api_keys):
     if engine == "sqlite":
         yield make_client(new_base, api_keys)
         return
-    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
         yield make_client(readers, api_keys)
 
 
@@ -539,7 +540,7 @@ def client_beyond_the_list_bound(engine, new_base, make_client, api_keys):
     if engine == "sqlite":
         yield make_client(new_base, api_keys)
         return
-    with open_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
         yield make_client(readers, api_keys)
 
 

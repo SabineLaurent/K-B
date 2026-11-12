@@ -4,6 +4,7 @@ import logging
 
 import psycopg
 import pytest
+from database.connected_readers import open_connected_readers
 from fastapi.routing import iter_route_contexts
 
 from k_b.core.config import (
@@ -13,7 +14,7 @@ from k_b.core.config import (
 )
 from k_b.data_api.routers import item_router
 from k_b.database import engine
-from k_b.database.engine import make_deadline_check, open_readers
+from k_b.database.engine import make_deadline_check
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
 HTTP_METHODS = (
@@ -125,7 +126,9 @@ def test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_wit
     try:
         # Names of the test only: nothing from outside enters the statement.
         holder.execute(f"LOCK TABLE {table} IN ACCESS EXCLUSIVE MODE")
-        with open_readers(items_postgresql_base, POSTGRESQL_TIMEOUT_SECONDS) as readers:
+        with open_connected_readers(
+            items_postgresql_base, POSTGRESQL_TIMEOUT_SECONDS
+        ) as readers:
             client = make_client(readers, api_keys)
             client.app.state.query_timeout_seconds = POSTGRESQL_TIMEOUT_SECONDS
             with caplog.at_level(logging.WARNING):
@@ -153,7 +156,9 @@ def test_on_postgresql_a_database_error_gives_500_without_detail_and_logs_its_ty
     make_client, postgresql_base, api_keys, authorization, caplog
 ):
     """A base without the tables of K-B: the type of the error only, never its message."""
-    with open_readers(postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+    with open_connected_readers(
+        postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS
+    ) as readers:
         client = make_client(readers, api_keys)
         with caplog.at_level(logging.ERROR, logger="k_b.data_api"):
             response = client.get("/items", headers=authorization)
