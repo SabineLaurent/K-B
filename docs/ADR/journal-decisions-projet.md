@@ -7063,8 +7063,15 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   retiré ; un titre que le nettoyage vide devient « Sans titre », en français, au fil et au détail ; une version
   vide, « sans nom ».** Pourquoi (revue de code, tranché par time-knight) : la base ne borne que leur longueur
   (`schema.sql`), si bien qu'un résumé vide y est une valeur valide. `NonEmptyText` en aurait fait une page 500,
-  et un titre vidé un lien sans nom (RGAA 6.2). Option écartée : refuser ces items, alors que la base les tient.
-  — PR de #564
+  et un titre vidé un lien sans nom (RGAA 6.2). Une seule définition du vide, `is_blank` : rien que des blancs et
+  des caractères de format (`Cf`, comme U+200B), sans quoi un titre fait de U+200B s'afficherait vide (dernière
+  revue de code). Option écartée : refuser ces items, alors que la base les tient. — PR de #564
+- **L'identifiant d'une alerte est lu par un type `GhsaId`, ajouté à `items.py` à côté de `CveId`, et non
+  nettoyé ni remplacé : un identifiant hors de sa forme est une réponse invalide de l'API (la page 500).** Tranché
+  par time-knight le 2026-11-12 (dernière revue de code), écart mineur au plan qui laissait `items.py` intact.
+  Pourquoi : la base tient `GHSA_ID` par sa GLOB, et la règle 4 de `conventions.md` nomme déjà `GhsaId` parmi
+  les types d'`items.py`. Options écartées : un repli « sans identifiant », pour un cas que la base interdit ; le
+  même type écrit dans le site, hors d'`items.py`, contre la règle 4. — PR de #564
 - **Le bandeau d'une faille ou d'une alerte est un état nommé, calculé depuis `exploited` et `withdrawn_at` sans
   rien supposer, dont le texte est écrit dans le gabarit ; seul un item au catalogue KEV prend le style d'alerte.
   Une alerte dont la CVE est au catalogue dit « Entrée au catalogue KEV », avec sa limite ; une faille retirée a

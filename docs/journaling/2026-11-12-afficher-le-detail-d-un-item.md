@@ -1,7 +1,7 @@
 # Afficher le détail d'un item sur le site
 
 - **Date** : 2026-11-12
-- **Branche** : `feat/web-item-detail`, commits `e5ce50b` à `44cdfa6`, partie d'`origin/main` à `1b6e0b8`
+- **Branche** : `feat/web-item-detail`, commits `e5ce50b` à `7aa9524`, partie d'`origin/main` à `1b6e0b8`
 - **Issue** : #564 (PR 1 du découpage de #564 ; les tendances sont devenues #596)
 - **Série** : suite de [Servir le fil de veille](2026-11-11-servir-le-fil-de-veille.md) (#563) et
   d'[Aligner le fil sur ses maquettes](2026-11-11-aligner-le-fil-sur-ses-maquettes.md) (#587)
@@ -47,9 +47,9 @@ def read_item_id(text: str) -> int | None:
     item_id = int(text)
     return item_id if item_id <= MAX_INT64 else None
 ```
-(`src/k_b/web/item_detail.py:123-128`)
+(`src/k_b/web/item_detail.py:127-132`)
 
-- **`ITEM_ID`, `[1-9][0-9]{0,18}`** (`item_detail.py:30`) : des chiffres ASCII, sans zéro en tête. Ce n'est pas
+- **`ITEM_ID`, `[1-9][0-9]{0,18}`** (`item_detail.py:34`) : des chiffres ASCII, sans zéro en tête. Ce n'est pas
   `\d` : `\d` accepte aussi un chiffre arabe ou pleine chasse, que `int()` saurait lire. Une seule adresse par
   item (Opquast 169) : `01` et `+1` sont refusés.
 - **`fullmatch`, et non `match` avec `$`** : `$` accepte un retour à la ligne final, si bien que `"1\n"`
@@ -66,13 +66,13 @@ if status == httpx2.codes.NOT_FOUND and is_item_not_found(body):
 if status != httpx2.codes.OK:
     raise name_failure(status, body)
 ```
-(`src/k_b/web/data_api_client.py:253-257`)
+(`src/k_b/web/data_api_client.py:254-258`)
 
 - **Le chemin est bâti d'un entier**, jamais de la chaîne reçue : aucun `../` ne peut atteindre une autre route
   de l'API.
 - **Seul un 404 dont le corps dit `item_not_found`** veut dire « item absent ». Un 404 `route_not_found`, ou un
   404 sans JSON venu de l'entrée d'Azure, est une réponse hors contrat : la page 500.
-- **La réponse est validée par une union discriminée sur `kind`** (`DETAIL`, `data_api_client.py:194-196`).
+- **La réponse est validée par une union discriminée sur `kind`** (`DETAIL`, `data_api_client.py:195-197`).
   Elle compte un modèle par sorte du fil, plus `ExcludedItem` (`:167`), qui ne lit que `kind` pour une entrée
   Zotero ou un clip. `extra="ignore"` laisse le reste du corps hors du modèle : le texte d'un clip n'est jamais
   modélisé, montré ni journalisé.
@@ -120,7 +120,7 @@ def is_kept(character: str) -> bool:
         return False
     return not is_noncharacter(character)
 ```
-(`src/k_b/web/received_text.py:31-38`)
+(`src/k_b/web/received_text.py:40-47`)
 
 - **Ce qui est retiré** :
   - les contrôles (`Cc`), sauf la tabulation et le retour à la ligne ;
@@ -130,10 +130,11 @@ def is_kept(character: str) -> bool:
     renverserait l'affichage de la date qui suit dans la même ligne. La même liste sert déjà le coffre
     (`post/vault_files.py`).
 - **Ce qui est gardé** : les autres `Cf`. U+200D, par exemple, lie les emojis composés.
-- **`clean_received_value`** (`received_text.py:25`) rend `None` quand il ne reste que des blancs. L'appelant
+- **`clean_received_value`** (`received_text.py:26`) rend `None` quand il ne reste rien de dessiné : que des blancs
+  et des caractères de format (`Cf`, comme U+200B ou U+FEFF), par `is_blank` (`:32`), la seule définition du vide. L'appelant
   dit alors « Sans titre », « sans nom » ou « Non renseigné » (fil et détail), plutôt qu'un lien sans nom.
 - **Les notes d'une *release*** restent du texte brut (D3) : jamais de Markdown rendu, jamais de lien.
-  `split_paragraphs` (`item_detail.py:310-314`) coupe aux lignes vides. Une ligne d'espaces Unicode, insécables
+  `split_paragraphs` (`item_detail.py:318-324`) coupe aux lignes vides. Une ligne d'espaces Unicode, insécables
   comprises, compte comme vide (`BLANK_LINES`, `:33`). Les lignes vides aux bouts d'un paragraphe sont retirées,
   mais le retrait d'une ligne écrite est gardé, sous `white-space: pre-wrap`.
 
@@ -147,7 +148,7 @@ if isinstance(detail, AdvisoryDetail):
         return "advisory_in_catalog"
     return "advisory_absent_from_catalog"
 ```
-(`src/k_b/web/item_detail.py:242-247`)
+(`src/k_b/web/item_detail.py:246-251`)
 
 Le code ne rend qu'un nom d'état. Le gabarit écrit le texte de chaque état, avec le sens de CVE, KEV et CISA à
 leur première occurrence (`item.html`).
@@ -162,12 +163,12 @@ leur première occurrence (`item.html`).
 
 La page suit les maquettes : 760 px de large avec ses marges, le titre en `h1`, les faits en `<dl>`, les textes
 sous des `h2`, et le lien vers la source en bouton. Trois règles viennent de la mesure :
-- **La colonne** : `.item` et `.item-facts` ont `grid-template-columns: minmax(0, 1fr)` (`site.css:710`,
-  `:787`). Sans cette règle, une colonne de grille prend la largeur de son mot le plus long. À texte 200 % sur
+- **La colonne** : `.item` et `.item-facts` ont `grid-template-columns: minmax(0, 1fr)` (`site.css:709`,
+  `:786`). Sans cette règle, une colonne de grille prend la largeur de son mot le plus long. À texte 200 % sur
   320 px, la page défilait alors en largeur.
 - **Le bouton** : `.button` passe à la ligne (`flex-wrap: wrap`), pour que son libellé et son annonce
   « (site externe, nouvel onglet) » tiennent sur un téléphone.
-- **Le titre d'une carte** : il a `margin-block: 0.75rem` (`site.css:651`), pour que la marge intérieure de son
+- **Le titre d'une carte** : il a `margin-block: 0.75rem` (`site.css:650`), pour que la marge intérieure de son
   lien (une cible de 44 px) et son anneau de focus ne mordent ni sur la ligne du dessus ni sur le lien du
   dessous.
 
@@ -181,6 +182,7 @@ sous des `h2`, et le lien vers la source en bouton. Trois règles viennent de la
 | L'identifiant en chaîne, validé par une fonction | un 422 JSON de FastAPI citerait la valeur ; #403 ne change qu'elle | `item_id: int` : le 422 en JSON |
 | Le texte du bandeau dans le gabarit, son état en Python | un développement de sigle est du HTML (`<i lang="en">`), et le filtre `safe` est interdit | des chaînes avec balises : il faudrait `Markup` |
 | Les champs longs du détail en `str`, pas `NonEmptyText` | la base ne borne que la longueur (`schema.sql`) : un résumé vide doit donner « Aucun résumé. », pas une 500 (revue de code, tranché par time-knight) | `NonEmptyText` : une 500 pour une valeur que la base tient |
+| `ghsa_id` typé `GhsaId`, ajouté à `items.py` à côté de `CveId` | la base tient `GHSA_ID` par sa GLOB ; la règle 4 de `conventions.md` nomme déjà `GhsaId` ; un identifiant hors forme n'est pas une réponse de l'API (la 500), plutôt qu'un repli pour un cas que la base interdit (tranché par time-knight, écart mineur au plan qui laissait `items.py` intact) | un repli « sans identifiant » ; un type écrit dans le site, hors d'`items.py` |
 | `id` du fil à `ge=1` | le fil ne bâtit jamais un lien que la route refuse ; les identifiants partent de 1 (tranché par time-knight) | accepter 0 : un lien vers une 404 |
 | La couleur des liens visités sur le titre de carte seul | Opquast 141 vise les liens dans un texte ; un bouton plein perdrait son contraste en ardoise ; « Retour au fil » mène à `/`, toujours visité (tranché par time-knight) | sur chaque lien du détail |
 | Garder `drop_control_characters` du fil à côté de `clean_received_text` | deux règles pour deux raisons : un contrôle refusé dans une saisie, un texte reçu nettoyé (`code.md`) | les fusionner : deux raisons de changer liées |
@@ -210,7 +212,7 @@ sous des `h2`, et le lien vers la source en bouton. Trois règles viennent de la
 
 1. **« Pourquoi ne pas typer `item_id` en `int` ? »** FastAPI rendrait un 422 en JSON qui cite la valeur reçue,
    sur un site qui ne répond qu'en pages HTML. `read_item_id` décide seule, et un identifiant hors de sa forme
-   rend la 404 sans appeler l'API (`item_detail.py:123`, `pages.py:113`).
+   rend la 404 sans appeler l'API (`item_detail.py:127`, `pages.py:113`).
 2. **« Le titre d'un item vient de GitHub : un `<script>` dedans ? »** Jinja2 échappe toute valeur
    (`autoescape=True`), aucun gabarit n'écrit `|safe`, et un test le vérifie champ par champ
    (`test_every_value_received_is_escaped_never_a_tag`). Les notes ne deviennent jamais du HTML (D3), et une URL
