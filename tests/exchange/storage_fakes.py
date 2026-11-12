@@ -226,13 +226,19 @@ def format_http_date(moment):
 
 # The code the storage gives with the status of a Get Blob, when the test gives the status only.
 CODE_OF_NEXT_GET = {404: "BlobNotFound", 412: "ConditionNotMet"}
+# The most names a page of List Blobs holds, and the page without maxresults (List Blobs, "URI
+# parameters").
+LISTING_PAGE_SIZE = 5000
+# The marker the fake gives: the position of the next name; the storage's own is opaque.
+MARKER_PREFIX = "position-"
 
 
 class FakeContainer:
     """A container of the fake storage: List Blobs, Get Blob and Put Blob, answered as the REST API
     documents them (learn.microsoft.com/en-us/rest/api/storageservices/blob-service-rest-api);
     each request is kept. A name is listed escaped, or percent-encoded (Encoded="true") when XML
-    cannot carry it, as the storage gives it."""
+    cannot carry it, as the storage gives it; a listing reads prefix, maxresults and marker, and
+    gives a NextMarker while names are left."""
 
     def __init__(self, name, blobs=None):
         self.name = name
@@ -241,13 +247,16 @@ class FakeContainer:
         # The blobs whose next Get answers this status instead (a blob changed or removed between
         # the listing and its download), or this status and this code (a container removed).
         self.status_of_next_get = {}
+        # The most names of a page below maxresults: the storage may cut a page short, even to no
+        # name, and give a NextMarker (List Blobs, "Remarks").
+        self.listing_page_size = None
 
     def handle(self, request):
         self.requests.append(request)
         url = urlsplit(request.url)
         query = parse_qs(url.query)
         if query.get("comp") == ["list"]:
-            return self.answer_listing()
+            return self.answer_listing(query)
         blob_name = unquote(url.path.removeprefix(f"/{self.name}/"))
         if request.method == "GET":
             return self.answer_get(blob_name, request.headers)
@@ -255,7 +264,20 @@ class FakeContainer:
             return self.answer_put(blob_name, request.headers, request.body)
         raise AssertionError(f"request not simulated: {request.method} {request.url}")
 
-    def answer_listing(self):
+    def answer_listing(self, query):
+        prefix = query.get("prefix", [""])[0]
+        page_size = min(
+            int(query.get("maxresults", [LISTING_PAGE_SIZE])[0]), LISTING_PAGE_SIZE
+        )
+        if self.listing_page_size is not None:
+            page_size = min(page_size, self.listing_page_size)
+        start = int(
+            query.get("marker", [MARKER_PREFIX + "0"])[0].removeprefix(MARKER_PREFIX)
+        )
+        names = [name for name in sorted(self.blobs) if name.startswith(prefix)]
+        page = names[start : start + page_size]
+        next_start = start + len(page)
+        next_marker = f"{MARKER_PREFIX}{next_start}" if next_start < len(names) else ""
         blobs = "".join(
             f"<Blob>{write_name_element(name)}<Properties>"
             f"<Last-Modified>{format_http_date(blob.last_modified)}</Last-Modified>"
@@ -267,15 +289,19 @@ class FakeContainer:
                 else ""
             )
             + "<BlobType>BlockBlob</BlobType></Properties></Blob>"
-            for name, blob in sorted(self.blobs.items())
+            for name, blob in ((name, self.blobs[name]) for name in page)
         )
         body = (
             '<?xml version="1.0" encoding="utf-8"?>'
             f'<EnumerationResults ServiceEndpoint="{TEST_ACCOUNT_URL}/"'
-            f' ContainerName="{self.name}"><Blobs>{blobs}</Blobs><NextMarker />'
-            "</EnumerationResults>"
+            f' ContainerName="{self.name}"><Blobs>{blobs}</Blobs>'
+            f"<NextMarker>{next_marker}</NextMarker></EnumerationResults>"
         )
         return 200, XML_HEADERS, body.encode()
+
+    def listings(self):
+        """The List Blobs requests, in order."""
+        return [request for request in self.requests if "comp=list" in request.url]
 
     def answer_get(self, blob_name, headers):
         answer = self.status_of_next_get.pop(blob_name, None)

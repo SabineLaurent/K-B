@@ -345,11 +345,42 @@ AI_API_RATE_LIMITS = {
 }
 # By the most read in a minute in the same logs: 804 details, 21 lists. The details hold 4 digests
 # at MAX_ITEMS_PER_DIGEST_REQUEST, the trends 3 trend reports at their 32 readings.
+# The tops, as the lists: the site reads one page of each at a time.
 DATA_API_RATE_LIMITS = {
     "/items": RateLimit(requests=120, window_seconds=60),
     "/items/{item_id}": RateLimit(requests=1200, window_seconds=60),
     "/trends": RateLimit(requests=120, window_seconds=60),
+    "/tops/{top}": RateLimit(requests=120, window_seconds=60),
+    "/tops/{top}/days": RateLimit(requests=120, window_seconds=60),
 }
+# The client of the site (web/settings.py, KB_DATA_API_KEY_WEB), the only one the routes of the tops
+# open to; the items stay open to every client (OWASP API5:2023).
+WEB_CLIENT = "WEB"
+DATA_API_CLIENT_BY_ROUTE = {
+    "/tops/{top}": WEB_CLIENT,
+    "/tops/{top}/days": WEB_CLIENT,
+}
+# The bounds of the parameters of the tops (docs/specs-api.md, "GET /tops/{top}"): the repositories
+# of a top, a twin holding GITHUB_RANKING_SIZE at most, and its days.
+TOP_LIMIT = 10
+MAX_TOP_LIMIT = GITHUB_RANKING_SIZE
+DAYS_LIMIT = 30
+MAX_DAYS_LIMIT = 100
+MAX_DAYS_OFFSET = 5_000
+# The reading of watch by the data API (data_api/watch_reading.py). The names of a folder listed, 5,000
+# at most, the most a page of List Blobs holds; the storage may cut a page short and give a marker
+# (List Blobs, "Remarks", Microsoft Learn, read on 2026-11-12), followed on one more page at most, so
+# that pages without a name do not hold a request. Beyond either bound, 502 watch_listing_too_long.
+MAX_WATCH_FOLDER_NAMES = 5_000
+MAX_WATCH_FOLDER_PAGES = 2
+# The listing of each folder kept 60 s, and the last productions read, by name and etag, refusals
+# included: 32 MB at most, MAX_WATCH_SHEET_BYTES each.
+WATCH_CACHE_SECONDS = 60
+WATCH_CACHED_PRODUCTIONS = 8
+# The waits of a request of the data API to the storage and to its identity, shorter than those of a
+# job (EXCHANGE_STORAGE_*): the site waits 30 s (WEB_DATA_API_READ_TIMEOUT_SECONDS).
+DATA_API_STORAGE_CONNECT_TIMEOUT_SECONDS = 5
+DATA_API_STORAGE_READ_TIMEOUT_SECONDS = 10
 
 # The time a request of the data API may spend in its base, all its readings counted, on SQLite;
 # each of its statements, on PostgreSQL (statement_timeout, database/postgresql.py); beyond, 503

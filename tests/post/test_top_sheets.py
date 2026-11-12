@@ -220,7 +220,7 @@ def test_two_rankings_of_a_day_give_one_sheet_the_one_of_the_first(data_dir, vau
     assert "collected_at: 2026-10-05T09:30:00Z" in sheet
     assert "| 551156 |" in sheet
     twin = read_twin(vault_dir, STARRED_TOP, "2026-10-05")
-    assert (twin["collected_at"], twin["repositories"][0]["count"]) == (
+    assert (twin["ranked_at"], twin["repositories"][0]["count"]) == (
         "2026-10-05T09:30:00Z",
         551156,
     )
@@ -684,7 +684,7 @@ def test_a_ranking_gives_the_twin_of_its_sheet_that_its_schema_reads_again(
     twin = find_twin(vault_dir, FORKED_TOP, "2026-10-05").read_bytes()
     assert json.loads(twin) == {
         "top": "most_forked",
-        "collected_at": "2026-10-05T09:30:00Z",
+        "ranked_at": "2026-10-05T09:30:00Z",
         "repositories": [
             {
                 "rank": 1,

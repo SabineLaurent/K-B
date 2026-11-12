@@ -25,7 +25,7 @@ REPOSITORY = {
 }
 TWIN = {
     "top": "most_starred",
-    "collected_at": "2026-10-05T09:30:00Z",
+    "ranked_at": "2026-10-05T09:30:00Z",
     "repositories": [REPOSITORY],
 }
 
@@ -45,7 +45,7 @@ def list_repositories(count):
 def test_a_twin_as_kb_writes_it_is_read_again():
     production = read_twin(TWIN)
 
-    assert production.collected_at == datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
+    assert production.ranked_at == datetime(2026, 10, 5, 9, 30, tzinfo=UTC)
     assert json.loads(production.model_dump_json()) == TWIN
 
 
@@ -80,10 +80,10 @@ def test_the_names_of_the_tops_are_those_of_their_twins():
     [
         pytest.param({**TWIN, "rank_count": 1}, id="field out of the schema"),
         pytest.param({**TWIN, "top": "most_watched"}, id="top unknown"),
-        pytest.param({**TWIN, "collected_at": "1760000000"}, id="Unix time as text"),
-        pytest.param({**TWIN, "collected_at": 1760000000}, id="Unix time"),
-        pytest.param({**TWIN, "collected_at": "2026-10-05T09:30:00"}, id="no zone"),
-        pytest.param({**TWIN, "collected_at": "2026-10-05"}, id="a day"),
+        pytest.param({**TWIN, "ranked_at": "1760000000"}, id="Unix time as text"),
+        pytest.param({**TWIN, "ranked_at": 1760000000}, id="Unix time"),
+        pytest.param({**TWIN, "ranked_at": "2026-10-05T09:30:00"}, id="no zone"),
+        pytest.param({**TWIN, "ranked_at": "2026-10-05"}, id="a day"),
         pytest.param(
             {**TWIN, "repositories": list_repositories(GITHUB_RANKING_SIZE + 1)},
             id="longer than a ranking",

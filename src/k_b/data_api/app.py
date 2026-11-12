@@ -1,4 +1,5 @@
-"""The data API: the items of the base, read only, for the clients of Sabine (docs/specs-api.md)."""
+"""The data API: the items of the base, read only, and the tops of watch, for the clients of Sabine
+(docs/specs-api.md)."""
 
 from collections.abc import Mapping, Sequence
 
@@ -15,15 +16,17 @@ from k_b.core.api_request_log import log_request
 from k_b.core.api_telemetry import NATIVE_TELEMETRY_OFF
 from k_b.core.config import (
     DATA_API_ALLOWED_HOSTS,
+    DATA_API_CLIENT_BY_ROUTE,
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_RATE_LIMITS,
 )
 from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
+from k_b.data_api.watch_reading import WatchReader
 from k_b.database.engine import Readers
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.12.0"
+API_VERSION = "0.13.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (
@@ -37,11 +40,12 @@ def create_app(
     allowed_hosts: Sequence[str] = DATA_API_ALLOWED_HOSTS,
     openapi_url: str | None = None,
     query_timeout_seconds: float = DATA_API_QUERY_TIMEOUT_SECONDS,
+    watch: WatchReader | None = None,
 ) -> FastAPI:
     """The app, its keys, its readers (the SQLite file, or the pool of a PostgreSQL base opened with
-    the same query_timeout_seconds), the hosts it answers and the path of its OpenAPI given;
-    without any key, every data route answers 401; without a path, neither the OpenAPI nor /docs
-    is served."""
+    the same query_timeout_seconds), the reader of watch, the hosts it answers and the path of its
+    OpenAPI given; without any key, every data route answers 401; without a reader of watch, the
+    tops answer 503; without a path, neither the OpenAPI nor /docs is served."""
     app = FastAPI(
         title="K-B data API",
         version=API_VERSION,
@@ -61,7 +65,10 @@ def create_app(
     )
     app.state.readers = readers
     app.state.query_timeout_seconds = query_timeout_seconds
+    app.state.watch = watch
     app.state.api_keys = dict(api_keys)
+    # The routes of the tops, for the site only (check_client_allowed, on their router).
+    app.state.client_by_route = dict(DATA_API_CLIENT_BY_ROUTE)
     app.state.rate_limiter = RateLimiter(DATA_API_RATE_LIMITS)
     # The last added is the outermost.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))

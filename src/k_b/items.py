@@ -690,7 +690,9 @@ class TopProduction(BaseModel):
     model_config = ConfigDict(strict=True, extra="forbid")
 
     top: TopName
-    collected_at: Annotated[UtcDatetime, BeforeValidator(read_written_datetime)]
+    # The moment its ranking was collected, the collected_at of its sheet: named apart from the
+    # collected_at of an item, which the data API never serves (docs/specs-api.md).
+    ranked_at: Annotated[UtcDatetime, BeforeValidator(read_written_datetime)]
     repositories: Annotated[list[TopRepository], Field(max_length=GITHUB_RANKING_SIZE)]
 
     @model_validator(mode="after")

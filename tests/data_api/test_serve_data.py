@@ -10,11 +10,17 @@ from pathlib import Path
 import pytest
 import uvicorn.config
 from database.connected_readers import open_connected_readers
+from exchange.storage_fakes import (
+    TEST_ACCOUNT_URL,
+    TEST_CLIENT_ID,
+    remove_online_variables,
+)
 from fastapi.testclient import TestClient
 
 from k_b import cli
 from k_b.commands import serve_data_command
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS
+from k_b.data_api.watch_reading import WatchReader
 from k_b.database import postgresql
 from k_b.database.engine import connect_reader
 from k_b.database.location import DATABASE_URL_VARIABLE
@@ -24,10 +30,12 @@ VERSIONED_OPENAPI = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnee
 
 @pytest.fixture(autouse=True)
 def no_api_key_of_the_terminal(monkeypatch):
-    """A terminal that exports a key must not give it to the tests."""
+    """A terminal that exports a key, or a setting of the exchange storage, must not give it to
+    the tests."""
     for name in os.environ:
         if name.startswith("KB_DATA_API_KEY_"):
             monkeypatch.delenv(name)
+    remove_online_variables(monkeypatch)
 
 
 @pytest.fixture
@@ -169,6 +177,73 @@ def test_serve_listens_on_the_host_and_port_of_the_environment(
 
     [(_, options)] = uvicorn_calls
     assert (options["host"], options["port"]) == ("192.0.2.10", 8080)
+
+
+@pytest.mark.parametrize(
+    ("variables", "missing"),
+    [
+        ({}, "KB_EXCHANGE_BLOB_URL"),
+        ({"KB_EXCHANGE_BLOB_URL": TEST_ACCOUNT_URL}, "AZURE_CLIENT_ID"),
+        ({"AZURE_CLIENT_ID": TEST_CLIENT_ID}, "KB_EXCHANGE_BLOB_URL"),
+    ],
+)
+def test_serve_without_a_setting_of_the_storage_starts_and_says_the_tops_unconfigured(
+    monkeypatch, capsys, data_dir, uvicorn_calls, variables, missing
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
+
+    exit_code = cli.main(["serve-data"])
+
+    [(app, _)] = uvicorn_calls
+    assert exit_code == 0
+    assert app.state.watch is None
+    assert f"watch unconfigured: {missing} not set" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize(
+    ("variables", "message"),
+    [
+        (
+            {
+                "KB_EXCHANGE_BLOB_URL": "http://stkbexchangetest.blob.core.windows.net",
+                "AZURE_CLIENT_ID": TEST_CLIENT_ID,
+            },
+            "KB_EXCHANGE_BLOB_URL: scheme not https",
+        ),
+        (
+            {"KB_EXCHANGE_BLOB_URL": TEST_ACCOUNT_URL, "AZURE_CLIENT_ID": "not-a-guid"},
+            "AZURE_CLIENT_ID: not a GUID",
+        ),
+    ],
+)
+def test_serve_exits_2_on_a_setting_of_the_storage_refused(
+    monkeypatch, capsys, data_dir, uvicorn_calls, variables, message
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    for name, value in variables.items():
+        monkeypatch.setenv(name, value)
+
+    exit_code = cli.main(["serve-data"])
+
+    assert exit_code == 2
+    assert message in capsys.readouterr().err
+    assert uvicorn_calls == []
+
+
+def test_serve_with_the_settings_of_the_storage_reads_watch(
+    monkeypatch, data_dir, uvicorn_calls
+):
+    monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
+    monkeypatch.setenv("KB_EXCHANGE_BLOB_URL", TEST_ACCOUNT_URL)
+    monkeypatch.setenv("AZURE_CLIENT_ID", TEST_CLIENT_ID)
+
+    exit_code = cli.main(["serve-data"])
+
+    [(app, _)] = uvicorn_calls
+    assert exit_code == 0
+    assert isinstance(app.state.watch, WatchReader)
 
 
 @pytest.mark.parametrize(

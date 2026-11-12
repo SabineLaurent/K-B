@@ -210,7 +210,7 @@ def build_twin(
     return TopProduction.model_validate(
         {
             "top": top.name,
-            "collected_at": collected_at,
+            "ranked_at": collected_at,
             "repositories": [build_twin_repository(entry) for entry in entries],
         }
     )
