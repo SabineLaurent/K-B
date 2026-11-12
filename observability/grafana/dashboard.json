@@ -1006,7 +1006,7 @@
       "id": 13,
       "type": "stat",
       "title": "Contrôles des fiches sur 24 h",
-      "description": "Ce que les contrôles ont retiré des fiches: affirmations hors bornes ou infidèles, et items qui n'étaient plus cités.",
+      "description": "Ce que les contrôles du code ont retiré des fiches avant leur écriture. Une affirmation est une phrase rédigée par le modèle, qui cite ses items et déclare ses faits; elle est retirée si elle sort de ses bornes (longueur du texte, nombre et longueur des faits) ou si elle n'est pas fidèle (un fait introuvable dans son texte ou dans l'item cité, un identifiant CVE ou GHSA non déclaré, un item cité sans fait retrouvé, un texte qui cache ou déguise des caractères). Un item retiré est un item que le modèle citait et qu'aucune affirmation gardée ne cite plus: il sort des sources de la fiche, pas de la base.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -1025,7 +1025,7 @@
             "uid": "${datasource}"
           },
           "expr": "sum(max_over_time(k_b_digest_claims_removed_total{deployment_environment_name=\"$env\"}[24h]))",
-          "legendFormat": "Affirmations retirées",
+          "legendFormat": "Affirmations retirées des fiches",
           "instant": true,
           "range": false,
           "format": "time_series"
@@ -1037,7 +1037,7 @@
             "uid": "${datasource}"
           },
           "expr": "sum(max_over_time(k_b_digest_items_removed_by_checks_total{deployment_environment_name=\"$env\"}[24h]))",
-          "legendFormat": "Items retirés par les contrôles",
+          "legendFormat": "Items retirés des sources des fiches",
           "instant": true,
           "range": false,
           "format": "time_series"
