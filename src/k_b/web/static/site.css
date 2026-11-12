@@ -320,6 +320,8 @@
     padding-inline: 1.25rem;
     display: inline-flex;
     align-items: center;
+    /* Its label and its announcement wrap with large text on a phone (WCAG 1.4.10). */
+    flex-wrap: wrap;
     /* The space between the arrow and its text, which a flex container drops. */
     gap: 0.5rem;
     /* Transparent, but drawn when Windows forces its colours: the button keeps its frame. */
@@ -642,8 +644,11 @@
     overflow-wrap: anywhere;
   }
 
+  /* Clear of the line above and of the link below: the padding of its link, a target of 44 px, and
+     its focus ring stay in its margin. */
   .card-title {
     margin: 0;
+    margin-block: 0.625rem;
     font-size: 1.0625rem;
     line-height: 1.35;
     overflow-wrap: anywhere;
@@ -815,6 +820,8 @@
     padding: 0.25rem 0.625rem;
     background: var(--color-chip);
     color: var(--color-ink);
+    /* Transparent, but drawn when Windows forces its colours: the chip keeps its frame. */
+    border: 1px solid transparent;
     border-radius: 4px;
     font-family: var(--font-code);
     overflow-wrap: anywhere;

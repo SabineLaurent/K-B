@@ -15,34 +15,34 @@ CISA at their first occurrence on the page (Opquast 2025, rule 5). -#}
 {% if detail.banner == "vulnerability_in_catalog" %}
 <div class="banner banner-alert">
 <p class="banner-title">Exploitée activement: oui</p>
-<p class="banner-text">La CISA (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>) ne met dans son catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>) que des failles exploitées.</p>
+<p class="banner-text">La CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>) ne met dans son catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) que des failles exploitées.</p>
 </div>
 {% elif detail.banner == "vulnerability_withdrawn" %}
 <div class="banner banner-neutral">
 <p class="banner-title">Retirée du catalogue le <time datetime="{{ detail.banner_day.iso }}">{{ detail.banner_day.text }}</time></p>
-<p class="banner-text">La CISA (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>) a retiré cette faille de son catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>). K-B la garde, avec la date à laquelle il a vu le retrait.</p>
+<p class="banner-text">La CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>) a retiré cette faille de son catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>). K-B la garde, avec la date à laquelle il a vu le retrait.</p>
 </div>
 {% elif detail.banner == "advisory_in_catalog" %}
 <div class="banner banner-alert">
-<p class="banner-title">Entrée au catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>)</p>
-<p class="banner-text">La CVE (<span lang="en">Common Vulnerabilities and Exposures</span>) de cette alerte est entrée au catalogue KEV de la CISA (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>), qui ne liste que des failles exploitées. Un retrait du catalogue depuis ne se voit pas sur cette page.</p>
+<p class="banner-title">Entrée au catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>)</p>
+<p class="banner-text">La CVE (<i lang="en">Common Vulnerabilities and Exposures</i>) de cette alerte est entrée au catalogue KEV de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>), qui ne liste que des failles exploitées. Un retrait du catalogue depuis ne se voit pas sur cette page.</p>
 </div>
 {% elif detail.banner == "advisory_absent_from_catalog" %}
 <div class="banner banner-neutral">
-<p class="banner-title">Absente du catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>)</p>
-<p class="banner-text">La CVE (<span lang="en">Common Vulnerabilities and Exposures</span>) de cette alerte n’est pas dans le catalogue KEV de la CISA (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>). Si elle y entrait, ce bandeau le dirait.</p>
+<p class="banner-title">Absente du catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>)</p>
+<p class="banner-text">La CVE (<i lang="en">Common Vulnerabilities and Exposures</i>) de cette alerte n’est pas dans le catalogue KEV de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>). Si elle y entrait, ce bandeau le dirait.</p>
 </div>
 {% elif detail.banner == "advisory_without_cve" %}
 <div class="banner banner-neutral">
-<p class="banner-title">Sans CVE (<span lang="en">Common Vulnerabilities and Exposures</span>)</p>
-<p class="banner-text">Cette alerte ne cite aucune CVE: K-B ne peut pas la chercher dans le catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>) de la CISA (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>).</p>
+<p class="banner-title">Sans CVE (<i lang="en">Common Vulnerabilities and Exposures</i>)</p>
+<p class="banner-text">Cette alerte ne cite aucune CVE: K-B ne peut pas la chercher dans le catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>).</p>
 </div>
 {% endif %}
 {% if detail.facts %}
 <dl class="item-facts">
 {% for fact in detail.facts %}
 <div{% if fact.is_list %} class="item-fact-wide"{% endif %}>
-<dt>{{ fact.term }}{% if fact.term_meaning %} (<span lang="en">{{ fact.term_meaning }}</span>){% endif %}</dt>
+<dt>{{ fact.term }}{% if fact.term_meaning %} (<i lang="en">{{ fact.term_meaning }}</i>){% endif %}</dt>
 {% if fact.is_list %}
 {#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
 <dd><ul class="packages" role="list">{% for value in fact.values %}<li class="package">{{ value }}</li>{% endfor %}</ul></dd>

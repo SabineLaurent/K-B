@@ -620,3 +620,21 @@ def test_the_dates_of_a_detail_are_time_elements_with_their_month_in_letters(nam
     assert all(
         re.fullmatch(r"(1er|[0-9]{1,2}) [a-zéû]+ [0-9]{4}", text) for _, text in days
     )
+
+
+@pytest.mark.parametrize("name", sorted(ITEM_PAGES))
+def test_the_meaning_of_an_abbreviation_is_in_italics_and_in_english(name):
+    """As on the feed, /sources and the statement: <i lang="en">."""
+    openings = re.findall(r'\((<[a-z]+) lang="en">', PAGES[name])
+
+    assert all(opening == "<i" for opening in openings)
+
+
+def test_the_statement_says_its_limits_of_the_detail():
+    """RGAA 9.1 and 9.3: the notes of a release are plain text (D3); RGAA 8.7: the language of the
+    texts of the sources is a hypothesis."""
+    text = outline(PAGES["/accessibilite"]).text
+
+    assert "texte brut" in text
+    assert "hypothèse" in text
+    assert "le sens de chaque sigle" not in text

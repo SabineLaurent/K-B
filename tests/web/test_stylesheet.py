@@ -167,6 +167,11 @@ def read_rule(selector, media=None):
         (".card-link", None, "font-size: 0.875rem;"),
         (".link-note", None, "font-size: 0.75rem;"),
         (".site-logout", None, "margin-inline-start: auto;"),
+        # The title of a card clear of the line above and of the link below: its padding of 44 px
+        # and its focus ring (relecteur d'accessibilité de #564).
+        (".card-title", None, "margin-block: 0.625rem;"),
+        # Framed when Windows forces its colours, as the badge and the buttons.
+        (".package", None, "border: 1px solid transparent;"),
     ],
 )
 def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declaration):
@@ -287,4 +292,12 @@ def test_a_link_of_a_detail_or_of_a_title_is_a_target_of_44_pixels(selector):
 
     assert re.search(
         r"padding-block: 0\.75rem;|min-block-size: var\(--target-size\);", rule
+    )
+
+
+def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
+    """WCAG 1.4.4 and 1.4.10: on one line, its label and its announcement would widen the page of
+    a phone with its text at 200 % (relecteur d'accessibilité de #564)."""
+    assert re.search(
+        r"\.button,\s*\.button-secondary\s*\{[^}]*flex-wrap:\s*wrap;", STYLESHEET
     )
