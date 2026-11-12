@@ -1,5 +1,5 @@
-"""The pages of the site: the watch feed, the sources and the accessibility (docs/site-web.md,
-"Pages")."""
+"""The pages of the site: the watch feed, the detail of an item, the sources and the accessibility
+(docs/site-web.md, "Pages")."""
 
 import logging
 from collections.abc import Sequence
@@ -9,11 +9,18 @@ from fastapi.responses import HTMLResponse
 
 from k_b.core.api_request_log import read_request_id
 from k_b.core.config import DATA_API_MAX_SEARCH_LENGTH
-from k_b.web.data_api_client import FEED_KINDS, DataApiError, list_feed_items
+from k_b.web.data_api_client import (
+    FEED_KINDS,
+    DataApiError,
+    ExcludedItem,
+    list_feed_items,
+    read_item,
+)
 from k_b.web.errors import render_error_page, render_server_error_page
 from k_b.web.feed import (
     ERRORS_TITLE,
     FEED_PATH,
+    ITEM_PATH,
     LABELS_BY_KIND,
     PERIOD_LABELS,
     PERIODS,
@@ -29,6 +36,7 @@ from k_b.web.feed import (
     read_feed_form,
     read_page_number,
 )
+from k_b.web.item_detail import build_item_page, read_item_id
 from k_b.web.rendering import render_page
 
 logger = logging.getLogger(__name__)
@@ -94,6 +102,28 @@ def render_feed(
         current_path=FEED_PATH,
         status_code=422 if errors else 200,
     )
+
+
+# item_id is read as a string, never typed by FastAPI: an id out of its form would get its 422 in
+# JSON. The log of the request names the template of the route, never the id (#564).
+@router.get(ITEM_PATH)
+def show_item(request: Request, item_id: str) -> Response:
+    """The detail of an item of the feed; the page not found for an id out of its form, an item
+    the base does not hold, a Zotero entry or a clip."""
+    read_id = read_item_id(item_id)
+    if read_id is None:
+        return render_error_page(request, 404)
+    try:
+        detail = read_item(request.app.state.data_api_client, read_id)
+    except DataApiError as error:
+        if error.state == "data_api_item_not_found":
+            return render_error_page(request, 404)
+        log_data_api_failure(request, error)
+        return render_server_error_page(request)
+    if isinstance(detail, ExcludedItem):
+        return render_error_page(request, 404)
+    # No link of the navigation is the current page: Veille is the feed, not its detail.
+    return render_page(request, "item.html", {"detail": build_item_page(detail)})
 
 
 def log_data_api_failure(request: Request, error: DataApiError) -> None:

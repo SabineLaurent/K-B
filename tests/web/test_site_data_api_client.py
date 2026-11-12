@@ -1,5 +1,5 @@
-"""The reading of the feed by the data API: against the real data API on the test base, and a
-simulated transport for the answers the base cannot give."""
+"""The reading of the feed and of the detail of an item by the data API: against the real data API
+on the test base, and a simulated transport for the answers the base cannot give."""
 
 import json
 import secrets
@@ -7,8 +7,15 @@ from datetime import date
 
 import httpx2
 import pytest
-from fastapi.testclient import TestClient
 from feed_fixture import ITEMS_PAGE
+from item_fixture import (
+    ADVISORY_WITHOUT_CVE,
+    CLIP,
+    ITEM_DETAILS,
+    PAPER,
+    ZOTERO_ENTRY,
+    make_detail,
+)
 from pydantic import SecretStr
 
 from k_b.core.config import (
@@ -19,13 +26,14 @@ from k_b.core.config import (
     WEB_DATA_API_READ_TIMEOUT_SECONDS,
     WEB_DATA_API_REQUEST_DEADLINE_SECONDS,
 )
-from k_b.data_api.app import create_app
 from k_b.web.data_api_client import (
     FEED_KINDS,
     DataApiError,
+    ExcludedItem,
     FeedQuery,
     build_data_api_client,
     list_feed_items,
+    read_item,
 )
 from k_b.web.settings import DataApiAccess
 
@@ -52,23 +60,6 @@ def read_state(http_client, query=QUERY, **options):
     with pytest.raises(DataApiError) as raised:
         list_feed_items(http_client, query, **options)
     return raised.value
-
-
-@pytest.fixture
-def data_api(items_database):
-    """The data API on the test base, its client WEB holding the test key; on localhost, as
-    TrustedHostMiddleware refuses the testserver host of TestClient."""
-    client = TestClient(
-        create_app(items_database, {"WEB": SecretStr(TEST_API_KEY)}),
-        base_url="http://localhost",
-        headers={"Authorization": f"Bearer {TEST_API_KEY}"},
-        follow_redirects=False,
-        raise_server_exceptions=False,
-    )
-    requests = []
-    client.event_hooks = {"request": [requests.append]}
-    client.requests = requests
-    return client
 
 
 def test_the_feed_reads_the_five_kinds_of_the_real_data_api_never_a_zotero_entry_nor_a_clip(
@@ -292,3 +283,100 @@ def test_an_error_never_quotes_the_url_nor_the_key():
     assert str(error) == "data_api_unavailable"
     assert error.__cause__ is None
     assert error.__suppress_context__ is True
+
+
+def read_item_state(http_client, item_id=PAPER):
+    with pytest.raises(DataApiError) as raised:
+        read_item(http_client, item_id)
+    return raised.value
+
+
+@pytest.mark.parametrize("item_id", sorted(ITEM_DETAILS))
+def test_the_detail_of_each_kind_is_read_on_the_real_data_api_as_the_fixture_holds_it(
+    data_api, item_id
+):
+    """The fixture is the answer of the data API on its test base: a field it renames or drops
+    fails here, not in production."""
+    detail = read_item(data_api, item_id)
+
+    [request] = data_api.requests
+    assert request.url.path == f"/items/{item_id}"
+    assert data_api.get(f"/items/{item_id}").json() == ITEM_DETAILS[item_id]
+    assert (detail.id, detail.kind) == (item_id, ITEM_DETAILS[item_id]["kind"])
+
+
+@pytest.mark.parametrize(
+    ("item_id", "kind"), [(ZOTERO_ENTRY, "zotero_entry"), (CLIP, "clip")]
+)
+def test_a_zotero_entry_or_a_clip_is_read_by_its_kind_alone(data_api, item_id, kind):
+    """Its body is parsed, never modelled: only its kind is kept, for the page not found."""
+    detail = read_item(data_api, item_id)
+
+    assert detail == ExcludedItem(kind=kind)
+
+
+def test_an_item_the_base_does_not_hold_is_named(data_api):
+    error = read_item_state(data_api, 999)
+
+    assert (error.state, error.http_status) == ("data_api_item_not_found", 404)
+
+
+def test_the_detail_sends_the_key_of_the_client_web():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx2.Response(200, json=ITEM_DETAILS[PAPER])
+
+    read_item(make_client(handler), PAPER)
+
+    assert requests[0].url.path == f"/items/{PAPER}"
+    assert requests[0].headers["Authorization"] == f"Bearer {TEST_API_KEY}"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{"error": "route_not_found"}, {"error": "trend_window_not_found"}, None],
+    ids=["route-not-found", "trend-window-not-found", "not-json"],
+)
+def test_a_404_other_than_item_not_found_is_an_answer_out_of_schema(body):
+    """One state by route: the 404 of the ingress of Azure, without JSON, is no item missing."""
+    handler = (
+        answer(404, body)
+        if body is not None
+        else (lambda request: httpx2.Response(404, content=b"<html>Not Found</html>"))
+    )
+
+    error = read_item_state(make_client(handler))
+
+    assert (error.state, error.http_status) == ("data_api_invalid_response", 404)
+
+
+@pytest.mark.parametrize(
+    ("handler", "state", "http_status"),
+    [
+        (answer(401, {"error": "invalid_api_key"}), "data_api_unauthorized", 401),
+        (answer(429, {"error": "rate_limit_exceeded"}), "data_api_rate_limited", 429),
+        (answer(503, {"error": "query_timeout"}), "data_api_unavailable", 503),
+        (answer(200, {"kind": "paper"}), "data_api_invalid_response", 200),
+    ],
+    ids=["unauthorized", "rate-limited", "unavailable", "out-of-schema"],
+)
+def test_each_answer_but_a_detail_is_a_named_state(handler, state, http_status):
+    error = read_item_state(make_client(handler))
+
+    assert (error.state, error.http_status) == (state, http_status)
+
+
+def test_a_field_the_data_api_adds_to_a_detail_is_ignored():
+    body = make_detail(PAPER, doi="10.1000/182")
+
+    assert read_item(make_client(answer(200, body)), PAPER).id == PAPER
+
+
+def test_an_advisory_without_package_is_read():
+    body = make_detail(ADVISORY_WITHOUT_CVE, packages=[])
+
+    assert (
+        read_item(make_client(answer(200, body)), ADVISORY_WITHOUT_CVE).packages == []
+    )

@@ -1,5 +1,6 @@
-"""The reading of the feed by the data API, with the key of the client WEB (docs/site-web.md,
-"Fil"): one GET /items by page, a failure a named state raised as a DataApiError, without retry."""
+"""The reading of the feed and of the detail of an item by the data API, with the key of the client
+WEB (docs/site-web.md, "Fil" and "Détail"): one GET /items by page, one GET /items/{item_id} by
+detail, a failure a named state raised as a DataApiError, without retry."""
 
 import time
 from collections.abc import Callable
@@ -27,11 +28,12 @@ from k_b.core.outbound import (
     read_bounded_body,
 )
 from k_b.items import (
+    MAX_INT64,
     ArxivId,
     CveId,
-    Int64,
     NewsletterEdition,
     NonEmptyText,
+    RansomwareUse,
     RepositoryName,
     UtcDatetime,
 )
@@ -51,6 +53,7 @@ type DataApiState = Literal[
     "data_api_rate_limited",
     "data_api_invalid_parameter",
     "data_api_invalid_response",
+    "data_api_item_not_found",
 ]
 
 
@@ -79,7 +82,8 @@ class DataApiModel(BaseModel):
 
 
 class FeedItemBase(DataApiModel):
-    id: Int64
+    # 1 at least: the feed never builds a link to a detail its route would refuse.
+    id: Annotated[int, Field(ge=1, le=MAX_INT64)]
     title: NonEmptyText
     source_date: UtcDatetime
     url: str | None
@@ -129,13 +133,76 @@ class FeedItemPage(DataApiModel):
     total: Annotated[int, Field(ge=0)]
 
 
+# The detail of each kind: the item of the feed, then what its page shows of the detail, never
+# more (RGESN 1.6).
+class PaperDetail(FeedPaper):
+    authors: list[NonEmptyText]
+    summary: NonEmptyText
+    arxiv_updated_at: UtcDatetime
+
+
+class VulnerabilityDetail(FeedVulnerability):
+    description: NonEmptyText
+    vendor: NonEmptyText
+    product: NonEmptyText
+    ransomware_use: RansomwareUse
+    revised_at: UtcDatetime | None
+
+
+class AdvisoryDetail(FeedAdvisory):
+    """An advisory has no field beyond those of the feed: every package, in the detail."""
+
+
+class ReleaseDetail(FeedRelease):
+    tag_name: NonEmptyText
+    body: str | None
+
+
+class NewsletterArticleDetail(FeedNewsletterArticle):
+    rank: Annotated[int, Field(ge=1)]
+    summary: NonEmptyText
+
+
+class ExcludedItem(DataApiModel):
+    """A Zotero entry or a clip: its kind alone is read, for the page not found; its text is
+    never modelled, shown nor logged."""
+
+    kind: Literal["zotero_entry", "clip"]
+
+
+type ItemDetail = (
+    PaperDetail
+    | VulnerabilityDetail
+    | AdvisoryDetail
+    | ReleaseDetail
+    | NewsletterArticleDetail
+)
+
+
 class InvalidParameterBody(DataApiModel):
     error: Literal["invalid_parameter"]
     parameters: list[str]
 
 
+class ItemNotFoundBody(DataApiModel):
+    error: Literal["item_not_found"]
+
+
 PAGE = TypeAdapter(FeedItemPage)
+# The kinds written out: pydantic reads the discriminator of each model, not of an alias.
+DETAIL: TypeAdapter[ItemDetail | ExcludedItem] = TypeAdapter(
+    Annotated[
+        PaperDetail
+        | VulnerabilityDetail
+        | AdvisoryDetail
+        | ReleaseDetail
+        | NewsletterArticleDetail
+        | ExcludedItem,
+        Field(discriminator="kind"),
+    ]
+)
 INVALID_PARAMETER = TypeAdapter(InvalidParameterBody)
+ITEM_NOT_FOUND = TypeAdapter(ItemNotFoundBody)
 
 
 @dataclass(frozen=True)
@@ -173,13 +240,40 @@ def list_feed_items(
     """A page of the feed, the most recent first, and the number of items of its filters. Each wait
     is bounded by its timeout and the body by the deadline, checked between two of its pieces: at
     worst about 70 s (connect and pool, 30 s for the headers, 30 s for a piece of the body)."""
-    status, body = send(http_client, build_params(query), clock)
+    status, body = send(http_client, ITEMS_PATH, build_params(query), clock)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
     try:
         return PAGE.validate_json(body)
     except ValidationError:
         raise DataApiError("data_api_invalid_response", status) from None
+
+
+def read_item(
+    http_client: httpx2.Client,
+    item_id: int,
+    clock: Callable[[], float] = time.monotonic,
+) -> ItemDetail | ExcludedItem:
+    """The detail of an item, or the kind alone of a Zotero entry or a clip; bounded as a page of
+    the feed. Only the 404 item_not_found names an item missing: any other 404 is an answer out
+    of the contract of the route."""
+    status, body = send(http_client, f"{ITEMS_PATH}/{item_id}", {}, clock)
+    if status == httpx2.codes.NOT_FOUND and is_item_not_found(body):
+        raise DataApiError("data_api_item_not_found", status)
+    if status != httpx2.codes.OK:
+        raise name_failure(status, body)
+    try:
+        return DETAIL.validate_json(body)
+    except ValidationError:
+        raise DataApiError("data_api_invalid_response", status) from None
+
+
+def is_item_not_found(body: bytes) -> bool:
+    try:
+        ITEM_NOT_FOUND.validate_json(body)
+    except ValidationError:
+        return False
+    return True
 
 
 def build_params(query: FeedQuery) -> dict[str, str | int | list[str]]:
@@ -198,14 +292,15 @@ def build_params(query: FeedQuery) -> dict[str, str | int | list[str]]:
 
 def send(
     http_client: httpx2.Client,
+    path: str,
     params: dict[str, str | int | list[str]],
     clock: Callable[[], float],
 ) -> tuple[int, bytes]:
-    """One GET of the list, its body read within its bounds; raised from None, as the error of
-    httpx2 names the URL."""
+    """One GET of path, its body read within its bounds; raised from None, as the error of httpx2
+    names the URL."""
     deadline = clock() + WEB_DATA_API_REQUEST_DEADLINE_SECONDS
     try:
-        with http_client.stream("GET", ITEMS_PATH, params=params) as response:
+        with http_client.stream("GET", path, params=params) as response:
             status = response.status_code
             try:
                 body = read_bounded_body(

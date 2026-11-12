@@ -31,8 +31,11 @@ from k_b.web.data_api_client import (
     FeedVulnerability,
 )
 from k_b.web.french_dates import write_day
+from k_b.web.received_text import clean_received_text
 
 FEED_PATH = "/"
+# The detail of an item, the target of the title of its card.
+ITEM_PATH = "/items/{item_id}"
 # The names of the fields in the address of the feed.
 SEARCH_FIELD = "q"
 KIND_FIELD = "kind"
@@ -167,6 +170,7 @@ class FeedCard:
     withdrawn_text: str | None
     title: str
     title_lang: str | None
+    detail_link: str
     # None: a URL out of https, never made a link.
     link: str | None
     link_label: str
@@ -396,19 +400,25 @@ def build_card(item: FeedItem) -> FeedCard:
         day=item.source_date.date().isoformat(),
         day_text=write_day(item.source_date),
         is_exploited=is_exploited(item),
-        identifiers=write_identifiers(item),
+        identifiers=clean_received_text(write_identifiers(item)),
         withdrawn_text=None
         if item.withdrawn_at is None
         else f"retirée du catalogue le {write_day(item.withdrawn_at)}",
-        title=item.title,
+        title=clean_received_text(item.title),
         title_lang=labels.title_lang,
+        detail_link=ITEM_PATH.format(item_id=item.id),
         link=keep_https_link(item.url),
         link_label=labels.link_label,
-        link_note=NEW_TAB_NOTE
-        if labels.link_lang is None
-        else f"en anglais, {NEW_TAB_NOTE}",
+        link_note=write_link_note(labels),
         link_lang=labels.link_lang,
     )
+
+
+def write_link_note(labels: KindLabels) -> str:
+    """The announcement of the link to the source of a kind, its language first if English."""
+    if labels.link_lang is None:
+        return NEW_TAB_NOTE
+    return f"en anglais, {NEW_TAB_NOTE}"
 
 
 def is_exploited(item: FeedItem) -> bool:
@@ -432,9 +442,13 @@ def write_identifiers(item: FeedItem) -> str:
         case FeedRelease():
             return item.repository_name
         case FeedNewsletterArticle():
-            return NEWSLETTER_NAME_BY_EDITION.get(item.edition, f"TLDR {item.edition}")
+            return write_newsletter_name(item.edition)
         case _:
             assert_never(item)
+
+
+def write_newsletter_name(edition: str) -> str:
+    return NEWSLETTER_NAME_BY_EDITION.get(edition, f"TLDR {edition}")
 
 
 def write_advisory_identifiers(advisory: FeedAdvisory) -> str:
