@@ -10,6 +10,7 @@ comme son client `WEB` (`KB_DATA_API_KEY_WEB`). Le paquet `src/k_b/web/` n'impor
 | Chemin | Page |
 |---|---|
 | `/` | « Quoi de neuf », le fil de veille (« Fil », ci-dessous) |
+| `/items/<id>` | le détail d'un item du fil (« Détail », ci-dessous) |
 | `/sources` | « Sources et conditions d'utilisation » |
 | `/accessibilite` | « Accessibilité » |
 | `/static/site.css`, `/static/favicon.svg` | la feuille de style et l'icône |
@@ -51,8 +52,8 @@ onglet) » (Opquast 2025, règle 146 ; demande de Sabine du 2026-11-11, pour res
 `/sources` font de même : tout lien vers un autre site s'écrit par la macro `external_link`
 (`web/templates/links.html`), seule à poser `target="_blank"` (`tests/web/test_templates.py`) ; un lien du site ne
 s'ouvre jamais ailleurs (règle 138). Une URL qui n'est pas en
-`https` vers un hôte ne devient jamais un lien. Le titre n'est pas encore un lien : le détail vient avec
-#564. Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
+`https` vers un hôte ne devient jamais un lien. Le titre mène au détail de l'item (« Détail ») ; il passe,
+comme tout texte reçu, par `clean_received_text` (`web/received_text.py`). Une newsletter porte le nom que TLDR donne à son édition (`NEWSLETTER_NAME_BY_EDITION`, « TLDR AI »
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
@@ -92,6 +93,60 @@ lecture asynchrone ou un fil à part : non faite (httpx2 ne change pas un délai
 **Le poids** (D2, RGESN 6.1) : 3 requêtes au plus, la page, la feuille de style et l'icône, et 30 Ko
 transférés, cache vide, gzip compris, mesurés sur 20 items de la fixture
 (`test_the_screen_of_the_feed_holds_three_requests_and_30_kb_at_most`).
+
+## Détail
+
+`/items/<id>` (#564) montre un item des cinq sortes du fil, par `GET /items/{item_id}` de l'API de données, avec
+la clé du client `WEB`. Maquettes du 09/11 : `Maquette-papier`, `Maquette-alerte` et `Maquette-faille`.
+
+**L'identifiant** est lu en chaîne, jamais typé par FastAPI (sinon un 422 en JSON) : `[1-9][0-9]{0,18}`, en
+chiffres ASCII, puis au plus 2⁶³ − 1, par `read_item_id` (`web/item_detail.py`), seule à porter cette forme
+(#403 la changera seule pour un UUID). Hors de sa forme, la page 404, sans appel à l'API. Limite : Starlette
+route sur le chemin décodé (spécification ASGI, `path`), si bien que `/items/%39` sert aussi l'item 9.
+
+**La page**, un seul gabarit (`item.html`) dans l'ordre des maquettes : « ← Retour au fil » (vers `/`, sans les
+filtres) ; la sorte encadrée, les identifiants et les dates en `<time>` ; le titre en `h1` ; le bandeau ; les
+faits en `<dl>` ; les textes sous des `h2` ; le lien vers la source, en bouton, par la macro `external_link`
+(nouvel onglet annoncé, même texte que sur la carte). Aucun lien de la navigation n'est marqué courant.
+
+| Sorte | Ligne du haut | Faits | Textes |
+|---|---|---|---|
+| papier | arXiv …, « Publié le », « dernière version arXiv le » | — | « Auteurs: » puis les noms dans l'ordre d'arXiv ; « Résumé » |
+| faille | « Ajoutée au catalogue le », « modification vue par K-B le » | CVE, usage par des rançongiciels, éditeur, produit | « Description » |
+| alerte | « Publiée le » | identifiant GitHub, CVE (« Aucune »), paquets touchés (« Aucun ») | — |
+| *release* | dépôt, version, « Publiée le » | — | « Notes de version, texte brut », ou « Aucune note de version. » |
+| newsletter | « TLDR AI », « édition du », n° | — | « Résumé » |
+
+**Le bandeau** dit l'état en mots, la couleur ne fait que suivre (RGAA 3.1) ; seul un item au catalogue KEV prend
+le style d'alerte. Il lit `exploited` et `withdrawn_at`, sans rien supposer :
+
+| Item | Titre |
+|---|---|
+| faille au catalogue | Exploitée activement: oui |
+| faille retirée | Retirée du catalogue le … (jamais « Exploitée », décision de Sabine du 2026-11-11) |
+| alerte, `exploited` vrai | Entrée au catalogue KEV ; le texte dit qu'un retrait depuis ne se voit pas ici |
+| alerte, faux | Absente du catalogue KEV |
+| alerte, nul | Sans CVE |
+
+**Les textes** : les notes d'une *release* sont du texte brut, échappé, jamais du Markdown rendu ni un lien
+(D3 de #564, décision de Sabine du 2026-11-11) ; les retours à la ligne sont gardés (`white-space: pre-wrap`) et
+les lignes vides séparent les paragraphes. Tout texte reçu passe d'abord par `clean_received_text` : sans
+caractère de contrôle hors tabulation et retour à la ligne, sans non-caractère ni demi-paire isolée, `\r\n` et
+`\r` ramenés à `\n` (RGAA 8.2). Le titre, le résumé, la description et les notes sont en `lang="en"`, comme
+au fil (hypothèse : un texte en français serait mal marqué) ; l'éditeur et le produit d'une faille aussi.
+
+**Les erreurs** : la page 404 pour un identifiant hors de sa forme, un 404 `item_not_found`, une entrée Zotero ou
+un clip (le client n'en lit que la sorte : leur texte n'est jamais modélisé, montré ni journalisé). Tout autre
+404 de l'API (`route_not_found`, un 404 sans JSON) et tout autre échec rendent la page 500, journalisée comme au
+fil (`data_api_failed: …`), sans l'identifiant. Le journal des requêtes écrit `route=/items/{item_id}`.
+
+**Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés par écran, cache vide, gzip compris, le
+résumé ou la description à sa borne de 5 000 caractères (`tests/web/test_item_page.py`). Hors budget : les notes
+d'une *release* (125 000 caractères au plus) et les auteurs d'un papier (1 000 au plus), que l'API sert entiers.
+
+**La preuve de bout en bout** (C17.3) : `tests/web/test_site_on_the_data_api.py` sert le site sur la vraie API
+de données de la base de test, en mémoire : une date du fil refusée sous son champ, un filtre gardé, puis le
+détail par le lien du titre d'une carte. Il tourne dans `uv run pytest`, donc en CI.
 
 ## Accès
 
