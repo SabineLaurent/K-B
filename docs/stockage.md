@@ -306,7 +306,7 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
     2026-10-13) ; les autres sortes exigent `https`, sauf `clip` (Web Clipper garde l'URL de la
     page, `http` ou `https`).
   - Un texte ou un commentaire de surlignage qui contient un NUL est refusé par l'item
-    (`src/k_b/items.py:372-387`), comme les autres textes (« Limite de SQLite » ci-dessus).
+    (`src/k_b/items.py:373-388`), comme les autres textes (« Limite de SQLite » ci-dessus).
 - **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
   `description` ; ils restent dans la copie brute. Les `tags` y vont depuis #260 (journal ADR,
