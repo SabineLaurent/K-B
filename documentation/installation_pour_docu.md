@@ -47,7 +47,7 @@ uv run kb --help
   `uv lock --check` a répondu `Resolved 96 packages` et est sorti en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv, « Automatic lock
   and sync »): après un `git pull` qui change `uv.lock`, `uv run kb …` installe d'abord les nouvelles versions.
-- `uv run kb --help` contrôle l'installation. Il liste les 13 commandes de `kb` et leurs codes de sortie, sans lire
+- `uv run kb --help` contrôle l'installation. Il liste les 16 commandes de `kb` et leurs codes de sortie, sans lire
   l'environnement: `main` lit la ligne de commande (`read_command`) avant l'environnement (`read_environment`,
   `cli.py`). `kb` est le point d'entrée que déclare `[project.scripts]` (`kb = "k_b.cli:main"`, `pyproject.toml`).
 
@@ -69,8 +69,8 @@ KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 base est ce fichier SQLite; avec elle, `kb create-db` crée les tables dans la base PostgreSQL de l'URL, qui doit déjà
 exister, en UTF8 et en collation C ([docs/stockage.md](../docs/stockage.md), « Le SGBD »).
 
-Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log` et
-`kb-serve-ai.log` pour les deux API (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et
+Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log`,
+`kb-serve-ai.log` et `kb-serve-web.log` pour les deux API et le site (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et
 `--dry-run` de `kb daily-routine` et `kb digest-watch`, qui affiche les étapes sans en lancer aucune (`main`,
 `cli.py`). Avec `KB_LOG_TO_FILE=false`, le journal ne va que sur la
 sortie d'erreur.
@@ -114,7 +114,10 @@ avec `--dry-run`, ils ne lisent que `KB_DATA_DIR` et `KB_LOG_TO_FILE` (`main`, `
 | `KB_LLM_BASE_URL`, `KB_LLM_MODEL`, `KB_LLM_API_KEY` | `kb serve-ai` | oui avec `KB_LLM_PROVIDER=openai_compatible` |
 | `KB_LLM_REPLAY_FILE` | `kb serve-ai` | oui avec `KB_LLM_PROVIDER=replay`, qui répond par les réponses d'un fichier, sans réseau ni clé |
 | `KB_LLM_REASONING_EFFORT`, `KB_AI_API_HOST`, `KB_AI_API_PORT`, `KB_DIGEST_WINDOW_DAYS` | `kb serve-ai` | non |
-| `KB_DATA_API_URL` | `kb serve-ai`, `kb smoke-test`, `kb digest-watch` | non |
+| `KB_DATA_API_URL` | `kb serve-ai`, `kb serve-web`, `kb smoke-test`, `kb digest-watch` | non |
+| `KB_DATA_API_KEY_WEB` | `kb serve-web`, la clé de son client `WEB` de l'API de données (`web/settings.py`) | oui |
+| `KB_WEB_HOST`, `KB_WEB_PORT`, `KB_WEB_ALLOWED_HOSTS` | `kb serve-web` | non |
+| `KB_WEB_AUTH`, `KB_WEB_OPERATOR_ID` | `kb serve-web`: `entra` par défaut, chaque requête sauf `/health` porte l'identifiant d'objet de l'opératrice; `off`, aucun en-tête vérifié (`web/settings.py`) | `KB_WEB_OPERATOR_ID` oui, sauf avec `KB_WEB_AUTH=off`, que `kb serve-web` refuse hors de `127.0.0.1` ou dans Azure (`web/settings.py`) |
 | `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS`, `KB_TRACE_CONTENT` | `kb serve-ai` | non: sans les deux premières, rien n'est exporté, et `kb serve-ai` refuse de démarrer avec `KB_TRACE_CONTENT` autre que `none` (`find_content_without_export_refusal`, `ai_api/connectors/metrics_export.py`) |
 | `KB_DEPLOYMENT_ENVIRONMENT` | `kb serve-data`, `kb serve-ai`; les commandes qui lisent `KB_AI_API_URL` ou `KB_DATA_API_URL`, pour une URL `http` vers un service de compose (`find_internal_api_url_refusal`, `core/outbound.py`) | non, sauf avec l'export (`sandbox` ou `production`). Seul `sandbox` sert `/docs` et `/openapi.json` (`read_openapi_url`, `core/api_settings.py`) |
 | `KB_AI_API_URL` | `kb digest`, `kb trend-report`, `kb smoke-test`, `kb digest-watch` | non |
@@ -123,7 +126,7 @@ avec `--dry-run`, ils ne lisent que `KB_DATA_DIR` et `KB_LOG_TO_FILE` (`main`, `
 
 ## Les dépendances
 
-`pyproject.toml` déclare les 16 dépendances de K-B (`[project]`, `dependencies`) et le groupe `dev`
+`pyproject.toml` déclare les 17 dépendances de K-B (`[project]`, `dependencies`) et le groupe `dev`
 (`[dependency-groups]`), qui ne sert qu'au développement et aux tests. `uv.lock` fixe la version exacte de chaque
 paquet, dépendances indirectes comprises: 96 paquets, K-B compris. Chacun porte l'empreinte `sha256` de ses fichiers,
 sauf K-B, installé depuis le dépôt (`source = { editable = "." }`).
@@ -135,16 +138,17 @@ L'image n'installe pas le groupe `dev`: ses deux `uv sync` portent `--no-dev` (`
 | `azure-storage-blob` | 12.31.1 | — | 12.31.1 | le stockage d'échange des jobs: le miroir des clips, la publication de `veille/`, la liste de `kb smoke-test` (`jobs/`) |
 | `beautifulsoup4` | 4.15.0 | — | 4.15.0 | la lecture des pages HTML de TLDR (`etl/sources/tldr.py`) |
 | `defusedxml` | 0.7.1 | — | 0.7.1 | la lecture du flux Atom d'arXiv, sans développer une entité déclarée dans le flux (`etl/sources/arxiv.py`) |
-| `fastapi` | 0.122 | — | 0.143.1 | les deux API, leurs routes et leurs dépendances (`data_api/`, `ai_api/`, `core/api_*.py`) |
+| `fastapi` | 0.122 | — | 0.143.1 | les deux API et le site, leurs routes et leurs dépendances (`data_api/`, `ai_api/`, `web/`, `core/api_*.py`) |
 | `google-cloud-bigquery` | 3.46 | < 4 | 3.46.1 | la requête de GH Archive sur BigQuery (`etl/sources/gh_archive.py`) |
-| `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), les `/health` des jobs (`jobs/api_health.py`) |
+| `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), le site vers l'API de données (`web/data_api_client.py`), les `/health` des jobs (`jobs/api_health.py`) |
+| `jinja2` | 3.1.6 | — | 3.1.6 | les gabarits des pages du site, rendus par le serveur, chaque valeur échappée (`autoescape=True`, `web/rendering.py`) |
 | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | < 1.46 | 1.45.2 | l'export des mesures, des traces et des journaux de l'API IA en OTLP (`ai_api/connectors/metrics_export.py`, `ai_api/connectors/trace_export.py`, `ai_api/tracing.py`, `ai_api/observability/metric_instruments.py`). La borne: `trace_export.py` importe des modules privés du SDK et de son exportateur, qui changent d'une version à l'autre |
 | `psycopg[binary]` | 3.3.8 | — | 3.3.8, avec `psycopg-binary` 3.3.8 | la connexion à PostgreSQL (`database/postgresql.py`, `database/errors.py`). L'option `binary` apporte libpq: la machine n'a pas à l'installer (documentation de psycopg, « Installation », lue par Context7 le 2026-11-08) |
 | `psycopg-pool` | 3.3.3 | — | 3.3.3 | le pool des connexions de lecture de l'API de données sur PostgreSQL (`database/postgresql.py`) |
 | `pydantic` | 2.13.5 | — | 2.13.5 | la validation des entrées: les items des sources (`items.py`, `etl/sources/`), les schémas et les réglages des API (`data_api/`, `ai_api/`), les réponses que lisent `kb digest` et `kb trend-report` (`post/`) |
 | `pyyaml` | 6.0.3 | — | 6.0.3 | la lecture du frontmatter des clips (`etl/sources/clipping.py`) |
 | `requests` | 2.34.2 | — | 2.34.2 | la session HTTP des exportateurs OTLP, qui ne lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`build_session`, `ai_api/connectors/metrics_export.py`) |
-| `uvicorn` | 0.54.0 | — | 0.54.0 | le serveur des deux API (`commands/serve_data_command.py`, `commands/serve_ai_command.py`) |
+| `uvicorn` | 0.54.0 | — | 0.54.0 | le serveur des deux API et du site (`commands/serve_data_command.py`, `commands/serve_ai_command.py`, `commands/serve_web_command.py`) |
 
 Les paquets du groupe `dev` (pytest, ruff, mypy…) et leur rôle sont dans [la fiche des tests](tests_pour_docu.md),
 « Les dépendances installées ».
