@@ -59,8 +59,9 @@ Sources (Microsoft Learn, lues le 2026-11-06) :
 
 ## Vérifier
 
-La CI (`.github/workflows/infra.yml`, job `bicep-build`) lance `az bicep build` sur toute PR qui touche `infra/`,
-sans aucun droit Azure. Sur le Mac, avec la même version de Bicep :
+La CI (`.github/workflows/infra.yml`, job `bicep-build`) lance `az bicep build` sur toute PR vers `main` et tout
+push sur `main`, sans aucun droit Azure ; c'est un contrôle exigé de `main` depuis #496. Sur le Mac, avec la même
+version de Bicep :
 
 ```sh
 az bicep install --version v0.48.1

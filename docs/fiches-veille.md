@@ -973,7 +973,7 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement dont la construction et la relecture seraient exigées (#496) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement, construit sur toute PR depuis #496, à exiger par le ruleset et à constater (#496) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
 | API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
@@ -1288,24 +1288,44 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée, risque accepté
-  jusqu'à #496 (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200),
-  l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme
-  le code ; la CI construit `infra/main.bicep` sur toute PR qui touche `infra/`
-  (`.github/workflows/infra.yml:27`) ; une version taguée part en ligne par
-  `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
-  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui manque, en quatre limites : le
-  socle s'applique à la main, en deux passes (`infra/README.md`) ; `deploy.yml` change l'image des
-  apps et des jobs par `az containerapp update` et `az containerapp job update`, hors du Bicep
-  (`deploy.yml:168`, `:174`) ; la construction du Bicep n'est pas un contrôle exigé de `main`
-  (`infra.yml:15`) ; le ruleset de `main` n'exige aucune relecture (`required_approving_review_count`
-  0), la relecture en PR est une pratique, pas une règle.
-  **Pour la tenir** : la construction du Bicep exigée, sans bloquer les PR qui ne touchent pas
-  `infra/` (un job toujours lancé, qui saute la construction hors de `infra/`, #496), et une
-  relecture exigée par le ruleset dès qu'une seconde personne peut relire. S.
-  **Pour réduire le risque** : d'ici #496, ne fusionner une PR qui touche `infra/` que sur sa
-  construction du Bicep verte (`infra.yml:27`) ; après une passe à la main ou une version, relire la
-  configuration en ligne (« Revue périodique », ci-dessous).
+- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée jusqu'à la fin de #496
+  (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200), l'environnement, les apps et
+  les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme le code ; depuis #496, la CI construit
+  `infra/main.bicep` sur toute PR vers `main` et tout push sur `main`, sans filtre de chemin
+  (`.github/workflows/infra.yml:3-7`, `:26` ; `grep -n "paths" .github/workflows/infra.yml` ne rend rien, le
+  2026-11-13) ; une version taguée part en ligne par `.github/workflows/deploy.yml` (#415). Un réglage refusé
+  empêche le démarrage (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui reste de #496 : `bicep-build`
+  exigé par le ruleset de `main`, et le constat d'une PR qui ne touche pas `infra/` et le reçoit, vert.
+  **Pour la tenir** : #496, ces deux constats. XS.
+  **Pour réduire le risque** : d'ici là, ne fusionner une PR qui touche `infra/` que sur sa construction du Bicep
+  verte (`infra.yml:26`) ; après une passe à la main ou une version, relire la configuration en ligne (« Revue
+  périodique », ci-dessous).
+  Trois écarts voulus, que la mesure garde une fois tenue (décision de Sabine du 2026-11-08 : tenir la construction
+  exigée, justifier le reste) :
+  - **Le socle s'applique à la main**, en deux passes (`infra/README.md`, « Appliquer »). Ces fichiers donnent des
+    rôles aux identités, ce qui demande le droit d'Owner sur le groupe ; la CI ne l'a jamais (moindre privilège :
+    `id-kb-deploy` n'a que AcrPush et Reader sur le registre, Container Apps Contributor sur chaque app et Container
+    Apps Jobs Contributor sur chaque job, `infra/README.md`, table des modules). La
+    passe reste répétable : le même Bicep, les mêmes commandes, l'aperçu (`what-if`) avant la création, et
+    `kb_check` qui refuse une valeur vide. **Limite** : une passe oubliée, ou lancée avec d'autres paramètres,
+    laisse la configuration en ligne s'écarter du dépôt. **Pour lever l'écart** : donner à la CI le droit d'appliquer
+    le Bicep, ce qui lui donnerait aussi celui de créer des rôles ; non chiffré. **Pour réduire le risque** : un seul
+    outil pour les passes (#455, ouverte) ; la relecture de la configuration en ligne à chaque version (#497, en
+    cours). Faisable avec nos droits.
+  - **`deploy.yml` change l'image hors du Bicep**, par `az containerapp update` et `az containerapp job update`
+    (`deploy.yml:168`, `:174`) : seule l'image change, tenue par son digest, vérifié contre le commit du tag
+    (`deploy.yml:102-134`). **Limite** : une passe à la main qui reprendrait un `imageTag` plus ancien remettrait
+    l'ancienne image. **Pour lever l'écart** : que `deploy.yml` applique le Bicep avec `imageTag`, ce qui demande le
+    droit du point précédent ; non chiffré. **Pour réduire le risque** : avant chaque passe, lire la version en
+    ligne et la donner pour `imageTag` (`infra/README.md`, « 5. Seconde passe ») ; faisable avec nos droits, déjà
+    écrit.
+  - **Le ruleset de `main` n'exige aucune relecture** (`required_approving_review_count` 0) : K-B n'a qu'une
+    personne au dépôt, et « Pull request authors cannot approve their own pull requests » (GitHub Docs,
+    « Approving a pull request with required reviews », relu le 2026-11-13) : une approbation exigée bloquerait
+    toute PR de Sabine. **Limite** : une seconde personne avec le droit d'écrire. **Pour lever l'écart** : exiger une
+    approbation dans le ruleset dès qu'une seconde personne peut relire. XS. **Pour réduire le risque** : chaque PR
+    de code passe `/code-review`, et `/security-review` quand elle touche une entrée externe, rapportés avant la
+    fusion (`.claude/rules/methode.md`) ; faisable, déjà fait.
 - **Revue périodique des configurations de toute la pile** : non tenue, en partie : mesure
   nécessaire non intégrée (#497). Chaque changement
   de `infra/` est relu en PR ; la configuration en ligne n'a été relue contre ces fichiers qu'une
