@@ -5,9 +5,10 @@
 - Issue : #600
 - Fichier : `docs/stockage.md` (section « Pourquoi un SGBD relationnel », et quatre retouches
   ailleurs dans le fichier)
-- Commits : `7cd5594` (la section), `cde3315` (les corrections après relecture). Les autres commits
-  de la liste injectée sont ceux de `main` avant la branche (`1b6e0b8` et avant) : ils ne sont pas
-  de cette PR.
+- Commits, après le rebase sur `main` en `eef28b2` : `628b0b2` (la section), `dcc6f84` et `143eeb6`
+  (les corrections des deux relectures), `52faece` et `44d4c54` (cette note), `3e0b72d` (un renvoi
+  de ligne décalé par le rebase). Les autres commits de la liste injectée sont ceux de `main` avant
+  la branche : ils ne sont pas de cette PR.
 - Série : [créer la base](2026-10-05-creer-la-base.md),
   [clarifier le modèle de la base](2026-10-07-clarifier-le-modele-de-la-base.md),
   [rejeter l'item que la base refuse](2026-10-16-rejeter-l-item-que-la-base-refuse.md),
