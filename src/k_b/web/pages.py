@@ -1,5 +1,5 @@
-"""The pages of the site: the watch feed, the detail of an item, the sources and the accessibility
-(docs/site-web.md, "Pages")."""
+"""The pages of the site: the watch feed, the detail of an item, the trends, the sources and the
+accessibility (docs/site-web.md, "Pages")."""
 
 import logging
 from collections.abc import Sequence
@@ -15,6 +15,7 @@ from k_b.web.data_api_client import (
     ExcludedItem,
     list_feed_items,
     read_item,
+    read_trends,
 )
 from k_b.web.errors import render_error_page, render_server_error_page
 from k_b.web.feed import (
@@ -38,6 +39,16 @@ from k_b.web.feed import (
 )
 from k_b.web.item_detail import build_item_page, read_item_id
 from k_b.web.rendering import render_page
+from k_b.web.trends import (
+    GITHUB_LINK_NOTE,
+    TRENDS_PATH,
+    TrendsPage,
+    build_missing_window_page,
+    build_refused_page,
+    build_trends_page,
+    find_api_window_end_error,
+    read_trends_form,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -124,6 +135,37 @@ def show_item(request: Request, item_id: str) -> Response:
         return render_error_page(request, 404)
     # No link of the navigation is the current page: Veille is the feed, not its detail.
     return render_page(request, "item.html", {"detail": build_item_page(detail)})
+
+
+# window_end is read raw, as the query of the feed: a 422 of FastAPI would quote the value received.
+@router.get(TRENDS_PATH)
+def show_trends(request: Request) -> Response:
+    """The trends of the latest window, or of the window that ends on the day of its form."""
+    form = read_trends_form(request.query_params)
+    if form.error:
+        return render_trends(request, build_refused_page(form.error))
+    try:
+        window = read_trends(request.app.state.data_api_client, form.window_end)
+    except DataApiError as error:
+        if error.state == "data_api_trend_window_not_found":
+            return render_trends(request, build_missing_window_page(form.window_end))
+        field_error = find_api_window_end_error(error)
+        if field_error is None:
+            log_data_api_failure(request, error)
+            return render_server_error_page(request)
+        return render_trends(request, build_refused_page(field_error))
+    return render_trends(request, build_trends_page(window))
+
+
+def render_trends(request: Request, trends: TrendsPage) -> Response:
+    """The trends with their form; a day refused, in 422, without table."""
+    return render_page(
+        request,
+        "trends.html",
+        {"trends": trends, "link_note": GITHUB_LINK_NOTE},
+        current_path=TRENDS_PATH,
+        status_code=422 if trends.error else 200,
+    )
 
 
 def log_data_api_failure(request: Request, error: DataApiError) -> None:

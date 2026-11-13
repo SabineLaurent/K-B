@@ -110,11 +110,12 @@ def test_a_search_holding_a_control_character_is_refused_on_its_field(control):
 
 @pytest.mark.parametrize(
     "start",
-    ["x" * 3000, "2026-10-07%01", "07/10/2026", "2026-10-07T00:00"],
-    ids=["long", "control", "french-form", "with-time"],
+    ["x" * 3000, "2026-10-07%01", "07/10/2026", "2026-10-07T00:00", "2026-02-30"],
+    ids=["long", "control", "french-form", "with-time", "no-such-day"],
 )
-def test_a_start_date_out_of_its_form_is_never_shown_again(start):
-    """Whatever the period: an input type=date holds a day of the form AAAA-MM-JJ or nothing."""
+def test_a_start_date_that_is_not_a_day_is_never_shown_again(start):
+    """Whatever the period: an input type=date holds a valid day or nothing (WHATWG; RGAA 8.2),
+    the rule of the date of the trends (#596)."""
     assert read(f"period=1&start={start}").start == ""
     assert read(f"period=date&start={start}").start == ""
 

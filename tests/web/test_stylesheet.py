@@ -214,7 +214,9 @@ def test_nothing_is_fetched_from_elsewhere():
     assert re.findall(r"@import|@font-face|url\(", STYLESHEET) == []
 
 
-@pytest.mark.parametrize("links", [r"\.prose a", r"\.card-link", r"\.card-title a"])
+@pytest.mark.parametrize(
+    "links", [r"\.prose a", r"\.card-link", r"\.card-title a", r"\.trends-table a"]
+)
 def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart(links):
     """Opquast 2025, rule 141: a link in a text, and the link of a card to its source; a menu is out
     of the rule. Its contrast on the pages and on a card: 4.5 at least."""
@@ -250,6 +252,7 @@ def test_a_page_prints_without_its_navigation():
         ".site-footer",
         ".error-actions",
         ".back-link",
+        ".trends-filter",
     } <= hidden
 
 
@@ -304,7 +307,7 @@ def test_the_banner_and_the_packages_have_the_colours_of_their_mockups(
     assert declaration in strip_nested_rules(read_rule(selector))
 
 
-@pytest.mark.parametrize("selector", [".card-title a", ".back-link"])
+@pytest.mark.parametrize("selector", [".card-title a", ".back-link", ".trends-table a"])
 def test_a_link_of_a_detail_or_of_a_title_is_a_target_of_44_pixels(selector):
     """Opquast 2025, rule 186: by its padding, or its minimum height."""
     rule = strip_nested_rules(read_rule(selector))
@@ -319,4 +322,20 @@ def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
     a phone with its text at 200 %."""
     assert re.search(
         r"\.button,\s*\.button-secondary\s*\{[^}]*flex-wrap:\s*wrap;", STYLESHEET
+    )
+
+
+def test_the_counts_of_the_trends_are_aligned_as_numbers():
+    """Maquette-tendances.dc.html: on the right, in tabular figures, a count never cut."""
+    rule = strip_nested_rules(read_rule(".trends-table .number"))
+
+    assert "text-align: end;" in rule
+    assert "font-variant-numeric: tabular-nums;" in rule
+    assert "white-space: nowrap;" in rule
+
+
+def test_the_name_of_a_repository_wraps_anywhere():
+    """39 characters for an owner and 100 for a repository hold at 320 px (RGAA 10.11)."""
+    assert "overflow-wrap: anywhere;" in strip_nested_rules(
+        read_rule(".trends-table a")
     )

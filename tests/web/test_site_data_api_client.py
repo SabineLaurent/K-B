@@ -1,5 +1,5 @@
-"""The reading of the feed and of the detail of an item by the data API: against the real data API
-on the test base, and a simulated transport for the answers the base cannot give."""
+"""The reading of the feed, of the detail of an item and of the trends by the data API: against the
+real data API on the test base, and a simulated transport for the answers the base cannot give."""
 
 import json
 import secrets
@@ -17,6 +17,7 @@ from item_fixture import (
     make_detail,
 )
 from pydantic import SecretStr
+from trends_fixture import OLDER_WINDOW_END, TRENDS, make_trends
 
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
@@ -34,6 +35,7 @@ from k_b.web.data_api_client import (
     build_data_api_client,
     list_feed_items,
     read_item,
+    read_trends,
 )
 from k_b.web.settings import DataApiAccess
 
@@ -393,3 +395,120 @@ def test_an_advisory_id_out_of_the_form_the_base_holds_is_an_invalid_answer(ghsa
     error = read_item_state(make_client(answer(200, body)), ADVISORY_WITHOUT_CVE)
 
     assert error.state == "data_api_invalid_response"
+
+
+def read_trends_state(http_client, window_end=None):
+    with pytest.raises(DataApiError) as raised:
+        read_trends(http_client, window_end)
+    return raised.value
+
+
+def test_the_latest_trends_are_read_on_the_real_data_api_as_the_fixture_holds_them(
+    data_api,
+):
+    """Without window_end, the latest window; the fixture is the answer of the test base."""
+    window = read_trends(data_api, None)
+
+    [request] = data_api.requests
+    assert request.url.path == "/trends"
+    assert "window_end" not in request.url.params
+    assert data_api.get("/trends").json() == TRENDS
+    assert window.window_end == date(2026, 10, 10)
+    assert [trend.repository_name for trend in window.trends] == [
+        trend["repository_name"] for trend in TRENDS["trends"]
+    ]
+
+
+def test_the_trends_of_a_window_send_its_last_day(data_api):
+    window = read_trends(data_api, date.fromisoformat(OLDER_WINDOW_END))
+
+    [request] = data_api.requests
+    assert request.url.params["window_end"] == OLDER_WINDOW_END
+    assert window.window_end == date(2026, 10, 9)
+    assert len(window.trends) == 2
+
+
+def test_a_window_the_base_does_not_hold_is_named(data_api):
+    error = read_trends_state(data_api, date(2026, 10, 11))
+
+    assert (error.state, error.http_status) == ("data_api_trend_window_not_found", 404)
+
+
+def test_the_trends_send_the_key_of_the_client_web():
+    requests = []
+
+    def handler(request):
+        requests.append(request)
+        return httpx2.Response(200, json=TRENDS)
+
+    read_trends(make_client(handler), None)
+
+    assert requests[0].headers["Authorization"] == f"Bearer {TEST_API_KEY}"
+
+
+@pytest.mark.parametrize(
+    "body",
+    [{"error": "item_not_found"}, {"error": "route_not_found"}, None],
+    ids=["item-not-found", "route-not-found", "not-json"],
+)
+def test_a_404_other_than_trend_window_not_found_is_an_answer_out_of_schema(body):
+    """One state by route, as for the detail."""
+    handler = (
+        answer(404, body)
+        if body is not None
+        else (lambda request: httpx2.Response(404, content=b"<html>Not Found</html>"))
+    )
+
+    error = read_trends_state(make_client(handler))
+
+    assert (error.state, error.http_status) == ("data_api_invalid_response", 404)
+
+
+def test_a_window_end_refused_by_the_data_api_gives_its_name():
+    handler = answer(422, {"error": "invalid_parameter", "parameters": ["window_end"]})
+
+    error = read_trends_state(make_client(handler), date(2026, 10, 10))
+
+    assert (error.state, error.parameters) == (
+        "data_api_invalid_parameter",
+        ("window_end",),
+    )
+
+
+@pytest.mark.parametrize(
+    "body",
+    [
+        make_trends(count=61),
+        make_trends(trends=[]),
+        make_trends(window_end="2026-10-10T00:00:00Z"),
+        # Its window would start before the first day a date holds.
+        make_trends(window_end="0001-01-02"),
+        make_trends(
+            trends=[{**TRENDS["trends"][0], "repository_name": "<b>owner</b>/repo"}]
+        ),
+        make_trends(trends=[{**TRENDS["trends"][0], "stars_gained": -1}]),
+        make_trends(trends=[{**TRENDS["trends"][0], "forks_gained": 2**63}]),
+    ],
+    ids=[
+        "61-rows",
+        "no-row",
+        "a-moment",
+        "before-the-first-window",
+        "name-out-of-form",
+        "stars-negative",
+        "forks-beyond-64-bits",
+    ],
+)
+def test_trends_out_of_the_contract_are_an_invalid_answer(body):
+    """60 rows at most; a window exists by its rows only, which its 404 says (docs/specs-api.md)."""
+    error = read_trends_state(make_client(answer(200, body)))
+
+    assert error.state == "data_api_invalid_response"
+
+
+def test_a_field_the_data_api_adds_to_the_trends_is_ignored():
+    body = make_trends(window_start="2026-10-08")
+
+    assert read_trends(make_client(answer(200, body)), None).window_end == date(
+        2026, 10, 10
+    )

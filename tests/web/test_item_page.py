@@ -2,7 +2,6 @@
 found, the page 500, the log without the id, a value received always escaped, and the title of a
 card of the feed made a link to it (docs/site-web.md, "Détail")."""
 
-import gzip
 import logging
 import random
 import re
@@ -22,6 +21,7 @@ from item_fixture import (
     WITHDRAWN_VULNERABILITY,
     make_detail,
 )
+from screen_weight import SCREEN_BUDGET_BYTES, SCREEN_RESOURCES, weigh_screen
 from site_client import OPERATOR_HEADERS, make_client, serve
 
 MARK = "<b>mark</b>"
@@ -381,17 +381,12 @@ def test_the_screen_of_a_detail_holds_three_requests_and_30_kb_at_most(
         **{field: write_text_of(length, field) for field, length in changes.items()},
     )
     client = make_client(handler=serve(body))
-    headers = {**OPERATOR_HEADERS, "Accept-Encoding": "gzip"}
-    page = client.get(f"/items/{item_id}", headers=headers)
-    resources = re.findall(r"<(?:link|img|script|iframe|source)\b[^>]*>", page.text)
-    paths = [re.search(r'(?:href|src)="([^"]+)"', tag).group(1) for tag in resources]
 
-    assert page.status_code == 200
-    assert paths == ["/static/site.css", "/static/favicon.svg"]
-    weights = [len(gzip.compress(page.content))] + [
-        client.get(path, headers=headers).num_bytes_downloaded for path in paths
-    ]
-    assert sum(weights) <= 30_000
+    screen = weigh_screen(client, f"/items/{item_id}")
+
+    assert screen.status_code == 200
+    assert screen.resources == SCREEN_RESOURCES
+    assert screen.weight <= SCREEN_BUDGET_BYTES
 
 
 def test_a_detail_whose_summary_is_empty_is_served():

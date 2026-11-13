@@ -1,11 +1,12 @@
-"""The reading of the feed and of the detail of an item by the data API, with the key of the client
-WEB (docs/site-web.md, "Fil" and "Détail"): one GET /items by page, one GET /items/{item_id} by
-detail, a failure a named state raised as a DataApiError, without retry."""
+"""The reading of the feed, of the detail of an item and of the trends by the data API, with the key
+of the client WEB (docs/site-web.md, "Fil", "Détail" and "Tendances"): one GET /items by page, one
+GET /items/{item_id} by detail, one GET /trends by window, a failure a named state raised as a
+DataApiError, without retry."""
 
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 from typing import Annotated, Literal, get_args
 
 import httpx2
@@ -16,6 +17,8 @@ from k_b.core.config import (
     DATA_API_POOL_TIMEOUT_SECONDS,
     DATA_API_WRITE_TIMEOUT_SECONDS,
     FEED_PAGE_SIZE,
+    GH_ARCHIVE_TOP_SIZE,
+    GH_ARCHIVE_WINDOW_DAYS,
     MAX_WEB_DATA_API_BODY_BYTES,
     WEB_DATA_API_READ_TIMEOUT_SECONDS,
     WEB_DATA_API_REQUEST_DEADLINE_SECONDS,
@@ -41,6 +44,12 @@ from k_b.items import (
 from k_b.web.settings import DataApiAccess
 
 ITEMS_PATH = "items"
+TREND_WINDOW_PATH = "trends"
+# The 30 first repositories by stars and the 30 first by forks, together (docs/specs-api.md).
+MAX_TRENDS = 2 * GH_ARCHIVE_TOP_SIZE
+# The first day a window can end on: the site writes its start, GH_ARCHIVE_WINDOW_DAYS - 1 days
+# before.
+FIRST_WINDOW_END = date.min + timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)
 # The kinds of the feed, in the order of the form; never zotero_entry nor clip.
 type FeedKind = Literal[
     "paper", "vulnerability", "advisory", "release", "newsletter_article"
@@ -55,6 +64,7 @@ type DataApiState = Literal[
     "data_api_invalid_parameter",
     "data_api_invalid_response",
     "data_api_item_not_found",
+    "data_api_trend_window_not_found",
 ]
 
 
@@ -182,6 +192,21 @@ ItemDetail = (
 )
 
 
+class Trend(DataApiModel):
+    """A repository of a window: its name, which the link to GitHub is built from, and its
+    counts."""
+
+    repository_name: RepositoryName
+    stars_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
+    forks_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
+
+
+class TrendWindow(DataApiModel):
+    window_end: Annotated[date, Field(ge=FIRST_WINDOW_END)]
+    # A window exists by its rows only: GET /trends answers 404 without one.
+    trends: Annotated[list[Trend], Field(min_length=1, max_length=MAX_TRENDS)]
+
+
 class InvalidParameterBody(DataApiModel):
     error: Literal["invalid_parameter"]
     parameters: list[str]
@@ -191,12 +216,18 @@ class ItemNotFoundBody(DataApiModel):
     error: Literal["item_not_found"]
 
 
+class TrendWindowNotFoundBody(DataApiModel):
+    error: Literal["trend_window_not_found"]
+
+
 PAGE = TypeAdapter(FeedItemPage)
 DETAIL: TypeAdapter[ItemDetail | ExcludedItem] = TypeAdapter(
     Annotated[ItemDetail | ExcludedItem, Field(discriminator="kind")]
 )
 INVALID_PARAMETER = TypeAdapter(InvalidParameterBody)
 ITEM_NOT_FOUND = TypeAdapter(ItemNotFoundBody)
+TREND_WINDOW = TypeAdapter(TrendWindow)
+TREND_WINDOW_NOT_FOUND = TypeAdapter(TrendWindowNotFoundBody)
 
 
 @dataclass(frozen=True)
@@ -265,6 +296,36 @@ def read_item(
 def is_item_not_found(body: bytes) -> bool:
     try:
         ITEM_NOT_FOUND.validate_json(body)
+    except ValidationError:
+        return False
+    return True
+
+
+def read_trends(
+    http_client: httpx2.Client,
+    window_end: date | None,
+    clock: Callable[[], float] = time.monotonic,
+) -> TrendWindow:
+    """The trends of the window that ends on window_end, or of the latest window without it;
+    bounded as a page of the feed. Only the 404 trend_window_not_found names a window missing, in
+    the base or of this day."""
+    params: dict[str, str | int | list[str]] = (
+        {} if window_end is None else {"window_end": window_end.isoformat()}
+    )
+    status, body = send(http_client, TREND_WINDOW_PATH, params, clock)
+    if status == httpx2.codes.NOT_FOUND and is_trend_window_not_found(body):
+        raise DataApiError("data_api_trend_window_not_found", status)
+    if status != httpx2.codes.OK:
+        raise name_failure(status, body)
+    try:
+        return TREND_WINDOW.validate_json(body)
+    except ValidationError:
+        raise DataApiError("data_api_invalid_response", status) from None
+
+
+def is_trend_window_not_found(body: bytes) -> bool:
+    try:
+        TREND_WINDOW_NOT_FOUND.validate_json(body)
     except ValidationError:
         return False
     return True

@@ -1,6 +1,7 @@
 """The site on the real data API of its test base, in memory, without network: a filter of the feed
 refused, a filter kept, then the detail of an item by the title of its card (C17.3 of the
-certification: an input validated and a second screen). Not marked e2e: it runs in the CI."""
+certification: an input validated and a second screen); the trends of the base, by their window.
+Not marked e2e: it runs in the CI."""
 
 import re
 
@@ -42,6 +43,7 @@ def test_a_start_date_that_does_not_exist_is_refused_on_its_field_without_asking
     assert start is not None
     assert 'aria-invalid="true"' in start.group(0)
     assert 'aria-describedby="start-error start-help"' in start.group(0)
+    assert 'value=""' in start.group(0)
     assert '<li class="card">' not in response.text
     assert data_api.requests == []
 
@@ -64,3 +66,23 @@ def test_a_filter_kept_lists_its_items_then_the_title_of_a_card_leads_to_its_det
     assert h1.group(1) == title
     assert "Entrée au catalogue KEV" in detail.text
     assert [request.url.path for request in data_api.requests] == ["/items", link]
+
+
+def test_the_trends_show_the_latest_window_then_the_window_asked_then_one_absent(
+    site, data_api
+):
+    latest = site.get("/tendances")
+    older = site.get("/tendances?window_end=2026-10-09")
+    absent = site.get("/tendances?window_end=2026-10-11")
+
+    assert [latest.status_code, older.status_code, absent.status_code] == [200] * 3
+    assert latest.text.count('<td class="rank">') == 5
+    assert older.text.count('<td class="rank">') == 2
+    assert (
+        "Aucune tendance pour la fenêtre qui se termine le 11 octobre 2026."
+        in absent.text
+    )
+    assert [
+        (request.url.path, request.url.params.get("window_end"))
+        for request in data_api.requests
+    ] == [("/trends", None), ("/trends", "2026-10-09"), ("/trends", "2026-10-11")]
