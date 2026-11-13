@@ -10,7 +10,14 @@ from datetime import date, timedelta
 from typing import Annotated, Literal, get_args
 
 import httpx2
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    ValidationError,
+)
 
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
@@ -40,6 +47,7 @@ from k_b.items import (
     RansomwareUse,
     RepositoryName,
     UtcDatetime,
+    is_repository_name,
 )
 from k_b.web.settings import DataApiAccess
 
@@ -192,11 +200,19 @@ ItemDetail = (
 )
 
 
+def check_path_segments(name: str) -> str:
+    """Refuse a name with a segment . or .., which a browser resolves to another page of GitHub:
+    the link would not lead to the repository its text names."""
+    if not is_repository_name(name):
+        raise ValueError("a segment . or ..")
+    return name
+
+
 class Trend(DataApiModel):
     """A repository of a window: its name, which the link to GitHub is built from, and its
     counts."""
 
-    repository_name: RepositoryName
+    repository_name: Annotated[RepositoryName, AfterValidator(check_path_segments)]
     stars_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
     forks_gained: Annotated[int, Field(ge=0, le=MAX_INT64)]
 
@@ -318,9 +334,13 @@ def read_trends(
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
     try:
-        return TREND_WINDOW.validate_json(body)
+        window = TREND_WINDOW.validate_json(body)
     except ValidationError:
         raise DataApiError("data_api_invalid_response", status) from None
+    # The window of the day asked or 404 (docs/specs-api.md): never another shown as its answer.
+    if window_end is not None and window.window_end != window_end:
+        raise DataApiError("data_api_invalid_response", status)
+    return window
 
 
 def is_trend_window_not_found(body: bytes) -> bool:

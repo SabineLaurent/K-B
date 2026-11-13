@@ -114,7 +114,8 @@ def build_trends_page(window: TrendWindow) -> TrendsPage:
             TrendRow(
                 rank=rank,
                 repository_name=trend.repository_name,
-                # A RepositoryName, owner/repository in [A-Za-z0-9_.-]: no character to encode.
+                # A RepositoryName without a segment . or .. (Trend): no character to encode,
+                # none a browser resolves elsewhere.
                 link=f"{GITHUB_URL}/{trend.repository_name}",
                 stars=write_count(trend.stars_gained),
                 forks=write_count(trend.forks_gained),

@@ -988,5 +988,10 @@
     .pagination {
       display: none;
     }
+
+    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns. */
+    .table-frame {
+      overflow: visible;
+    }
   }
 }

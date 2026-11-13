@@ -210,3 +210,9 @@ def test_the_screen_of_the_trends_holds_three_requests_and_30_kb_at_most():
     assert screen.status_code == 200
     assert screen.resources == SCREEN_RESOURCES
     assert screen.weight <= SCREEN_BUDGET_BYTES
+
+
+def test_a_window_other_than_the_day_asked_gives_the_page_500():
+    response = get(f"{TRENDS_PATH}?window_end=2026-10-09", serve(TRENDS))
+
+    assert response.status_code == 500

@@ -486,6 +486,9 @@ def test_a_window_end_refused_by_the_data_api_gives_its_name():
         make_trends(
             trends=[{**TRENDS["trends"][0], "repository_name": "<b>owner</b>/repo"}]
         ),
+        # A dot segment: https://github.com/owner/.. leads to https://github.com/.
+        make_trends(trends=[{**TRENDS["trends"][0], "repository_name": "owner/.."}]),
+        make_trends(trends=[{**TRENDS["trends"][0], "repository_name": "./repo"}]),
         make_trends(trends=[{**TRENDS["trends"][0], "stars_gained": -1}]),
         make_trends(trends=[{**TRENDS["trends"][0], "forks_gained": 2**63}]),
     ],
@@ -495,6 +498,8 @@ def test_a_window_end_refused_by_the_data_api_gives_its_name():
         "a-moment",
         "before-the-first-window",
         "name-out-of-form",
+        "dot-dot-segment",
+        "dot-segment",
         "stars-negative",
         "forks-beyond-64-bits",
     ],
@@ -512,3 +517,11 @@ def test_a_field_the_data_api_adds_to_the_trends_is_ignored():
     assert read_trends(make_client(answer(200, body)), None).window_end == date(
         2026, 10, 10
     )
+
+
+def test_a_window_other_than_the_day_asked_is_an_invalid_answer():
+    """GET /trends?window_end=D answers the window of D or 404 (docs/specs-api.md): another window
+    is never shown as the answer to D."""
+    error = read_trends_state(make_client(answer(200, TRENDS)), date(2026, 10, 9))
+
+    assert (error.state, error.http_status) == ("data_api_invalid_response", 200)

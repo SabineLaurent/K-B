@@ -345,3 +345,12 @@ def test_the_table_of_the_trends_scrolls_in_its_frame_rather_than_widen_the_page
     """Maquette-tendances.dc.html; measured for #596 at 320 px, a name at the lengths GitHub allows
     widens the table beyond its frame by 12 px. WCAG 1.4.10 exempts a table of data."""
     assert "overflow-x: auto;" in strip_nested_rules(read_rule(".table-frame"))
+
+
+def test_a_table_wider_than_the_page_prints_all_its_columns():
+    """Opquast 2025, rules 195 and 196: on paper, the frame no longer scrolls."""
+    rule = read_block(
+        read_block(STYLESHEET, r"@media print\s*\{"), r"\.table-frame\s*\{"
+    )
+
+    assert "overflow: visible;" in rule
