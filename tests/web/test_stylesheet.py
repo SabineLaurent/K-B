@@ -342,7 +342,7 @@ def test_the_name_of_a_repository_wraps_anywhere():
 
 
 def test_the_table_of_the_trends_scrolls_in_its_frame_rather_than_widen_the_page():
-    """Maquette-tendances.dc.html; measured for #596 at 320 px, a name at the lengths GitHub allows
+    """Maquette-tendances.dc.html; measured at 320 px, a name at the lengths GitHub allows
     widens the table beyond its frame by 12 px. WCAG 1.4.10 exempts a table of data."""
     assert "overflow-x: auto;" in strip_nested_rules(read_rule(".table-frame"))
 

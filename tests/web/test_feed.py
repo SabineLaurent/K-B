@@ -115,7 +115,7 @@ def test_a_search_holding_a_control_character_is_refused_on_its_field(control):
 )
 def test_a_start_date_that_is_not_a_day_is_never_shown_again(start):
     """Whatever the period: an input type=date holds a valid day or nothing (WHATWG; RGAA 8.2),
-    the rule of the date of the trends (#596)."""
+    the rule of the date of the trends."""
     assert read(f"period=1&start={start}").start == ""
     assert read(f"period=date&start={start}").start == ""
 

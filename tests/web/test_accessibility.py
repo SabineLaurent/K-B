@@ -659,7 +659,7 @@ def test_the_statement_says_its_limits_of_the_detail():
 
 @pytest.mark.parametrize("name", sorted(PAGES))
 def test_the_navigation_leads_to_the_feed_and_to_the_trends(name):
-    """D2 of #564 (Sabine, 2026-11-11): both links in sight at every width, no menu folded."""
+    """Sabine, 2026-11-11: both links in sight at every width, no menu folded."""
     navigation = re.search(
         r'<div class="site-nav-links">(.*?)</div>', PAGES[name], flags=re.DOTALL
     )
@@ -729,7 +729,10 @@ def test_the_trends_say_their_sample_and_their_order():
     mesurée le 2026-10-29"); the order of GET /trends (docs/specs-api.md)."""
     text = outline(PAGES["/tendances"]).text
 
-    assert "qui ne voit qu’environ 1 % des étoiles et de 1 à 4 % des forks" in text
+    assert (
+        "qui ne voit qu’environ 1 % des étoiles et de 0,8 à 1,3 % des forks, jusqu’à 4,2 %"
+        in text
+    )
     assert "triés par étoiles gagnées, puis par forks" in text
     assert "Jusqu’à 60" not in text
 
@@ -774,7 +777,7 @@ def test_the_statement_says_what_the_tests_check_of_the_table():
 
 
 def test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption():
-    """C7 of #564, measured at 320 px: a name of the length GitHub allows widens the table beyond
+    """Measured at 320 px: a name of the length GitHub allows widens the table beyond
     its frame, which scrolls (Maquette-tendances.dc.html); WCAG 2.1.1 asks the keyboard, without
     script: the frame takes the focus, a region named by the caption."""
     page = outline(PAGES["/tendances"])

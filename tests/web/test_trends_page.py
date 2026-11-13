@@ -72,7 +72,7 @@ def test_sixty_rows_are_shown_in_the_order_of_the_data_api():
 
 
 def test_each_repository_links_to_github_in_a_new_tab_it_announces():
-    """C13: in English, to another site, in a new tab (the macro external_link, #587)."""
+    """In English, to another site, in a new tab (the macro external_link)."""
     response = get(TRENDS_PATH, serve(TRENDS))
 
     assert (
@@ -216,3 +216,14 @@ def test_a_window_other_than_the_day_asked_gives_the_page_500():
     response = get(f"{TRENDS_PATH}?window_end=2026-10-09", serve(TRENDS))
 
     assert response.status_code == 500
+
+
+def test_a_name_without_a_link_is_written_as_text_in_its_cell():
+    trends = make_trends()
+    trends["trends"][0]["repository_name"] = "owner/.."
+
+    response = get(TRENDS_PATH, serve(trends))
+
+    assert response.status_code == 200
+    assert "<td>owner/..</td>" in response.text
+    assert response.text.count('<td class="rank">') == 5

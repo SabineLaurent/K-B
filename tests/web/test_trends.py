@@ -195,3 +195,18 @@ def test_a_window_end_refused_by_the_data_api_is_said_on_its_field():
 def test_any_other_failure_is_an_error_of_the_site(error):
     """The site sends window_end alone: another refusal is no field to correct."""
     assert find_api_window_end_error(error) is None
+
+
+@pytest.mark.parametrize("name", ["owner/..", "./repo", "owner/foo..bar"])
+def test_a_name_is_repository_name_refuses_keeps_its_row_and_its_rank_without_a_link(
+    name,
+):
+    """A browser resolves https://github.com/owner/.. to another page of GitHub: no link, as a URL
+    out of https on the feed; the row and the rank of the others stay."""
+    trends = make_trends()
+    trends["trends"][1]["repository_name"] = name
+
+    rows = build_trends_page(read_window(trends)).table.rows
+
+    assert (rows[1].rank, rows[1].repository_name, rows[1].link) == (2, name, None)
+    assert rows[2].rank == 3

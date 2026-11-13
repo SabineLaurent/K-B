@@ -172,8 +172,8 @@ et ne déborde pas de la page de 320 à 1280 px (mesuré pour #596) ; un nom aux
 100 caractères) ou un compte de 19 chiffres l'élargit au-delà de son cadre, qui défile alors : le cadre prend le
 focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ; WCAG 2.1.1).
 
-**L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 1 à 4 % des
-*forks* (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
+**L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
+*forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
 tableau (étoiles gagnées, puis *forks*). Pas de « jusqu'à 60 dépôts » (mission du 2026-11-11).
 
 **Les états** :
@@ -188,8 +188,11 @@ tableau (étoiles gagnées, puis *forks*). Pas de « jusqu'à 60 dépôts » (mi
 | tout autre échec, une réponse hors contrat | 500 | journalisée comme au fil (`data_api_failed: …`), sans le jour |
 
 Une réponse est hors contrat sans ligne, au-delà de 60 lignes, avec un nom hors de `RepositoryName`, un compte
-négatif ou au-delà de 64 bits, ou une fenêtre qui finirait avant le 3 janvier de l'an 1 (son premier jour
-n'existerait pas). Le journal des requêtes écrit `route=/tendances`, jamais le jour.
+négatif ou au-delà de 64 bits, une fenêtre qui finirait avant le 3 janvier de l'an 1 (son premier jour
+n'existerait pas), ou une autre fenêtre que celle du jour demandé. Un nom que `is_repository_name` refuse (un
+segment `.` ou `..`, ou `..` en son sein) garde sa ligne et son rang, écrit sans lien : un navigateur résoudrait
+`https://github.com/owner/..` vers une autre page de GitHub, et un seul nom ne cache pas les autres lignes. Le
+journal des requêtes écrit `route=/tendances`, jamais le jour.
 
 **La navigation** mène au fil (« Veille ») et aux tendances, visibles à toutes les largeurs, sans menu replié
 (D2 de #564, décision de Sabine du 2026-11-11) ; la page 404 propose aussi « Voir les tendances ».

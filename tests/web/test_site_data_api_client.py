@@ -486,9 +486,6 @@ def test_a_window_end_refused_by_the_data_api_gives_its_name():
         make_trends(
             trends=[{**TRENDS["trends"][0], "repository_name": "<b>owner</b>/repo"}]
         ),
-        # A dot segment: https://github.com/owner/.. leads to https://github.com/.
-        make_trends(trends=[{**TRENDS["trends"][0], "repository_name": "owner/.."}]),
-        make_trends(trends=[{**TRENDS["trends"][0], "repository_name": "./repo"}]),
         make_trends(trends=[{**TRENDS["trends"][0], "stars_gained": -1}]),
         make_trends(trends=[{**TRENDS["trends"][0], "forks_gained": 2**63}]),
     ],
@@ -498,8 +495,6 @@ def test_a_window_end_refused_by_the_data_api_gives_its_name():
         "a-moment",
         "before-the-first-window",
         "name-out-of-form",
-        "dot-dot-segment",
-        "dot-segment",
         "stars-negative",
         "forks-beyond-64-bits",
     ],
@@ -525,3 +520,13 @@ def test_a_window_other_than_the_day_asked_is_an_invalid_answer():
     error = read_trends_state(make_client(answer(200, TRENDS)), date(2026, 10, 9))
 
     assert (error.state, error.http_status) == ("data_api_invalid_response", 200)
+
+
+@pytest.mark.parametrize("name", ["owner/..", "./repo", "owner/foo..bar"])
+def test_a_name_of_the_base_with_dots_is_read_its_row_kept(name):
+    """RepositoryName, the CHECK of the base: one name never hides the other rows of its window."""
+    body = make_trends(trends=[{**TRENDS["trends"][0], "repository_name": name}])
+
+    window = read_trends(make_client(answer(200, body)), None)
+
+    assert [trend.repository_name for trend in window.trends] == [name]

@@ -7,6 +7,7 @@ from datetime import date, timedelta
 from starlette.datastructures import QueryParams
 
 from k_b.core.config import GH_ARCHIVE_WINDOW_DAYS
+from k_b.items import is_repository_name
 from k_b.web.data_api_client import DataApiError, TrendWindow
 from k_b.web.feed import NEW_TAB_NOTE, FieldError, read_written_day
 from k_b.web.french_dates import write_day
@@ -42,7 +43,8 @@ class TrendsForm:
 class TrendRow:
     rank: int
     repository_name: str
-    link: str
+    # None: a name is_repository_name refuses, never made a link.
+    link: str | None
     stars: str
     forks: str
 
@@ -114,9 +116,7 @@ def build_trends_page(window: TrendWindow) -> TrendsPage:
             TrendRow(
                 rank=rank,
                 repository_name=trend.repository_name,
-                # A RepositoryName without a segment . or .. (Trend): no character to encode,
-                # none a browser resolves elsewhere.
-                link=f"{GITHUB_URL}/{trend.repository_name}",
+                link=build_github_link(trend.repository_name),
                 stars=write_count(trend.stars_gained),
                 forks=write_count(trend.forks_gained),
             )
@@ -131,6 +131,15 @@ def build_trends_page(window: TrendWindow) -> TrendsPage:
         empty_text=None,
         latest_link=None,
     )
+
+
+def build_github_link(repository_name: str) -> str | None:
+    """The page of a repository on GitHub; None for a name is_repository_name refuses, a segment
+    . or .. or a .. in it, which a browser could resolve to another page of GitHub. A
+    RepositoryName has no character to encode."""
+    if not is_repository_name(repository_name):
+        return None
+    return f"{GITHUB_URL}/{repository_name}"
 
 
 def build_refused_page(error: FieldError) -> TrendsPage:

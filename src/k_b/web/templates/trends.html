@@ -4,7 +4,7 @@
 {% block main_class %}page trends{% endblock %}
 {% block content %}
 <h1>Dépôts qui ont le vent en poupe</h1>
-<p class="page-intro">Étoiles et <span lang="en">forks</span> gagnés sur GitHub pendant une fenêtre de 3 jours, d’après GH Archive, qui ne voit qu’environ 1&nbsp;% des étoiles et de 1 à 4&nbsp;% des <span lang="en">forks</span> (mesures du <time datetime="2026-10-29">29 octobre 2026</time>).</p>
+<p class="page-intro">Étoiles et <span lang="en">forks</span> gagnés sur GitHub pendant une fenêtre de 3 jours, d’après GH Archive, qui ne voit qu’environ 1&nbsp;% des étoiles et de 0,8 à 1,3&nbsp;% des <span lang="en">forks</span>, jusqu’à 4,2&nbsp;% (mesures du <time datetime="2026-10-29">29 octobre 2026</time>).</p>
 <form class="trends-filter" method="get" action="/tendances" aria-label="Fenêtre des tendances">
 <div class="field">
 <label for="window-end">Fenêtre se terminant le</label>
@@ -30,7 +30,7 @@ without script (WCAG 2.1.1), a region named by the caption. -#}
 </thead>
 <tbody>
 {% for row in table.rows %}
-<tr><td class="rank">{{ row.rank }}</td><td>{{ external_link(row.link, row.repository_name, link_note, "en") }}</td><td class="number">{{ row.stars }}</td><td class="number">{{ row.forks }}</td></tr>
+<tr><td class="rank">{{ row.rank }}</td><td>{% if row.link %}{{ external_link(row.link, row.repository_name, link_note, "en") }}{% else %}{{ row.repository_name }}{% endif %}</td><td class="number">{{ row.stars }}</td><td class="number">{{ row.forks }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

@@ -1,5 +1,5 @@
-"""The weight of a screen of the site, the budget of D2 of #563 and D4 of #564 (Sabine, 2026-11-11;
-RGESN 6.1): the page and what it fetches, cache empty, compressed."""
+"""The weight of a screen of the site, its budget decided by Sabine on 2026-11-11 (RGESN 6.1): the page
+and what it fetches, cache empty, compressed."""
 
 import gzip
 import re
