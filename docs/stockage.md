@@ -331,8 +331,9 @@ corrigés quand ils n'étaient plus en phase avec le besoin ; dernière correcti
 entités, associations, cardinalités et disposition, mais sans propriétés :
 [`mcd-k-b_20261020_vue-ensemble.drawio`](merise/mcd-k-b_20261020_vue-ensemble.drawio), et son image
 [`mcd-k-b_20261020_vue-ensemble.svg`](merise/mcd-k-b_20261020_vue-ensemble.svg). Chaque élément du MCD renvoie
-à ses lignes de `schema.sql` ; le MLD se déduit du MCD par les règles de passage, et chacune de ses
-tables et colonnes renvoie à sa ligne de `schema.sql` quand elle y est. Le MPD est `schema.sql`.
+à ses lignes de [`schema.sql`](../src/k_b/database/schema.sql) ; le MLD se déduit du MCD par les
+règles de passage, et chacune de ses tables et colonnes renvoie à sa ligne de `schema.sql` quand
+elle y est. Le MPD est `schema.sql`.
 Les modèles ne sont pas recopiés ici ; la disposition du MCD suit
 [`positions-mcd.md`](merise/positions-mcd.md).
 
