@@ -34,6 +34,12 @@ PAIRS = [
     ("--color-alert-ink", "--color-alert-wash", 4.5),
     # The packages of an advisory, each in its chip.
     ("--color-ink", "--color-chip", 4.5),
+    # A card under the pointer or holding the focus: its texts and its links, visited or hovered,
+    # on its tint.
+    ("--color-ink", "--color-card-hover", 4.5),
+    ("--color-slate", "--color-card-hover", 4.5),
+    ("--color-teal", "--color-card-hover", 4.5),
+    ("--color-teal-deep", "--color-card-hover", 4.5),
 ]
 
 
@@ -185,6 +191,15 @@ def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declarat
     the link of a card short. The heights measured are in the PR; this test keeps each rule, in
     the rule it names, never in one nested in it."""
     assert declaration in strip_nested_rules(read_rule(selector, media))
+
+
+def test_a_card_takes_the_tint_of_its_mockup_under_the_pointer_or_the_focus():
+    """Maquettes-fil.dc.html (2026-11-09), version (c): the first card hovered, in #E6F0F1; the
+    same tint when a link of the card has the focus, for the keyboard."""
+    rule = read_block(read_rule(".card"), r"&:hover,\s*&:focus-within\s*\{")
+
+    assert "background: var(--color-card-hover);" in rule
+    assert read_colours()["--color-card-hover"] == "#E6F0F1"
 
 
 def test_the_date_field_spans_the_two_lines_of_its_label_and_its_help_on_a_computer():
