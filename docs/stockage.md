@@ -29,6 +29,70 @@ base : il lit la veille par l'API de données (`src/k_b/ai_api/connectors/data_a
 est servi par `kb serve-ai` (#156). `kb search` vient après le 08/11 (journal ADR, 2026-10-15, « POC du
 25/10 », décision 1).
 
+## Pourquoi un SGBD relationnel
+
+Le modèle de données de K-B est relationnel : le MCD et le MLD de [`docs/merise/`](merise/) et
+`schema.sql`, le MPD, décrivent le même modèle, aux écarts près que liste « MCD et MLD »,
+ci-dessous ; `schema.sql` fait foi pour le code. Un SGBD relationnel tient lui-même les clés,
+l'exclusion des sous-types et les `CHECK` à chaque écriture, et l'import entier par sa
+transaction ; sans lui, ils seraient à coder et à tester dans K-B, et les contrôles de l'item
+perdraient leur second filet. Ce qu'il ne tient pas est listé plus bas (« Ce que la base ne tient
+pas »).
+
+- **Les clés étrangères relient ce que le modèle associe.** Un fichier brut vise sa source, un item
+  le fichier brut de sa version actuelle (`src/k_b/database/schema.sql:30`, `:47`) ; une release
+  vise son dépôt suivi (`:178`), un surlignage son item (`:97`), et la liaison `item_has_tag` un
+  item et un tag (`:337-338`). La base refuse une ligne qui viserait une ligne absente ; en SQLite,
+  à condition que la connexion l'active, ce que K-B fait à chaque ouverture (« Spécifications de
+  stockage », « Clés étrangères », ci-dessous ; test : `tests/test_database.py:31`).
+- **La clé `(item_id, kind)` tient l'exclusion des sous-types.** `item` porte la sorte de chaque
+  item, et `UNIQUE (id, kind)` fait de ce couple la cible d'une clé étrangère (`schema.sql:42-50`).
+  Chacun des cinq sous-types, `release`, `advisory`, `newsletter_article`, `zotero_entry` et
+  `clip`, fixe sa sorte par un `CHECK` (`kind = 'release'`…), a un `item_id` unique et vise `item`
+  par la clé étrangère composée `(item_id, kind)` (`schema.sql:176-177` et `:192`, `:201-202` et
+  `:219`, `:229-230` et `:250`, `:262-263` et `:284`, `:295-296` et `:319`). Un item a donc un
+  sous-type au plus, celui de sa sorte : la base refuse tout autre rattachement d'un sous-type.
+  `kind` y est `NOT NULL` : un `kind` nul passerait son `CHECK` et échapperait à la clé étrangère
+  (`schema.sql:173`). C'est l'option D du journal ADR (2026-10-07). Tests : un sous-type qui vise
+  un item d'une autre sorte, qui porte une autre sorte que la sienne ou aucune, est refusé
+  (`tests/test_schema.py:372`, `:384`, `:416`, `:426`, `:877`, `:896`, `:901`).
+- **Les contraintes `CHECK` refusent ce que le modèle ne permet pas** : une valeur hors de sa liste
+  (`source_type`, `acquisition_mode`, `kind` : `schema.sql:21`, `:23`, `:45-46`), une date hors de
+  la forme `AAAA-MM-JJTHH:MM:SSZ` (`release.published_at`, `:186-187` ; les dates de `clip` sont
+  l'exception, « Spécifications de stockage », ci-dessous), un texte trop long (« Longueurs
+  maximales », ci-dessous), une liste JSON qui n'est pas un tableau non vide ou qui dépasse son
+  nombre maximal d'éléments (`:64-66`). Un test compare chaque type de l'item à son `CHECK`
+  (règle 4 de `.claude/rules/conventions.md`).
+- **La transaction de l'import.** `kb import` écrit les dépôts suivis, puis inscrit chaque fichier
+  lu au registre (`raw_data`) et écrit ses items, dans une seule transaction, sous le verrou des
+  écrivains (`src/k_b/etl/load.py:60-88`). Chaque item s'y écrit dans un `SAVEPOINT`
+  (`src/k_b/database/savepoint.py:19-40`) : une entrée que la base refuse pour ses propres valeurs
+  (`CHECK`, `UNIQUE` hors clé primaire, `NOT NULL`), ou que Python ne peut pas lui passer (un entier
+  au-delà de 64 bits, un surrogate isolé), est annulée seule et devient un rejet du journal
+  d'import, et l'import continue (règle 1). Une clé étrangère, une
+  clé primaire ou un type refusés viennent de l'écrivain ou du schéma : ils arrêtent l'import,
+  comme une erreur du système (`src/k_b/database/errors.py:17-28`). Une erreur qui arrête l'import,
+  ou une interruption (Ctrl-C, SIGTERM) avant le `commit`, annule l'import entier
+  (`load.py:80-85`, `:138`) : la base ne garde jamais un import à moitié écrit.
+
+Ce que la base ne tient pas :
+
+- les deux dénormalisations voulues du MPD, le classement dans `trend` et les listes JSON (« MCD et
+  MLD », ci-dessous) : la règle « une fenêtre, une donnée brute » de `trend` est tenue par
+  l'écriture ; d'une liste, la base tient la forme et, pour les auteurs et les paquets touchés, le
+  nombre maximal d'éléments, pas chaque élément ;
+- `publication` et `vulnerability` sont des tables de référence, pas des sous-types : elles visent
+  leur item par une clé étrangère simple (`schema.sql:59`, `:134`), et la base ne vérifie pas la
+  sorte de l'item visé ;
+- un surlignage vise `item`, pas l'entrée Zotero : son rattachement à une entrée Zotero est tenu par
+  le code (« MCD et MLD », ci-dessous).
+
+Le choix du moteur vient ensuite : SQLite et PostgreSQL sont tous deux relationnels, et
+`schema_postgresql.sql` garde les mêmes clés étrangères (17 `REFERENCES` dans chaque script, dont
+les cinq clés `(item_id, kind)`) et la même cible `UNIQUE (id, kind)` ;
+`tests/test_schema_structures.py` compare les deux structures table par table. Ce que chaque schéma
+écrit à sa façon est listé dans « Ce qui est propre à SQLite », ci-dessous.
+
 ## Le SGBD : SQLite en local, PostgreSQL en ligne
 
 La variable `KB_DATABASE_URL` choisit le moteur (journal ADR, 2026-11-06, « Base : PostgreSQL en
@@ -149,12 +213,12 @@ elles ne sont pas recopiées ici. Un test (`tests/test_schema.py`) vérifie que 
 - **Colonnes sans borne** : celles que le code remplit (`source`, `tracked_repository`, le chemin
   et le flux de `raw_data`) ; les dates et les listes fermées, tenues par leur propre `CHECK`.
 - **Limite de SQLite** : `length()` compte les caractères jusqu'au premier caractère NUL, alors
-  que l'item les compte tous. Les deux contrôles peuvent donc diverger, dans les deux sens : un
-  texte qui contient un NUL peut passer le `CHECK` en étant plus long que le maximum ; un
-  `tag_name` qui commence par un NUL est accepté par l'item (3 caractères pour `"\0v1"`) et refusé
-  par `CHECK (length(tag_name) > 0)`, ce qui annule l'import entier. Ce second cas n'est pas
-  traité. Pour `trend`, il l'est : `GLOB` s'arrête lui aussi au premier NUL, et `TrendRow` refuse
-  un nom de dépôt qui contient un caractère de contrôle, NUL compris.
+  que l'item les compte tous. Un `CHECK` seul laisserait donc passer un texte qui contient un NUL
+  en étant plus long que le maximum, et refuserait un `tag_name` qui commence par un NUL
+  (`"\0v1"`). L'item refuse tout NUL avant la base (`check_text_can_be_stored`,
+  `src/k_b/items.py:118-124` ; `tests/test_schema.py:1092`) : aucun des deux cas n'atteint la base.
+  Pour `trend`, `GLOB` s'arrête lui aussi au premier NUL, et `TrendRow` refuse un nom de dépôt qui
+  contient un caractère de contrôle, NUL compris.
 
 ### Ce que chaque source met dans l'item, puis dans la base
 
@@ -241,8 +305,8 @@ GH Archive, dont chaque ligne de classement (`TrendRow`, `src/k_b/items.py`) dev
   - L'URL est gardée en `http` si Zotero la donne ainsi (les 5 documents de l'extrait du
     2026-10-13) ; les autres sortes exigent `https`, sauf `clip` (Web Clipper garde l'URL de la
     page, `http` ou `https`).
-  - Un texte de surlignage n'est pas contrôlé pour le caractère NUL, comme les autres textes
-    (« Limite de SQLite » ci-dessus).
+  - Un texte ou un commentaire de surlignage qui contient un NUL est refusé par l'item
+    (`src/k_b/items.py:373-388`), comme les autres textes (« Limite de SQLite » ci-dessus).
 - **Web Clipper** (#14, journal ADR, 2026-10-17) : un clip a un `item.id` technique, comme les
   autres items ; son URL sans `utm_*` est sa clé naturelle. Ne vont pas en base : `author`,
   `description` ; ils restent dans la copie brute. Les `tags` y vont depuis #260 (journal ADR,
@@ -281,7 +345,7 @@ aucune issue ne les aligne :
   clé naturelle `(window_end, repository_id)`, ce que la 2FN refuse. Un classement n'a pas
   d'autre attribut que sa donnée brute. La règle « une fenêtre, une donnée brute »
   (`schema.sql:105-106`) est tenue par l'écriture : une ligne n'est écrite que si aucune autre
-  donnée brute n'a apporté sa fenêtre (`src/k_b/database/writers/trend_writer.py:18-26`).
+  donnée brute n'a apporté sa fenêtre (`src/k_b/database/writers/trend_writer.py:15-31`).
 - **Les listes JSON (1FN).** Au MLD, `author`, `tracked_package` et `affected_package` ont une
   ligne par élément. Au MPD, ce sont trois listes JSON : `publication.authors`,
   `tracked_repository.packages` et `advisory.packages`, ce que la 1FN refuse (une valeur non
@@ -296,7 +360,7 @@ aucune issue ne les aligne :
 Les autres écarts sont propres au MPD et annotés dans le MLD : chaque sous-type d'item y a sa
 colonne `id`, la colonne `kind` et la clé étrangère `(item_id, kind)`, qui tiennent l'exclusion
 des sous-types ; la clé étrangère de `highlight` vise `item`, l'entrée Zotero étant tenue par le
-code (`src/k_b/database/writers/zotero_entry_writer.py:89-100, 136`).
+code (`src/k_b/database/writers/zotero_entry_writer.py:89-103, 139`).
 
 ## MPD
 
@@ -334,7 +398,7 @@ source ne touche pas aux tables.
   `src/k_b/core/config.py` ; un test vérifie que chaque mode du `CHECK` y a sa durée.
 - **ITEM minimal** : ce que dit un item est dans son sous-type (`release`, `advisory`) ou dans
   son référentiel (`publication`, `vulnerability`). Un sous-type pointe vers son item par la clé
-  étrangère composée (`item_id`, `kind`) : un item n'a qu'un sous-type, celui de sa sorte.
+  étrangère composée (`item_id`, `kind`) : un item a un sous-type au plus, celui de sa sorte.
 - **Référentiels** : un papier ou une faille existe dès qu'une source le cite. Les colonnes
   données par la source qui fait foi sont remplies si et seulement si `item_id` pointe vers
   l'item de cette source (un `CHECK` de table) ; « exploitée » se lit `item_id IS NOT NULL` dans
