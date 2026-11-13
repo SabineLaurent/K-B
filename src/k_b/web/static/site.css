@@ -40,6 +40,8 @@
     --color-alert-ink: #5B2410;
     /* The chip of a package (Maquette-alerte.dc.html). */
     --color-chip: #EEF0EC;
+    /* A card under the pointer (Maquettes-fil.dc.html, version (c)). */
+    --color-card-hover: #E6F0F1;
     --color-field-border: #8A8F96;
     --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-code: ui-monospace, Menlo, Consolas, monospace;
@@ -607,6 +609,13 @@
 
     & p {
       margin: 0;
+    }
+
+    /* The tint of the mockup, and the same for the keyboard when a link of the card has the
+       focus. */
+    &:hover,
+    &:focus-within {
+      background: var(--color-card-hover);
     }
   }
 
