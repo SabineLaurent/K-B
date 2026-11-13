@@ -7,7 +7,8 @@ détail, les couches du code, puis chaque partie, de la collecte au déploiement
 code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du commit `cbada1e`, et la purge, sortie
 de `kb import` par #540, d'après le code de sa PR, et les jobs planifiés en ligne et le stockage qu'ils utilisent
 (#420, #330, #423), d'après le code de la PR de #423, et la fenêtre par sujet, par #565, d'après le code de sa PR,
-et le site privé (#562, #563, #571, #587, #564), d'après `main` au commit `5bbe3ce` (2026-11-13). Les chemins du
+et le site privé (#562, #563, #571, #587, #564), d'après `main` au commit `5bbe3ce` (2026-11-13), et ses tendances
+(#596), d'après le code de sa PR, au commit `5f9c783`. Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -22,8 +23,8 @@ coffre et la bibliothèque Zotero), garde ce qu'il reçoit tel quel dans des fic
 L'API de données sert la base à deux clients. L'API IA fait rédiger par le modèle de langage les comptes rendus de la
 veille et des tendances, que K-B écrit dans la base de connaissance (coffre Obsidian), avec les fiches des dépôts les
 plus étoilés et les plus forkés, tirées directement des fichiers bruts. Le site, `kb serve-web`, montre le fil de
-veille et le détail de chacun de ses items dans le navigateur de sa seule opératrice, derrière la connexion
-Microsoft Entra de Container Apps. Le schéma qui suit dit la même chose.
+veille, le détail de chacun de ses items et les tendances de GH Archive dans le navigateur de sa seule opératrice,
+derrière la connexion Microsoft Entra de Container Apps. Le schéma qui suit dit la même chose.
 
 ```mermaid
 flowchart LR
@@ -49,8 +50,8 @@ flowchart LR
     aiApi <-->|"rédige"| model
     aiApi -->|"rédige"| reports
     reports -->|"écrit"| vault
-    dataApi -->|"sert les items"| web
-    web -->|"montre le fil et le détail,<br>derrière la connexion Entra"| browser
+    dataApi -->|"sert les items et les tendances"| web
+    web -->|"montre le fil, le détail et les tendances,<br>derrière la connexion Entra"| browser
 ```
 
 ## Le flux des données, en détail
@@ -512,9 +513,9 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   routine à l'écart, pas le job des comptes rendus, qui ne touche pas la base.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
-- **Le site ne montre pas encore les tendances** (#596): il montre le fil de veille, le détail d'un item, `/sources`
-  et `/accessibilite` (`web/pages.py:52`, `:109`, `:139`, `:144`). Les comptes rendus se lisent dans
-  Obsidian, et K-B se lance dans le terminal.
+- **Le site ne montre pas les comptes rendus**: il montre le fil de veille, le détail d'un item, les tendances,
+  `/sources` et `/accessibilite` (`web/pages.py:63`, `:120`, `:141`, `:181`, `:186`, au commit `5f9c783`). Les
+  comptes rendus se lisent dans Obsidian, et K-B se lance dans le terminal.
 
 ## Vérifier cette fiche
 
@@ -532,8 +533,8 @@ uv run kb --help
 grep -n "SourceKind(" src/k_b/etl/source_kinds.py
 # Les routes des deux API.
 grep -nE "@router\.(get|post)|APIRouter\(" src/k_b/data_api/routers/*.py src/k_b/ai_api/routers/*.py
-# Les pages du site et son app en ligne, au commit 5bbe3ce.
-git show 5bbe3ce:src/k_b/web/pages.py | grep -n "@router.get"
+# Les pages du site, tendances comprises (#596), au commit 5f9c783, puis son app en ligne, au commit 5bbe3ce.
+git show 5f9c783:src/k_b/web/pages.py | grep -n "@router.get"
 git show 5bbe3ce:infra/main.bicep | sed -n '320,352p'
 # Les 15 tables de chaque schéma.
 grep -c "^CREATE TABLE" src/k_b/database/schema.sql src/k_b/database/schema_postgresql.sql
