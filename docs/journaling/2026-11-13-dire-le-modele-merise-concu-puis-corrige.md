@@ -6,20 +6,21 @@
 - Fichiers : `docs/stockage.md` (« MCD et MLD »), `docs/merise/mcd-k-b_20261020.drawio` et son image
   `docs/merise/mcd-k-b_20261020.svg` (le cartouche)
 - Commits : `5a48cd2` (la phrase), `10e248f` (le tri de la relecture neuve : « l. » à sa place, le
-  lien vers `schema.sql` remis), `7250310` et la suivante (cette note). Les autres commits de la liste injectée sont ceux de
-  `main` avant la branche : ils ne sont pas de cette PR.
+  lien vers `schema.sql` remis), `7250310`, `c475fde` et le commit suivant (cette note et ses
+  corrections).
 - Série : [redessiner le modèle Merise](2026-10-20-redessiner-le-modele-merise-depuis-le-schema.md) (#211),
   [dire pourquoi un SGBD relationnel convient](2026-11-12-dire-pourquoi-un-sgbd-relationnel.md) (#600).
 
 ## Le pourquoi
 
-`docs/stockage.md` et le cartouche du MCD disaient le MCD et le MLD « tirés de `schema.sql` » : le
-modèle aurait été déduit de la base codée. Ce n'est pas la démarche suivie. La démarche Merise va du
-MCD au MLD, puis au MPD : le premier commit de la base, `43f71f2` (2026-10-02, « design the items
-database with Merise »), écrit le MCD et le MLD en Mermaid avec le MPD, `schema.sql`. Les modèles ont
-ensuite été dessinés avec draw.io (`54aac46`, 2026-10-08), puis corrigés quand ils n'étaient plus en
-phase avec le besoin, la dernière fois le 2026-10-20 (#211 : le modèle du 12/10 n'avait ni clip, ni
-étiquette, ni entrée Zotero). La phrase dit maintenant cela, aux mots de Sabine.
+`docs/stockage.md` et le cartouche du MCD disaient le MCD et le MLD « tirés de `schema.sql` », comme
+si le modèle venait de la base codée. Ils ont été conçus d'abord : la démarche Merise va du MCD au
+MLD, puis au MPD, et le premier commit de la base, `43f71f2` (2026-10-02, « design the items database
+with Merise »), écrit le MCD et le MLD en Mermaid avec le MPD, `schema.sql`. Les modèles ont ensuite
+été dessinés avec draw.io (`54aac46`, 2026-10-08). Les corrections du 12/10 (`3d45684`) et du 20/10
+(`e4b989e`, #211) les ont remis en phase avec le schéma codé, qui avait suivi le besoin : le modèle du
+12/10 n'avait ni clip, ni étiquette, ni entrée Zotero. La phrase dit maintenant cela, aux mots de
+Sabine.
 
 ## Le comment
 
@@ -48,8 +49,8 @@ passage. Les renvois disent où le modèle est codé ; ils ne disent pas d'où i
 
 Le commit `d540499` passe de la première phrase à la seconde : il dit à quelle version de `schema.sql`
 renvoient les « l. ». Sans lui, un numéro de ligne ne se vérifie plus, `schema.sql` ayant changé
-depuis (3 commits). « (« l. ») » suit « lignes », qu'il abrège, et non le commit (relecture neuve). Le cartouche du MLD (« Déduit du MCD … ») ne disait pas « tiré de `schema.sql` » : il reste
-tel quel.
+depuis (3 commits). « (« l. ») » suit « lignes », qu'il abrège, et non le commit (relecture neuve).
+Le cartouche du MLD (« Déduit du MCD … ») ne disait pas « tiré de `schema.sql` » : il reste tel quel.
 
 ### Les trois copies de la phrase dans le SVG
 
@@ -63,7 +64,8 @@ fois :
    échappé dont le `<diagram>` contient le XML encodé pour une URL, compressé (*deflate* brut), puis
    en base64.
 
-Le script du scratchpad remplace la phrase dans les trois, et dans le `.drawio`. Il exige une seule
+Un script jetable, non versionné, remplace la phrase dans les trois, et dans le `.drawio` ; ses
+contrôles sont dans « Preuve », plus bas. Il exige une seule
 occurrence de l'ancienne phrase à chaque endroit, sinon il s'arrête. Il recoupe les lignes de repli à
 la longueur de la plus longue ligne de l'export du 2026-10-20 (276 caractères), sans couper devant
 « » », « ; », « : » ni après « « ». Il décompresse la copie, y remplace la phrase avec l'apostrophe de
@@ -72,7 +74,7 @@ cette copie (`'` dans la copie, `&#39;` dans le `.drawio`), puis la recompresse.
 ## Choix faits et options écartées
 
 - **Retenu : l'édition par script.** Le diff se limite au cartouche, et le reste de l'image est
-  l'export de Sabine du 2026-10-20 (`1c22f35`). Accord de tn-orchestrateur.
+  l'export de Sabine du 2026-10-20 (`1c22f35`). Accord de time-knight, par délégation de Sabine.
 - **Écarté : le réexport par la CLI de draw.io 32.6.10.** Essayé à blanc sur le `.drawio` inchangé, il
   ne redonne pas le SVG actuel : 1 738 lignes de diff, `color-scheme: light dark` au lieu de `light`,
   des couleurs adaptatives au mode sombre, une hauteur de 3110 au lieu de 3109. Il changerait le
@@ -84,9 +86,9 @@ cette copie (`'` dans la copie, `&#39;` dans le `.drawio`), puis la recompresse.
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `grep -on "[a-zé]*tir[ée]s\?\b"` sur `docs/stockage.md` et sur le `.drawio` et le `.svg` du MCD : seulement « retiré » et « retire » (`stockage.md:415`, `:434`, `mcd-k-b_20261020.drawio:664`), sans rapport | Plus aucun « tiré de `schema.sql` » pour le MCD et le MLD dans ces fichiers |
+| `grep -on "[a-zé]*tir[ée]s\?\b"` sur `docs/stockage.md` et sur le `.drawio` et le `.svg` du MCD : seulement « retiré » et « retire » (`stockage.md:416`, `:435`, `mcd-k-b_20261020.drawio:664`, deux fois `mcd-k-b_20261020.svg:1`), sans rapport | Plus aucun « tiré de `schema.sql` » pour le MCD et le MLD dans ces fichiers |
 | Copie de `content=` décompressée, comparée au `.drawio` modifié : 431 nœuds, mêmes attributs, sauf `dx` (décalage de la vue, déjà différent avant) | La copie qui rouvre l'image dans draw.io dit la même chose que le `.drawio` |
-| Diff normalisé (`content=` vidé) contre `origin/main` (`690a63f`) : 8 lignes changées dans le SVG, 2 dans le `.drawio`, toutes du cartouche | Rien d'autre n'a bougé |
+| Diff normalisé (`content=` vidé) contre `origin/main` (`690a63f`) : 4 lignes changées dans le SVG, 1 dans le `.drawio`, toutes du cartouche | Rien d'autre n'a bougé |
 | `xml.etree.ElementTree.fromstring` sur les deux fichiers | Les deux restent du XML valide |
 | Capture du cartouche dans Chrome sans interface, avant et après | La phrase tient en 3 lignes dans le cadre de 190 px, comme avant |
 | Recherche des caractères `Cc` et `Cf` dans les trois fichiers : 0 | Aucun caractère invisible ajouté |
@@ -118,3 +120,5 @@ cette copie (`'` dans la copie, `&#39;` dans le `.drawio`), puis la recompresse.
 - Les écrits datés qui disent le modèle redessiné « depuis le schéma » (issue #211, note
   [du 2026-10-20](2026-10-20-redessiner-le-modele-merise-depuis-le-schema.md)) restent tels quels :
   ils racontent ce qui a été fait ce jour-là.
+- Les modèles du 12/10 (`docs/merise/mcd-k-b_20261012.drawio` et `mld-k-b_20261012.drawio`) sont des
+  instantanés datés : leurs cartouches ne sont pas touchés.
