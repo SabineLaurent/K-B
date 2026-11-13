@@ -516,9 +516,13 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
     qui passe par `links.tldrnewsletter.com` est gardé tel quel (3 liens) : l'adresse de
     l'article demanderait un appel réseau.
   - **Dépendance** : `beautifulsoup4` (4.15.0, du 2026-06-07) amène `soupsieve`, verrouillé
-    en 2.10 (du 2026-09-24) dans `uv.lock` : la 3.0.3 que `uv` avait choisie datait du jour
-    même (décision de Sabine du 2026-10-12, constat de la revue de sécurité). **Limite** :
-    `pyproject.toml` ne porte pas cette borne ; un `uv lock --upgrade` remontera `soupsieve`.
+    en 4.0.1 (du 2026-11-04) dans `uv.lock` depuis #606 : la 2.10 avait trois vulnérabilités
+    publiées, dont une seule, un sélecteur à combinateur descendant sur une page très
+    imbriquée, atteignable par `article article` ; la 4.0.1 les corrige toutes (décision de
+    Sabine du 2026-11-13). Sur les éditions `ai`, `tech` et `dev` du 2026-11-13, la 2.10 et la
+    4.0.1 trouvent les mêmes articles, titres, résumés et `h1` ; aucun article n'est dans un
+    `template`, que la 4.0 ne parcourt plus. **Limite** : `pyproject.toml` ne porte pas cette
+    borne ; un `uv lock --upgrade` remontera `soupsieve`.
 - **Jours sans édition** : un jour redirigé vers la page d'accueil de l'édition,
   `https://tldr.tech/<édition>`, n'a pas de page d'édition (observé pour le 2026-10-03 et le
   2026-10-04) : il est journalisé avec l'adresse de redirection et sauté. Toute autre

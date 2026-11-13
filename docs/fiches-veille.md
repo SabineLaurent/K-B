@@ -1721,7 +1721,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
   le sujet et le `request_id` (section « Traces de `POST /digests` »).
 - **Noms** : ceux des conventions OpenTelemetry pour l'IA générative quand elles en ont un (statut
   *Development*, dépôt `semantic-conventions-genai`, lu le 2026-10-24), l'espace `k_b.` sinon.
-  Le paquet Python `opentelemetry-semantic-conventions` 0.66b1 (installé avec le SDK 1.45.1) a
+  Le paquet Python `opentelemetry-semantic-conventions` 0.66b2 (installé avec le SDK 1.45.2) a
   encore les anciens noms (`gen_ai.client.operation.duration`, `gen_ai.client.token.usage`) : K-B
   suit le texte des conventions, pas ce paquet ([client-inference.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/client-inference.md),
   [gen-ai-token-metrics.md](https://github.com/open-telemetry/semantic-conventions-genai/blob/main/docs/gen-ai/gen-ai-token-metrics.md),

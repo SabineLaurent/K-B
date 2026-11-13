@@ -7093,6 +7093,25 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   route, il n'a jamais été rouge avant le code ; son rouge a été montré par deux mutations sur une copie (lien du
   titre retiré, route cassée). — PR de #564
 
+## 2026-11-13
+
+### Dépendances : `soupsieve` et OpenTelemetry montés pour des vulnérabilités publiées (#606)
+
+- **`soupsieve` passe de 2.10 à 4.0.1, et les trois paquets d'OpenTelemetry de 1.45.1 à 1.45.2, dans `uv.lock` seul.
+  Inverse le verrou de `soupsieve` en 2.10 du 2026-10-12.** Décision de Sabine, sur recommandation. Ce qui a
+  changé : pip-audit a trouvé quatre vulnérabilités publiées entre le 12/11 et le 13/11 (CI de `main` rouge sur
+  5bbe3ce). Une seule est atteignable par K-B : un sélecteur à combinateur descendant (`article article`,
+  `etl/sources/tldr.py`) sur une page de TLDR très imbriquée, qui ralentirait la collecte. Les deux autres de
+  `soupsieve` demandent un sélecteur écrit par l'attaquant, et celle d'`opentelemetry-api` un appel à `extract()`,
+  que K-B ne fait pas. Pourquoi 4.0.1 : elle corrige les trois de `soupsieve` et a 9 jours de recul, ce qui garde la
+  raison du 12/10 (pas de version du jour même). Options écartées : 4.1 (du 10/11), moins de recul sans correctif de
+  plus pour K-B ; 3.0.x, qui laisse CVE-2026-126190 ; le tag v0.1.6 posé sur la CI rouge, qui aurait mis en ligne les
+  versions vulnérables. Vérifié : sur les éditions `ai`, `tech` et `dev` du 13/11, la 2.10 et la 4.0.1 trouvent les
+  mêmes articles, titres, résumés et `h1`, et aucun article n'est dans un `template`, que la 4.0 ne parcourt plus ;
+  entre 1.45.1 et 1.45.2, les modules privés des journaux n'ont pas changé (relecture voulue par la décision du
+  27/10), et le SDK ajoute une limite de 2 000 jeux d'attributs par instrument, loin des listes fermées de K-B.
+  Limite assumée : la borne de `soupsieve` reste dans `uv.lock` seul. — PR de #606
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
