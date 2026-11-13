@@ -712,7 +712,7 @@ def test_the_table_of_the_trends_has_its_caption_and_a_header_for_each_column():
 def test_the_window_of_the_trends_is_given_by_two_time_elements():
     """Opquast 2025, rules 4 and 231: its first and its last day, the month in letters."""
     caption = re.search(
-        r"<caption>(.*?)</caption>", PAGES["/tendances"], flags=re.DOTALL
+        r"<caption\b[^>]*>(.*?)</caption>", PAGES["/tendances"], flags=re.DOTALL
     )
 
     assert caption is not None
@@ -771,3 +771,20 @@ def test_the_statement_says_what_the_tests_check_of_the_table():
         "le tableau des tendances, avec sa légende et l’en-tête de chaque colonne"
         in (outline(PAGES["/accessibilite"]).text)
     )
+
+
+def test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption():
+    """C7 of #564, measured at 320 px: a name of the length GitHub allows widens the table beyond
+    its frame, which scrolls (Maquette-tendances.dc.html); WCAG 2.1.1 asks the keyboard, without
+    script: the frame takes the focus, a region named by the caption."""
+    page = outline(PAGES["/tendances"])
+    [frame] = [
+        attributes
+        for tag, attributes in page.tags
+        if tag == "div" and attributes.get("class") == "table-frame"
+    ]
+    [caption] = page.find_all("caption")
+
+    assert (frame.get("role"), frame.get("tabindex")) == ("region", "0")
+    assert frame.get("aria-labelledby") == caption.get("id")
+    assert caption.get("id")

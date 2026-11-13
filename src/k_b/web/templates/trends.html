@@ -20,9 +20,11 @@
 </form>
 {% if trends.table %}
 {% set table = trends.table %}
-<div class="table-frame">
+{#- The frame scrolls a table wider than the screen: it takes the focus, for the keyboard
+without script (WCAG 2.1.1), a region named by the caption. -#}
+<div class="table-frame" role="region" aria-labelledby="trends-caption" tabindex="0">
 <table class="trends-table">
-<caption>Fenêtre du <time datetime="{{ table.start_day }}">{{ table.start_text }}</time> au <time datetime="{{ table.end_day }}">{{ table.end_text }}</time>: étoiles et <span lang="en">forks</span> gagnés sur GitHub, échantillon de GH Archive</caption>
+<caption id="trends-caption">Fenêtre du <time datetime="{{ table.start_day }}">{{ table.start_text }}</time> au <time datetime="{{ table.end_day }}">{{ table.end_text }}</time>: étoiles et <span lang="en">forks</span> gagnés sur GitHub, échantillon de GH Archive</caption>
 <thead>
 <tr><th scope="col">Rang</th><th scope="col">Dépôt</th><th scope="col" class="number">Étoiles</th><th scope="col" class="number"><span lang="en">Forks</span></th></tr>
 </thead>
