@@ -8,7 +8,7 @@ code de `main` au commit `0292266` (2026-11-09), dont `infra/` est celui du comm
 de `kb import` par #540, d'après le code de sa PR, et les jobs planifiés en ligne et le stockage qu'ils utilisent
 (#420, #330, #423), d'après le code de la PR de #423, et la fenêtre par sujet, par #565, d'après le code de sa PR,
 et le site privé (#562, #563, #571, #587, #564), d'après `main` au commit `5bbe3ce` (2026-11-13), et ses tendances
-(#596), d'après le code de sa PR, au commit `5f9c783`. Les chemins du
+(#596), d'après le code de sa PR, au commit `c2e7cb9`. Les chemins du
 code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
@@ -514,7 +514,7 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).
 - **Le site ne montre pas les comptes rendus**: il montre le fil de veille, le détail d'un item, les tendances,
-  `/sources` et `/accessibilite` (`web/pages.py:63`, `:120`, `:141`, `:181`, `:186`, au commit `5f9c783`). Les
+  `/sources` et `/accessibilite` (`web/pages.py:63`, `:120`, `:141`, `:181`, `:186`, au commit `c2e7cb9`). Les
   comptes rendus se lisent dans Obsidian, et K-B se lance dans le terminal.
 
 ## Vérifier cette fiche
@@ -533,8 +533,8 @@ uv run kb --help
 grep -n "SourceKind(" src/k_b/etl/source_kinds.py
 # Les routes des deux API.
 grep -nE "@router\.(get|post)|APIRouter\(" src/k_b/data_api/routers/*.py src/k_b/ai_api/routers/*.py
-# Les pages du site, tendances comprises (#596), au commit 5f9c783, puis son app en ligne, au commit 5bbe3ce.
-git show 5f9c783:src/k_b/web/pages.py | grep -n "@router.get"
+# Les pages du site, tendances comprises (#596), au commit c2e7cb9, puis son app en ligne, au commit 5bbe3ce.
+git show c2e7cb9:src/k_b/web/pages.py | grep -n "@router.get"
 git show 5bbe3ce:infra/main.bicep | sed -n '320,352p'
 # Les 15 tables de chaque schéma.
 grep -c "^CREATE TABLE" src/k_b/database/schema.sql src/k_b/database/schema_postgresql.sql
