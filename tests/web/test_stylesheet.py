@@ -29,6 +29,11 @@ PAIRS = [
     ("--color-alert-deep", "--color-card", 4.5),
     ("--color-alert-deep", "--color-paper", 4.5),
     ("--color-field-border", "--color-card", 3),
+    # The banner of an item in the CISA KEV catalog: its title and its text on its background.
+    ("--color-alert-deep", "--color-alert-wash", 4.5),
+    ("--color-alert-ink", "--color-alert-wash", 4.5),
+    # The packages of an advisory, each in its chip.
+    ("--color-ink", "--color-chip", 4.5),
 ]
 
 
@@ -162,6 +167,15 @@ def read_rule(selector, media=None):
         (".card-link", None, "font-size: 0.875rem;"),
         (".link-note", None, "font-size: 0.75rem;"),
         (".site-logout", None, "margin-inline-start: auto;"),
+        # The title of a card clear of the line above and of the link below: its padding of 44 px
+        # and its focus ring.
+        (".card-title", None, "margin-block: 0.75rem;"),
+        # Framed when Windows forces its colours, as the badge and the buttons.
+        (".package", None, "border: 1px solid transparent;"),
+        # The column of the detail and of its facts never wider than the page, whatever the
+        # longest word at 200 % text (WCAG 1.4.10).
+        (".item", None, "grid-template-columns: minmax(0, 1fr);"),
+        (".item-facts", None, "grid-template-columns: minmax(0, 1fr);"),
     ],
 )
 def test_the_layout_of_the_mockups_holds_at_each_width(selector, media, declaration):
@@ -185,7 +199,7 @@ def test_nothing_is_fetched_from_elsewhere():
     assert re.findall(r"@import|@font-face|url\(", STYLESHEET) == []
 
 
-@pytest.mark.parametrize("links", [r"\.prose a", r"\.card-link"])
+@pytest.mark.parametrize("links", [r"\.prose a", r"\.card-link", r"\.card-title a"])
 def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart(links):
     """Opquast 2025, rule 141: a link in a text, and the link of a card to its source; a menu is out
     of the rule. Its contrast on the pages and on a card: 4.5 at least."""
@@ -215,7 +229,13 @@ def test_a_page_prints_without_its_navigation():
 
     assert rule is not None
     hidden = {selector.strip() for selector in rule.group(1).split(",")}
-    assert {".skip-link", ".site-header", ".site-footer", ".error-actions"} <= hidden
+    assert {
+        ".skip-link",
+        ".site-header",
+        ".site-footer",
+        ".error-actions",
+        ".back-link",
+    } <= hidden
 
 
 def test_the_skip_link_is_a_target_of_the_size_of_the_others():
@@ -230,4 +250,58 @@ def test_a_button_keeps_a_border_in_the_forced_colours_of_windows():
     assert re.search(
         r"\.button,\s*\.button-secondary\s*\{[^}]*border:\s*1px solid transparent;",
         STYLESHEET,
+    )
+
+
+@pytest.mark.parametrize(
+    "selector",
+    [".item h1", ".item-authors", ".item-text", ".item-facts dd", ".package"],
+)
+def test_a_long_text_of_a_detail_wraps_anywhere(selector):
+    """100 packages of 255 characters, or a word of a source without space, hold at 320 px
+    (RGAA 10.11)."""
+    assert "overflow-wrap: anywhere;" in strip_nested_rules(read_rule(selector))
+
+
+def test_the_notes_of_a_release_keep_their_lines():
+    """D3 (Sabine, 2026-11-11): plain text, its line breaks kept."""
+    assert "white-space: pre-wrap;" in strip_nested_rules(read_rule(".item-text p"))
+
+
+def test_the_detail_has_the_width_of_its_mockups():
+    """Maquette-papier.dc.html: 760 px with its padding, a line of text short."""
+    assert "max-inline-size: 47.5rem;" in strip_nested_rules(read_rule(".item-page"))
+
+
+@pytest.mark.parametrize(
+    ("selector", "declaration"),
+    [
+        (".banner-alert", "background: var(--color-alert-wash);"),
+        (".banner-neutral", "background: var(--color-card);"),
+        (".package", "background: var(--color-chip);"),
+    ],
+)
+def test_the_banner_and_the_packages_have_the_colours_of_their_mockups(
+    selector, declaration
+):
+    """Maquette-alerte.dc.html and Maquette-faille.dc.html; the alert only for an item in the
+    catalog (C4)."""
+    assert declaration in strip_nested_rules(read_rule(selector))
+
+
+@pytest.mark.parametrize("selector", [".card-title a", ".back-link"])
+def test_a_link_of_a_detail_or_of_a_title_is_a_target_of_44_pixels(selector):
+    """Opquast 2025, rule 186: by its padding, or its minimum height."""
+    rule = strip_nested_rules(read_rule(selector))
+
+    assert re.search(
+        r"padding-block: 0\.75rem;|min-block-size: var\(--target-size\);", rule
+    )
+
+
+def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
+    """WCAG 1.4.4 and 1.4.10: on one line, its label and its announcement would widen the page of
+    a phone with its text at 200 %."""
+    assert re.search(
+        r"\.button,\s*\.button-secondary\s*\{[^}]*flex-wrap:\s*wrap;", STYLESHEET
     )

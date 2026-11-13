@@ -3,7 +3,7 @@
 {% block main_class %}page prose{% endblock %}
 {% block content %}
 <h1>Accessibilité</h1>
-<p>Déclaration établie le <time datetime="2026-11-11">11 novembre 2026</time>.</p>
+<p>Déclaration établie le <time datetime="2026-11-11">11 novembre 2026</time>, mise à jour le <time datetime="2026-11-12">12 novembre 2026</time>.</p>
 <h2>État de conformité</h2>
 <p>Non conforme: aucun audit RGAA (référentiel général d’amélioration de l’accessibilité) n’a été mené, et sans audit le RGAA ne permet pas d’autre état.</p>
 <h2>Référentiel visé</h2>
@@ -18,6 +18,8 @@
 <li>les liens du pied de page, en liste;</li>
 <li>les liens vers un autre site, signalés comme tels, avec leur langue quand elle n’est pas le français, et ouverts dans un nouvel onglet que leur texte annonce;</li>
 <li>les images décoratives, ignorées des technologies d’assistance;</li>
+<li>à leur première occurrence, le sens des sigles des sources de la veille, des failles et des alertes, des référentiels d’accessibilité et de l’heure de la page d’erreur (TLDR, nom de la newsletter, n’est pas développé);</li>
+<li>sur le détail d’un item, ses faits en liste de termes, ses dates en éléments de temps, et l’état d’une faille ou d’une alerte au catalogue des failles exploitées dit en mots, pas par la couleur;</li>
 <li>les contrastes des couleurs de la charte, et l’anneau de focus visible au clavier;</li>
 <li>l’absence de script: le site fonctionne sans JavaScript.</li>
 </ul>
@@ -25,5 +27,7 @@
 <ul>
 <li>Aucun outil ne valide le code des pages: sa validité se contrôle à la main.</li>
 <li>Le zoom à 200 %, l’affichage sur 320 pixels de large, l’espacement du texte, la navigation au clavier et la lecture par un lecteur d’écran se contrôlent à la main.</li>
+<li>Les notes de version sont affichées en texte brut: leurs titres et leurs listes, écrits en Markdown, n’ont pas de structure.</li>
+<li>Les textes des sources (titres, résumés, descriptions, notes) sont marqués en anglais par hypothèse: un texte écrit dans une autre langue est mal marqué.</li>
 </ul>
 {% endblock %}

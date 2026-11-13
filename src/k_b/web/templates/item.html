@@ -1,0 +1,71 @@
+{%- from "links.html" import external_link -%}
+{% extends "base.html" %}
+{% block title %}{{ detail.page_title }}{% endblock %}
+{% block main_class %}page item-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/"><span aria-hidden="true">←</span> Retour au fil</a>
+<article class="item">
+<p class="item-meta"><span class="card-kind"{% if detail.kind_lang %} lang="{{ detail.kind_lang }}"{% endif %}>{{ detail.kind_label }}</span> <span class="item-line">{% for part in detail.line %}{% if not loop.first %} · {% endif %}{% if part.is_code %}<span class="item-code">{{ part.text }}</span>{% elif part.day %}{{ part.text }} <time datetime="{{ part.day.iso }}">{{ part.day.text }}</time>{% else %}{{ part.text }}{% endif %}{% endfor %}</span></p>
+<h1{% if detail.title_lang %} lang="{{ detail.title_lang }}"{% endif %}>{{ detail.title }}</h1>
+{% if detail.authors %}
+<p class="item-authors">{{ detail.authors }}</p>
+{% endif %}
+{#- The banner says its state in words, the colour following (RGAA 3.1); the meaning of CVE, KEV and
+CISA at their first occurrence on the page (Opquast 2025, rule 5). -#}
+{% if detail.banner == "vulnerability_in_catalog" %}
+<div class="banner banner-alert">
+<p class="banner-title">Exploitée activement: oui</p>
+<p class="banner-text">La CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>) ne met dans son catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) que des failles exploitées.</p>
+</div>
+{% elif detail.banner == "vulnerability_withdrawn" %}
+<div class="banner banner-neutral">
+<p class="banner-title">Retirée du catalogue le <time datetime="{{ detail.banner_day.iso }}">{{ detail.banner_day.text }}</time></p>
+<p class="banner-text">La CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>) a retiré cette faille de son catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>). K-B la garde, avec la date à laquelle il a vu le retrait.</p>
+</div>
+{% elif detail.banner == "advisory_in_catalog" %}
+<div class="banner banner-alert">
+<p class="banner-title">Entrée au catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>)</p>
+<p class="banner-text">La CVE (<i lang="en">Common Vulnerabilities and Exposures</i>) de cette alerte est entrée au catalogue KEV de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>), qui ne liste que des failles exploitées. Un retrait du catalogue depuis ne se voit pas sur cette page.</p>
+</div>
+{% elif detail.banner == "advisory_absent_from_catalog" %}
+<div class="banner banner-neutral">
+<p class="banner-title">Absente du catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>)</p>
+<p class="banner-text">La CVE (<i lang="en">Common Vulnerabilities and Exposures</i>) de cette alerte n’est pas dans le catalogue KEV de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>). Si elle y entrait, ce bandeau le dirait.</p>
+</div>
+{% elif detail.banner == "advisory_without_cve" %}
+<div class="banner banner-neutral">
+<p class="banner-title">Sans CVE (<i lang="en">Common Vulnerabilities and Exposures</i>)</p>
+<p class="banner-text">Cette alerte ne cite aucune CVE: K-B ne peut pas la chercher dans le catalogue KEV (<i lang="en">Known Exploited Vulnerabilities</i>) de la CISA (<i lang="en">Cybersecurity and Infrastructure Security Agency</i>).</p>
+</div>
+{% endif %}
+{% if detail.facts %}
+<dl class="item-facts">
+{% for fact in detail.facts %}
+<div{% if fact.is_list %} class="item-fact-wide"{% endif %}>
+<dt>{{ fact.term }}{% if fact.term_meaning %} (<i lang="en">{{ fact.term_meaning }}</i>){% endif %}</dt>
+{% if fact.is_list %}
+{#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
+<dd><ul class="packages" role="list">{% for value in fact.values %}<li class="package">{{ value }}</li>{% endfor %}</ul></dd>
+{% else %}
+<dd{% if fact.is_code %} class="item-code"{% endif %}{% if fact.lang %} lang="{{ fact.lang }}"{% endif %}>{{ fact.values|join(", ") }}</dd>
+{% endif %}
+</div>
+{% endfor %}
+</dl>
+{% endif %}
+{% for text in detail.texts %}
+<section class="item-text" aria-labelledby="{{ text.id }}">
+<h2 id="{{ text.id }}">{{ text.heading }}</h2>
+{% for paragraph in text.paragraphs %}
+<p{% if text.lang %} lang="{{ text.lang }}"{% endif %}>{{ paragraph }}</p>
+{% endfor %}
+</section>
+{% endfor %}
+{% if detail.empty_text %}
+<p class="item-empty">{{ detail.empty_text }}</p>
+{% endif %}
+{% if detail.link %}
+<p class="item-source">{{ external_link(detail.link, detail.link_label, detail.link_note, detail.link_lang, "button") }}</p>
+{% endif %}
+</article>
+{% endblock %}

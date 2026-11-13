@@ -11,6 +11,17 @@ from itertools import pairwise
 import pytest
 from fastapi.testclient import TestClient
 from feed_fixture import make_page
+from item_fixture import (
+    ADVISORY_ABSENT_FROM_CATALOG,
+    ADVISORY_IN_CATALOG,
+    ADVISORY_WITHOUT_CVE,
+    NEWSLETTER_ARTICLE,
+    PAPER,
+    RELEASE,
+    VULNERABILITY,
+    WITHDRAWN_VULNERABILITY,
+    make_detail,
+)
 from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_app, make_client, serve
 
 HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -20,6 +31,28 @@ SKIP_TARGET = "contenu"
 # The feed refused on its three fields: a search too long, a kind out of the five, date without day.
 FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date"
 FEED_PAGES = ("/", "/?page=2", "feed-empty", "feed-refused")
+# The detail of each kind and of each state of its banner, by name; the variants have an identifier
+# of their own, as each page has a title of its own.
+ITEM_PAGES = {
+    "item-paper": make_detail(PAPER),
+    "item-vulnerability": make_detail(VULNERABILITY),
+    "item-vulnerability-withdrawn": make_detail(WITHDRAWN_VULNERABILITY),
+    "item-advisory-in-catalog": make_detail(ADVISORY_IN_CATALOG),
+    "item-advisory-absent": make_detail(ADVISORY_ABSENT_FROM_CATALOG),
+    "item-advisory-without-cve": make_detail(ADVISORY_WITHOUT_CVE),
+    "item-advisory-without-package": make_detail(
+        ADVISORY_ABSENT_FROM_CATALOG, packages=[], ghsa_id="GHSA-2222-3333-4444"
+    ),
+    "item-release": make_detail(RELEASE),
+    "item-release-without-notes": make_detail(RELEASE, body=None, tag_name="v2.1.285"),
+    "item-newsletter-article": make_detail(NEWSLETTER_ARTICLE),
+}
+ADVISORY_PAGES = (
+    "item-advisory-in-catalog",
+    "item-advisory-absent",
+    "item-advisory-without-cve",
+)
+VULNERABILITY_PAGES = ("item-vulnerability", "item-vulnerability-withdrawn")
 
 
 @dataclass
@@ -128,6 +161,10 @@ def fetch_every_page():
         "/", headers=OPERATOR_HEADERS
     )
     pages["feed-refused"] = client.get(FEED_REFUSED, headers=OPERATOR_HEADERS)
+    for name, detail in ITEM_PAGES.items():
+        pages[name] = make_client(handler=serve(detail)).get(
+            f"/items/{detail['id']}", headers=OPERATOR_HEADERS
+        )
     return {name: response.text for name, response in pages.items()}
 
 
@@ -184,6 +221,8 @@ def test_the_first_link_skips_to_the_content(name):
         ("/sources", ["/sources"]),
         ("/accessibilite", ["/accessibilite"]),
         ("404", []),
+        # The detail of an item is not the feed (Veille).
+        ("item-paper", []),
     ],
 )
 def test_only_the_link_of_the_current_page_is_marked(name, current):
@@ -327,14 +366,24 @@ def test_the_link_to_a_page_in_english_gives_its_language():
         ("500", "UTC", "temps universel coordonné"),
         ("/", "KEV", "Known Exploited Vulnerabilities"),
         ("/", "CISA", "Cybersecurity and Infrastructure Security Agency"),
+        *(
+            (name, abbreviation, meaning)
+            for name in (*VULNERABILITY_PAGES, *ADVISORY_PAGES)
+            for abbreviation, meaning in (
+                ("CVE", "Common Vulnerabilities and Exposures"),
+                ("KEV", "Known Exploited Vulnerabilities"),
+                ("CISA", "Cybersecurity and Infrastructure Security Agency"),
+            )
+        ),
     ],
 )
 def test_the_first_abbreviation_of_a_page_gives_its_meaning(
     name, abbreviation, meaning
 ):
-    """Opquast 2025, rule 5: at its first occurrence, in brackets, a version number aside."""
+    """Opquast 2025, rule 5: at its first occurrence, in brackets, a version number aside; an
+    identifier such as CVE-2020-29583 is not the abbreviation."""
     text = outline(PAGES[name]).text
-    first = re.search(rf"\b{abbreviation}\b", text)
+    first = re.search(rf"\b{abbreviation}\b(?!-)", text)
 
     assert first is not None
     assert re.match(
@@ -361,9 +410,10 @@ def test_the_sources_name_the_author_of_the_site():
 
 
 def test_the_accessibility_statement_gives_its_date():
-    """Opquast 2025, rule 6."""
+    """Opquast 2025, rule 6: established, then updated."""
     assert outline(PAGES["/accessibilite"]).find_all("time") == [
-        {"datetime": "2026-11-11"}
+        {"datetime": "2026-11-11"},
+        {"datetime": "2026-11-12"},
     ]
 
 
@@ -523,3 +573,69 @@ def test_the_rules_of_a_field_are_written_before_sending():
     assert described["start"] == "start-help"
     assert "Obligatoire avec « Date »" in helps["start-help"]
     assert "les cinq sortes" in helps["kinds-help"]
+
+
+@pytest.mark.parametrize("name", sorted(ITEM_PAGES))
+def test_a_detail_has_its_texts_of_the_source_in_english(name):
+    """RGAA 8.7: the title, as on the feed (the title of a release, a repository and a name, is
+    not), the vendor and the product; the summary, the description and the notes by their
+    paragraphs."""
+    page = outline(PAGES[name])
+    detail = ITEM_PAGES[name]
+
+    assert (detail["title"] in page.texts_in_english) is (detail["kind"] != "release")
+    assert all(
+        'lang="en"' in paragraph
+        for paragraph in re.findall(
+            r'<section class="item-text"[^>]*>.*?</section>',
+            PAGES[name],
+            flags=re.DOTALL,
+        )
+        for paragraph in re.findall(r"<p[^>]*>", paragraph)
+    )
+    for name_of_field in ("vendor", "product"):
+        if name_of_field in detail:
+            assert detail[name_of_field] in page.texts_in_english
+
+
+@pytest.mark.parametrize("name", sorted(ITEM_PAGES))
+def test_the_facts_of_a_detail_are_a_list_of_terms_each_with_its_value(name):
+    """RGAA 9.3: each dt followed by its dd, in a div of the dl."""
+    for facts in re.findall(
+        r'<dl class="item-facts">(.*?)</dl>', PAGES[name], flags=re.DOTALL
+    ):
+        groups = re.findall(
+            r"<div[^>]*>\s*(<dt>.*?</dt>)\s*(<dd[^>]*>.*?</dd>)\s*</div>",
+            facts,
+            flags=re.DOTALL,
+        )
+        assert len(groups) == facts.count("<dt>") == facts.count("<dd")
+
+
+@pytest.mark.parametrize("name", sorted(ITEM_PAGES))
+def test_the_dates_of_a_detail_are_time_elements_with_their_month_in_letters(name):
+    days = re.findall(r'<time datetime="([0-9-]+)">([^<]+)</time>', PAGES[name])
+
+    assert days
+    assert all(
+        re.fullmatch(r"(1er|[0-9]{1,2}) [a-zéû]+ [0-9]{4}", text) for _, text in days
+    )
+
+
+@pytest.mark.parametrize("name", sorted(ITEM_PAGES))
+def test_the_meaning_of_an_abbreviation_is_in_italics_and_in_english(name):
+    """As on the feed, /sources and the statement: <i lang="en">."""
+    openings = re.findall(r'\((<[a-z]+) lang="en">', PAGES[name])
+
+    assert all(opening == "<i" for opening in openings)
+
+
+def test_the_statement_says_its_limits_of_the_detail():
+    """RGAA 9.1 and 9.3: the notes of a release are plain text (D3); RGAA 8.7: the language of the
+    texts of the sources is a hypothesis."""
+    text = outline(PAGES["/accessibilite"]).text
+
+    assert "texte brut" in text
+    assert "hypothèse" in text
+    assert "le sens de chaque sigle" not in text
+    assert "TLDR, nom de la newsletter, n’est pas développé" in text
