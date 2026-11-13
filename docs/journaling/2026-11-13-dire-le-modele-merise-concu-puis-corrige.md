@@ -5,7 +5,8 @@
 - Issue : #613
 - Fichiers : `docs/stockage.md` (« MCD et MLD »), `docs/merise/mcd-k-b_20261020.drawio` et son image
   `docs/merise/mcd-k-b_20261020.svg` (le cartouche)
-- Commits : `5a48cd2` (la phrase), puis cette note. Les autres commits de la liste injectée sont ceux de
+- Commits : `5a48cd2` (la phrase), `10e248f` (le tri de la relecture neuve : « l. » à sa place, le
+  lien vers `schema.sql` remis), `7250310` et la suivante (cette note). Les autres commits de la liste injectée sont ceux de
   `main` avant la branche : ils ne sont pas de cette PR.
 - Série : [redessiner le modèle Merise](2026-10-20-redessiner-le-modele-merise-depuis-le-schema.md) (#211),
   [dire pourquoi un SGBD relationnel convient](2026-11-12-dire-pourquoi-un-sgbd-relationnel.md) (#600).
@@ -32,21 +33,22 @@ corrigés quand ils n'étaient plus en phase avec le besoin ; dernière correcti
 (#211). Leurs images, exportées en SVG : [`mcd-k-b_20261020.svg`](merise/mcd-k-b_20261020.svg) et
 ```
 
-Seul « tirés de `schema.sql` le 2026-10-20 » disparaît. La phrase qui suit dans la section reste :
-chaque élément du MCD renvoie à ses lignes de `schema.sql`, et le MLD se déduit du MCD par les règles
-de passage. Les renvois disent où le modèle est codé ; ils ne disent pas d'où il vient.
+Seul « tirés de `schema.sql` le 2026-10-20 » disparaît ; le lien vers `schema.sql` qu'il portait passe
+sur la mention suivante (`docs/stockage.md:334`). La phrase qui suit dans la section reste : chaque
+élément du MCD renvoie à ses lignes de `schema.sql`, et le MLD se déduit du MCD par les règles de
+passage. Les renvois disent où le modèle est codé ; ils ne disent pas d'où il vient.
 
 ### Le cartouche du MCD
 
 `docs/merise/mcd-k-b_20261020.drawio:10`, l'attribut `value` de la cellule `title` (du HTML échappé) :
 
 ```text
-&lt;b&gt;Le MCD et le MLD ont été conçus d&#39;abord, puis corrigés quand ils n&#39;étaient plus en phase avec le besoin ; dernière correction le 2026-10-20 (#211).&lt;/b&gt; Chaque entité, propriété et association renvoie à ses lignes de &lt;code&gt;src/k_b/database/schema.sql&lt;/code&gt; (le MPD) à origin/main d540499 (« l. ») ;
+&lt;b&gt;Le MCD et le MLD ont été conçus d&#39;abord, puis corrigés quand ils n&#39;étaient plus en phase avec le besoin ; dernière correction le 2026-10-20 (#211).&lt;/b&gt; Chaque entité, propriété et association renvoie à ses lignes (« l. ») de &lt;code&gt;src/k_b/database/schema.sql&lt;/code&gt; (le MPD) à origin/main d540499 ;
 ```
 
 Le commit `d540499` passe de la première phrase à la seconde : il dit à quelle version de `schema.sql`
 renvoient les « l. ». Sans lui, un numéro de ligne ne se vérifie plus, `schema.sql` ayant changé
-depuis. Le cartouche du MLD (« Déduit du MCD … ») ne disait pas « tiré de `schema.sql` » : il reste
+depuis (3 commits). « (« l. ») » suit « lignes », qu'il abrège, et non le commit (relecture neuve). Le cartouche du MLD (« Déduit du MCD … ») ne disait pas « tiré de `schema.sql` » : il reste
 tel quel.
 
 ### Les trois copies de la phrase dans le SVG
@@ -91,10 +93,11 @@ cette copie (`'` dans la copie, `&#39;` dans le `.drawio`), puis la recompresse.
 
 ## Ce que tu dois pouvoir défendre
 
-- **« #211 dit "redessinés depuis `schema.sql`" : le modèle n'est-il pas tiré du code ? »** Le
-  modèle a été conçu le 2026-10-02 par la démarche Merise (`43f71f2`). #211 l'a corrigé quand il
-  n'était plus en phase avec le besoin : clips, étiquettes et entrées Zotero étaient codés, absents du
-  modèle du 12/10. L'issue est un écrit daté ; la doc vivante dit la démarche.
+- **« #211 dit "redessinés depuis `schema.sql`" : le modèle vient-il du code ? »** Le modèle a été
+  conçu le 2026-10-02 par la démarche Merise (`43f71f2`). Le schéma codé a ensuite suivi le besoin :
+  clips, étiquettes et entrées Zotero y sont entrés, absents du modèle du 12/10. La correction du
+  2026-10-20 a remis le MCD en phase avec ce schéma codé, en le lisant (`e4b989e`, #211). L'issue et
+  sa note sont des écrits datés ; la doc vivante dit la démarche.
 - **« Pourquoi garder les renvois aux lignes de `schema.sql` ? »** Ils relient chaque élément du
   modèle à son code, au commit `d540499` : on vérifie qu'un élément conçu est bien codé, et où.
 - **« Pourquoi ne pas avoir réexporté l'image ? »** Le réexport par la version installée de draw.io
