@@ -877,7 +877,7 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 - Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
 
 **Une PR témoin** : [#533](https://github.com/SabineLaurent/K-B/pull/533) a passé, avant sa fusion le
-2026-11-09, les 7 checks que reçoit une PR qui ne touche ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
+2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
 (`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
 `bicep-build`, un huitième check.

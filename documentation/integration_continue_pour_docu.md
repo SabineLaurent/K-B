@@ -228,8 +228,9 @@ dans l'exécution 42617081839 de `CI`, et `image-build` (23 s), dans l'exécutio
 `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi `bicep-build`, un huitième contrôle.
 
 **Un push témoin**: la fusion `89ef7fb` sur `main`, le 2026-11-10, a lancé `CI` (42815479408) et `Image`
-(42815479369), toutes deux `success`; `Infra` n'a pas tourné, `infra/` n'ayant pas changé. La dernière exécution
-d'`Infra` sur `main` est 42750689052, `success`, sur `cad8328` (2026-11-10).
+(42815479369), toutes deux `success`; `Infra` n'y a pas tourné, `infra/` n'ayant pas changé, avant #496, qui le
+lance sur tout push sur `main`. La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`, sur
+`cad8328` (2026-11-10).
 
 **Un refus témoin**: l'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards`
 (2026-10-31), a eu `audit` en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
