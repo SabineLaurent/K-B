@@ -5,8 +5,8 @@
 Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6-luna` dans Microsoft Foundry
 (anciennement Azure AI Foundry), fait à la main dans le portail, hors du code de K-B. Elle dit qui y accède,
 comment il s'installe et se teste, de quoi il dépend, et quelles données il reçoit. L'API IA, qui l'appelle, a sa
-propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `cad8328`
-(2026-11-10). Ce qui est hors du code a été lu avec `az`, en lecture seule, le 2026-11-09 entre 23:41 et 23:55 UTC,
+propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `57ff235`
+(2026-11-14). Ce qui est hors du code a été lu avec `az`, en lecture seule, le 2026-11-09 entre 23:41 et 23:55 UTC,
 puis essayé par deux appels le 2026-11-10 vers 00:03 UTC (« Relire l'état », « Le test »). Les chemins du code de
 K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
@@ -35,8 +35,8 @@ La ressource porte deux déploiements (`az cognitiveservices account deployment 
 - **`DeepSeek-V4-Flash`** a été essayé comme candidat juge le 2026-10-17, pour le seul mode strict, sur des données
   fabriquées (même note, « Choix
   faits et options écartées »). Aucun fichier du code, de l'infrastructure, des tests ni de la configuration ne le
-  nomme; seuls la documentation et le journal ADR le citent. La commande suivante ne renvoie rien:
-  `git grep -niE deepseek cad8328 -- src infra tests observability Makefile .github '*.example' Dockerfile pyproject.toml`.
+  nomme; seuls la documentation et le journal des décisions d'architecture (ADR) le citent. La commande suivante ne renvoie rien:
+  `git grep -niE deepseek 57ff235 -- src infra tests observability Makefile .github '*.example' Dockerfile pyproject.toml`.
   Le code n'a qu'une variable de modèle, `KB_LLM_MODEL` (`ai_api/connectors/llm_settings.py:26`), et aucune variable
   de juge.
 - **L'ancien déploiement**: un premier déploiement de `gpt-6-luna`, en Global Standard (`GlobalStandard`), a été
@@ -48,20 +48,20 @@ La ressource porte deux déploiements (`az cognitiveservices account deployment 
 
 `DataZoneStandard` est le type « Zone de données standard »: le prix est à la consommation (par jeton), et le
 traitement reste dans une zone de données que Microsoft définit. Pour une ressource en France, c'est la zone de
-l'Union européenne. Ce que dit Microsoft Learn (page « Understanding deployment types in Microsoft Foundry Models »,
+l'Union européenne. Ce que dit Microsoft Learn (page « <span lang="en">Understanding deployment types in Microsoft Foundry Models</span> »,
 `ms.date` 2026-08-06, relue le 2026-11-09):
 
-- « The EU Data Zone follows the Azure EU Data Boundary, which can include European Free Trade Association (EFTA)
-  countries and regions such as Norway and Switzerland in addition to EU member states. » La zone de l'Union
+- « <span lang="en">The EU Data Zone follows the Azure EU Data Boundary, which can include European Free Trade Association (EFTA)
+  countries and regions such as Norway and Switzerland in addition to EU member states.</span> » La zone de l'Union
   peut donc compter, en plus des États membres, des pays de l'AELE comme la Norvège ou la Suisse.
-- « Microsoft can add regions to either data zone without prior notice »: la zone peut s'étendre à d'autres
+- « <span lang="en">Microsoft can add regions to either data zone without prior notice</span> »: la zone peut s'étendre à d'autres
   régions sans préavis.
-- « Data stored at rest remains in the designated Azure geography »: les données au repos restent dans la
+- « <span lang="en">Data stored at rest remains in the designated Azure geography</span> »: les données au repos restent dans la
   géographie de la ressource.
 
-La page « Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry » (`ms.date`
-2026-05-18, relue le 2026-11-09) le dit autrement: « prompts and responses may be processed in that or any other
-European Union Member Nation ». Les deux pages de Microsoft ne nomment donc pas le même périmètre (« Limites »).
+La page « <span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> » (`ms.date`
+2026-05-18, relue le 2026-11-09) le dit autrement: « <span lang="en">prompts and responses may be processed in that or any other
+European Union Member Nation</span> ». Les deux pages de Microsoft ne nomment donc pas le même périmètre (« Limites »).
 
 Le type a été choisi le 2026-10-17 pour une règle du projet: le lieu du traitement est choisi et écrit, en zone de
 l'Union quand le fournisseur l'offre (`.claude/rules/conformite.md`, « RGPD: sous-traitance et transferts »). Le
@@ -70,23 +70,23 @@ type Global Standard, écarté, peut traiter les données dans toute région Azu
 ### La version figée
 
 `NoAutoUpgrade` fige la version 2026-09-22: le modèle ne change pas sans qu'on le décide, et les mesures du
-2026-10-17 restent comparables. La page « Foundry Models lifecycle and support policy » (`ms.date` 2026-07-24,
+2026-10-17 restent comparables. La page « <span lang="en">Foundry Models lifecycle and support policy</span> » (`ms.date` 2026-07-24,
 relue le 2026-11-09) dit ce qui se passe au retrait de la version, de deux façons (« Limites »): sa foire aux
-questions dit que, avec `NoAutoUpgrade`, le déploiement « stops working at retirement », et son tableau « Lifecycle
-stages » qu'une version retirée rend `410 Gone` à toute requête; sa section « Automatic upgrades » s'ouvre sur
-« For Global Standard, Data Zone Standard, and Standard deployment types, Microsoft manages automatic upgrades when
-a model version is retired », sans exception pour `NoAutoUpgrade`. La date de retrait lue le 2026-10-17 par
+questions dit que, avec `NoAutoUpgrade`, le déploiement « <span lang="en">stops working at retirement</span> », et son tableau « <span lang="en">Lifecycle
+stages</span> » qu'une version retirée rend `410 Gone` à toute requête; sa section « <span lang="en">Automatic upgrades</span> » s'ouvre sur
+« <span lang="en">For Global Standard, Data Zone Standard, and Standard deployment types, Microsoft manages automatic upgrades when
+a model version is retired</span> », sans exception pour `NoAutoUpgrade`. La date de retrait lue le 2026-10-17 par
 l'API des modèles est le 2028-03-11 (`deprecation.inference`, note du branchement, « Preuve »): c'est celle du
 modèle de base, pas celle du type de déploiement. Microsoft prévient au moins 60 jours avant, par courriel aux
-propriétaires de l'abonnement qui ont un déploiement actif (« Sent to subscription owners with active
-deployments »), et dans Azure Service Health (même page).
+propriétaires de l'abonnement qui ont un déploiement actif (« <span lang="en">Sent to subscription owners with active
+deployments</span> »), et dans Azure Service Health (même page).
 
 ### Le filtre de contenu `DefaultV2`
 
 `Microsoft.DefaultV2` est le jeu de garde-fous par défaut de Foundry. Pour un modèle de texte, il filtre la haine,
 la violence, le contenu sexuel et l'automutilation dans la demande et dans la réponse, à partir du niveau de
 gravité moyen; il détecte les attaques par la consigne (*jailbreak*) dans la demande, et le texte ou le code
-protégés dans la réponse (« Default safety policies in Microsoft Foundry », `ms.date` 2026-10-08, relue le
+protégés dans la réponse (« <span lang="en">Default safety policies in Microsoft Foundry</span> », `ms.date` 2026-10-08, relue le
 2026-11-09). Une demande bloquée rend un 400 `content_filter`; une réponse filtrée se termine par `finish_reason`
 `content_filter`. Le client de K-B lit l'un et l'autre `llm_content_filtered`, sans nouvelle tentative
 (`ai_api/connectors/llm_client.py:485-489`, `:556-557`). Sur les 20 réponses de l'essai du 2026-10-17, aucun filtre
@@ -101,17 +101,17 @@ jeton Microsoft Entra ID.
 ### Les rôles de l'opératrice
 
 Relevés le 2026-11-09 (`az role assignment list`). Sur la ressource, les rôles sont hérités du groupe. Chaque
-définition est celle de Microsoft Learn, relue le 2026-11-09 (pages « Azure built-in roles », catégories General,
+définition est celle de Microsoft Learn, relue le 2026-11-09 (pages « <span lang="en">Azure built-in roles</span> », catégories General,
 Privileged, AI + Machine Learning et Security, `ms.date` 2026-07-01).
 
 | Rôle | Portée | Définition de Microsoft | Ce qu'il permet sur le service |
 |---|---|---|---|
-| Reader | l'abonnement | « View all resources, but does not allow you to make any changes. » | voir la ressource et ses déploiements |
-| Owner | le groupe de ressources | « Grants full access to manage all resources, including the ability to assign roles in Azure RBAC. » | tout gérer, attribuer des rôles, lire les clés (action `*`) |
-| Contributor | le groupe | « Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC […] » | tout gérer sauf les rôles, déployer un modèle, lire les clés (action `*`) |
-| Foundry User | le groupe | « Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project. » | lire la ressource, lire les clés (`Microsoft.CognitiveServices/accounts/listkeys/action`), appeler le modèle par Entra ID (actions de données `Microsoft.CognitiveServices/*`) |
-| Key Vault Contributor | le groupe | « Manage key vaults, but does not allow you to assign roles in Azure RBAC, and does not allow you to access secrets, keys, or certificates. » | rien sur le service; gérer le coffre de secrets (Key Vault) de K-B sans en lire les secrets |
-| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | « Perform any action on the secrets of a key vault, except manage permissions. » | poser et lire le secret `kb-llm-api-key`, la clé du service |
+| Reader | l'abonnement | « <span lang="en">View all resources, but does not allow you to make any changes.</span> » | voir la ressource et ses déploiements |
+| Owner | le groupe de ressources | « <span lang="en">Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.</span> » | tout gérer, attribuer des rôles, lire les clés (action `*`) |
+| Contributor | le groupe | « <span lang="en">Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC […]</span> » | tout gérer sauf les rôles, déployer un modèle, lire les clés (action `*`) |
+| Foundry User | le groupe | « <span lang="en">Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project.</span> » | lire la ressource, lire les clés (`Microsoft.CognitiveServices/accounts/listkeys/action`), appeler le modèle par Entra ID (actions de données `Microsoft.CognitiveServices/*`) |
+| Key Vault Contributor | le groupe | « <span lang="en">Manage key vaults, but does not allow you to assign roles in Azure RBAC, and does not allow you to access secrets, keys, or certificates.</span> » | rien sur le service; gérer le coffre de secrets (Key Vault) de K-B sans en lire les secrets |
+| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | « <span lang="en">Perform any action on the secrets of a key vault, except manage permissions.</span> » | poser et lire le secret `kb-llm-api-key`, la clé du service |
 
 L'opératrice a donc plus que le nécessaire pour l'usage courant: appeler le modèle demande la clé ou Foundry User,
 et Owner, Contributor et Foundry User suffisent chacun à lire la clé. D'autres qu'elle peuvent en faire autant: tout
@@ -124,9 +124,9 @@ accès (registre, « Destinataires possibles chez l'organisme »). Seuls les rô
 K-B appelle le modèle par la clé de la ressource, envoyée dans l'en-tête `Authorization: Bearer`
 (`ai_api/connectors/llm_client.py:214`). L'API IA la lit dans la variable `KB_LLM_API_KEY`
 (`ai_api/connectors/llm_settings.py:27`, `:105`). L'authentification par clé est active sur la ressource
-(`disableLocalAuth` vaut `False`, lecture du 2026-11-09 à 23:54 UTC). Microsoft Learn le rappelle: « If you use
-key-based authentication instead, the key grants full access without role restrictions » (« Role-based access
-control for Microsoft Foundry », `ms.date` 2026-09-16, relue le 2026-11-09). Qui a la clé appelle donc les deux
+(`disableLocalAuth` vaut `False`, lecture du 2026-11-09 à 23:54 UTC). Microsoft Learn le rappelle: « <span lang="en">If you use
+key-based authentication instead, the key grants full access without role restrictions</span> » (« <span lang="en">Role-based access
+control for Microsoft Foundry</span> », `ms.date` 2026-09-16, relue le 2026-11-09). Qui a la clé appelle donc les deux
 déploiements, quels que soient ses rôles.
 
 Où vit la clé:
@@ -135,10 +135,10 @@ Où vit la clé:
   `kb` ne le lit jamais lui-même (`.claude/rules/poc.md`, règle 2).
 - **En ligne**: dans le secret `kb-llm-api-key` du coffre de secrets de K-B, posé à la main, collé sans écho
   (`infra/README.md`, « 4. Poser les secrets »). Parmi les identités de K-B, seule celle de l'app `ca-kb-ai-api` le
-  lit (`infra/main.bicep:159`, `:162-171`), par le rôle Key Vault Secrets User sur ce seul secret
+  lit (`infra/main.bicep:181`, `:205-208`), par le rôle Key Vault Secrets User sur ce seul secret
   (`infra/modules/key-vault-secret-access.bicep:1-9`, `:28-38`). Container Apps le donne au conteneur comme variable
   d'environnement, par une référence au coffre de secrets (Key Vault)
-  (`infra/modules/api-container-app.bicep:52-57`, `:89-93`, `:115`). La
+  (`infra/modules/api-container-app.bicep:68-73`, `:75-81`, `:132`, `:152`). La
   clé n'est ni dans l'image ni dans le code.
 
 Changer la clé: une clé régénérée dans le portail (ressource, « Clés et point de terminaison ») se reporte dans
@@ -166,23 +166,23 @@ l'Union:
 6. Nom du déploiement: `gpt-6-luna`. C'est la valeur de `KB_LLM_MODEL`.
 
 Aujourd'hui, la version est en disponibilité générale (`generally-available`, lu le 2026-10-17), et un nouveau
-déploiement est permis. Une fois la version au stade « Deprecated », 12 mois après sa sortie, ce déploiement ne se
-refera que sur un abonnement qui l'a déjà déployée (« "Existing customer" is determined at the subscription level
-[…] A new subscription under the same tenant doesn't inherit access. », page « Foundry Models lifecycle and
-support policy »).
+déploiement est permis. Une fois la version au stade « <span lang="en">Deprecated</span> », 12 mois après sa sortie, ce déploiement ne se
+refera que sur un abonnement qui l'a déjà déployée (« <span lang="en">"Existing customer" is determined at the subscription level
+[…] A new subscription under the same tenant doesn't inherit access.</span> », page « <span lang="en">Foundry Models lifecycle and
+support policy</span> »).
 
 ### Le branchement de K-B
 
 L'API IA ne connaît du service que des réglages; aucune branche du code n'est propre à Azure
 ([architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « Vue d'ensemble »).
 
-| Réglage | Valeur pour ce service | Sur le Mac (`.env`, `.env.example:89-100`) | En ligne (`infra/main.bicep`) |
+| Réglage | Valeur pour ce service | Sur le Mac (`.env`, `.env.example:114-125`) | En ligne (`infra/main.bicep`) |
 |---|---|---|---|
-| `KB_LLM_PROVIDER` | `openai_compatible` | à poser | fixé (`:218`) |
-| `KB_LLM_BASE_URL` | `https://<sous-domaine>.openai.azure.com/openai/v1` | à poser | paramètre `llmBaseUrl` de la passe 2 (`:21-22`, `:219`) |
-| `KB_LLM_MODEL` | `gpt-6-luna` | à poser | paramètre `llmModel` de la passe 2 (`:24-25`, `:220`) |
-| `KB_LLM_API_KEY` | la clé de la ressource | à poser | le secret `kb-llm-api-key` (`:141`) |
-| `KB_LLM_REASONING_EFFORT` | `none` | déjà `none` dans `.env.example` (`:100`) | fixé (`:222`) |
+| `KB_LLM_PROVIDER` | `openai_compatible` | à poser | fixé (`:298`) |
+| `KB_LLM_BASE_URL` | `https://<sous-domaine>.openai.azure.com/openai/v1` | à poser | paramètre `llmBaseUrl` de la passe 2 (`:22-23`, `:299`) |
+| `KB_LLM_MODEL` | `gpt-6-luna` | à poser | paramètre `llmModel` de la passe 2 (`:25-26`, `:300`) |
+| `KB_LLM_API_KEY` | la clé de la ressource | à poser | le secret `kb-llm-api-key` (`:181`) |
+| `KB_LLM_REASONING_EFFORT` | `none` | déjà `none` dans `.env.example` (`:125`) | fixé (`:302`) |
 
 - `KB_LLM_REASONING_EFFORT=none` fait envoyer `reasoning_effort: "none"` au lieu de `temperature: 0`
   (`ai_api/connectors/llm_client.py:417-420`): `gpt-6-luna` refuse `temperature: 0` seul par un 400
@@ -221,12 +221,12 @@ az cognitiveservices account list -g "$RG" --query "[].{nom:name, region:locatio
   `model` `gpt-6-luna-2026-09-22`; 6 classements, 5 rédactions et 3 jugements d'une veille réelle passent, avec le
   schéma strict de K-B; aucun cache n'est écrit (`cache_write_tokens` vaut 0 sur 20 réponses).
 - **Le 2026-10-28**, par `kb serve-ai` dans le bac à sable, l'environnement d'essai que nomme
-  `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, distinct de la production (`.env.example:135-138`): une demande de fiches,
+  `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, distinct de la production (`.env.example:160-163`): une demande de fiches,
   10 requêtes au modèle, 200 en 56,8 s
   ([note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel »).
-- **Le 2026-11-10**, par les deux commandes ci-dessous, lancées à la main: avec la clé, vers 00:03 UTC, le
+- **Le 2026-11-10**, par les deux commandes de [Refaire le test](#refaire-le-test), lancées à la main: avec la clé, vers 00:03 UTC, le
   déploiement répond `gpt-6-luna-2026-09-22 stop`; sans clé, à 00:03 UTC, il refuse: `HTTP 401`, avec le code
-  `"401"` et le message « Access denied due to invalid subscription key or wrong API endpoint […] ».
+  `"401"` et le message « <span lang="en">Access denied due to invalid subscription key or wrong API endpoint […]</span> ».
 
 ### Refaire le test
 
@@ -264,7 +264,7 @@ voient les autres processus.
    l'API IA »), puis `kb digest` (même README, « Écrire les comptes rendus de veille dans le coffre », le coffre
    Obsidian). Elle envoie une veille réelle au modèle, et coûte ses jetons.
 
-Les tests du dépôt (`uv run pytest`, la CI) n'appellent jamais le service: le client du modèle y est servi par un
+Les tests du dépôt (`uv run pytest`, l'intégration continue ou CI) n'appellent jamais le service: le client du modèle y est servi par un
 rejeu ou un transport simulé. Ils vérifient le corps de la requête que K-B envoie: le cache coupé
 (`tests/ai_api/test_llm_client.py:204`,
 `test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict`) et `reasoning_effort`
@@ -272,10 +272,13 @@ rejeu ou un transport simulé. Ils vérifient le corps de la requête que K-B en
 
 ## Les dépendances et les interconnexions
 
+Le schéma suivant montre qui appelle le service et ce dont l'appel dépend. La liste qui le suit le décrit en
+texte, élément par élément.
+
 ```mermaid
 flowchart LR
     digest["kb digest<br>kb trend-report"] -->|"POST /digests<br>POST /trend-reports"| ai["API IA<br>kb serve-ai"]
-    ai -->|"chat/completions, clé de la ressource<br>aujourd'hui sur le Mac seulement"| model["Foundry<br>déploiement gpt-6-luna"]
+    ai -->|"chat/completions, clé de la ressource<br>sur le Mac et en ligne"| model["Foundry<br>déploiement gpt-6-luna"]
     ai -->|"OTLP: mesures, traces"| grafana["Grafana Cloud"]
     vault["coffre de secrets<br>kb-llm-api-key"] -.->|"en ligne: la clé,<br>par l'identité managée"| ai
 ```
@@ -286,14 +289,15 @@ flowchart LR
   « Usage par le fournisseur »). Ses clients sont `kb digest` et `kb trend-report` (la fiche de l'API IA). Le
   script d'enregistrement du jeu de référence, `tests/ai_api/digests_reference.py`, lancé à la main, passe lui
   aussi par l'API IA, dans le même processus.
-- **En ligne, le modèle n'est pas encore appelé.** L'app `ca-kb-ai-api` est réglée pour joindre le déploiement
-  (`infra/main.bicep:218-253`), mais rien ne lui demande de fiche: les jobs déployés sont `caj-kb-smoke-test` et
-  `caj-kb-migrate-database` (`infra/deployment.json`). Le premier n'appelle de l'API IA que `GET /health`, qui
-  répond sans appeler le modèle (`core/api_health.py:12-13`). Le job qui lancerait `kb digest` en ligne n'est pas
-  déclaré dans `infra/` ([architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « En ligne, sur Azure
-  Container Apps »).
+- **En ligne, le modèle est appelé depuis le 2026-11-11.** L'app `ca-kb-ai-api` est réglée pour joindre le
+  déploiement (`infra/main.bicep:280-315`). Le job `caj-kb-digest-watch` (`infra/deployment.json:3`) lance
+  `kb digest`, puis `kb trend-report` (`commands/digest_watch_command.py:59-75`), par défaut le lundi et le jeudi à
+  10:00 UTC (`infra/main.bicep:31-32`). Lancé à la main le 2026-11-11, il a donné les premiers points de la
+  production dans Grafana Cloud, vers 16:00 UTC; lancé par son horaire le 2026-11-12, de 10:00:00 à 10:02:44 UTC, il
+  a appelé le modèle (#522). Les autres jobs n'appellent pas le modèle: `caj-kb-smoke-test` n'appelle de l'API IA
+  que `GET /health`, qui répond sans lui (`core/api_health.py:12-13`).
 - **Le coffre de secrets**, en ligne: il porte la clé; l'identité managée de l'API IA la lit (« La clé de K-B »).
-- **Grafana Cloud** reçoit les mesures de chaque appel au modèle, et, sous réglage, son contenu (« Les données
+- **Grafana Cloud** reçoit, par OTLP (le protocole d'export d'OpenTelemetry), les mesures de chaque appel au modèle, et, sous réglage, son contenu (« Les données
   envoyées au modèle »). Le monitorage du modèle a sa fiche, [la fiche du monitorage](monitoring_pour_docu.md).
 - **Le quota** de 140 000 jetons par minute est partagé: un compte rendu des tendances et un `kb digest` lancés
   dans la même minute le consomment ensemble (journal ADR, « Tendances: le choix du modèle et ses contrôles
@@ -324,9 +328,9 @@ fiches » et « Envoi des dépôts au modèle du compte rendu des tendances »:
   Jamais l'auteur ni l'URL. Toute URL devient `[url]` (`ai_api/watch_items.py:28`), et chaque `@login` des notes
   d'une release devient `@user` (`:33`, `:94`). Au classement, chaque publication n'envoie que `item_id`, `kind`,
   `title` et, sauf un avis de sécurité, son texte long (résumé, description ou notes), coupé à 500 caractères
-  (`ai_api/stages/classification.py:71-77`, `:289-304`, `core/config.py:368`); à la rédaction, chaque texte est
+  (`ai_api/stages/classification.py:71-77`, `:289-304`, `core/config.py:451`); à la rédaction, chaque texte est
   coupé à 2 000
-  caractères (`core/config.py:357`).
+  caractères (`core/config.py:433`).
 - **Pour le compte rendu des tendances**, des champs de chaque dépôt candidat (nom, description, topics, langage),
   puis le README nettoyé des dépôts choisis, coupé à 4 000 caractères (registre).
 - **Rien de la bibliothèque de lecture**: ni entrée Zotero ni clip (registre, « Envoi des items au modèle des
@@ -337,9 +341,9 @@ une personne; une adresse mail écrite dans les notes d'une release; un nom écr
 
 ### Ce que Microsoft en garde
 
-- **Le modèle ne garde rien et n'apprend rien**: « The models are stateless: no prompts or completions are stored
-  in the model. Additionally, prompts and completions are not used to train, retrain, or improve the base models. »
-  (« Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry », relue le 2026-11-09).
+- **Le modèle ne garde rien et n'apprend rien**: « <span lang="en">The models are stateless: no prompts or completions are stored
+  in the model. Additionally, prompts and completions are not used to train, retrain, or improve the base models.</span> »
+  (« <span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> », relue le 2026-11-09).
 - **Le cache de la consigne est coupé**: à chaque requête, K-B envoie `prompt_cache_options: {"mode": "explicit"}`
   sans point d'arrêt, qui n'écrit aucun cache (`ai_api/connectors/llm_client.py:41`, `:414`). Vérifié une fois, le
   2026-10-17: `cache_write_tokens` vaut 0 sur 20 réponses. Le client ne suit pas ce champ en production.
@@ -347,17 +351,17 @@ une personne; une adresse mail écrite dans les notes d'une release; un nom écr
   ou qui font partie d'un usage potentiellement abusif, peuvent être stockées pour une revue humaine; la revue
   automatique, elle, ne stocke rien. Elles le sont dans la géographie de la ressource, séparées par ressource. Les
   relecteurs sont des employés de Microsoft situés dans l'Espace économique européen, pour un déploiement dans
-  l'Espace économique européen. Aucune des deux pages de Microsoft ne publie de durée de conservation (« Data,
-  privacy, and security for Foundry Models sold by Azure in Microsoft Foundry », section « Preventing abuse »,
-  `ms.date` 2026-05-18; « Foundry Models sold by Azure abuse monitoring », `ms.date` 2026-05-13; relues le
+  l'Espace économique européen. Aucune des deux pages de Microsoft ne publie de durée de conservation (« <span lang="en">Data,
+  privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> », section « <span lang="en">Preventing abuse</span> »,
+  `ms.date` 2026-05-18; « <span lang="en">Foundry Models sold by Azure abuse monitoring</span> », `ms.date` 2026-05-13; relues le
   2026-11-09). Une demande signalée porte les publications de son lot, donc parfois des données personnelles.
 - **Cette surveillance est modifiable**, sur demande du titulaire de l'abonnement, l'organisme, s'il remplit les
-  critères d'accès limité de Microsoft (« modified abuse monitoring », page « Foundry Models sold by Azure abuse
-  monitoring »). Sur la ressource de K-B, elle ne l'est pas: la capacité `ContentLogging` de la ressource est
-  absente (lecture du 2026-11-09 à 23:54 UTC). Or « The value of "false" for the "ContentLogging" attribute appears
-  only if data storage for abuse monitoring is turned off. Otherwise, this property will not appear » (« Data,
-  privacy, and security for Foundry Models sold by Azure in Microsoft Foundry », section « How can a customer
-  verify if data storage for abuse monitoring is off? »).
+  critères d'accès limité de Microsoft (« <span lang="en">modified abuse monitoring</span> », page « <span lang="en">Foundry Models sold by Azure abuse
+  monitoring</span> »). Sur la ressource de K-B, elle ne l'est pas: la capacité `ContentLogging` de la ressource est
+  absente (lecture du 2026-11-09 à 23:54 UTC). Or « <span lang="en">The value of "false" for the "ContentLogging" attribute appears
+  only if data storage for abuse monitoring is turned off. Otherwise, this property will not appear</span> » (« <span lang="en">Data,
+  privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> », section « <span lang="en">How can a customer
+  verify if data storage for abuse monitoring is off?</span> »).
 - **Ce qui relève de l'organisme**: s'il active la protection des services d'IA de Microsoft Defender for Cloud,
   les demandes et les réponses sont gardées 30 jours chez Microsoft; ses politiques sur les journaux de diagnostic
   ne sont pas connues. K-B n'active aucune de ces fonctions (registre, « Destinataires possibles chez
@@ -370,15 +374,15 @@ envoyés et la sortie du modèle) à Grafana Cloud, avec les traces. C'est un fl
 registre (« Envoi des mesures à Grafana Cloud »).
 
 - **Par défaut, rien ne part**: sans la variable, le réglage vaut `none` (`ai_api/connectors/metrics_export.py:158`).
-- **En production**, il est fixé à `none` (`infra/main.bicep:235`), et `all` y est refusé au démarrage
+- **En production**, il est fixé à `none` (`infra/main.bicep:297`), et `all` y est refusé au démarrage
   (`ai_api/connectors/metrics_export.py:186-187`).
-- **Dans le bac à sable**, aucun fichier du dépôt ne le pose (`.env.example:140-145`, `.env.e2e_test.example`), et
+- **Dans le bac à sable**, aucun fichier du dépôt ne le pose (`.env.example:165-170`, `.env.e2e_test.example`), et
   `make sandbox-alerts` tourne sur le rejeu, sans le modèle et sans traces (`tests/e2e/test_sandbox_alerts.py`).
 - **À la main**, `KB_TRACE_CONTENT=all` peut être posé pour un essai hors production. Le contenu des appels part
   alors dans Grafana Cloud, qui le garde 14 jours (registre, « Envoi des mesures à Grafana Cloud », « Durée de
   conservation »). Un essai l'a posé le 2026-10-28, avec 10 requêtes à `gpt-6-luna` (note du contenu des appels,
   « Essai réel »). Depuis la réponse de Grafana Labs du 2026-10-29, le réglage reste à `none`: ce qu'elle change
-  au DPA est à décider (#163; registre, même section, « Contrat »).
+  au contrat de sous-traitance (DPA, <span lang="en">Data Processing Agreement</span>) est à décider (#163; registre, même section, « Contrat »).
 
 ## Limites
 
@@ -389,11 +393,11 @@ registre (« Envoi des mesures à Grafana Cloud »).
   aucun test de K-B; seule une lecture comme celles de « Relire l'état » la montre.
 - **`DeepSeek-V4-Flash` reste déployé**, avec une version qui suit celle de Microsoft. K-B ne l'appelle pas; la clé
   le permet.
-- **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union: « that or any other
-  European Union Member Nation » (« Data, privacy, and security »), ou la limite des données de l'Union, qui peut
-  compter des pays de l'AELE (« Understanding deployment types »).
+- **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union: « <span lang="en">that or any other
+  European Union Member Nation</span> » (« <span lang="en">Data, privacy, and security</span> »), ou la limite des données de l'Union, qui peut
+  compter des pays de l'AELE (« <span lang="en">Understanding deployment types</span> »).
 - **Deux sections de la même page de Microsoft ne disent pas la même chose du retrait**: avec `NoAutoUpgrade`, le
-  déploiement cesse de répondre (foire aux questions), ou il est mis à niveau d'office (« Automatic upgrades »,
+  déploiement cesse de répondre (foire aux questions), ou il est mis à niveau d'office (« <span lang="en">Automatic upgrades</span> »,
   sans exception pour `NoAutoUpgrade`).
 - **La durée de conservation de la surveillance des abus** n'est pas publiée par Microsoft.
 - **Le premier déploiement**, en Global Standard, n'a été cherché que dans le groupe de ressources du service.
@@ -407,24 +411,19 @@ registre (« Envoi des mesures à Grafana Cloud »).
 
 Pages de Microsoft Learn, relues le 2026-11-09 (en UTC):
 
-- Understanding deployment types in Microsoft Foundry Models, `ms.date` 2026-08-06:
-  https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types
-- Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry, `ms.date` 2026-05-18:
-  https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy
-- Foundry Models sold by Azure abuse monitoring, `ms.date` 2026-05-13:
-  https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/abuse-monitoring
-- Foundry Models lifecycle and support policy, `ms.date` 2026-07-24:
-  https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements
-- Default safety policies in Microsoft Foundry, `ms.date` 2026-10-08:
-  https://learn.microsoft.com/en-us/azure/foundry/guardrails/default-safety-policies
-- Role-based access control for Microsoft Foundry, `ms.date` 2026-09-16:
-  https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry
-- Azure built-in roles, `ms.date` 2026-07-01: General (Reader), Privileged (Owner, Contributor), AI + Machine
-  Learning (Foundry User), Security (Key Vault Contributor, Key Vault Secrets Officer):
-  https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/general,
-  https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged,
-  https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning,
-  https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/security
+- [<span lang="en">Understanding deployment types in Microsoft Foundry Models</span>](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types),
+  `ms.date` 2026-08-06
+- [<span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy),
+  `ms.date` 2026-05-18
+- [<span lang="en">Foundry Models sold by Azure abuse monitoring</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/abuse-monitoring), `ms.date` 2026-05-13
+- [<span lang="en">Foundry Models lifecycle and support policy</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements), `ms.date` 2026-07-24
+- [<span lang="en">Default safety policies in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/guardrails/default-safety-policies), `ms.date` 2026-10-08
+- [<span lang="en">Role-based access control for Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry), `ms.date` 2026-09-16
+- <span lang="en">Azure built-in roles</span>, `ms.date` 2026-07-01, en quatre pages:
+  [<span lang="en">General</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/general) (Reader),
+  [<span lang="en">Privileged</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged) (Owner, Contributor),
+  [<span lang="en">AI + Machine Learning</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning) (Foundry User) et
+  [<span lang="en">Security</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/security) (Key Vault Contributor, Key Vault Secrets Officer)
 
 Lectures par `az`, en lecture seule, le 2026-11-09 (UTC): la liste des déploiements (23:41:29), leurs réglages
 (23:42:29), les rôles de l'opératrice (`az role assignment list`), la ressource (23:54:30); puis, le 2026-11-10 vers
