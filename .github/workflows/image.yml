@@ -10,7 +10,9 @@ permissions:
   contents: read
 
 # Builds the image of K-B for Azure Container Apps, which runs linux/amd64 images only, then checks
-# it (issue #200). Nothing is pushed: the registry and the delivery are #415.
+# it (issue #200) and scans it (#498). Nothing is pushed: the registry and the delivery are #415.
+# A required check of main (#498): no path filter, since a check that a filter skips stays pending and
+# blocks the merge.
 jobs:
   image-build:
     runs-on: ubuntu-latest
@@ -34,6 +36,24 @@ jobs:
           found=$(find "$context" \( -name '.env*' -o -name '*.sqlite*' -o -name decoy -o -name .DS_Store -o -name __pycache__ \) -print)
           test -z "$found" || { echo "$found"; exit 1; }
       - run: docker buildx build --platform linux/amd64 --tag k-b:ci .
+      # Grype (Anchore), the binary of its release, checked by its SHA256 (GitHub release asset digest), like
+      # Bicep in infra.yml: update both with the version. The last version published 7 days before or more
+      # (issue #498).
+      - name: Installs Grype v0.121.2
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/grype.tar.gz" \
+            https://github.com/anchore/grype/releases/download/v0.121.2/grype_0.121.2_linux_amd64.tar.gz
+          echo "9c8965ced9df657e5e851c14021bae838802f711edd7a48f9bc3c923a8d28f12  $RUNNER_TEMP/grype.tar.gz" | sha256sum -c
+          tar -xzf "$RUNNER_TEMP/grype.tar.gz" -C "$RUNNER_TEMP" grype
+      # Debian packages, Python packages of the virtual environment and CPython: what Grype finds in the
+      # final filesystem of the image. --fail-on counts what --only-fixed keeps: a high or critical
+      # vulnerability that has a fix. The database is downloaded at each run, and refused if built more
+      # than 5 days before (Grype's default). No check for a newer Grype: its version is pinned above.
+      - name: Has no high or critical vulnerability that has a fix
+        env:
+          GRYPE_CHECK_FOR_APP_UPDATE: "false"
+        run: |
+          "$RUNNER_TEMP/grype" docker:k-b:ci --only-fixed --fail-on high
       - name: Runs as a non-root user
         # In a variable, so that a failed docker run fails the step (bash -e); -ne refuses an empty value.
         run: |

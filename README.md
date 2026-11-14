@@ -830,7 +830,7 @@ son SHA, sa version en commentaire.
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
 | `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
-| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
+| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit ; la scanne par Grype v0.121.2, vérifié par son SHA256, et refuse une vulnérabilité haute ou critique qui a un correctif (paquets Debian, paquets Python de l'environnement virtuel, CPython) ; vérifie l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
@@ -855,13 +855,13 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
 - `main` ne se supprime pas et ne reçoit pas de push forcé ;
 - tout changement passe par une PR, fusionnée par un commit de fusion (la seule méthode permise), sans
   approbation requise ;
-- 6 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et, depuis
-  #496, `bicep-build` ;
+- 7 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build`
+  (depuis #496) et `image-build` (depuis #498) ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`image-build` et `tests-data` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
-PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de `infra.yml`). Les
-non requis comptent au déploiement : `check` exige
+`tests-data` n'est pas requis à la fusion. `bicep-build` l'est depuis #496 et `image-build` depuis #498 : ils tournent
+sur toute PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de
+`infra.yml`). Les non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
 GitHub crée lui-même (Dependabot). Sur un dépôt neuf, ce ruleset se recrée dans
 Settings → Rules → Rulesets, avec ces règles. Les rulesets des tags, l'environnement `production` et les secrets
