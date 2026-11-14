@@ -718,7 +718,7 @@ def test_the_oldest_twin_read_is_forgotten_beyond_the_productions_kept(
 
     for day in days:
         top_client.get(f"/tops/most_starred?day={day}", headers=web_headers)
-    top_client.get(f"/tops/most_starred?day={days[-1]}", headers=web_headers)
+    top_client.get(f"/tops/most_starred?day={days[1]}", headers=web_headers)
     top_client.get(f"/tops/most_starred?day={days[0]}", headers=web_headers)
 
     assert watch.downloaded_names() == [name_twin(day) for day in [*days, days[0]]]

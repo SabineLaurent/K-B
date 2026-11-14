@@ -525,7 +525,7 @@ def test_the_oldest_digest_read_is_forgotten_beyond_the_digests_kept(
 
     for day in days:
         digest_client.get(f"/digests/{SUBJECT}?day={day}", headers=web_headers)
-    digest_client.get(f"/digests/{SUBJECT}?day={days[-1]}", headers=web_headers)
+    digest_client.get(f"/digests/{SUBJECT}?day={days[1]}", headers=web_headers)
     digest_client.get(f"/digests/{SUBJECT}?day={days[0]}", headers=web_headers)
 
     assert watch.downloaded_names() == [name_twin(day) for day in [*days, days[0]]]
