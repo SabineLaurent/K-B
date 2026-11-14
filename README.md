@@ -816,8 +816,8 @@ Sous 96 % (lignes et branches), les deux commandes échouent : c'est le `fail_un
 vérifient (`make test` et `uv run pytest`, non) ; sur une partie de la suite, ajouter `--cov-fail-under=0`.
 
 **La CI** (GitHub Actions, `.github/workflows/`) : quatre workflows. `ci.yml` et `image.yml` tournent sur chaque
-PR vers `main` et sur chaque push sur `main`, donc après chaque fusion ; `infra.yml` aussi, mais seulement quand
-la PR ou le push touche `infra/` ou ce workflow ; `deploy.yml`, sur un tag `vX.Y.Z` poussé, ou à la main
+PR vers `main` et sur chaque push sur `main`, donc après chaque fusion, et `infra.yml` de même, sans filtre de
+chemin depuis #496 ; `deploy.yml`, sur un tag `vX.Y.Z` poussé, ou à la main
 (`gh workflow run deploy.yml --ref <tag>`). Le jeton de chaque workflow ne lit que le dépôt
 (`permissions: contents: read`), sauf ce que les jobs de `deploy.yml` ajoutent. Chaque action est épinglée par
 son SHA, sa version en commentaire.
@@ -855,11 +855,13 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
 - `main` ne se supprime pas et ne reçoit pas de push forcé ;
 - tout changement passe par une PR, fusionnée par un commit de fusion (la seule méthode permise), sans
   approbation requise ;
-- 5 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types` et `tests-postgresql` ;
+- 6 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et, depuis
+  #496, `bicep-build` ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`image-build` et `bicep-build` ne sont pas requis à la fusion : `bicep-build`, filtré par chemin, bloquerait
-toute PR qui laisse `infra/` de côté (commentaire de `infra.yml`). Ils comptent au déploiement : `check` exige
+`image-build` et `tests-data` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
+PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de `infra.yml`). Les
+non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
 GitHub crée lui-même (Dependabot). Sur un dépôt neuf, ce ruleset se recrée dans
 Settings → Rules → Rulesets, avec ces règles. Les rulesets des tags, l'environnement `production` et les secrets
@@ -875,9 +877,10 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 - Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
 
 **Une PR témoin** : [#533](https://github.com/SabineLaurent/K-B/pull/533) a passé, avant sa fusion le
-2026-11-09, les 7 checks que reçoit une PR qui ne touche ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
+2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
-(`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné.
+(`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
+`bicep-build`, un huitième check.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 

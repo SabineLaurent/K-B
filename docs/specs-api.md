@@ -852,8 +852,9 @@ avec ses sources.
   (`git ls-files | grep -i compose` ne rend rien le 2026-11-10 ; #200, fermée, n'en a pas versé) ;
   en ligne, le conteneur ne publie aucun port, derrière l'entrée interne.
 - **API8, durcissement, revue et évaluation** : non tenus, communs aux deux API, comme dans l'API IA
-  ([fiches-veille.md](fiches-veille.md), API8), avec leurs « Pour la tenir » et « Pour réduire le
-  risque » (#496 à #499) ; la chaîne Envoy → uvicorn, écart voulu, justifié de même.
+  ([fiches-veille.md](fiches-veille.md), API8), avec leurs « Pour la tenir », leurs « Pour réduire le
+  risque » et, pour le durcissement, ses trois écarts voulus (#496 à #499) ; la chaîne Envoy → uvicorn,
+  écart voulu, justifié de même.
 - **API9, documentation en `sandbox`** : `/docs` et `/openapi.json` sans clé en `sandbox`, écart
   voulu, justifié comme dans l'API IA (#393 ; [fiches-veille.md](fiches-veille.md), API9,
   « Documentation réservée aux utilisateurs autorisés ») ; pour le lever, ne plus les servir du
