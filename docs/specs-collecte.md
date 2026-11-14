@@ -236,8 +236,9 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   refusée. Dépôts les plus forkés collectés (#264) : de même, un instantané du top 100 à chaque
   collecte, sous `raw/automated_watch/github_most_forked/`.
   Après l'import, `kb write-tops` (#265) écrit une fiche Markdown par top et par jour de collecte
-  encore dans le brut, dans le coffre (`veille/tops/<most_starred|most_forked>/AAAA-MM-JJ.md`),
-  puis supprime les relevés lisibles antérieurs au dernier relevé lisible : le brut d'un top ne
+  encore dans le brut, dans le coffre (`veille/tops/<most_starred|most_forked>/AAAA-MM-JJ.md`), et son
+  jumeau JSON à côté (`AAAA-MM-JJ.json`, #559 ; [fiches-veille.md](fiches-veille.md), « Jumeau d'une fiche
+  d'un top »), puis supprime les relevés lisibles antérieurs au dernier relevé lisible : le brut d'un top ne
   garde que son dernier relevé lisible (registre des traitements, étape 7), et aucun relevé plus de
   6 mois, illisible ou sans fiche compris (étape 3).
 - **Filtre à la requête** (exception à la règle du brut intact, décidée le 2026-10-02) : les
@@ -264,7 +265,10 @@ Faits vérifiés le 2026-10-01, sources en fin de page ; revus sur le code le 20
   communs : un classement refuse sa page entière (règle 1 de `.claude/rules/conventions.md`) :
   pas du JSON ; pas une réponse de recherche avec une liste `items` ; `incomplete_results` autre
   que `false` ; un nombre de dépôts autre que 100 ; un dépôt invalide (nom qui n'est pas
-  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…).
+  `owner/name`, URL hors de `https://github.com/`, nombre d'étoiles qui n'est pas un entier…). Ce
+  que le jumeau de la fiche refuse (`TopProduction`, #559), la collecte le refuse avant : un nom de
+  plus de 255 caractères, un nombre hors de 0 à 2^63 − 1. Toute la page, car retirer un dépôt
+  décalerait les rangs du top.
   Sans fenêtre de dates, un échec ne retarde rien : la collecte suivante prend un nouvel
   instantané, et celui du jour manqué est perdu.
 - **En cas de panne :** dépôts les plus forkés (`github_most_forked`) : les refus des plus

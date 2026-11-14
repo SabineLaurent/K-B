@@ -1,6 +1,6 @@
-"""The exchange storage, Azure Blob Storage, reached by the managed identity of a job, or on the Mac
-by the account of az login: its settings, its clients, the download of a blob as listed, and its
-errors named without what the storage answers.
+"""The exchange storage, Azure Blob Storage, reached by the managed identity of a job or of the data
+API, or on the Mac by the account of az login: its settings, its clients, the download of a blob as
+listed, and its errors named without what the storage answers.
 
 A blob is named by its path, the title of a clip for one (etl/sources/clipping.py): K-B never
 writes it, and keeps the SDK, which logs the URL of a request at INFO, at ERROR
@@ -10,15 +10,17 @@ import re
 from collections.abc import Iterator, Mapping
 from contextlib import contextmanager
 from dataclasses import dataclass
-from typing import Literal
+from typing import Any, Literal
 
 from azure.core import MatchConditions
-from azure.core.credentials import TokenCredential
+from azure.core.credentials import AccessToken, TokenCredential
 from azure.core.exceptions import (
     AzureError,
     HttpResponseError,
     ServiceRequestError,
+    ServiceRequestTimeoutError,
     ServiceResponseError,
+    ServiceResponseTimeoutError,
 )
 from azure.core.pipeline.transport import RequestsTransport
 from azure.identity import AzureCliCredential, ManagedIdentityCredential
@@ -33,8 +35,8 @@ from k_b.core.config import (
 from k_b.core.outbound import find_url_refusal
 
 EXCHANGE_BLOB_URL_VARIABLE = "KB_EXCHANGE_BLOB_URL"
-# The client id of the user-assigned identity of the job: without it, ManagedIdentityCredential asks
-# for the system-assigned identity, which a job of K-B does not have.
+# The client id of the user-assigned identity of the job or of the data API: without it,
+# ManagedIdentityCredential asks for the system-assigned identity, which neither has.
 CLIENT_ID_VARIABLE = "AZURE_CLIENT_ID"
 # A bearer token goes over HTTPS only.
 EXCHANGE_BLOB_SCHEMES = ("https",)
@@ -46,6 +48,7 @@ ERROR_CODE = re.compile(r"[A-Za-z]{1,64}")
 
 type ExchangeStorageState = Literal[
     "exchange_storage_unavailable",
+    "exchange_storage_timeout",
     "exchange_storage_no_token",
     "exchange_storage_unauthorized",
     "exchange_storage_forbidden",
@@ -60,13 +63,18 @@ STATE_BY_STATUS: dict[int, ExchangeStorageState] = {
     403: "exchange_storage_forbidden",
     404: "exchange_storage_not_found",
 }
-# A download answered 404 or 412: the blob was removed or changed since the listing.
-STATUS_CHANGED_SINCE_LISTING = frozenset({404, 412})
+# A download answered 412, or 404 for its blob: the blob was changed or removed since the listing. A
+# 404 ContainerNotFound is not: the container itself is gone.
+STATUS_CHANGED_SINCE_LISTING = 412
+BLOB_NOT_FOUND = (404, "BlobNotFound")
+# The errors of a wait past its timeout, on the connection or on the answer (azure-core 1.41.0).
+TIMEOUT_ERRORS = (ServiceRequestTimeoutError, ServiceResponseTimeoutError)
 
 
 @dataclass(frozen=True)
 class ExchangeStorageSettings:
-    """The account of the exchange storage, and the identity of the job that reaches it."""
+    """The account of the exchange storage, and the identity of the job or of the data API that
+    reaches it."""
 
     account_url: str
     client_id: str
@@ -91,6 +99,7 @@ class ExchangeStorageError(Exception):
         super().__init__(", ".join(details))
         self.state: ExchangeStorageState = state
         self.http_status = http_status
+        self.error_code = error_code
 
 
 def read_exchange_storage_settings_or_refusal(
@@ -120,22 +129,31 @@ def find_exchange_blob_url_refusal(environ: Mapping[str, str]) -> str | None:
     )
 
 
-def build_transport() -> RequestsTransport:
+def build_transport(
+    connect_timeout_seconds: float = EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
+    read_timeout_seconds: float = EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS,
+) -> RequestsTransport:
     """The transport of the SDK: it reads neither a proxy nor a certificate of the environment, as
-    open_http_client (core/outbound.py), and waits as the SDK of the storage does without one."""
+    open_http_client (core/outbound.py), and waits as the SDK of the storage does without one,
+    unless given shorter waits."""
     return RequestsTransport(
         use_env_settings=False,
-        connection_timeout=EXCHANGE_STORAGE_CONNECT_TIMEOUT_SECONDS,
-        read_timeout=EXCHANGE_STORAGE_READ_TIMEOUT_SECONDS,
+        connection_timeout=connect_timeout_seconds,
+        read_timeout=read_timeout_seconds,
     )
 
 
 def build_managed_identity_credential(
-    client_id: str, transport: RequestsTransport | None = None
+    client_id: str,
+    transport: RequestsTransport | None = None,
+    retry_total: int | None = None,
 ) -> ManagedIdentityCredential:
-    """The credential of the user-assigned identity of client_id."""
+    """The credential of the user-assigned identity of client_id; retry_total, when given, replaces
+    the retries of azure-identity, which hands it to its RetryPolicy (_internal/pipeline.py)."""
     return ManagedIdentityCredential(
-        client_id=client_id, transport=transport or build_transport()
+        client_id=client_id,
+        transport=transport or build_transport(),
+        **retry_options(retry_total),
     )
 
 
@@ -150,15 +168,23 @@ def open_container_client(
     container_name: str,
     credential: TokenCredential,
     transport: RequestsTransport | None = None,
+    retry_total: int | None = None,
 ) -> ContainerClient:
-    """A client of one container of the account, which follows no redirection."""
+    """A client of one container of the account, which follows no redirection; retry_total, when
+    given, replaces the retries of the SDK (ExponentialRetry, 3)."""
     return ContainerClient(
         account_url,
         container_name,
         credential=credential,
         transport=transport or build_transport(),
         permit_redirects=False,
+        **retry_options(retry_total),
     )
+
+
+def retry_options(retry_total: int | None) -> dict[str, Any]:
+    """The keyword of the retries, left out when not given: the default stays that of the SDK."""
+    return {} if retry_total is None else {"retry_total": retry_total}
 
 
 def check_identity(credential: TokenCredential) -> None:
@@ -168,8 +194,29 @@ def check_identity(credential: TokenCredential) -> None:
     an outage (a 500 in JSON is CredentialUnavailableError, as a client id it does not know), and
     none carries the HTTP status of the endpoint (azure-identity 1.27.0: 400, 401, 403, 404, seen on
     2026-11-06; review of #412)."""
-    try:
+    with naming_token_failures():
         credential.get_token(STORAGE_SCOPE)
+
+
+class NamedFailureCredential:
+    """A credential whose failure to give a token is exchange_storage_no_token, as in
+    check_identity: the data API asks its token during a request, never before."""
+
+    def __init__(self, credential: TokenCredential) -> None:
+        self.credential = credential
+
+    def get_token(self, *scopes: str, **kwargs: Any) -> AccessToken:
+        """The token of the credential, or exchange_storage_no_token."""
+        with naming_token_failures():
+            return self.credential.get_token(*scopes, **kwargs)
+
+
+@contextmanager
+def naming_token_failures() -> Iterator[None]:
+    """Turn any failure of an identity to give a token into exchange_storage_no_token; nothing of
+    azure-identity is chained."""
+    try:
+        yield
     # ValueError and AttributeError: an answer that is not a JSON object (a 500 in HTML, a list),
     # which azure-identity does not turn into an AzureError.
     except (AzureError, ValueError, AttributeError):
@@ -186,24 +233,39 @@ def count_listed_blobs(container_client: ContainerClient) -> int:
 
 
 def download_listed_version(
-    container_client: ContainerClient, blob: BlobProperties
+    container_client: ContainerClient, blob: BlobProperties, max_bytes: int
 ) -> bytes | None:
     """The bytes of the version listed, as stored: never decompressed, as a blob sent with
     Content-Encoding: gzip would pass any bound once inflated. None when the blob was removed or
-    changed since the listing."""
+    changed since the listing, or when the length received is not the size listed.
+
+    At most max_bytes + 1 bytes are asked: without a range, the SDK reads up to 32 MiB at once
+    (max_single_get_size). A blob listed empty is asked whole, as a range on it is answered 416."""
     try:
         with naming_storage_errors():
             downloader = container_client.download_blob(
                 blob.name,
+                offset=0 if blob.size else None,
+                length=max_bytes + 1 if blob.size else None,
                 etag=blob.etag,
                 match_condition=MatchConditions.IfNotModified,
                 decompress=False,
             )
-            return downloader.readall()
+            content = downloader.readall()
     except ExchangeStorageError as error:
-        if error.http_status in STATUS_CHANGED_SINCE_LISTING:
+        if is_changed_since_listing(error):
             return None
         raise
+    if len(content) != blob.size:
+        return None
+    return content
+
+
+def is_changed_since_listing(error: ExchangeStorageError) -> bool:
+    """Whether the download was refused because its blob was changed or removed."""
+    return error.http_status == STATUS_CHANGED_SINCE_LISTING or (
+        (error.http_status, error.error_code) == BLOB_NOT_FOUND
+    )
 
 
 @contextmanager
@@ -217,7 +279,12 @@ def naming_storage_errors() -> Iterator[None]:
 
 
 def describe_storage_error(error: AzureError) -> ExchangeStorageError:
-    """The state, the status and the code of an error of the SDK."""
+    """The state, the status and the code of an error of the SDK; a timeout the downloader wraps
+    in an error without a status (azure/storage/blob/_download.py) is still a timeout."""
+    if isinstance(error, TIMEOUT_ERRORS) or isinstance(
+        error.inner_exception, TIMEOUT_ERRORS
+    ):
+        return ExchangeStorageError("exchange_storage_timeout")
     if isinstance(error, HttpResponseError) and error.status_code is not None:
         state = STATE_BY_STATUS.get(error.status_code, "exchange_storage_failed")
         return ExchangeStorageError(state, error.status_code, read_error_code(error))

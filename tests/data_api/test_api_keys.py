@@ -35,6 +35,8 @@ def test_the_routes_are_listed(items_database, api_keys):
         "/items",
         "/items/{item_id}",
         "/openapi.json",
+        "/tops/{top}",
+        "/tops/{top}/days",
         "/trends",
     ]
 

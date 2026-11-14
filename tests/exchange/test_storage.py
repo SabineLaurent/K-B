@@ -1,6 +1,8 @@
 """The exchange storage: its settings, the identity of the job, the listing and its errors, named
 without the text the storage answers."""
 
+import io
+from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
@@ -13,6 +15,8 @@ from exchange.storage_fakes import (
     TEST_CLIENT_ID,
     TEST_IDENTITY_HEADER,
     TEST_TOKEN,
+    FakeBlob,
+    FakeContainer,
     FakeTransport,
     answer_error,
     answer_forbidden_naming_the_blob,
@@ -21,6 +25,7 @@ from exchange.storage_fakes import (
     answer_listing,
     answer_token,
     names_the_spotted_blob,
+    open_fake_container_client,
     set_identity_endpoint,
 )
 
@@ -34,6 +39,7 @@ from k_b.exchange.storage import (
     build_transport,
     check_identity,
     count_listed_blobs,
+    download_listed_version,
     find_exchange_blob_url_refusal,
     naming_storage_errors,
     open_container_client,
@@ -41,6 +47,7 @@ from k_b.exchange.storage import (
 )
 
 TEST_CONTAINER = "smoke-test"
+SENT_ON = datetime(2026, 11, 11, 8, 0, tzinfo=UTC)
 TEST_ENVIRON = {
     "KB_EXCHANGE_BLOB_URL": TEST_ACCOUNT_URL,
     "AZURE_CLIENT_ID": TEST_CLIENT_ID,
@@ -328,3 +335,196 @@ def test_the_clients_take_the_transport_of_k_b_by_default(monkeypatch):
 
     assert len(built) == 2
     assert len(built[0].adapter.requests) == 1
+
+
+def test_an_error_of_the_storage_keeps_its_code():
+    with pytest.raises(ExchangeStorageError) as raised:
+        list_with(answer_error(404, "ContainerNotFound", "no container"))
+
+    assert raised.value.error_code == "ContainerNotFound"
+
+
+def test_a_listing_past_its_wait_is_a_timeout():
+    def wait_too_long(request):
+        raise requests.ReadTimeout(f"read timed out on {SPOTTED_BLOB_NAME}")
+
+    with pytest.raises(ExchangeStorageError) as raised:
+        list_with(wait_too_long)
+
+    assert str(raised.value) == "exchange_storage_timeout"
+
+
+def test_the_transport_waits_the_timeouts_it_is_given():
+    configuration = build_transport(
+        connect_timeout_seconds=5, read_timeout_seconds=10
+    ).connection_config
+
+    assert configuration.timeout == 5
+    assert configuration.read_timeout == 10
+
+
+def test_a_client_without_retries_sends_a_failed_listing_once():
+    storage = FakeTransport(answer_error(503, "ServerBusy", "busy"))
+
+    with (
+        pytest.raises(ExchangeStorageError),
+        naming_storage_errors(),
+        open_container_client(
+            TEST_ACCOUNT_URL,
+            TEST_CONTAINER,
+            FakeCredential(),
+            transport=storage,
+            retry_total=0,
+        ) as container,
+    ):
+        count_listed_blobs(container)
+
+    assert len(storage.adapter.requests) == 1
+
+
+def test_a_credential_without_retries_asks_a_failed_token_once(monkeypatch):
+    set_identity_endpoint(monkeypatch)
+    identity = FakeTransport(
+        answer_identity_with(500, "application/json", b'{"error": "busy"}')
+    )
+
+    with (
+        build_managed_identity_credential(
+            TEST_CLIENT_ID, transport=identity, retry_total=0
+        ) as credential,
+        pytest.raises(ExchangeStorageError),
+    ):
+        check_identity(credential)
+
+    assert len(identity.adapter.requests) == 1
+
+
+# A bound of the tests, smaller than the blobs below.
+TEST_MAX_BYTES = 8
+LISTED_NAME = "tops/most_starred/2026-11-11.json"
+
+
+def download_with(container, max_bytes=TEST_MAX_BYTES, change=None):
+    """Download the one blob of container as listed; change is applied after the listing."""
+    with open_fake_container_client(container) as container_client:
+        [listed] = list(container_client.list_blobs())
+        if change is not None:
+            change(container)
+        return download_listed_version(container_client, listed, max_bytes)
+
+
+def test_the_version_listed_is_downloaded_by_its_etag():
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+
+    content = download_with(container)
+
+    assert content == b"12345"
+    [download] = [request for request in container.requests if request.method == "GET"][
+        1:
+    ]
+    assert download.headers["If-Match"] == container.blobs[LISTED_NAME].etag
+
+
+def test_at_most_one_byte_past_the_bound_is_asked():
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+
+    download_with(container)
+
+    download = container.requests[-1]
+    assert download.headers["x-ms-range"] == f"bytes=0-{TEST_MAX_BYTES}"
+
+
+def test_a_blob_listed_empty_is_downloaded_whole():
+    """A range on an empty blob is answered 416 (azure/storage/blob/_download.py)."""
+    container = FakeContainer(TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"", SENT_ON)})
+
+    assert download_with(container) == b""
+    assert "x-ms-range" not in container.requests[-1].headers
+
+
+def test_a_blob_compressed_is_given_as_stored():
+    container = FakeContainer(
+        TEST_CONTAINER,
+        {LISTED_NAME: FakeBlob(b"\x1f\x8b\x08\x00", SENT_ON, content_encoding="gzip")},
+    )
+
+    assert download_with(container) == b"\x1f\x8b\x08\x00"
+
+
+@pytest.mark.parametrize("received", [b"123", b"1234567890123"])
+def test_a_length_received_other_than_the_size_listed_gives_none(received):
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+
+    def send_another_length(container):
+        listed = container.blobs[LISTED_NAME]
+        container.blobs[LISTED_NAME] = FakeBlob(received, SENT_ON, etag=listed.etag)
+
+    assert download_with(container, change=send_another_length) is None
+
+
+@pytest.mark.parametrize(
+    "status_and_code", [(404, "BlobNotFound"), (412, "ConditionNotMet")]
+)
+def test_a_blob_removed_or_changed_since_the_listing_gives_none(status_and_code):
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+    container.status_of_next_get[LISTED_NAME] = status_and_code
+
+    assert download_with(container) is None
+
+
+def test_a_container_removed_since_the_listing_raises_its_state():
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+    container.status_of_next_get[LISTED_NAME] = (404, "ContainerNotFound")
+
+    with pytest.raises(ExchangeStorageError) as raised:
+        download_with(container)
+
+    assert raised.value.state == "exchange_storage_not_found"
+    assert raised.value.error_code == "ContainerNotFound"
+
+
+class BodyPastItsWait(io.RawIOBase):
+    """A body whose read waits past its timeout, as a socket does (socket.timeout)."""
+
+    def readable(self):
+        return True
+
+    def readinto(self, buffer):
+        raise TimeoutError("read timed out")
+
+
+def test_a_download_past_its_wait_on_its_body_is_a_timeout(monkeypatch):
+    """The downloader tries 3 times, then wraps the timeout in an error without a status
+    (azure/storage/blob/_download.py)."""
+    monkeypatch.setattr("azure.storage.blob._download.time.sleep", lambda seconds: None)
+    container = FakeContainer(
+        TEST_CONTAINER, {LISTED_NAME: FakeBlob(b"12345", SENT_ON)}
+    )
+    answer = container.handle
+
+    def wait_too_long_on_the_body(request):
+        status, headers, body = answer(request)
+        if request.method == "GET" and "comp=list" not in request.url:
+            return (
+                status,
+                {**headers, "Content-Length": str(len(body))},
+                BodyPastItsWait(),
+            )
+        return status, headers, body
+
+    container.handle = wait_too_long_on_the_body
+
+    with pytest.raises(ExchangeStorageError) as raised:
+        download_with(container)
+
+    assert raised.value.state == "exchange_storage_timeout"
