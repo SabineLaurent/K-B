@@ -93,7 +93,9 @@ Le workflow `docs.yml` publie le site sur GitHub Pages quand on le lance à la m
 2026-11-14, Pages n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la
 première publication, deux gestes de Sabine:
 
-1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14).
+1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14). Pages ne sert un dépôt privé qu'avec une offre
+   payante de GitHub (Pro, Team ou Enterprise), et **un site publié depuis un dépôt privé est public**: activer Pages
+   sur le dépôt encore privé publierait toutes les fiches.
 2. Dans les réglages du dépôt, <span lang="en">Settings > Pages > Build and deployment > Source</span>, choisir
    <span lang="en">« GitHub Actions »</span>.
 
@@ -127,6 +129,9 @@ Lues le 2026-11-14:
   [page du support de Microsoft](https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d).
 - DINUM, RGAA 4.1.2, [critères et tests](https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/), qui
   annonce le RGAA 5 pour la fin de 2026.
+- GitHub, <span lang="en">« What is GitHub Pages? »</span>,
+  [page de la documentation de GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages),
+  pour l'offre qui permet Pages sur un dépôt privé.
 - GitHub, <span lang="en">« Configuring a publishing source for your GitHub Pages site »</span>,
   [page de la documentation de GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 - Material for MkDocs, [notes de la version 9.8.1](https://github.com/squidfunk/mkdocs-material/releases/tag/9.8.1),
