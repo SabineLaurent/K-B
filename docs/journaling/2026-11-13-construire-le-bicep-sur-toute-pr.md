@@ -96,14 +96,14 @@ filtre.
 
 ### 5. Les trois écarts voulus du « durcissement répétable »
 
-`docs/fiches-veille.md:1305-1328`. La mesure demande « A repeatable hardening process leading to fast and easy
+`docs/fiches-veille.md:1308-1331`. La mesure demande « A repeatable hardening process leading to fast and easy
 deployment of a properly locked down environment ». Trois limites restent, et ne seront pas levées :
-- **le socle appliqué à la main** (`:1305`) : appliquer le Bicep crée des rôles, ce qui demande le droit d'Owner
+- **le socle appliqué à la main** (`:1308`) : appliquer le Bicep crée des rôles, ce qui demande le droit d'Owner
   sur le groupe ; donner ce droit à la CI irait contre le moindre privilège. La passe reste répétable : même Bicep,
   mêmes commandes, aperçu (`what-if`) avant la création ;
-- **l'image changée hors du Bicep par `deploy.yml`** (`:1315`) : seule l'image change, tenue par son digest, vérifié
+- **l'image changée hors du Bicep par `deploy.yml`** (`:1318`) : seule l'image change, tenue par son digest, vérifié
   contre le commit du tag ;
-- **aucune relecture exigée** (`:1322`) : une seule personne au dépôt, et GitHub dit « Pull request authors cannot
+- **aucune relecture exigée** (`:1325`) : une seule personne au dépôt, et GitHub dit « Pull request authors cannot
   approve their own pull requests » ; exiger une approbation bloquerait toute PR de Sabine.
 
 Chacun a sa « Limite » (ce qui le rendrait à lever : la grille le définit ainsi, `docs/fiches-veille.md:948-950`),
@@ -126,6 +126,7 @@ son « Pour lever l'écart » et son « Pour réduire le risque », dit faisable
 | Avant le code : `grep -n "paths" .github/workflows/infra.yml` → lignes 6 et 9 | le critère rouge de l'issue |
 | Après : la même commande ne rend rien | le filtre a disparu (premier critère de #496) |
 | Avant le geste : la lecture du ruleset ne nomme pas `bicep-build` | le second critère, rouge |
+| Après le geste de Sabine, le 2026-11-14 à 11:57 UTC : la même lecture nomme `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build` | le second critère, vert |
 | `uv run pytest` : 5119 passés ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | rien d'autre n'a bougé |
 | `/security-review` : aucune faille | lancer le workflow partout est sûr |
 | `/code-review` (high) : 8 constats de doc, triés par time-knight ; 2 corrigés dans `ad71d6b`, 2 au commit de la lecture du ruleset | la doc dit ce qui est observé |
@@ -141,7 +142,7 @@ son « Pour lever l'écart » et son « Pour réduire le risque », dit faisable
    et non `pull_request_target`, jeton en lecture seule, aucun secret, aucune entrée de la PR dans une commande, Bicep
    vérifié par son SHA256 (`infra.yml:9-10`, `:24`).
 4. **Pourquoi la CI n'applique-t-elle pas le Bicep elle-même ?** Il faudrait lui donner le droit de créer des rôles
-   (Owner) : le moindre privilège l'emporte, c'est un écart voulu, écrit avec sa limite (`fiches-veille.md:1305`).
+   (Owner) : le moindre privilège l'emporte, c'est un écart voulu, écrit avec sa limite (`fiches-veille.md:1308`).
 5. **Que change ce travail pour une mise en ligne ?** `deploy.yml` attend désormais aussi `Infra` sur le commit du
    tag (section 3).
 
@@ -151,7 +152,6 @@ son « Pour lever l'écart » et son « Pour réduire le risque », dit faisable
 
 ## Ce qui reste
 
-- Le geste de Sabine sur le ruleset, juste avant la fusion, et sa lecture citée dans la PR.
 - Le constat d'une PR qui ne touche pas `infra/` et reçoit `bicep-build`, vert : la PR de #611 (API10). La PR de #498,
   qui touche ensuite API8, l'écrit et passe la mesure à « tenue ».
 - Faire échouer `bicep-build` sur un avertissement de Bicep : #452.

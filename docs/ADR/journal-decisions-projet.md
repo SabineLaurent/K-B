@@ -7161,9 +7161,9 @@ sous la délégation de Sabine du 15/10.
 ### CI : `bicep-build` sur toute PR, contrôle exigé de `main` (#496)
 
 - **`infra.yml` n'a plus de filtre de chemin : `bicep-build` construit `infra/main.bicep` sur toute PR vers `main` et
-  tout push sur `main`, et devient un contrôle exigé du ruleset de `main`, posé par Sabine juste avant la fusion.**
-  Plan validé par Sabine le 13/11, sur la décision du 08/11 de tenir cette partie du « durcissement répétable »
-  d'API8 (`docs/fiches-veille.md`). Pourquoi : avec le filtre, une PR pouvait fusionner sans que le Bicep se
+  tout push sur `main`, et devient un contrôle exigé du ruleset de `main`, posé par Sabine le 2026-11-14, juste avant
+  la fusion.** Plan validé par Sabine le 13/11, sur la décision du 08/11 de tenir cette partie du « durcissement
+  répétable » d'API8 (`docs/fiches-veille.md`). Pourquoi : avec le filtre, une PR pouvait fusionner sans que le Bicep se
   construise, et un contrôle exigé qu'un filtre saute reste en attente et bloque toute PR qui ne touche pas
   `infra/`. Options écartées : un job préalable qui saute la construction hors d'`infra/` (plus de code, et un job
   sauté par une condition rend « Success », ce qu'il faudrait encore rattraper) ; l'action `dorny/paths-filter`
@@ -7175,7 +7175,7 @@ sous la délégation de Sabine du 15/10.
   Bicep par `deploy.yml` (seul le digest change, vérifié contre le commit) ; aucune relecture exigée par le ruleset
   (une seule personne au dépôt, et une auteure ne peut pas approuver sa PR). Chacun a sa limite, son « Pour lever
   l'écart » et son « Pour réduire le risque » dans `docs/fiches-veille.md`, API8. Limite assumée : la mesure n'est
-  tenue qu'une fois `bicep-build` exigé et vu vert sur une PR qui ne touche pas `infra/`. — PR de #496, à venir
+  tenue qu'une fois `bicep-build` exigé et vu vert sur une PR qui ne touche pas `infra/`. — PR de #496
 
 ## 2026-11-14
 

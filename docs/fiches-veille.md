@@ -973,7 +973,7 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement, construit sur toute PR depuis #496, à exiger par le ruleset et à constater (#496) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement, construit sur toute PR et exigé par le ruleset de `main` depuis #496, à constater sur une PR qui ne touche pas `infra/` (PR de #611, citée par celle de #498) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
 | API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
@@ -1288,18 +1288,21 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée jusqu'à la fin de #496
-  (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200), l'environnement, les apps et
-  les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme le code ; depuis #496, la CI construit
-  `infra/main.bicep` sur toute PR vers `main` et tout push sur `main`, sans filtre de chemin
+- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée jusqu'au constat d'une PR qui ne
+  touche pas `infra/` (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200),
+  l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme le code ; depuis
+  #496, la CI construit `infra/main.bicep` sur toute PR vers `main` et tout push sur `main`, sans filtre de chemin
   (`.github/workflows/infra.yml:3-7`, `:26` ; `grep -n "paths" .github/workflows/infra.yml` ne rend rien, le
-  2026-11-13) ; une version taguée part en ligne par `.github/workflows/deploy.yml` (#415). Un réglage refusé
-  empêche le démarrage (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui reste de #496 : `bicep-build`
-  exigé par le ruleset de `main`, et le constat d'une PR qui ne touche pas `infra/` et le reçoit, vert.
-  **Pour la tenir** : #496, ces deux constats. XS.
-  **Pour réduire le risque** : d'ici là, ne fusionner une PR qui touche `infra/` que sur sa construction du Bicep
-  verte (`infra.yml:26`) ; après une passe à la main ou une version, relire la configuration en ligne (« Revue
-  périodique », ci-dessous).
+  2026-11-13), et `bicep-build` est un contrôle exigé du ruleset de `main` (ruleset 25257125, lu le 2026-11-14 à
+  11:57 UTC : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`, `strict`) ; une version taguée
+  part en ligne par `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
+  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui reste : le constat d'une PR qui ne touche pas
+  `infra/` et reçoit `bicep-build`, vert.
+  **Pour la tenir** : ce constat, sur la PR de #611, cité par la PR de #498. XS.
+  **Pour réduire le risque** : d'ici là, le ruleset échoue fermé : un contrôle exigé qui ne tournerait pas reste
+  « Pending » et bloque la fusion (« Associated checks stay in a "Pending" state and block merging », GitHub Docs,
+  « Troubleshooting required status checks », relu le 2026-11-14) ; faisable, déjà fait. Après une passe à la main ou
+  une version, relire la configuration en ligne (« Revue périodique », ci-dessous).
   Trois écarts voulus, que la mesure garde une fois tenue (décision de Sabine du 2026-11-08 : tenir la construction
   exigée, justifier le reste) :
   - **Le socle s'applique à la main**, en deux passes (`infra/README.md`, « Appliquer »). Ces fichiers donnent des
