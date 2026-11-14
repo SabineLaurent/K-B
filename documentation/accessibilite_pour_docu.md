@@ -89,8 +89,9 @@ style construite de Material 9.8.1, le 2026-11-14. Le seuil du RGAA 3.2 est de 4
 ## Publier
 
 Le workflow `docs.yml` publie le site sur GitHub Pages quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:9`, `:26-45`). Seul son job `deploy` a le droit d'écrire sur Pages (`:37-39`). Avant
-la première publication, deux gestes de Sabine, pas encore faits le 2026-11-14:
+(`.github/workflows/docs.yml:9`, `:30-49`). Seul son job `deploy` a le droit d'écrire sur Pages (`:41-43`). Le
+2026-11-14, Pages n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la
+première publication, deux gestes de Sabine:
 
 1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14).
 2. Dans les réglages du dépôt, <span lang="en">Settings > Pages > Build and deployment > Source</span>, choisir
@@ -107,8 +108,11 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
   le service d'IA et l'intégration continue; les autres fiches suivent, chacune dans sa PR.
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
   décrit reste lisible dans les deux cas.
-- **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), sans contrôle
-  d'intégrité: le site sert ce qu'unpkg sert ce jour-là.
+- **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
+  qui bouge. Parade: le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
+  vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
+  (`.github/workflows/docs.yml:26-29`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
+  de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
   successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.
 - **Le site n'est pas en ligne** le 2026-11-14 (section [Publier](#publier)).
