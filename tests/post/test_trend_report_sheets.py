@@ -25,9 +25,8 @@ from k_b.core.config import (
     TRENDS_DIR_NAME,
     WATCH_DIR_NAME,
 )
-from k_b.items import CAUTIONS
+from k_b.items import CAUTIONS, is_writable_url
 from k_b.jobs.watch_download import find_sheet_text_refusal
-from k_b.post.digest_sheets import is_writable_url
 from k_b.post.trend_report_client import DroppedCandidates, TrendReportResponse
 from k_b.post.trend_report_sheets import (
     CAUTION_LABELS,

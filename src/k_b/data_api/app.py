@@ -1,5 +1,5 @@
-"""The data API: the items of the base, read only, and the tops of watch, for the clients of Sabine
-(docs/specs-api.md)."""
+"""The data API: the items of the base, read only, and the tops and the digests of watch, for the
+clients of Sabine (docs/specs-api.md)."""
 
 from collections.abc import Mapping, Sequence
 
@@ -26,7 +26,7 @@ from k_b.data_api.watch_reading import WatchReader
 from k_b.database.engine import Readers
 
 # The version of docs/specs-api.md: a change a client can see changes both.
-API_VERSION = "0.13.0"
+API_VERSION = "0.14.0"
 # Asked of every user of the arXiv API, "on your product" (arXiv API Access, 2026-10-25): the
 # data API serves its papers.
 ARXIV_ACKNOWLEDGEMENT = (

@@ -7238,6 +7238,51 @@ points de revue tranchés par time-knight, sous la délégation de Sabine du 15/
   entrer en base. Pour réduire le risque : la même règle à l'import des tendances (#615, faisable avec nos droits).
   — PR de #596
 
+### API de données : les comptes rendus de veille servis au site, du jumeau JSON de leur fiche dans `watch` (#560)
+
+Plan de la session K-B validé par Sabine le 2026-11-14 ; les écarts et les points de revue, tranchés par time-knight
+sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12), sans la modifier.
+
+- **`kb digest` écrit, une fois, à côté de chaque fiche d'un sujet son jumeau JSON (`veille/<sujet>/<jour>.json`),
+  que l'API de données sert au seul client `WEB` : `GET /digests/{subject}` et `GET /digests/{subject}/days`, relu
+  par un schéma fermé commun à l'écrivain et au lecteur (`DigestProduction`, `items.py`). Chaque source y garde son
+  `item_id`, que la fiche n'écrit pas.** Décision de Sabine du 2026-11-11 : la forme de #559, pour la même raison
+  (le site ne lit que l'API de données et ne rend aucun Markdown) ; la cible reste un index en base (#531).
+  L'`item_id`, pour que le site mène de la source à l'item du fil (issue #560). Limites assumées, chacune avec sa
+  parade dans `docs/specs-api.md` (« `GET /digests/{subject}` ») : (a) l'historique commence au premier jumeau ;
+  (b) en ligne, rien avant le tag, une exécution de `caj-kb-digest-watch` et l'abonnement Azure rétabli ; (c) un
+  jumeau non écrit après sa fiche perd ce jour sur le site ; (d) `item_id` est une clé de substitution, qu'une base
+  refaite renumérote ; (e) un sujet retiré rend ses comptes rendus inaccessibles ; (f) les textes du modèle et les
+  titres des sources peuvent nommer une personne ; (g) une affirmation sans caractère visible fait refuser le
+  jumeau, et le compte rendu du sujet attend le lancement suivant (parade : #624, tranché par time-knight, revue de
+  code de #560). — PR de #560
+- **Le jumeau est construit et relu par son schéma avant la fiche : refusé, ni fiche ni jumeau, le sujet échoue
+  (`twin_refused`) et garde son début ; sinon la fiche, puis le jumeau.** Plan validé (point 1), comme #559 : rien
+  n'est écrit que l'API refuserait, et le sujet gardant son début (#565), son compte rendu suivant recouvre la
+  fenêtre, sans perte. La fiche avant le jumeau (raison déduite du code par la session, validée par time-knight
+  le 2026-11-14) : la fiche seule fait avancer le début du sujet (`find_previous_until`) ; un jumeau écrit avant une
+  fiche en échec montrerait au site un compte rendu absent du coffre, dont le suivant relirait la fenêtre, et
+  refuserait un nouveau lancement du même jour (`twin_exists`). Le revers est la limite (c). — PR de #560
+- **Un seul lecteur de `watch` pour toutes les sortes de jumeaux : une `TwinKind` par sorte (`TOP_TWINS`,
+  `DIGEST_TWINS` : dossier, schéma, contrôle du dossier et du jour, borne en octets, nombre gardé), et à chaque
+  sorte son cache des productions lues.** Plan validé (point 4). Écarté : un second lecteur copié, que #561 aurait
+  triplé. Les listes, une par dossier (9 sujets et 2 tops, un ensemble fermé), gardées 60 s ; les productions,
+  8 tops et 16 comptes rendus (le dernier jour des 9 sujets et une marge) : lire les comptes rendus ne fait pas
+  oublier un top. Choix de forme annoncés à time-knight le 2026-11-14 et acceptés : des fonctions typées pour lire
+  le dossier et le moment d'une production, plutôt qu'un `getattr` sur un nom de champ, non typé ;
+  `WATCH_CACHED_PRODUCTIONS` renommée `WATCH_CACHED_TOPS`, son nom devenu faux. — PR de #560
+- **Un jumeau de compte rendu fait 400 000 octets au plus (`MAX_DIGEST_TWIN_BYTES`) : le plus gros que son schéma
+  permet à `kb digest` en fait 389 968, mesuré le 2026-11-14 ; servi, il reste sous le 1 Mo que le site lit.**
+  Tranché par time-knight le 2026-11-14. Pourquoi : la borne refuse avant le téléchargement ce que `kb digest` ne
+  peut pas écrire (OWASP API4:2023) ; prise sur le pire cas mesuré plutôt que sur les 4 Mo d'une fiche, elle borne
+  aussi le cache, 6,4 Mo pour 16 comptes rendus. Un test refait la mesure sur les bornes du schéma : une borne
+  relevée qui ferait dépasser les 400 000 octets le fait échouer. — PR de #560
+- **`subject` est un `Literal` de l'API de données, `DigestSubjectName`, tenu égal à `DIGEST_SUBJECTS` par un
+  test ; un autre sujet répond 422.** Plan validé (point 5). Pourquoi un `Literal` écrit en clair (raison de la
+  session, validée par time-knight le 2026-11-14) : il donne l'`enum` des sujets dans l'OpenAPI, et mypy le
+  vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
+  ci-dessus. — PR de #560
+
 ### CI : l'image scannée par Grype, `image-build` exigé de `main` (#498)
 
 Plan validé par Sabine le 2026-11-13 (points 3 à 6), sur sa décision du 08/11 de tenir l'« évaluation automatisée »
@@ -7272,9 +7317,10 @@ Sabine du 15/10.
   le 2026-11-10) : non exigé, un scan rouge laisse fusionner, et ne bloque qu'au déploiement (`deploy.yml` exige
   toutes les exécutions vertes). Limite assumée : une vulnérabilité corrigée publiée un matin bloque toutes les PR, comme `audit` le 2026-11-13 (#606). D'où la marche à suivre écrite dans
   `documentation/integration_continue_pour_docu.md` : un paquet Python d'`uv.lock`, monté dans `uv.lock` ; sinon
-  (paquet Debian, CPython, `pip`) le digest de l'image de base monté à la main si l'image amont a le correctif ; sinon une entrée de `.grype.yaml`, avec sa raison,
-  sa date et l'issue qui la retire, décidée par Sabine (une règle non tenue l'est par décision écrite). Écarté :
-  `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image du jour de sa construction. — PR de #498
+  (paquet Debian, CPython, `pip`) le digest de l'image de base monté à la main si l'image amont a le correctif ;
+  sinon une entrée de `.grype.yaml`, avec sa raison, sa date et l'issue qui la retire, décidée par Sabine (une règle
+  non tenue l'est par décision écrite). Écarté : `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image
+  du jour de sa construction. — PR de #498
 
 ## Décisions encore ouvertes
 

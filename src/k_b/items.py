@@ -5,7 +5,7 @@ import re
 import unicodedata
 from datetime import UTC, date, datetime, time
 from typing import Annotated, Literal, Self, get_args
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 from pydantic import (
     AfterValidator,
@@ -18,7 +18,16 @@ from pydantic import (
     model_validator,
 )
 
-from k_b.core.config import GH_ARCHIVE_MAX_CATCH_UP_WINDOWS, GITHUB_RANKING_SIZE
+from k_b.core.config import (
+    CHARACTER_REFERENCE,
+    GH_ARCHIVE_MAX_CATCH_UP_WINDOWS,
+    GITHUB_RANKING_SIZE,
+    ITEMS_PER_CLAIM,
+    MAX_CLAIMS,
+    MAX_ITEMS_PER_DIGEST,
+    MODEL_NAME,
+    TEXT_CHARS,
+)
 from k_b.core.quoting import quote_value
 
 # The sources of seed_sources.sql: a test keeps both lists equal.
@@ -91,11 +100,25 @@ TAG_MAX_COUNT = 30
 # write-tops cuts a longer one and says so (description_truncated), so that a top of 100 stays
 # under the 1 MB the site reads (MAX_WEB_DATA_API_BODY_BYTES).
 MAX_TOP_DESCRIPTION_CHARS = 1_000
+# The longest title and URL of a source in the twin of the sheet of a digest, in characters: the
+# longest the base gives an item of the watch, an advisory for a title, 2,000 for a URL
+# (MAX_LENGTH_BY_KIND); a test keeps them above each kind.
+MAX_DIGEST_SOURCE_TITLE_CHARS = 1_024
+MAX_DIGEST_SOURCE_URL_CHARS = 2_000
 # The categories of the characters a reader does not see, or that hide or reorder what is around
 # them: the controls, the format characters, the lone surrogates.
 HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Cs"})
 # The format character a text keeps: it joins the emojis.
 ZERO_WIDTH_JOINER = "\u200d"
+URL_SCHEMES = ("http://", "https://")
+# A URL is written, as an autolink, only when it is made of the characters of RFC 3986 (unreserved,
+# delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
+# Obsidian: it cannot leave its <…>, where a backslash escapes nothing (CommonMark 0.31.2, 6.5).
+URL_CHARACTERS = re.compile(r"(?:[A-Za-z0-9._~:/?#@!&'()*+,;=-]|%[0-9A-Fa-f]{2})+")
+# What a URL may not hold once its percents are decoded (markdown-it shows them decoded): a control,
+# a format character (the bidirectional ones, U+200B to U+200F, U+FEFF, U+00AD), a surrogate, a line
+# or paragraph separator. A link would read otherwise than it leads (CWE-451).
+URL_HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})
 
 
 def is_repository_name(text: str) -> bool:
@@ -171,6 +194,40 @@ def check_text_is_visible(text: str) -> str:
     if any(map(is_hidden_character, text)):
         raise ValueError(f"text with a hidden character: {len(text)} characters")
     return text
+
+
+def is_writable_url(url: str) -> bool:
+    """Whether the URL can be written as an autolink, never rewritten: :: would make a field of
+    Dataview, a character reference is decoded even in an autolink, and kb download-watch-sheets
+    refuses ~~~ anywhere in a line."""
+    return (
+        url.startswith(URL_SCHEMES)
+        and URL_CHARACTERS.fullmatch(url) is not None
+        and "::" not in url
+        and "~~~" not in url
+        and CHARACTER_REFERENCE.search(url) is None
+        and not has_hidden_character(url)
+    )
+
+
+def has_hidden_character(url: str) -> bool:
+    """Whether the URL, its percents decoded, holds a character not shown as itself; a
+    percent-encoding that is not UTF-8 counts as one."""
+    try:
+        decoded = unquote(url, errors="strict")
+    except UnicodeDecodeError:
+        return True
+    return any(
+        unicodedata.category(character) in URL_HIDDEN_CATEGORIES
+        for character in decoded
+    )
+
+
+def check_url_is_writable(url: str) -> str:
+    """Refuse a URL that is_writable_url refuses, saying its length only."""
+    if not is_writable_url(url):
+        raise ValueError(f"url a sheet does not write: {len(url)} characters")
+    return url
 
 
 def normalize_tag(tag: str) -> str:
@@ -253,6 +310,8 @@ ArxivId = Annotated[str, StringConstraints(pattern=f"^{ARXIV_ID}$")]
 ZoteroKey = Annotated[str, StringConstraints(pattern=f"^{ZOTERO_KEY}$")]
 # A text shown as text, on one line, without a character a reader would not see.
 VisibleText = Annotated[str, AfterValidator(check_text_is_visible)]
+# A URL a sheet of a digest writes as a link: the site may link it as it is.
+VisibleUrl = Annotated[str, AfterValidator(check_url_is_writable)]
 # A tag of an imported .md, in its normalized form.
 Tag = Annotated[
     str,
@@ -295,6 +354,8 @@ type TrendText = Literal["sector", "watch_link", "readme_summary", "promise"]
 TREND_TEXTS: tuple[TrendText, ...] = get_args(TrendText.__value__)
 # A date with its time zone, held in UTC.
 UtcDatetime = Annotated[AwareDatetime, AfterValidator(convert_to_utc)]
+# The same as kb writes it in a twin, read again from its text only (read_written_datetime).
+WrittenDatetime = Annotated[UtcDatetime, BeforeValidator(read_written_datetime)]
 # An integer SQLite holds: a larger one fails to be written.
 Int64 = Annotated[int, Field(ge=MIN_INT64, le=MAX_INT64)]
 
@@ -692,7 +753,7 @@ class TopProduction(BaseModel):
     top: TopName
     # The moment its ranking was collected, the collected_at of its sheet: named apart from the
     # collected_at of an item, which the data API never serves (docs/specs-api.md).
-    ranked_at: Annotated[UtcDatetime, BeforeValidator(read_written_datetime)]
+    ranked_at: WrittenDatetime
     repositories: Annotated[list[TopRepository], Field(max_length=GITHUB_RANKING_SIZE)]
 
     @model_validator(mode="after")
@@ -701,4 +762,94 @@ class TopProduction(BaseModel):
         ranks = [repository.rank for repository in self.repositories]
         if ranks != list(range(1, len(ranks) + 1)):
             raise ValueError("ranks not 1 to n in order")
+        return self
+
+
+# What a sheet of a digest says (post/digest_sheets.py): its claims, that none was kept
+# (NO_CLAIM), or that no item fell in its subject (NO_ITEM).
+type DigestOutcome = Literal["written", "no_claim", "no_item"]
+
+
+class DigestClaim(BaseModel):
+    """A claim of a digest, as the twin of its sheet holds it."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    text: Annotated[
+        VisibleText, Field(min_length=TEXT_CHARS[0], max_length=TEXT_CHARS[1])
+    ]
+    item_ids: Annotated[
+        list[Annotated[Int64, Field(gt=0)]],
+        Field(min_length=ITEMS_PER_CLAIM[0], max_length=ITEMS_PER_CLAIM[1]),
+    ]
+
+
+class DigestSource(BaseModel):
+    """A source of a digest, as the twin of its sheet holds it: its item_id leads to the item."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    item_id: Annotated[Int64, Field(gt=0)]
+    title: Annotated[VisibleText, Field(max_length=MAX_DIGEST_SOURCE_TITLE_CHARS)]
+    # null exactly when the sheet writes "(sans URL)".
+    url: Annotated[VisibleUrl, Field(max_length=MAX_DIGEST_SOURCE_URL_CHARS)] | None
+
+
+class DigestProduction(BaseModel):
+    """The twin of the sheet of a digest of a subject and a day (#560): what kb digest writes
+    beside the sheet, in JSON, and what the data API reads again from watch."""
+
+    model_config = ConfigDict(strict=True, extra="forbid")
+
+    # The form of a folder of veille/: the reader wants it equal to its folder.
+    subject: Annotated[str, StringConstraints(pattern=r"^[a-z_]{1,64}$")]
+    # The window of the subject: dates of the sources, never of their collection.
+    since: WrittenDatetime
+    until: WrittenDatetime
+    model: Annotated[str, StringConstraints(pattern=f"^{MODEL_NAME.pattern}$")]
+    # The reading cut, as in the front matter of the sheet: a digest cut must not look whole
+    # (OWASP LLM07).
+    items_capped: bool
+    capped_kind: ItemKind | None
+    covered_after: WrittenDatetime | None
+    outcome: DigestOutcome
+    claims: Annotated[list[DigestClaim], Field(max_length=MAX_CLAIMS)]
+    sources: Annotated[list[DigestSource], Field(max_length=MAX_ITEMS_PER_DIGEST)]
+
+    @model_validator(mode="after")
+    def check_the_cap_is_named_whole(self) -> Self:
+        """A reading cut names the kind cut and the date after which it is read, or neither."""
+        named = {self.capped_kind is not None, self.covered_after is not None}
+        if named != {self.items_capped}:
+            raise ValueError("items_capped, capped_kind and covered_after disagree")
+        return self
+
+    @model_validator(mode="after")
+    def check_since_is_not_after_until(self) -> Self:
+        """The start of the window of the subject, at its end or before."""
+        if self.since > self.until:
+            raise ValueError("since after until")
+        return self
+
+    @model_validator(mode="after")
+    def check_the_outcome_is_the_claims(self) -> Self:
+        """written exactly when a claim is there."""
+        if (self.outcome == "written") != bool(self.claims):
+            raise ValueError("outcome not the claims")
+        return self
+
+    @model_validator(mode="after")
+    def check_each_source_is_cited_once(self) -> Self:
+        """Each source listed once and cited by a claim; each claim cites its sources once, among
+        the sources listed."""
+        source_ids = [source.item_id for source in self.sources]
+        if len(set(source_ids)) != len(source_ids):
+            raise ValueError("a source listed twice")
+        cited_ids: set[int] = set()
+        for claim in self.claims:
+            if len(set(claim.item_ids)) != len(claim.item_ids):
+                raise ValueError("a source cited twice by a claim")
+            cited_ids.update(claim.item_ids)
+        if cited_ids != set(source_ids):
+            raise ValueError("sources not those the claims cite")
         return self
