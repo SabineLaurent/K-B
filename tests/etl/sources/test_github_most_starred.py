@@ -13,6 +13,7 @@ from k_b.etl.sources.github.most_starred import (
     read_most_starred,
 )
 from k_b.etl.tops import TopEntry
+from k_b.items import MAX_INT64, TREND_REPOSITORY_NAME_MAX_LENGTH
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 RECORDED_RESPONSE = (FIXTURES_DIR / "github_most_starred_extract.json").read_bytes()
@@ -147,6 +148,10 @@ def test_a_response_without_a_list_of_items_is_refused():
         {"html_url": "https://evil.example.com/codecrafters-io/build-your-own-x"},
         {"stargazers_count": "many"},
         {"stargazers_count": True},
+        # What the twin of the sheet refuses (TopProduction), the collection refuses before.
+        {"stargazers_count": -1},
+        {"stargazers_count": MAX_INT64 + 1},
+        {"full_name": "owner/" + "a" * (TREND_REPOSITORY_NAME_MAX_LENGTH - 5)},
         {"topics": "awesome-list"},
         {"created_at": "2018-05-09T12:03:18"},
     ],
@@ -154,6 +159,17 @@ def test_a_response_without_a_list_of_items_is_refused():
 def test_an_invalid_repository_is_refused_with_its_rank(changes):
     with pytest.raises(PageRefusedError, match="repository 1"):
         read_most_starred(response_with(**changes), expected_size=3)
+
+
+@pytest.mark.parametrize(
+    ("count", "crossed"),
+    [(-1, "below 0"), (MAX_INT64 + 1, f"above {MAX_INT64}")],
+)
+def test_a_count_out_of_its_bounds_names_the_bound_it_crossed(count, crossed):
+    with pytest.raises(PageRefusedError) as refusal:
+        read_most_starred(response_with(stargazers_count=count), expected_size=3)
+
+    assert str(refusal.value) == f"repository 1: stargazers_count {crossed}"
 
 
 def test_a_refused_name_is_quoted_by_its_length_only():

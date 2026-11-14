@@ -56,7 +56,10 @@ def run_write_tops(data_dir: Path, environ: Mapping[str, str]) -> int:
         lines.append(f"{top.name}: {describe_outcome(outcome)}")
         has_failed = has_failed or outcome.unreadable_count > 0
         has_done = (
-            has_done or outcome.written_count > 0 or outcome.unreadable_count == 0
+            has_done
+            or outcome.written_count > 0
+            or outcome.twins_written_count > 0
+            or outcome.unreadable_count == 0
         )
         if deleted_count is not None:
             deleted_count += outcome.deleted_count
@@ -82,12 +85,14 @@ def describe_error(error: OSError | VaultEntryRefusedError) -> str:
 
 
 def describe_outcome(outcome: TopSheetsOutcome) -> str:
-    """A ranking kept unread first, then the sheets written, then the sheet of the day already
-    there."""
+    """A ranking kept unread first, then the sheets and the twins written, then the sheet of the
+    day already there."""
     if outcome.unreadable_count > 0:
         return "failed (ranking_unreadable)"
-    if outcome.written_count > 0:
-        return f"ok, {describe_count(outcome.written_count, 'sheet')} written"
+    if outcome.written_count > 0 or outcome.twins_written_count > 0:
+        sheets = describe_count(outcome.written_count, "sheet")
+        twins = describe_count(outcome.twins_written_count, "twin")
+        return f"ok, {sheets} and {twins} written"
     if outcome.skipped_count > 0:
         return "ok, 0 sheets written, the sheet of the day already exists"
     return "no ranking"

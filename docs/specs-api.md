@@ -3,11 +3,12 @@
 L'API de données sert la veille et la bibliothèque de K-B, en lecture seule, sur la machine de
 Sabine. Elle est appelée par les programmes de Sabine (terminal, scripts), par des agents, et par
 l'API IA si celle-ci lit la base. Ce document fixe ce qu'elle sert, la règle de « quoi de neuf », l'accès par clé, les
-erreurs et les exigences de sécurité. Les décisions et leur pourquoi sont dans le
+erreurs et les exigences de sécurité. Depuis #559, elle sert aussi au site les tops GitHub, lus dans le
+conteneur `watch` du stockage d'échange, pas dans la base. Les décisions et leur pourquoi sont dans le
 [journal ADR](ADR/journal-decisions-projet.md) (entrées du 2026-10-14) ; la collecte, dans
 [specs-collecte.md](specs-collecte.md) ; la base, dans [stockage.md](stockage.md).
 
-**Version de la spec : 0.12.0**, la même que `info.version` de l'OpenAPI
+**Version de la spec : 0.13.0**, la même que `info.version` de l'OpenAPI
 (`docs/api/openapi-donnees.json`, que #184 écrit). Un changement de comportement visible par un client, comme
 l'ordre des résultats, change la version.
 
@@ -25,6 +26,7 @@ l'ordre des résultats, change la version.
 | 0.10.0 | une requête a 5 s dans la base ; au-delà, 503 `query_timeout` ; le détail d'une entrée Zotero sert 100 surlignages et 125 000 caractères de leur texte et commentaire au plus, et celui d'un clip 125 000 caractères de son texte, la coupe dite par `highlights_truncated` et `body_truncated` (#331) |
 | 0.11.0 | la base PostgreSQL que nomme `KB_DATABASE_URL` servie, et non plus le fichier SQLite ; sur elle, une base injoignable ou sans tables répond 500 `database_error`, et non 503 `database_missing` ; au-delà de 4 lectures en même temps, une requête attend 2 s puis répond 500 `database_error` ; la recherche `q` rend les mêmes résultats qu'en SQLite (#418) |
 | 0.12.0 | `GET /items` sert, pour chaque item, les identifiants de sa sorte (`arxiv_id`, `cve_id`, `exploited`, `ghsa_id`, `packages`, `repository_name`, `tag_name`, `edition`, « Identifiants par sorte »), dont 10 paquets d'une alerte au plus, la coupe dite par `packages_truncated`, et, pour la page, `total`, le nombre des items des filtres ; le détail d'une faille sert aussi `exploited`, celui d'une alerte `packages_truncated`, toujours faux (#550) |
+| 0.13.0 | `GET /tops/{top}` et `GET /tops/{top}/days` servis, lus dans `watch`, au client `WEB` seul : 403 `client_not_allowed` pour un autre client ; leurs erreurs de `watch` et du stockage nommées en 502, 503 et 504 (#559) |
 
 ## Règles communes
 
@@ -175,6 +177,9 @@ l'ordre des résultats, change la version.
 - **Pas de route de connexion**, pas de jeton à durée de vie : voir l'entrée « Clés par client »
   du journal.
 - **Journal** : il nomme le client, jamais la clé. Un 401 est journalisé sans nom ni valeur reçue.
+- **Une route, ses clients** : les routes des tops ne s'ouvrent qu'au client `WEB`, le site
+  (`KB_DATA_API_KEY_WEB` ; `DATA_API_CLIENT_BY_ROUTE`, `core/config.py`). Un autre client reçoit 403
+  `client_not_allowed`, après le 401 et le 429. Les items et les tendances restent ouverts à tout client (#559).
 
 ## Débit
 
@@ -188,6 +193,8 @@ fenêtre. Un appel refusé ne compte pas.
 | `GET /items` | 120 par minute | 21 par minute au plus dans les journaux d'essai du 26 au 29/10 |
 | `GET /items/{item_id}` | 1 200 par minute | 804 par minute au plus dans les mêmes journaux ; 4 demandes de fiches à 300 items |
 | `GET /trends` | 120 par minute | 3 comptes rendus à 32 lectures, sans mesure dans ces journaux |
+| `GET /tops/{top}` | 120 par minute | le site lit une page à la fois, comme la liste ; sans mesure (#559) |
+| `GET /tops/{top}/days` | 120 par minute | de même |
 
 - **Ordre** : le 401 d'abord, une requête sans clé valide ne compte donc pas. Un paramètre refusé
   (422) compte. `/health`, `/docs` et `/openapi.json` n'ont pas de limite.
@@ -210,8 +217,8 @@ la route qui répond à chacun.
 | P4 | Cette faille est-elle exploitée activement ? | `GET /items?kind=advisory` : `cve_id` et `exploited` de chaque alerte | — ; limite : `q` ne cherche pas dans `cve_id` |
 | P5 | Quels dépôts ont le vent en poupe ? | `GET /trends?window_end=…` | — |
 | P6 | Quels papiers récents sur un sujet ? | `GET /items?kind=paper&q=…&since=…` | — |
-| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_starred/` (#265) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
-| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; le top des plus forkés est collecté depuis #264 (`github_most_forked`, recherche triée par `forks`) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_forked/` (#265) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
+| P7 | Quels sont les dépôts les plus étoilés (top 10) ? | — | hors base (journal ADR, 2026-10-07) : `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_starred/` (#265), et son jumeau JSON, que `GET /tops/most_starred` sert au site seul (#559) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
+| P8 | Quels sont les dépôts les plus forkés (top 10) ? | — | hors API : les tops sont hors base (journal ADR, 2026-10-07) ; le top des plus forkés est collecté depuis #264 (`github_most_forked`, recherche triée par `forks`) ; `kb write-tops` en écrit une fiche par jour dans le coffre, `veille/tops/most_forked/` (#265), et son jumeau JSON, que `GET /tops/most_forked` sert au site seul (#559) ; la commande `kb top`, décidée le 2026-10-08, n'est pas codée |
 | P9 | Quoi de neuf dans l'écosystème LangChain ? | `GET /items?q=langchain`, puis `GET /items?q=langgraph` : un seul morceau de texte par `q` | — |
 
 Les chemins du brut (`raw_file_path`) ne sont servis par aucune route : un chemin local dévoile le
@@ -422,6 +429,119 @@ colonne (décision ouverte « Noms des colonnes de date », journal ADR).
 - Limite : les fenêtres glissent d'un jour et aucune route ne les liste ; sans `window_end`, la
   route rend la plus récente.
 
+## `GET /tops/{top}` et `GET /tops/{top}/days` : les tops GitHub, pour le site
+
+Les deux routes lisent le conteneur `watch` du stockage d'échange, pas la base. Elles lisent le jumeau JSON que
+`kb write-tops` écrit à côté de chaque fiche d'un top, `tops/<top>/<AAAA-MM-JJ>.json` (#559 ; sa forme dans
+[fiches-veille.md](fiches-veille.md), « Jumeau d'une fiche d'un top »). C'est la forme du POC ; la cible est un
+index en base (#531). Les deux routes sont réservées au client `WEB` (« Accès par clé »). `top` vaut
+`most_starred` ou `most_forked` ; une autre valeur répond 422.
+
+### `GET /tops/{top}`
+
+| Paramètre | Forme | Défaut | Hors bornes |
+|---|---|---|---|
+| `day` | date écrite `AAAA-MM-JJ` exactement | le jour le plus récent | 422, comme `window_end` de `GET /trends` |
+| `limit` | entier de 1 à 100 (`MAX_TOP_LIMIT`, la taille d'un relevé) | 10 (`TOP_LIMIT`) | 422 |
+
+```json
+{
+  "top": "most_starred",
+  "day": "2026-11-10",
+  "ranked_at": "2026-11-10T09:30:00Z",
+  "repositories": [
+    {
+      "rank": 1,
+      "repository_name": "owner/repo",
+      "url": "https://github.com/owner/repo",
+      "description": "Une description, sur une ligne.",
+      "description_truncated": false,
+      "count": 551156
+    }
+  ]
+}
+```
+
+- `repositories` : les `limit` premiers, par rang. `count` : les étoiles du dépôt dans `most_starred`, ses forks
+  dans `most_forked`, à `ranked_at`.
+- `ranked_at` : l'heure du relevé du top chez GitHub, en UTC, le `collected_at` de l'en-tête de sa fiche ; `day`
+  est son jour en UTC. Nommé à part du `collected_at` d'un item, que l'API ne sert jamais (« Pas dans la liste » ;
+  décision de time-knight du 2026-11-12, déléguée par Sabine).
+- `description` : à afficher comme du texte. Le jumeau la porte sur une ligne, sans caractère caché, jamais
+  échappée ; coupée à 1 000 caractères, ce que dit `description_truncated`. `url` vaut `https://github.com/` suivi
+  de `repository_name`, et rien d'autre.
+- Aucun jumeau du jour demandé, ou aucun jumeau : 404 `top_not_found`.
+
+### `GET /tops/{top}/days`
+
+| Paramètre | Forme | Défaut | Hors bornes |
+|---|---|---|---|
+| `limit` | entier de 1 à 100 (`MAX_DAYS_LIMIT`) | 30 (`DAYS_LIMIT`) | 422 |
+| `offset` | entier de 0 à 5 000 (`MAX_DAYS_OFFSET`) | 0 | 422 |
+
+```json
+{"days": ["2026-11-10", "2026-11-09"], "total": 2}
+```
+
+Les jours qui ont un jumeau, du plus récent au plus ancien, et leur nombre. Un dossier sans jumeau rend
+`{"days": [], "total": 0}`, comme une liste vide.
+
+### Lecture de `watch`
+
+- **Les noms** : seul `tops/<top>/<AAAA-MM-JJ>.json` est lu, le jour une date du calendrier. Tout autre nom du
+  dossier (la fiche `.md`, un temporaire) est laissé de côté, ni téléchargé ni journalisé. Un jour postérieur à
+  aujourd'hui (UTC) est laissé de côté.
+- **La liste** : par le préfixe `tops/<top>/`, 5 000 noms par page (`MAX_WATCH_FOLDER_NAMES`). Le marqueur d'une
+  page coupée court est suivi, sur deux pages au plus (`MAX_WATCH_FOLDER_PAGES`) : le service peut rendre moins de
+  noms que demandé, et même aucun, avec un marqueur ; seul un marqueur vide dit que la liste est finie
+  ([List Blobs](https://learn.microsoft.com/en-us/rest/api/storageservices/list-blobs), « Remarks », lu le
+  2026-11-12 ; décision de time-knight du 2026-11-12, déléguée par Sabine). Au-delà de 5 000 noms ou de deux
+  pages : 502 `watch_listing_too_long`.
+- **Le jumeau** : téléchargé tel que listé (par son etag, jamais décompressé), 4 000 000 octets au plus
+  (`MAX_WATCH_SHEET_BYTES`, refusé avant le téléchargement), puis relu par le schéma fermé du jumeau
+  (`TopProduction`, `items.py`). Il est refusé et jamais servi, 502 `watch_production_refused`, s'il est hors
+  schéma (un champ en plus, un rang manquant, une URL autre que celle de son nom, un caractère caché), s'il porte un
+  autre `top` que son dossier, un `ranked_at` d'un autre jour (UTC) que son nom, ou s'il est trop gros. Le journal
+  dit le top, le jour et le motif (le champ et le type d'erreur), jamais le texte.
+- **Un jumeau changé depuis la liste** (412, ou 404 `BlobNotFound`) : la liste est oubliée et la requête répond
+  503 `watch_production_changed` ; la suivante relit la liste.
+- **Le stockage** : par l'identité managée de l'API (`AZURE_CLIENT_ID`), connexion 5 s, lecture 10 s
+  (`DATA_API_STORAGE_*`), aucune nouvelle tentative du pipeline, ni pour le stockage ni pour l'identité. Son échec
+  rend son état : 504 `exchange_storage_timeout`, 503 `exchange_storage_not_found` (conteneur absent), 502 sinon.
+  Le jeton est demandé pendant la requête : tout échec de l'identité est 502 `exchange_storage_no_token`, comme
+  pour un job (`check_identity`), jamais un 500 ni l'état d'un stockage qui n'a pas été joint
+  (`test_a_token_refused_during_a_request_answers_502_no_token`). Ni la réponse ni le journal ne nomment un blob.
+- **Le cache**, en mémoire, sous un verrou jamais tenu pendant une requête au stockage : la liste de chaque dossier
+  60 s (`WATCH_CACHE_SECONDS`), et les 8 dernières productions lues, par nom et etag, refus compris
+  (`WATCH_CACHED_PRODUCTIONS`, 32 Mo au plus). Un redémarrage le vide.
+- **Sans réglage** : sans `KB_EXCHANGE_BLOB_URL` ou sans `AZURE_CLIENT_ID`, `kb serve-data` démarre et le dit au
+  journal, une ligne INFO qui nomme les variables absentes ; les tops répondent 503 `watch_unconfigured`, les items
+  restent servis. INFO dans tous les cas : l'URL seule est le réglage du Mac (`kb download-watch-sheets` par
+  `az login`, `.env.example`), et `AZURE_CLIENT_ID` seul l'identité de la base (`KB_DATABASE_AUTH=entra`). Une URL
+  ou un `AZURE_CLIENT_ID` mal formé : `kb serve-data` ne démarre pas (code 2).
+- **La taille** : un top de 100 dépôts aux descriptions les plus longues (1 000 caractères de 4 octets en UTF-8)
+  pèse moins de 0,5 Mo, sous le 1 Mo que le site lit (`MAX_WEB_DATA_API_BODY_BYTES` ;
+  `test_a_top_of_100_with_the_longest_descriptions_stays_under_the_bound_of_the_site`).
+
+**Limites** :
+
+- (a) Une requête froide (le jeton, la liste, le téléchargement, que le SDK retente en interne sur une coupure du
+  corps) peut attendre plus que les 30 s de lecture du site, qui montre alors son `data_api_timeout`. Pour réduire
+  le risque : une échéance d'ensemble, vérifiée entre les étapes (504) ; faisable en code, non planifiée.
+- (b) Des requêtes froides simultanées vont chacune au stockage, et chacune occupe un fil du pool que partagent les
+  items. Pour réduire le risque : une seule lecture à la fois par dossier ; faisable en code, non planifiée.
+- (c) Sur le Mac, sans `AZURE_CLIENT_ID`, les tops répondent 503 `watch_unconfigured`. Pour réduire le risque :
+  `AzureCliCredential` sans `AZURE_CLIENT_ID`, comme `kb download-watch-sheets` ; faisable, hors de #559.
+- (d) L'historique commence au premier jumeau : une fiche publiée avant n'est pas servie. Pour réduire le risque :
+  écrire une seule fois, depuis son Markdown, le jumeau des fiches passées ; faisable en code, et le lancer en ligne
+  serait un geste de tn-codeur. Non planifié.
+- (e) Une fiche écrite avant #559 depuis le premier relevé d'un jour, dont `kb write-tops` a ensuite supprimé ce
+  relevé, reçoit son jumeau du dernier relevé de ce jour, gardé dans `raw/` : le site et la fiche montrent alors
+  deux relevés du même jour (rangs, comptes, heure). Cela n'arrive qu'une fois, au premier passage après #559, pour
+  le dernier jour de chaque top, et seulement si ce jour a eu plusieurs collectes. Pour réduire le risque : lire
+  le `collected_at` de la fiche qui existe et n'écrire le jumeau que s'il est celui du relevé ; faisable en code,
+  non planifié.
+
 ## Erreurs
 
 Corps : `{"error": "<état>"}`. Aucune erreur ne renvoie de pile, de requête SQL, de chemin ni la
@@ -430,9 +550,11 @@ valeur reçue.
 | État | Statut | Quand |
 |---|---|---|
 | `invalid_api_key` | 401 | route de données appelée sans clé, ou avec une clé inconnue (même corps) |
+| `client_not_allowed` | 403 | route des tops appelée par un autre client que `WEB` |
 | `item_not_found` | 404 | `GET /items/{item_id}` : aucun item de cet identifiant |
 | `trend_window_not_found` | 404 | `GET /trends?window_end=…` : aucune tendance pour cette fenêtre |
 | `trend_window_not_found` | 404 | `GET /trends` sans `window_end` : aucune tendance en base |
+| `top_not_found` | 404 | `GET /tops/{top}` : aucun jumeau du jour demandé, ou aucun jumeau |
 | `route_not_found` | 404 | chemin inconnu |
 | `method_not_allowed` | 405 | méthode autre que GET |
 | `invalid_parameter` | 422 | paramètre hors bornes ou mal formé ; le corps ajoute `"parameters": [<noms>]`, sans les valeurs |
@@ -441,6 +563,13 @@ valeur reçue.
 | `database_missing` | 503 | le fichier SQLite de la base n'existe pas ; en PostgreSQL, une base injoignable ou sans tables répond 500 `database_error` |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
 | `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |
+| `watch_listing_too_long` | 502 | le dossier d'un top a plus de 5 000 noms, ou sa liste plus de deux pages |
+| `watch_production_refused` | 502 | le jumeau est refusé (« Lecture de `watch` ») ; journalisé sans son texte |
+| `exchange_storage_unavailable`, `exchange_storage_no_token`, `exchange_storage_unauthorized`, `exchange_storage_forbidden`, `exchange_storage_failed` | 502 | le stockage d'échange ou l'identité ont échoué ou refusé ; journalisé par l'état, le statut et le code du stockage, jamais le nom d'un blob |
+| `watch_unconfigured` | 503 | `kb serve-data` n'a pas les réglages du stockage d'échange |
+| `watch_production_changed` | 503 | le jumeau a changé depuis la liste gardée ; la requête suivante relit la liste |
+| `exchange_storage_not_found` | 503 | le conteneur `watch` est absent |
+| `exchange_storage_timeout` | 504 | le stockage n'a pas répondu dans ses délais |
 
 Exception : un `Host` hors des hôtes permis (`127.0.0.1` et `localhost` par défaut) reçoit le 400
 de `TrustedHostMiddleware`, qui répond avant l'app, en texte.
@@ -490,7 +619,8 @@ Selon le [registre des traitements](registre-traitements.md) :
   seulement, jamais dans la liste ni au journal ;
 - le login du propriétaire d'un dépôt, dans le nom du dépôt : servi par `/trends`
   (`repository_name`), dans le titre d'une release et dans son `repository_name` (liste et
-  détail) ;
+  détail), et par `GET /tops/{top}` au site seul (`repository_name`, `url`), avec la description du
+  dépôt, un texte libre qui peut nommer une personne ; ni l'un ni l'autre n'est journalisé (#559) ;
 - les titres et dates des entrées Zotero de Sabine : dans la liste ; ses surlignages et
   commentaires : au détail de leur entrée ;
 - les titres et dates des clips de Sabine : dans la liste ; le texte d'un clip, qui peut nommer
@@ -514,14 +644,14 @@ de « non tenue » et d'« écart voulu, justifié » sont ceux de l'API IA
 |---|---|---|
 | API1:2023 Broken Object Level Authorization | Une seule propriétaire, Sabine : tout client authentifié lit tous les items. Un identifiant inconnu rend 404, jamais une erreur qui dirait autre chose. `item.id`, séquentiel, est dans l'URL : la recommandation d'identifiants difficiles à deviner est écartée tant que l'API n'a qu'une propriétaire (journal ADR, 2026-10-15). | **Tenue.** `test_each_client_is_served_with_its_key`, `test_an_unknown_item_id_gives_404_item_not_found`, `test_an_unknown_window_gives_404` |
 | API2:2023 Broken Authentication | Une clé par client, générée en 256 bits (minimum contrôlé : 32 caractères) ; pas de route de connexion ; comparaison en temps constant ; 401 testé sur chaque route de données. | **Écart voulu, justifié** pour l'anti-force brute et le TLS mutuel (« Ce qui manque, et comment le tenir ») ; le reste tenu : `test_every_data_route_refuses_a_missing_and_a_wrong_key_with_the_same_body` (chaque route, lue dans l'app par le parcours de FastAPI, routes hors OpenAPI comprises), `test_only_the_public_routes_answer_without_a_key` (`/docs`, `/openapi.json` et `/health`, aucune autre), `test_an_app_without_key_refuses_every_data_route`, `test_a_removed_key_gives_401_and_the_other_clients_are_still_served`, `test_serve_exits_2_and_names_the_variable_without_its_value` ; le temps constant n'est pas mesuré par un test (`hmac.compare_digest`, `src/k_b/core/api_access.py`) |
-| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : dans la liste, les six champs et les identifiants de sa sorte, ni `raw_file_path`, ni `collected_at`, ni texte long, ni auteur ; au détail, les champs du tableau de sa sorte et rien d'autre. `total` ne compte que des items que la liste sert. | **Tenue.** `test_the_list_serves_only_the_fields_of_each_kind`, `test_each_kind_is_listed_with_its_identifiers`, `test_the_total_counts_the_items_of_the_filters_on_every_page`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` |
-| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). `total` : une requête `count(*)` de plus, sous les mêmes filtres et le même délai ; `limit` et `offset` gardent leurs bornes. Dans la liste, 10 paquets d'une alerte au plus (« Identifiants par sorte »). | **Écart voulu, justifié** pour les redémarrages, les descripteurs et les processus (« Ce qui manque, et comment le tenir », API4) ; le reste tenu. Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; sur PostgreSQL, `test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (les trois routes), `test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_idle`, `test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disables_it`, `test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs` (le délai appliqué est celui du journal), et l'attente d'une connexion, `test_the_pool_lends_no_connection_beyond_its_wait`, `test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; la borne des paquets de la liste, `test_the_list_serves_ten_packages_of_an_advisory_and_says_the_cut` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL ; sur PostgreSQL, le délai compte par instruction, la liste en fait deux et le détail jusqu'à trois (« Délai ») ; en SQLite, la page de la liste et son total se partagent les 5 s de la requête (« Délai ») ; la base lit tous les paquets d'une alerte avant la coupe de la liste ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps en SQLite ; en PostgreSQL, 4 lectures en même temps au plus, les connexions du pool, et une requête de plus attend 2 s puis répond 500 `database_error`. La dépense : une alerte de facturation, `budget-kb` (« Ce qui manque, et comment le tenir », API4) |
-| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon, `HEAD` compris ; aucune route d'administration. | **Tenue.** `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405` |
+| API3:2023 Broken Object Property Level Authorization | Réponses en liste blanche : dans la liste, les six champs et les identifiants de sa sorte, ni `raw_file_path`, ni `collected_at`, ni texte long, ni auteur ; au détail, les champs du tableau de sa sorte et rien d'autre. `total` ne compte que des items que la liste sert. | **Tenue.** `test_the_list_serves_only_the_fields_of_each_kind`, `test_each_kind_is_listed_with_its_identifiers`, `test_the_total_counts_the_items_of_the_filters_on_every_page`, `test_each_kind_has_its_detail` (corps entier, une sorte par cas), `test_no_detail_serves_a_raw_file_path_or_a_collection_date`, `test_trends_without_window_end_give_the_latest_window`, `test_no_error_body_holds_a_raw_file_path_or_a_path`, `test_no_route_documents_a_raw_file_path_or_a_collection_date` ; les tops : les champs de `TopSchema`, jamais le jumeau tel quel, `test_the_twin_kb_write_tops_writes_is_served_by_the_route` (corps entier) |
+| API4:2023 Unrestricted Resource Consumption | Bornes de `limit` (100), `offset` (10 000), `q` (200 caractères) et du nombre de `kind` (7) ; `/trends` rend 60 lignes au plus, sans pagination. Une limite de débit par client et par route (« Débit »). Un délai de 5 s par requête dans la base (« Délai ») ; au détail, 100 surlignages et 125 000 caractères de texte long au plus (« Bornes du détail »). `total` : une requête `count(*)` de plus, sous les mêmes filtres et le même délai ; `limit` et `offset` gardent leurs bornes. Dans la liste, 10 paquets d'une alerte au plus (« Identifiants par sorte »). | **Écart voulu, justifié** pour les redémarrages, les descripteurs et les processus (« Ce qui manque, et comment le tenir », API4) ; le reste tenu. Le délai : `test_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (la liste, le détail, les tendances : chaque route lit par la connexion qui porte le délai), `test_the_deadline_of_a_request_is_below_the_read_timeout_of_the_ai_api_client` ; sur PostgreSQL, `test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_without_detail` (les trois routes), `test_a_reading_past_its_deadline_is_stopped_and_its_connection_given_back_idle`, `test_a_deadline_below_one_millisecond_is_refused_as_statement_timeout_0_disables_it`, `test_serve_reads_the_postgresql_base_of_kb_database_url_with_the_deadline_it_logs` (le délai appliqué est celui du journal), et l'attente d'une connexion, `test_the_pool_lends_no_connection_beyond_its_wait`, `test_the_wait_for_a_connection_and_one_reading_hold_below_the_read_timeout_of_the_client` ; les bornes du détail : `test_the_highlights_beyond_their_number_are_cut_and_the_cut_is_said`, `test_the_highlights_beyond_their_length_are_cut_and_the_cut_is_said`, `test_the_text_of_a_clip_beyond_its_length_is_cut_and_the_cut_is_said` ; la borne des paquets de la liste, `test_the_list_serves_ten_packages_of_an_advisory_and_says_the_cut` ; les bornes et la taille de page, `test_a_parameter_out_of_bounds_gives_422_with_its_name_only`, `test_next_offset_stops_at_the_offset_bound`, `test_an_item_id_not_written_as_an_integer_gives_422`, `test_a_malformed_window_end_gives_422` ; le débit, pour les clients authentifiés, `test_beyond_its_limit_a_client_gets_429_with_its_wait_and_its_id`, `test_the_limit_is_per_client_and_per_route`, `test_every_data_route_has_its_limit` ; les 60 lignes d'une fenêtre sont bornées à la collecte (`gh_archive.py`), pas par l'API. Limites : les surlignages sont tous lus avant la coupe, bornés en temps par le délai, pas en mémoire ; une instruction seule de SQLite ne s'interrompt pas, et chaque contrôle du délai reprend le GIL ; sur PostgreSQL, le délai compte par instruction, la liste en fait deux et le détail jusqu'à trois (« Délai ») ; en SQLite, la page de la liste et son total se partagent les 5 s de la requête (« Délai ») ; la base lit tous les paquets d'une alerte avant la coupe de la liste ; le délai se multiplie par le débit (120 listes par minute, 5 s chacune au plus), sans plafond de requêtes en même temps en SQLite ; en PostgreSQL, 4 lectures en même temps au plus, les connexions du pool, et une requête de plus attend 2 s puis répond 500 `database_error`. La dépense : une alerte de facturation, `budget-kb` (« Ce qui manque, et comment le tenir », API4). Les tops (#559) : `limit` (100), `offset` (5 000), un jumeau de 4 000 000 octets au plus, une liste de 5 000 noms et de deux pages au plus, connexion 5 s et lecture 10 s, sans nouvelle tentative, un cache de 8 productions ; `test_a_parameter_out_of_its_bounds_is_refused`, `test_a_twin_larger_than_a_sheet_is_refused_without_its_download`, `test_a_folder_of_more_names_than_its_bound_is_refused`, `test_a_listing_of_more_pages_than_its_bound_is_refused`, `test_the_reader_of_kb_serve_data_waits_its_timeouts_and_sends_a_request_once`, `test_the_oldest_twin_read_is_forgotten_beyond_the_productions_kept`, `test_a_top_of_100_with_the_longest_descriptions_stays_under_the_bound_of_the_site`. Limites (a) et (b) des tops (« Lecture de `watch` ») |
+| API5:2023 Broken Function Level Authorization | GET seulement, 405 sinon, `HEAD` compris ; aucune route d'administration. Les routes des tops au client `WEB` seul, 403 pour un autre (#559). | **Tenue.** `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_the_routes_are_listed`, `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`, `test_health_refuses_another_method_with_405`, `test_another_client_is_refused_and_the_items_stay_open_to_it` |
 | API6:2023 Unrestricted Access to Sensitive Business Flows | Sans objet : l'API n'a aucun flux métier à protéger (ni achat, ni réservation, ni création de compte), seulement des lectures. | Sans objet, sans test |
 | API7:2023 Server Side Request Forgery | Sans objet : l'API ne va chercher aucune adresse fournie par un client. | Sans objet, sans test |
 | API8:2023 Security Misconfiguration | Hôte d'écoute réglable (`KB_DATA_API_HOST`, une adresse IPv4), `127.0.0.1` par défaut ; hôtes permis réglables (`KB_DATA_API_ALLOWED_HOSTS`), `127.0.0.1` et `localhost` par défaut ; `*`, une liste ou une entrée vide et un nom hors motif refusés au démarrage ; en conteneur, écoute sur `0.0.0.0` (`infra/main.bicep:202`), derrière l'entrée interne d'ACA ; pas de CORS ; erreurs sans pile ; `/health` ne dit que `ok` ; pas d'en-tête `Server` (`server_header=False` d'uvicorn), qui nommerait le logiciel (Opquast 2025, règle 213), essayé en local le 2026-11-11 ; en ligne, l'en-tête que l'entrée d'ACA peut poser n'est pas constaté ; chaque route n'accepte que `GET` : `HEAD`, que Starlette ajoute à toute route `GET`, est retiré, et toute autre méthode sur le chemin d'une route, `TRACE` et `CONNECT` compris, rend 405 ; `CONNECT hôte:port` et `OPTIONS *`, qui ne visent aucun chemin, rendent 404 `route_not_found` avec un hôte permis, 400 sinon (essayé sous uvicorn le 2026-11-05). `/docs` et `/openapi.json` servis en `sandbox` seulement (#393). Limites : Swagger UI (`/docs`) charge ses fichiers depuis un CDN ; pas de TLS sur la machine, où l'écoute sur `127.0.0.1` n'admet que ses programmes ; en ligne, le TLS de l'entrée interne d'ACA et du chiffrement entre apps (relu le 2026-11-08, #454). | **Non tenue**, comme dans l'API IA : le durcissement répétable, la revue périodique et l'évaluation automatisée, communs aux deux API (`infra/`, la CI), sont des mesures nécessaires non intégrées (#496 à #499). Ports publiés sur `127.0.0.1` : *s.o.* ; chaîne Envoy → uvicorn : écart voulu, justifié comme dans l'API IA ; le TLS est tenu en ligne (« Ce qui manque, et comment le tenir », API8). Ce qui est tenu : `test_serve_listens_on_127_0_0_1_8000_by_default_without_uvicorn_logging_config`, `test_serve_data_sends_no_server_header`, `test_serve_listens_on_the_host_and_port_of_the_environment`, `test_serve_exits_2_on_a_host_or_port_refused`, `test_serve_exits_2_and_names_the_allowed_hosts_refused`, `test_serve_allows_the_hosts_of_the_environment_and_no_other`, `test_a_host_other_than_localhost_gives_400`, `test_a_host_other_than_the_allowed_ones_gives_400_on_health`, `test_health_answers_ok_without_key`, `test_every_route_answers_get_only_and_405_to_any_other_method`, `test_no_route_answers_cors`, `test_an_unexpected_error_gives_500_internal_error_and_logs_its_type_only`, `test_a_database_error_gives_500_without_detail_and_logs_its_type` |
 | API9:2023 Improper Inventory Management | OpenAPI versionnée (`docs/api/openapi-donnees.json`), comparée en CI au schéma produit ; hors `sandbox`, la route ne la sert pas, le contrat reste dans le dépôt (#393). `/health`, hors OpenAPI comme `/docs`, est inventoriée par ce document (« Santé »). | **Écart voulu, justifié** pour la documentation en `sandbox` et les protections externes (« Ce qui manque, et comment le tenir ») ; le reste tenu : `test_the_versioned_openapi_is_the_one_the_app_produces`, `test_the_versioned_openapi_is_valid_and_declares_its_security_scheme`, `test_each_data_route_documents_its_errors` |
-| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero, pages gardées avec Web Clipper) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source. Côté client, une consigne, sans test |
+| API10:2023 Unsafe Consumption of APIs | Le contenu servi vient de tiers (arXiv, GitHub, CISA, TLDR, Zotero, pages gardées avec Web Clipper) : pour un client, et d'abord pour un agent, c'est une donnée, jamais une consigne. Côté K-B, la réponse d'une source est validée à la collecte (modèles de `items.py`, `CHECK` de `schema.sql`). | **Tenue côté K-B** : `tests/test_schema.py` (chaque type refusé par l'item et par la base) et les tests de chaque source ; un jumeau de `watch`, écrit par un job, est relu par son schéma fermé avant d'être servi (#559), `test_a_twin_out_of_its_schema_is_refused_and_its_text_never_logged`. Côté client, une consigne, sans test |
 
 ### Ce qui manque, et comment le tenir
 
