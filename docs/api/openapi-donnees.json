@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.13.0"
+    "version": "0.14.0"
   },
   "paths": {
     "/items": {
@@ -720,6 +720,315 @@
           }
         }
       }
+    },
+    "/digests/{subject}": {
+      "get": {
+        "tags": [
+          "digests"
+        ],
+        "summary": "Read Digest",
+        "description": "The digest of the subject of a day, the most recent when none is given.",
+        "operationId": "read_digest_digests__subject__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "vulnerabilities",
+                "llm_security",
+                "agent_frameworks",
+                "coding_assistants",
+                "models",
+                "ai_industry",
+                "cybersecurity",
+                "software_engineering",
+                "tech_industry"
+              ],
+              "type": "string",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchDigestSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidParameterSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "watch_listing_too_long, watch_production_refused, exchange_storage_unavailable, exchange_storage_no_token, exchange_storage_unauthorized, exchange_storage_forbidden, exchange_storage_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "watch_unconfigured, watch_production_changed, exchange_storage_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "exchange_storage_timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "digest_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/digests/{subject}/days": {
+      "get": {
+        "tags": [
+          "digests"
+        ],
+        "summary": "List Digest Days",
+        "description": "The days of the subject, the most recent first, and their total.",
+        "operationId": "list_digest_days_digests__subject__days_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "subject",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "vulnerabilities",
+                "llm_security",
+                "agent_frameworks",
+                "coding_assistants",
+                "models",
+                "ai_industry",
+                "cybersecurity",
+                "software_engineering",
+                "tech_industry"
+              ],
+              "type": "string",
+              "title": "Subject"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WatchDigestDaysSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidParameterSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "watch_listing_too_long, watch_production_refused, exchange_storage_unavailable, exchange_storage_no_token, exchange_storage_unauthorized, exchange_storage_forbidden, exchange_storage_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "watch_unconfigured, watch_production_changed, exchange_storage_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "exchange_storage_timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        }
+      }
     }
   },
   "components": {
@@ -902,6 +1211,14 @@
           "body_truncated"
         ],
         "title": "ClipDetailSchema"
+      },
+      "DigestOutcome": {
+        "type": "string",
+        "enum": [
+          "written",
+          "no_claim",
+          "no_item"
+        ]
       },
       "ErrorSchema": {
         "properties": {
@@ -2022,6 +2339,199 @@
           "revised_at"
         ],
         "title": "VulnerabilityDetailSchema"
+      },
+      "WatchDigestClaimSchema": {
+        "properties": {
+          "text": {
+            "type": "string",
+            "title": "Text",
+            "description": "Written by the model. Shown as text: on one line, without a hidden character, never escaped."
+          },
+          "item_ids": {
+            "items": {
+              "type": "integer"
+            },
+            "type": "array",
+            "title": "Item Ids",
+            "description": "The item_id of its sources, among sources."
+          }
+        },
+        "type": "object",
+        "required": [
+          "text",
+          "item_ids"
+        ],
+        "title": "WatchDigestClaimSchema"
+      },
+      "WatchDigestDaysSchema": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "The days of the subject, every page counted."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "total"
+        ],
+        "title": "WatchDigestDaysSchema"
+      },
+      "WatchDigestSchema": {
+        "properties": {
+          "subject": {
+            "type": "string",
+            "enum": [
+              "vulnerabilities",
+              "llm_security",
+              "agent_frameworks",
+              "coding_assistants",
+              "models",
+              "ai_industry",
+              "cybersecurity",
+              "software_engineering",
+              "tech_industry"
+            ],
+            "title": "Subject"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day",
+            "description": "The day of the twin, the day of until in UTC."
+          },
+          "since": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Since",
+            "description": "The start of the window of the subject: a date of the sources, never of their arrival in K-B."
+          },
+          "until": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Until",
+            "description": "The end of the window of the subject."
+          },
+          "model": {
+            "type": "string",
+            "title": "Model",
+            "description": "The model that wrote the claims."
+          },
+          "items_capped": {
+            "type": "boolean",
+            "title": "Items Capped",
+            "description": "The reading of the items was cut: the digest is not whole."
+          },
+          "capped_kind": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "paper",
+                  "vulnerability",
+                  "newsletter_article",
+                  "release",
+                  "advisory",
+                  "zotero_entry",
+                  "clip"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Capped Kind",
+            "description": "The kind cut by the cap of the reading; null when nothing is cut."
+          },
+          "covered_after": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Covered After",
+            "description": "The date of the first item of the kind cut left out, excluded: each item of that kind strictly more recent was read; null when nothing is cut."
+          },
+          "outcome": {
+            "$ref": "#/components/schemas/DigestOutcome",
+            "description": "written: its claims; no_claim: no claim kept; no_item: no item fell in the subject. Without a claim, no source."
+          },
+          "claims": {
+            "items": {
+              "$ref": "#/components/schemas/WatchDigestClaimSchema"
+            },
+            "type": "array",
+            "title": "Claims"
+          },
+          "sources": {
+            "items": {
+              "$ref": "#/components/schemas/WatchDigestSourceSchema"
+            },
+            "type": "array",
+            "title": "Sources"
+          }
+        },
+        "type": "object",
+        "required": [
+          "subject",
+          "day",
+          "since",
+          "until",
+          "model",
+          "items_capped",
+          "capped_kind",
+          "covered_after",
+          "outcome",
+          "claims",
+          "sources"
+        ],
+        "title": "WatchDigestSchema"
+      },
+      "WatchDigestSourceSchema": {
+        "properties": {
+          "item_id": {
+            "type": "integer",
+            "title": "Item Id",
+            "description": "The item of the base: a base made again numbers its items anew, so lead to it only when its title is the one of the source."
+          },
+          "title": {
+            "type": "string",
+            "title": "Title",
+            "description": "Shown as text: on one line, without a hidden character, never escaped."
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url",
+            "description": "An http or https URL the sheet writes as a link; null when it writes none."
+          }
+        },
+        "type": "object",
+        "required": [
+          "item_id",
+          "title",
+          "url"
+        ],
+        "title": "WatchDigestSourceSchema"
       },
       "ZoteroEntryDetailSchema": {
         "properties": {

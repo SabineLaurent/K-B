@@ -19,11 +19,12 @@ from k_b.core.quoting import locate_first_error, quote_value
 from k_b.etl.raw_files import read_collection_time
 from k_b.etl.raw_store import RawStore
 from k_b.etl.tops import Top, TopEntry
-from k_b.items import MAX_TOP_DESCRIPTION_CHARS, TopProduction, is_hidden_character
+from k_b.items import MAX_TOP_DESCRIPTION_CHARS, TopProduction
 from k_b.post.vault_files import (
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
+    make_visible,
     neutralize_text,
     refuse_linked_folders,
     write_new_sheet,
@@ -231,16 +232,6 @@ def build_twin_repository(entry: TopEntry) -> dict[str, object]:
         and len(description) > MAX_TOP_DESCRIPTION_CHARS,
         "count": entry.count,
     }
-
-
-def make_visible(text: str) -> str:
-    """The text on one line, each character a reader would not see a space
-    (is_hidden_character)."""
-    return " ".join(
-        "".join(
-            " " if is_hidden_character(character) else character for character in text
-        ).split()
-    )
 
 
 def render_sheet(top: Top, ranking: Ranking) -> str:
