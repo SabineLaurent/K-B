@@ -7112,6 +7112,56 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   27/10), et le SDK ajoute une limite de 2 000 jeux d'attributs par instrument, loin des listes fermées de K-B.
   Limite assumée : la borne de `soupsieve` reste dans `uv.lock` seul. — PR de #606
 
+## 2026-11-14
+
+### Site : les tendances (#596)
+
+Plan validé par Sabine le 2026-11-11 (partie « PR 2 » du plan de #564) ; deux décisions de Sabine du 2026-11-14 ;
+points de revue tranchés par time-knight, sous la délégation de Sabine du 15/10.
+
+- **`/tendances` montre une fenêtre de 3 jours de GH Archive par `GET /trends` : la plus récente, ou celle qui se
+  termine le jour du formulaire. Le site calcule le rang (l'ordre de l'API, à partir de 1), le premier jour
+  (`window_end` − 2 jours) et le lien vers GitHub ; il n'écrit pas « jusqu'à 60 dépôts ».** Pourquoi : la mission du
+  11/11, qui relève ces écarts entre la maquette et l'API. L'API, tenue par une autre piste, reste inchangée, et
+  `web/trends.py` calcule sans entrée ni sortie, donc testable seul. Le jour est lu par `WrittenDay`, la règle des
+  routes de l'API, désormais commune au fil : `2026-02-30` n'est plus réaffiché dans le champ du fil. — PR de #596
+- **Le tableau a 560 px de large au moins (`35rem`), comme la maquette, et défile dans son cadre sur un écran plus
+  étroit. Le cadre prend le focus (`tabindex="0"`) : c'est une région nommée par la légende. Il est le conteneur de
+  la légende (`container-type: inline-size`), qui garde sa largeur (`max-inline-size: 100cqi`).** Décision de Sabine
+  du 2026-11-14 pour les 560 px ; le cadre (C7 de #564) et la légende, tris de time-knight. Pourquoi : la maquette
+  (`min-width: 560px`) ; WCAG 1.4.10 exempte un tableau de données ; WCAG 2.1.1 demande le clavier, sans script. Sans
+  borne, la légende, qui fait partie du tableau, sortirait de l'écran. `cqi` est retenu parce que la fonction
+  « Container queries » est Baseline « widely available » depuis le 2025-08-14 (web-features explorer ; unités dans
+  Chrome et Edge 105, Firefox 110, Safari 16, caniuse, lus le 14/11). Options écartées : la largeur naturelle du
+  tableau, qui ne défilait qu'avec un nom aux longueurs maximales de GitHub mais tassait les colonnes sur un
+  téléphone, loin de la maquette ; pour la légende, `calc(100vw - …)`, qui dépend des marges de la page et compte la
+  barre de défilement de la page. Limite assumée : sous 600 px environ, les colonnes des comptes ne se voient qu'en
+  faisant défiler le cadre (à 390 px, le cadre en montre 356 px sur 560), et une barre de défilement superposée
+  (macOS, iOS) n'apparaît qu'au défilement. Pour réduire le risque : une ombre au bord du cadre quand le tableau
+  continue, en CSS seul (`background-attachment: local`, technique de Lea Verou, 2012 ; le cadre a un fond uni,
+  condition de la technique, CSS-Tricks), faisable avec nos droits, non fait. Un auteur la dit peu fiable sur
+  mobile ; support des navigateurs non vérifié ce jour. — PR de #596
+- **L'annonce « (en anglais, site externe, nouvel onglet) » reste visible dans chaque lien du tableau, comme
+  ailleurs sur le site.** Décision de Sabine du 2026-11-14, sur l'option (a) que recommandait time-knight après la
+  relecture d'accessibilité. Confirme la décision de #587 (2026-11-11). Option écartée (b) : la flèche seule visible
+  dans le tableau, l'annonce dans le nom accessible et expliquée sous le tableau. Les lignes seraient plus basses,
+  mais une personne voyante ne lirait pas l'annonce au moment du clic (G201), et le tableau ferait autrement que le
+  reste du site (Opquast 138). Limite assumée : à 390 px, l'annonce passe sur deux lignes et rend chaque ligne plus
+  haute. À l'impression, la flèche et l'annonce sont retirées du seul tableau. — PR de #596
+- **Le dépôt est l'en-tête de sa ligne (`th scope="row"`), en graisse normale ; les colonnes portent les mots de la
+  maquette, « Étoiles gagnées » et « *Forks* gagnés ».** Tris de time-knight (relecture d'accessibilité). Pourquoi :
+  RGAA 5.7, un lecteur d'écran annonce le dépôt avec chacun de ses comptes ; « gagnées » reste dit avec son
+  échantillon, dans la légende et l'introduction (GH Archive ne voit qu'environ 1 % des étoiles). Option écartée :
+  le rang en en-tête de ligne, un numéro qui ne nomme pas la ligne. — PR de #596
+- **Un nom que `is_repository_name` refuse (un segment `.` ou `..`, ou `..` en son sein) garde sa ligne et son
+  rang, écrit sans lien ; une fenêtre d'un autre jour que celui demandé est hors contrat (page 500).** Tris de
+  time-knight sur les deux `/code-review`. Le premier tri renvoyait toute la fenêtre en page 500 pour un tel nom ;
+  le second l'a révisé : un seul nom ne doit ni cacher 59 lignes justes ni fausser le rang des autres. Un navigateur
+  résoudrait `https://github.com/owner/..` vers une autre page de GitHub, d'où l'absence de lien. Une fenêtre d'un
+  autre jour, affichée, ferait dire à la page une fenêtre et en montrer une autre. Limite assumée : un tel nom peut
+  entrer en base. Pour réduire le risque : la même règle à l'import des tendances (#615, faisable avec nos droits).
+  — PR de #596
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
