@@ -114,6 +114,23 @@ def test_a_sheet_of_a_folder_unknown_is_left_aside_without_failing():
     assert not result.has_failed
 
 
+def test_the_twin_of_a_sheet_is_left_aside_without_failing():
+    """The data API reads the twin of a sheet in watch (#559); the Mac never copies it."""
+    container = FakeContainer(
+        "watch",
+        {
+            SHEET_NAME: FakeBlob(b"# models", PUBLISHED_ON),
+            "tops/most_starred/2026-11-10.json": FakeBlob(b"{}", PUBLISHED_ON),
+        },
+    )
+
+    sheets, result = list_sheets_of(container)
+
+    assert [sheet.blob.name for sheet in sheets] == [SHEET_NAME]
+    assert result.left_aside == {"sheet_twin": 1}
+    assert not result.has_failed
+
+
 def test_a_sheet_larger_than_the_bound_is_refused_with_its_size(monkeypatch, caplog):
     monkeypatch.setattr(watch_download, "MAX_WATCH_SHEET_BYTES", 8)
     container = FakeContainer(

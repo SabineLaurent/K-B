@@ -321,6 +321,18 @@ def test_a_blob_removed_or_changed_since_the_listing_is_left_to_the_next_run(
     assert not (clippings_dir / CLIP_NAME).exists()
 
 
+def test_a_container_removed_since_the_listing_stops_the_mirror(clippings_dir):
+    container = FakeContainer("clippings", {CLIP_NAME: FakeBlob(b"# clip", SENT_ON)})
+    container.status_of_next_get[CLIP_NAME] = (404, "ContainerNotFound")
+
+    result = mirror(container, clippings_dir)
+
+    assert result.storage_error is not None
+    assert result.storage_error.state == "exchange_storage_not_found"
+    assert result.left_to_next_run == 0
+    assert result.has_failed
+
+
 def test_a_storage_error_stops_the_mirror(clippings_dir):
     container = FakeContainer(
         "clippings",

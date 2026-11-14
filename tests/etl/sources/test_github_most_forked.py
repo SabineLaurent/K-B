@@ -13,6 +13,7 @@ from k_b.etl.sources.github.most_forked import (
     read_most_forked,
 )
 from k_b.etl.tops import TopEntry
+from k_b.items import MAX_INT64, TREND_REPOSITORY_NAME_MAX_LENGTH
 
 FIXTURES_DIR = Path(__file__).parent.parent.parent / "fixtures"
 # Ranks 4 to 6 of the collection of 2026-10-19: the first three are owned by persons (minimisation).
@@ -160,11 +161,26 @@ def test_a_response_without_a_list_of_items_is_refused():
         {"description": 42},
         {"forks_count": "many"},
         {"forks_count": True},
+        # What the twin of the sheet refuses (TopProduction), the collection refuses before.
+        {"forks_count": -1},
+        {"forks_count": MAX_INT64 + 1},
+        {"full_name": "owner/" + "a" * (TREND_REPOSITORY_NAME_MAX_LENGTH - 5)},
     ],
 )
 def test_an_invalid_repository_is_refused_with_its_rank(changes):
     with pytest.raises(PageRefusedError, match="repository 1"):
         read_most_forked(response_with(**changes), expected_size=3)
+
+
+@pytest.mark.parametrize(
+    ("count", "crossed"),
+    [(-1, "below 0"), (MAX_INT64 + 1, f"above {MAX_INT64}")],
+)
+def test_a_count_out_of_its_bounds_names_the_bound_it_crossed(count, crossed):
+    with pytest.raises(PageRefusedError) as refusal:
+        read_most_forked(response_with(forks_count=count), expected_size=3)
+
+    assert str(refusal.value) == f"repository 1: forks_count {crossed}"
 
 
 def test_a_repository_that_is_not_an_object_is_refused_with_its_rank():

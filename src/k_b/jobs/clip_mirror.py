@@ -140,7 +140,12 @@ def mirror_blob(
         return
     try:
         copy_when_newer(
-            container_client, clippings_dir / blob.name, blob, where, result
+            container_client,
+            clippings_dir / blob.name,
+            blob,
+            rules.max_bytes,
+            where,
+            result,
         )
     except OSError as error:
         name = name_os_error(error)
@@ -211,6 +216,7 @@ def copy_when_newer(
     container_client: ContainerClient,
     path: Path,
     blob: BlobProperties,
+    max_bytes: int,
     where: str,
     result: MirrorResult,
 ) -> None:
@@ -234,8 +240,8 @@ def copy_when_newer(
     ):
         result.unchanged += 1
         return
-    content = download_listed_version(container_client, blob)
-    if content is None or len(content) != blob.size:
+    content = download_listed_version(container_client, blob, max_bytes)
+    if content is None:
         result.left_to_next_run += 1
         return
     write_file_atomically(path, content)

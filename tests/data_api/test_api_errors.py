@@ -256,7 +256,11 @@ def test_every_route_answers_get_only_and_405_to_any_other_method(
     """HEAD too, which Starlette adds to a GET route (OWASP API8:2023, verbs)."""
     answers = {
         (route.path, method): read_status_allow_and_body(
-            client.request(method, route.path.format(item_id=1), headers=authorization)
+            client.request(
+                method,
+                route.path.format(item_id=1, top="most_starred"),
+                headers=authorization,
+            )
         )
         for route in iter_route_contexts(client.app.routes)
         for method in HTTP_METHODS

@@ -2261,6 +2261,44 @@ tronqué et échappé (règle 3 de `conventions.md`).
 - **Le rendu dans Obsidian**, un logiciel fermé, n'est prouvé que par la recette de #209 (PR) : un
   autre lecteur de Markdown, ou un autre module d'Obsidian (Templater…), n'est pas couvert.
 
+### Jumeau d'une fiche d'un top
+
+Depuis #559, `kb write-tops` écrit à côté de chaque fiche d'un top son jumeau JSON,
+`veille/tops/<top>/AAAA-MM-JJ.json`, que l'API de données lit dans `watch` pour le site
+([specs-api.md](specs-api.md), « `GET /tops/{top}` »). C'est la forme du POC : le site ne lit que l'API de
+données et ne rend aucun Markdown (décision de Sabine du 2026-11-11) ; la cible est un index en base (#531).
+
+```json
+{
+  "top": "most_forked",
+  "ranked_at": "2026-10-05T09:30:00Z",
+  "repositories": [
+    {
+      "rank": 1,
+      "repository_name": "firstcontributions/first-contributions",
+      "url": "https://github.com/firstcontributions/first-contributions",
+      "description": "🚀✨ Help beginners to contribute to open source projects",
+      "description_truncated": false,
+      "count": 111263
+    }
+  ]
+}
+```
+
+- **Un schéma pour l'écrivain et le lecteur** : `TopProduction` (`items.py`), fermé (aucun champ en plus) et
+  strict ; 100 dépôts au plus, rangs de 1 à n dans l'ordre, `url` égale à `https://github.com/` suivi de
+  `repository_name`. `kb write-tops` valide le jumeau avant de l'écrire ; l'API le revalide avant de le servir.
+- **`ranked_at`** : l'heure du relevé, celle du `collected_at` de l'en-tête de la fiche. Nommé à part du
+  `collected_at` d'un item, que l'API de données ne sert jamais (décision de time-knight du 2026-11-12, déléguée
+  par Sabine).
+- **`description`** : sur une ligne, chaque caractère caché (`Cc`, `Cf` sauf U+200D, `Cs`) remplacé par une
+  espace, jamais échappée pour Markdown : le site l'affiche comme du texte. Coupée à 1 000 caractères
+  (`MAX_TOP_DESCRIPTION_CHARS`), ce que dit `description_truncated`. `count` : les étoiles dans `most_starred`, les
+  forks dans `most_forked`.
+- **Écrit une fois**, comme la fiche (`write_new_sheet`) ; écrit même à côté d'une fiche qui existe déjà : le dernier
+  relevé encore dans le brut gagne son jumeau au premier passage. Le relevé n'est supprimé que si sa fiche et son
+  jumeau sont là. `kb download-watch-sheets` le laisse de côté (`sheet_twin`), sans échec.
+
 ## Sources
 
 Consultées le 2026-10-15, sauf mention.
