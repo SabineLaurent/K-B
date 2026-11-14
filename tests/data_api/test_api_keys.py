@@ -30,6 +30,8 @@ def list_data_routes(items_database, api_keys):
 
 def test_the_routes_are_listed(items_database, api_keys):
     assert sorted(list_routes(items_database, api_keys)) == [
+        "/digests/{subject}",
+        "/digests/{subject}/days",
         "/docs",
         "/health",
         "/items",

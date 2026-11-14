@@ -2031,9 +2031,9 @@ des tops).
    `KB_AI_API_KEY_KB_DIGEST`, sans défaut, aux règles des clés (section « Accès »). Un refus nomme
    la variable, jamais la clé ni l'URL.
 2. **Avant la demande**, pour chaque sujet de la liste : ni `veille/` ni `veille/<sujet>/` n'est un
-   lien symbolique, et la fiche du jour UTC n'existe pas. Sinon : code 2 (`vault_link_refused`,
-   `sheet_not_a_file`, `sheet_exists`), aucune demande : aucun item ne part au modèle pour une
-   fiche qui ne serait pas écrite. Rien n'est créé par ce contrôle.
+   lien symbolique, et ni la fiche du jour UTC ni son jumeau (#560) n'existe. Sinon : code 2
+   (`vault_link_refused`, `sheet_not_a_file`, `sheet_exists`, `twin_exists`), aucune demande : aucun item ne
+   part au modèle pour une fiche qui ne serait pas écrite. Rien n'est créé par ce contrôle.
    **Le début de chaque sujet** (#565) : le `until` de sa dernière fiche, celle du plus grand jour
    parmi les noms `AAAA-MM-JJ.md` de `veille/<sujet>/` ; un autre fichier du dossier (une note de
    Sabine, un temporaire caché) n'est pas une fiche. Seul l'en-tête est lu : 4 096 octets au plus,
@@ -2092,6 +2092,11 @@ des tops).
    et la fiche sont recontrôlés juste avant l'écriture, par un temporaire caché au nom fixe, créé
    seulement s'il n'existe pas, puis renommé (règle 2 de `conventions.md`, #295). Une limite : voir
    « Limites », ci-dessous.
+   **Le jumeau de chaque fiche** (#560) est construit d'abord, puis relu par son schéma fermé : refusé, ni fiche
+   ni jumeau, le sujet échoue (`twin_refused`, journalisé par la place et le type d'erreur, jamais le texte) et
+   garde son début. Sinon la fiche est écrite, puis le jumeau, `veille/<sujet>/AAAA-MM-JJ.json`, de la même façon,
+   une fois. Un jumeau non écrit fait échouer le sujet (`twin not written`), sa fiche restée écrite
+   (« Jumeau d'une fiche de veille », ci-dessous).
 
 **La fiche** : du Markdown déterministe (la même réponse donne les mêmes octets), ses clés en
 anglais, son texte en français (règle de Sabine du 2026-10-21) :
@@ -2321,6 +2326,61 @@ données et ne rend aucun Markdown (décision de Sabine du 2026-11-11) ; la cibl
 - **Écrit une fois**, comme la fiche (`write_new_sheet`) ; écrit même à côté d'une fiche qui existe déjà : le dernier
   relevé encore dans le brut gagne son jumeau au premier passage. Le relevé n'est supprimé que si sa fiche et son
   jumeau sont là. `kb download-watch-sheets` le laisse de côté (`sheet_twin`), sans échec.
+
+### Jumeau d'une fiche de veille
+
+Depuis #560, `kb digest` écrit à côté de chaque fiche d'un sujet son jumeau JSON, `veille/<sujet>/AAAA-MM-JJ.json`,
+que l'API de données lit dans `watch` pour le site ([specs-api.md](specs-api.md), « `GET /digests/{subject}` »).
+C'est la forme du jumeau d'un top, pour la même raison (décision de Sabine du 2026-11-11) ; la cible reste un index
+en base (#531).
+
+```json
+{
+  "subject": "agent_frameworks",
+  "since": "2026-10-18T16:30:00Z",
+  "until": "2026-10-21T16:30:00Z",
+  "model": "gpt-6-luna",
+  "items_capped": false,
+  "capped_kind": null,
+  "covered_after": null,
+  "outcome": "written",
+  "claims": [{"text": "Claude Code publie la version v2.1.287.", "item_ids": [6]}],
+  "sources": [
+    {
+      "item_id": 6,
+      "title": "Claude Code 2.1.287",
+      "url": "https://github.com/anthropics/claude-code/releases/tag/v2.1.287"
+    }
+  ]
+}
+```
+
+- **Un schéma pour l'écrivain et le lecteur** : `DigestProduction` (`items.py`), fermé et strict. `kb digest` le
+  construit de la réponse déjà relue (étape 4) avant la fiche ; l'API le revalide avant de le servir.
+- **Ce qu'il dit de la fiche** : `since`, `until`, `model`, `items_capped`, `capped_kind` et `covered_after` de son
+  en-tête, sans `generated` (le `until` de la réponse) ni `request_id` (OWASP API3) ; `outcome`, ses trois textes
+  (`written`, `no_claim` : « Aucune affirmation retenue. », `no_item` : « Aucun item classé dans ce sujet. ») ;
+  sans affirmation, aucune source, comme la fiche. Chaque source garde son `item_id`, que la fiche n'écrit pas,
+  pour que le site mène à l'item du fil.
+- **Bornes** (`core/config.py`, partagées avec la sortie du modèle) : 12 affirmations (`MAX_CLAIMS`), de 1 à 400
+  caractères (`TEXT_CHARS`), de 1 à 5 sources chacune (`ITEMS_PER_CLAIM`) ; 60 sources (`MAX_ITEMS_PER_DIGEST`) ;
+  un titre de 1 024 caractères au plus, au-dessus du plus long que la base permet, et une URL de 2 000 caractères
+  (`items.py`). `subject` a la forme d'un dossier (`[a-z_]{1,64}`), `model` le motif `MODEL_NAME`, `capped_kind`
+  une sorte d'item.
+- **Cohérences** : `items_capped` vrai exactement quand `capped_kind` et `covered_after` sont donnés ; `since` au
+  plus `until` ; `written` exactement quand une affirmation est là ; chaque source listée une fois et citée,
+  chaque affirmation cite ses sources une fois, parmi les sources listées.
+- **Les textes** : sur une ligne, chaque caractère caché (`Cc`, `Cf` sauf U+200D, `Cs`) remplacé par une espace,
+  jamais échappés pour Markdown : le site les affiche comme du texte. `url` : `null` exactement quand la fiche
+  écrit « (sans URL) », la règle des URL de la fiche (« Une URL », ci-dessus) étant la même.
+- **Écrit une fois**, comme la fiche, après elle. `kb download-watch-sheets` le laisse de côté (`sheet_twin`). Une
+  journée de `watch` compte 23 noms, fiches et jumeaux des 9 sujets, des 2 tops et du compte rendu des tendances :
+  `MAX_WATCH_LISTED_BLOBS` (20 000) en tient environ 2 ans et 4 mois ; au-delà, la liste s'arrête et le
+  téléchargement échoue. Pour réduire le risque : recompter les noms d'une journée dans le commentaire de
+  `MAX_WATCH_LISTED_BLOBS` (`core/config.py`) à chaque production nouvelle, et monter la borne quand l'horizon
+  approche ; faisable en code (décision de time-knight du 2026-11-14, déléguée par Sabine).
+- **Limites** : celles de la route ([specs-api.md](specs-api.md), « `GET /digests/{subject}` », (a) à (g)) ; un
+  jumeau non écrit après sa fiche perd ce jour sur le site (limite (c)).
 
 ## Sources
 

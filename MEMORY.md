@@ -104,7 +104,10 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `GET /tops/{top}/days`, réservées au client `WEB` (`DATA_API_CLIENT_BY_ROUTE`, `check_client_allowed` sur leur
   routeur). Elles lisent le jumeau JSON que `kb write-tops` écrit à côté de chaque fiche d'un top, `TopProduction`
   (`items.py`). Son heure est `ranked_at`, jamais `collected_at`, que l'API ne sert pas
-  (`test_no_route_documents_a_raw_file_path_or_a_collection_date`).
+  (`test_no_route_documents_a_raw_file_path_or_a_collection_date`). Depuis #560, de même `GET /digests/{subject}` et
+  `GET /digests/{subject}/days`, du jumeau que `kb digest` écrit après chaque fiche, `DigestProduction` : un seul
+  lecteur, une `TwinKind` par sorte (`TOP_TWINS`, `DIGEST_TWINS`, chacune son cache). Un sujet nouveau de
+  `DIGEST_SUBJECTS` s'écrit aussi dans `DigestSubjectName` (`data_api/schemas/watch_digest_schema.py`, tenu par un test).
 - `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
   `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve-data` et `kb serve-ai` doivent tourner (journal ADR,
   2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).

@@ -15,16 +15,20 @@ from post.test_ai_api_client import (
     make_response,
     to_body,
 )
+from pydantic import ValidationError
 
 from k_b.ai_api.schemas.digest_schema import ClaimSchema, WindowSchema
+from k_b.items import DigestProduction
 from k_b.jobs.watch_download import find_sheet_text_refusal
 from k_b.post import digest_sheets
 from k_b.post.ai_api_client import DigestsResponse
 from k_b.post.digest_sheets import (
+    build_digest_twin,
     find_previous_until,
     refuse_written_sheets,
     render_digest_sheet,
     write_digest_sheet,
+    write_digest_twin,
     write_empty_sheet,
 )
 from k_b.post.vault_files import VaultEntryRefusedError, neutralize_digest_text
@@ -35,6 +39,52 @@ NOW = datetime(2026, 11, 12, tzinfo=UTC)
 SUBJECT_NAMES = ("security_alerts", "agent_tools", "research")
 # A bidirectional control, written by its code: never as itself in a source file.
 RIGHT_TO_LEFT_OVERRIDE = chr(0x202E)
+
+
+# The URLs a sheet writes "(sans URL)" for, and those it writes as an autolink: the twin
+# serves null for the first, the URL for the others.
+URLS_OUT_OF_THE_RULE = [
+    None,
+    "javascript:alert(1)",
+    "ftp://example.invalid/x",
+    "https://example.invalid/a b",
+    "https://example.invalid/a>b",
+    "https://example.invalid/a<b",
+    "https://example.invalid/a\\b",
+    "https://example.invalid/a`b`",
+    "https://example.invalid/a|b",
+    "https://example.invalid/%%comment",
+    "https://example.invalid/[[note]]",
+    "https://example.invalid/$x$",
+    # A character reference, or a percent-encoding of a control or format character,
+    # would show U+202E in the link text (second code review, finding 2): CWE-451.
+    "https://docs.python.org&#x202E;@evil.example/",
+    "https://example.invalid/&#8238;a",
+    "https://example.invalid/&rlm;a",
+    "https://example.invalid/%E2%80%AEgpj.exe",
+    "https://example.invalid/%E2%80%8Fa",
+    "https://example.invalid/%00a",
+    "https://example.invalid/%0Aa",
+    "https://example.invalid/%ED%A0%80a",
+    "https://example.invalid/%FFa",
+    # Dataview would take (a::b) in the rendered line for a field (security review).
+    "https://example.invalid/(a::b)",
+    "https://evil.example.invalid/a(status::done)",
+    # kb download-watch-sheets refuses ~~~ anywhere in a line (second code review of #424,
+    # finding 2).
+    "https://example.invalid/a~~~b",
+    "https://exämple.invalid/",
+    f"https://example.invalid/{RIGHT_TO_LEFT_OVERRIDE}a",
+    "HTTPS://example.invalid/",
+]
+URLS_OF_THE_RULE = [
+    "https://github.com/advisories/GHSA-2c8m-cx5r-f9x8",
+    "http://example.invalid/a?b=c&d=%20e;f=(g)#h",
+    "https://example.invalid/~user/@y/!'*+,=",
+    "https://example.invalid/search?a=1&b=2",
+    "https://example.invalid/a%20b/%C3%A9t%C3%A9",
+    "https://fr.wikipedia.org/wiki/Python_(langage)",
+]
 
 
 def read(response):
@@ -520,43 +570,7 @@ def test_a_character_reference_in_a_title_and_a_claim_is_written_as_text():
     )
 
 
-@pytest.mark.parametrize(
-    "url",
-    [
-        None,
-        "javascript:alert(1)",
-        "ftp://example.invalid/x",
-        "https://example.invalid/a b",
-        "https://example.invalid/a>b",
-        "https://example.invalid/a<b",
-        "https://example.invalid/a\\b",
-        "https://example.invalid/a`b`",
-        "https://example.invalid/a|b",
-        "https://example.invalid/%%comment",
-        "https://example.invalid/[[note]]",
-        "https://example.invalid/$x$",
-        # A character reference, or a percent-encoding of a control or format character,
-        # would show U+202E in the link text (second code review, finding 2): CWE-451.
-        "https://docs.python.org&#x202E;@evil.example/",
-        "https://example.invalid/&#8238;a",
-        "https://example.invalid/&rlm;a",
-        "https://example.invalid/%E2%80%AEgpj.exe",
-        "https://example.invalid/%E2%80%8Fa",
-        "https://example.invalid/%00a",
-        "https://example.invalid/%0Aa",
-        "https://example.invalid/%ED%A0%80a",
-        "https://example.invalid/%FFa",
-        # Dataview would take (a::b) in the rendered line for a field (security review).
-        "https://example.invalid/(a::b)",
-        "https://evil.example.invalid/a(status::done)",
-        # kb download-watch-sheets refuses ~~~ anywhere in a line (second code review of #424,
-        # finding 2).
-        "https://example.invalid/a~~~b",
-        "https://exämple.invalid/",
-        f"https://example.invalid/{RIGHT_TO_LEFT_OVERRIDE}a",
-        "HTTPS://example.invalid/",
-    ],
-)
+@pytest.mark.parametrize("url", URLS_OUT_OF_THE_RULE)
 def test_a_url_out_of_the_rule_is_not_written(url):
     response, digest = read_one_digest(
         claims=[ClaimSchema(text="Une affirmation.", item_ids=[6])],
@@ -568,17 +582,7 @@ def test_a_url_out_of_the_rule_is_not_written(url):
     )
 
 
-@pytest.mark.parametrize(
-    "url",
-    [
-        "https://github.com/advisories/GHSA-2c8m-cx5r-f9x8",
-        "http://example.invalid/a?b=c&d=%20e;f=(g)#h",
-        "https://example.invalid/~user/@y/!'*+,=",
-        "https://example.invalid/search?a=1&b=2",
-        "https://example.invalid/a%20b/%C3%A9t%C3%A9",
-        "https://fr.wikipedia.org/wiki/Python_(langage)",
-    ],
-)
+@pytest.mark.parametrize("url", URLS_OF_THE_RULE)
 def test_a_url_of_the_rule_is_written_as_an_autolink(url):
     response, digest = read_one_digest(
         claims=[ClaimSchema(text="Une affirmation.", item_ids=[6])],
@@ -724,3 +728,193 @@ def test_a_digest_sheet_of_a_trapped_claim_and_title_passes_the_check_of_the_dow
     sheet = render_digest_sheet(response, digest)
 
     assert find_sheet_text_refusal(sheet.encode()) is None
+
+
+# --- The twin of a sheet (#560).
+
+
+def test_a_digest_gives_the_twin_of_its_sheet_that_its_schema_reads_again(vault_dir):
+    response = read(make_response())
+
+    twin = build_digest_twin(response, "agent_tools", response.digests[0])
+    written = write_digest_twin(vault_dir, twin)
+
+    assert written == "veille/agent_tools/2026-10-21.json"
+    content = (vault_dir / written).read_bytes()
+    assert DigestProduction.model_validate_json(content) == twin
+    assert json.loads(content) == {
+        "subject": "agent_tools",
+        "since": "2026-10-18T16:30:00Z",
+        "until": "2026-10-21T16:30:00Z",
+        "model": "gpt-6-luna",
+        "items_capped": False,
+        "capped_kind": None,
+        "covered_after": None,
+        "outcome": "written",
+        "claims": [
+            {"text": "Claude Code publie la version v2.1.287.", "item_ids": [6]},
+            {
+                "text": "Un cadre d'agents ancré sur une blockchain protège la chaîne"
+                " logicielle.",
+                "item_ids": [1, 6],
+            },
+        ],
+        "sources": [
+            {
+                "item_id": 6,
+                "title": "Claude Code 2.1.287",
+                "url": RELEASE_SOURCE.url,
+            },
+            {"item_id": 1, "title": PAPER_SOURCE.title, "url": PAPER_SOURCE.url},
+        ],
+    }
+
+
+def test_the_twin_of_a_subject_starts_at_the_start_of_its_subject():
+    start = datetime(2026, 10, 20, 8, 0, 5, tzinfo=UTC)
+    response = read(
+        make_response(
+            since_by_subject={
+                "security_alerts": datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+                "agent_tools": start,
+                "research": datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+            }
+        )
+    )
+
+    twin = build_digest_twin(response, "agent_tools", response.digests[0])
+
+    assert (twin.since, twin.until) == (start, UNTIL)
+
+
+def test_a_subject_without_items_gets_a_twin_that_says_so():
+    response = read(make_response([]))
+
+    twin = build_digest_twin(response, "research", None)
+
+    assert (twin.subject, twin.outcome, twin.claims, twin.sources) == (
+        "research",
+        "no_item",
+        [],
+        [],
+    )
+
+
+def test_a_digest_without_claim_gets_a_twin_without_source():
+    response, digest = read_one_digest(claims=[])
+
+    twin = build_digest_twin(response, "agent_tools", digest)
+
+    assert (twin.outcome, twin.claims, twin.sources) == ("no_claim", [], [])
+
+
+def test_a_capped_window_is_named_in_the_twin_as_in_the_sheet():
+    covered_after = datetime(2026, 10, 19, 7, 0, tzinfo=UTC)
+    response = read(
+        make_response(
+            window=WindowSchema(
+                days=3,
+                since=datetime(2026, 10, 18, 16, 30, tzinfo=UTC),
+                until=UNTIL,
+                capped_kind="newsletter_article",
+                covered_after=covered_after,
+            ),
+            items_capped=True,
+        )
+    )
+
+    twin = build_digest_twin(response, "agent_tools", response.digests[0])
+
+    assert (twin.items_capped, twin.capped_kind, twin.covered_after) == (
+        True,
+        "newsletter_article",
+        covered_after,
+    )
+
+
+@pytest.mark.parametrize(
+    ("url", "served"),
+    [(url, None) for url in URLS_OUT_OF_THE_RULE]
+    + [(url, url) for url in URLS_OF_THE_RULE],
+)
+def test_the_twin_serves_a_url_exactly_when_the_sheet_writes_it(url, served):
+    response, digest = read_one_digest(
+        claims=[ClaimSchema(text="Une affirmation.", item_ids=[6])],
+        sources=[RELEASE_SOURCE.model_copy(update={"url": url})],
+    )
+
+    twin = build_digest_twin(response, "agent_tools", digest)
+
+    assert twin.sources[0].url == served
+
+
+def test_the_texts_of_a_twin_are_visible_on_one_line_and_kept_as_text():
+    response, digest = read_one_digest(
+        claims=[
+            ClaimSchema(
+                text=f"Une <b>affirmation</b>\n{RIGHT_TO_LEFT_OVERRIDE}| [x](y)",
+                item_ids=[6],
+            )
+        ],
+        sources=[
+            RELEASE_SOURCE.model_copy(
+                update={"title": f"Un\ttitre{RIGHT_TO_LEFT_OVERRIDE} #tag"}
+            )
+        ],
+    )
+
+    twin = build_digest_twin(response, "agent_tools", digest)
+
+    assert twin.claims[0].text == "Une <b>affirmation</b> | [x](y)"
+    assert twin.sources[0].title == "Un titre #tag"
+
+
+def test_a_digest_its_schema_refuses_raises_a_validation_error():
+    response, digest = read_one_digest(
+        claims=[ClaimSchema(text="a" * 401, item_ids=[6])],
+        sources=[RELEASE_SOURCE],
+    )
+
+    with pytest.raises(ValidationError):
+        build_digest_twin(response, "agent_tools", digest)
+
+
+def test_a_twin_written_meanwhile_is_never_rewritten(vault_dir):
+    response = read(make_response())
+    twin_path = vault_dir / "veille" / "agent_tools" / "2026-10-21.json"
+    twin_path.parent.mkdir(parents=True)
+    twin_path.write_bytes(b"written meanwhile\n")
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match="^twin_exists: veille/agent_tools/2026-10-21.json is there;"
+        " kb digest never rewrites a twin$",
+    ):
+        write_digest_twin(
+            vault_dir, build_digest_twin(response, "agent_tools", response.digests[0])
+        )
+
+    assert twin_path.read_bytes() == b"written meanwhile\n"
+
+
+def test_a_twin_of_the_day_refuses_the_request(vault_dir):
+    twin_path = vault_dir / "veille" / "research" / "2026-10-21.json"
+    twin_path.parent.mkdir(parents=True)
+    twin_path.write_bytes(b"{}")
+
+    with pytest.raises(
+        VaultEntryRefusedError,
+        match="^twin_exists: veille/research/2026-10-21.json is there;",
+    ):
+        refuse_written_sheets(vault_dir, SUBJECT_NAMES, DAY)
+
+
+def test_a_twin_linked_elsewhere_refuses_the_request(vault_dir, tmp_path):
+    target = tmp_path / "elsewhere.json"
+    target.write_bytes(b"{}")
+    twin_path = vault_dir / "veille" / "research" / "2026-10-21.json"
+    twin_path.parent.mkdir(parents=True)
+    twin_path.symlink_to(target)
+
+    with pytest.raises(VaultEntryRefusedError, match="^vault_link_refused: "):
+        refuse_written_sheets(vault_dir, SUBJECT_NAMES, DAY)

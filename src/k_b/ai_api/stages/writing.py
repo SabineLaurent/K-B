@@ -15,15 +15,13 @@ from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.tracing import TRACING_OFF, Tracing
 from k_b.ai_api.watch_items import WatchItem, to_item_ref
-from k_b.core.config import DigestSubject
+from k_b.core.config import ITEMS_PER_CLAIM, MAX_CLAIMS, TEXT_CHARS, DigestSubject
 
 WRITING_PROMPT_NAME = "write"
 WRITING_PROMPT_VERSION = "write-1"
-# The bounds of a digest: of structure (MAX_CLAIMS, ITEMS_PER_CLAIM), which fail the output, and
-# of a claim (TEXT_CHARS, FACTS_PER_CLAIM, FACT_VALUE_CHARS), which remove the claim.
-MAX_CLAIMS = 12
-ITEMS_PER_CLAIM = (1, 5)
-TEXT_CHARS = (1, 400)
+# The bounds of a digest: of structure (MAX_CLAIMS, ITEMS_PER_CLAIM, in core/config.py), which fail
+# the output, and of a claim (TEXT_CHARS, in core/config.py, FACTS_PER_CLAIM, FACT_VALUE_CHARS),
+# which remove the claim.
 FACTS_PER_CLAIM = (1, 10)
 FACT_VALUE_CHARS = (3, 120)
 # A module constant, never an expression: no text of an item can be in it (poc.md, rule 8). Its

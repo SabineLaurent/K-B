@@ -1,5 +1,5 @@
 """kb digest: ask the AI API for the digests of the watch, then write the sheet of each subject
-in the vault; kb serve-data and kb serve-ai must run."""
+and its twin in the vault; kb serve-data and kb serve-ai must run."""
 
 import logging
 from collections.abc import Callable, Mapping
@@ -8,6 +8,8 @@ from functools import partial
 from pathlib import Path
 from time import monotonic
 from typing import NamedTuple
+
+from pydantic import ValidationError
 
 from k_b.commands.batch_summary import (
     COLUMN_GAP,
@@ -28,7 +30,9 @@ from k_b.core.config import (
     MAX_DIGEST_WINDOW_DAYS,
 )
 from k_b.core.dates import format_date
+from k_b.core.quoting import locate_first_error
 from k_b.etl.collected_sources import read_vault_dir_or_refusal
+from k_b.items import DigestProduction
 from k_b.post.ai_api_client import (
     DIGEST_KEY_VARIABLE,
     AiApiError,
@@ -39,9 +43,11 @@ from k_b.post.ai_api_client import (
     request_digests,
 )
 from k_b.post.digest_sheets import (
+    build_digest_twin,
     read_subject_starts,
     refuse_written_sheets,
     write_digest_sheet,
+    write_digest_twin,
     write_empty_sheet,
 )
 from k_b.post.vault_files import VaultEntryRefusedError
@@ -50,10 +56,13 @@ logger = logging.getLogger(LOGGER_NAME)
 
 SHEET_WRITTEN = "sheet written"
 NO_ITEM_SHEET_WRITTEN = "no item, sheet written"
+# The statuses of a subject written whole, its sheet and its twin; any other is a failure.
+WRITTEN_STATUSES = frozenset({SHEET_WRITTEN, NO_ITEM_SHEET_WRITTEN})
 
 
 class SummaryRow(NamedTuple):
-    """A row of the summary of kb digest; sheet is empty when the sheet is not written."""
+    """A row of the summary of kb digest; sheet is empty when the sheet is not written, and kept
+    when its twin is not."""
 
     subject: str
     status: str
@@ -117,7 +126,7 @@ def run_digest(environ: Mapping[str, str]) -> int:
     else:
         rows = write_digest_sheets(vault_dir, response)
     logger.info("digest finished in %s", describe_duration(monotonic() - started))
-    written_count = sum(1 for row in rows if row.sheet)
+    written_count = sum(1 for row in rows if row.status in WRITTEN_STATUSES)
     failed_count = len(rows) - written_count
     print(render_digest_summary(response, rows, written_count, failed_count))
     # A blank line after the result, apart from what follows (make's line of an error):
@@ -148,23 +157,27 @@ def log_starts_brought_to_the_bound(
 
 
 def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> list[SummaryRow]:
-    """Each sheet in turn, a sheet not written not stopping the others; a subject fails when the
-    AI API names it or its sheet is not written. One row of the summary per subject; a subject
-    without items gets its sheet, the start of its next digest."""
+    """Each sheet and its twin in turn, one not written not stopping the others; a subject fails
+    when the AI API names it, or its sheet or its twin is not written. One row of the summary per
+    subject; a subject without items gets its sheet, the start of its next digest."""
     rows: list[SummaryRow] = []
     for digest in response.digests:
         rows.append(
-            write_one_sheet(
+            write_one_subject(
+                vault_dir,
                 digest.subject,
                 SHEET_WRITTEN,
+                partial(build_digest_twin, response, digest.subject, digest),
                 partial(write_digest_sheet, vault_dir, response, digest),
             )
         )
     for subject in response.subjects_without_items:
         rows.append(
-            write_one_sheet(
+            write_one_subject(
+                vault_dir,
                 subject,
                 NO_ITEM_SHEET_WRITTEN,
+                partial(build_digest_twin, response, subject, None),
                 partial(write_empty_sheet, vault_dir, response, subject),
             )
         )
@@ -179,14 +192,34 @@ def write_digest_sheets(vault_dir: Path, response: DigestsResponse) -> list[Summ
     return rows
 
 
-def write_one_sheet(subject: str, status: str, write: Callable[[], str]) -> SummaryRow:
-    """The row of a sheet written by write, or not written: logged, and not stopping the
-    others."""
+def write_one_subject(
+    vault_dir: Path,
+    subject: str,
+    status: str,
+    build_twin: Callable[[], DigestProduction],
+    write_sheet: Callable[[], str],
+) -> SummaryRow:
+    """The row of a subject: its twin built first, as a twin refused writes no sheet and keeps the
+    start of the subject, then its sheet and its twin written; a failure logged, and not stopping
+    the others."""
     try:
-        sheet = write()
+        twin = build_twin()
+    except ValidationError as error:
+        # The place and the type only: a text of the response is never logged.
+        logger.error(
+            "%s: twin_refused, no sheet written: %s", subject, locate_first_error(error)
+        )
+        return SummaryRow(subject, "twin refused", "")
+    try:
+        sheet = write_sheet()
     except (OSError, VaultEntryRefusedError) as error:
         logger.error("%s: sheet not written: %s", subject, describe_error(error))
         return SummaryRow(subject, "sheet not written", "")
+    try:
+        write_digest_twin(vault_dir, twin)
+    except (OSError, VaultEntryRefusedError) as error:
+        logger.error("%s: twin not written: %s", subject, describe_error(error))
+        return SummaryRow(subject, "twin not written", sheet)
     return SummaryRow(subject, status, sheet)
 
 
