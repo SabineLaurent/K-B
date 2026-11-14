@@ -7139,8 +7139,8 @@ points de revue tranchés par time-knight, sous la délégation de Sabine du 15/
   faisant défiler le cadre (à 390 px, le cadre en montre 356 px sur 560), et une barre de défilement superposée
   (macOS, iOS) n'apparaît qu'au défilement. Pour réduire le risque : une ombre au bord du cadre quand le tableau
   continue, en CSS seul (`background-attachment: local`, technique de Lea Verou, 2012 ; le cadre a un fond uni,
-  condition de la technique, CSS-Tricks), faisable avec nos droits, non fait. Un auteur la dit peu fiable sur
-  mobile ; support des navigateurs non vérifié ce jour. — PR de #596
+  condition de la technique, CSS-Tricks), faisable avec nos droits : #618 (XS, au Backlog, tri de time-knight). Un
+  auteur la dit peu fiable sur mobile ; support des navigateurs non vérifié ce jour. — PR de #596
 - **L'annonce « (en anglais, site externe, nouvel onglet) » reste visible dans chaque lien du tableau, comme
   ailleurs sur le site.** Décision de Sabine du 2026-11-14, sur l'option (a) que recommandait time-knight après la
   relecture d'accessibilité. Confirme la décision de #587 (2026-11-11). Option écartée (b) : la flèche seule visible
@@ -7148,6 +7148,17 @@ points de revue tranchés par time-knight, sous la délégation de Sabine du 15/
   mais une personne voyante ne lirait pas l'annonce au moment du clic (G201), et le tableau ferait autrement que le
   reste du site (Opquast 138). Limite assumée : à 390 px, l'annonce passe sur deux lignes et rend chaque ligne plus
   haute. À l'impression, la flèche et l'annonce sont retirées du seul tableau. — PR de #596
+- **Le champ du jour reste un `input type=date` ; un jour refusé n'y revient pas, et son message le nomme quand il a
+  la forme d'un jour (`DAY_SHAPE`, chiffres ASCII et tirets seuls : « Date invalide: 2026-02-30 n’existe pas. ») ;
+  toute autre valeur n'atteint jamais la page.** Tri de time-knight du 2026-11-14 (Opquast 81 : les données
+  refusées restent modifiables). Pourquoi : un champ date natif ne peut pas tenir une valeur invalide (WHATWG), et
+  le sélecteur de date du navigateur n'envoie qu'un jour valide : une valeur refusée ne vient que d'une adresse
+  écrite à la main. Ne nommer que des chiffres et des tirets : un lien qui ferait dire à la page un texte choisi
+  (usurpation de contenu) n'a rien à y mettre, et la longueur est fixe. Options écartées : un champ texte, qui
+  perdrait le sélecteur de date ; nommer toute valeur reçue, ce que le fil s'interdit déjà (« a value received is
+  never sent back raw », `web/feed.py`). Limite assumée : Opquast 81 tenue en partie, la valeur ne revient pas dans
+  le champ ; un jour valide que l'API refuserait (même règle `WrittenDay` que le site) vide aussi le champ, sans
+  être nommé. — PR de #596
 - **Le dépôt est l'en-tête de sa ligne (`th scope="row"`), en graisse normale ; les colonnes portent les mots de la
   maquette, « Étoiles gagnées » et « *Forks* gagnés ».** Tris de time-knight (relecture d'accessibilité). Pourquoi :
   RGAA 5.7, un lecteur d'écran annonce le dépôt avec chacun de ses comptes ; « gagnées » reste dit avec son

@@ -119,14 +119,30 @@ revenait dans le champ, alors qu'un `input type=date` ne tient qu'un jour valide
 fil et les tendances passent par `WrittenDay` (`items.py:214`), la règle des routes de l'API de données : la forme
 `AAAA-MM-JJ` et un jour qui existe. Une seule connaissance, à un seul endroit (`code.md`, « Duplication »).
 
+Un jour refusé ne revient donc pas dans le champ. Pour qu'on sache quoi corriger (Opquast 81), son message le nomme,
+mais seulement s'il a la forme d'un jour :
+
+```python
+def write_refusal(value: str) -> str:
+    """The message of a day refused, which names a value of the form of a day only."""
+    if not DAY_SHAPE.fullmatch(value):
+        return WINDOW_END_REFUSED
+    return f"Date invalide: {value} n’existe pas. Un jour attendu, sous la forme AAAA-MM-JJ."
+```
+(`src/k_b/web/trends.py:93-97`, avec `DAY_SHAPE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")` à la ligne 31)
+
+`[0-9]` et non `\d` : `\d` accepte aussi les chiffres d'autres écritures, `[0-9]` les seuls chiffres ASCII. La page ne
+peut donc citer que dix caractères faits de chiffres et de tirets. Une adresse comme
+`/tendances?window_end=Appelez le 0800…` ne lui fait rien dire : elle reçoit le message général.
+
 ### 4. La page sans entrée ni sortie : rang, début de fenêtre, lien vers GitHub
 
 `web/trends.py` ne fait ni réseau ni rendu : il reçoit une `TrendWindow` et rend un `TrendsPage`, des données que
 le gabarit affiche. Trois choses que l'API ne sert pas sont calculées par le site (écarts connus de la mission) :
 
 - **le rang** : la position dans l'ordre de l'API, à partir de 1 (`enumerate(window.trends, start=1)`,
-  `trends.py:123`) ;
-- **le premier jour** : `window_end - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)` (`trends.py:98-100`) ;
+  `trends.py:135`) ;
+- **le premier jour** : `window_end - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)` (`trends.py:110-112`) ;
 - **le lien** :
 
 ```python
@@ -135,7 +151,7 @@ def build_github_link(repository_name: str) -> str | None:
         return None
     return f"{GITHUB_URL}/{repository_name}"
 ```
-(`src/k_b/web/trends.py:136-142`, docstring retirée de l'extrait)
+(`src/k_b/web/trends.py:148-154`, docstring retirée de l'extrait)
 
 `RepositoryName` permet `owner/..` : un navigateur résoudrait `https://github.com/owner/..` vers une autre page de
 GitHub. `is_repository_name` refuse ces segments. Un tel nom garde sa ligne et son rang, écrit sans lien. Écarter
@@ -143,7 +159,7 @@ toute la fenêtre pour un seul nom aurait caché 59 lignes justes et faussé le 
 `/code-review`).
 
 Les comptes sont écrits à la française, les milliers groupés par une espace fine insécable
-(`write_count`, `trends.py:103-104`, `chr(0x202F)` et jamais un échappement dans la source : `MEMORY.md`,
+(`write_count`, `trends.py:115-116`, `chr(0x202F)` et jamais un échappement dans la source : `MEMORY.md`,
 « Échappements »).
 
 ### 5. Le tableau : un vrai tableau de données, lisible au clavier et au lecteur d'écran
@@ -213,6 +229,9 @@ Les comptes sont écrits à la française, les milliers groupés par une espace 
 | Nom refusé par `is_repository_name` | sa ligne et son rang, sans lien | Écarter toute la fenêtre (page 500) : un seul nom cacherait 59 lignes justes |
 | Fenêtre d'un autre jour que celui demandé | page 500 (`data_api_invalid_response`) | L'afficher : la page dirait une fenêtre et en montrerait une autre |
 | `window_end` | lu brut par la route | Paramètre typé de FastAPI : son 422 citerait la valeur reçue |
+| Un jour refusé (Opquast 81) | le champ reste un `type=date`, vide ; le message nomme une valeur de la forme d'un jour (tri de time-knight du 14/11) | Un champ texte, qui garderait la valeur mais perdrait le sélecteur de date ; nommer toute valeur reçue, qui laisserait un lien faire dire n'importe quel texte à la page |
+| GH Archive (Opquast 5) | expliqué à sa première occurrence, dans les mots de `/sources` (tri de time-knight du 14/11) | Le laisser sans explication |
+| Ombre au bord du cadre | une issue, #618 (tri de time-knight) | La faire dans cette PR : sa fiabilité sur mobile n'est pas vérifiée |
 | « Voir la fenêtre la plus récente » | bouton secondaire (gardé par time-knight) | Lien simple de la maquette : l'écart est écrit dans la PR |
 | Pas de « jusqu'à 60 dépôts » | consigne de la mission du 11/11 | — |
 
@@ -225,6 +244,8 @@ Les comptes sont écrits à la française, les milliers groupés par une espace 
 | `test_a_window_other_than_the_day_asked_gives_the_page_500` | une fenêtre d'un autre jour n'est jamais montrée |
 | `test_a_name_is_repository_name_refuses_keeps_its_row_and_its_rank_without_a_link` (`test_trends.py`) | `owner/..`, `./repo`, `owner/foo..bar` : ligne et rang gardés, aucun lien |
 | `test_a_failure_of_the_data_api_gives_the_page_500_logged_without_the_day` | le journal ne cite pas le jour demandé |
+| `test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_message` (`test_trends.py`), `test_a_value_refused_out_of_the_form_of_a_day_never_reaches_the_page` (`test_trends_page.py`) | `2026-02-30`, `2026-13-01`, `0000-01-01` nommés ; « Appelez le 0800… » jamais dans la page |
+| `test_gh_archive_is_explained_at_its_first_occurrence` (`test_accessibility.py`) | GH Archive expliqué à sa première occurrence, dans chaque état de la page |
 | `test_the_screen_of_the_trends_holds_three_requests_and_30_kb_at_most` | 60 lignes aux longueurs maximales de GitHub : 3 requêtes, 30 Ko au plus (RGESN 6.1) |
 | `test_the_table_of_the_trends_has_its_caption_and_a_header_for_each_column` (`test_accessibility.py`) | légende en tête, `th scope="col"` avec les mots de la maquette, `th scope="row"` dans chaque ligne |
 | `test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption` | cadre au clavier, région nommée par la légende |
@@ -237,8 +258,8 @@ Les comptes sont écrits à la française, les milliers groupés par une espace 
 
 1. **« Pourquoi le site recalcule-t-il le rang et le premier jour au lieu de les demander à l'API ? »**
    L'API sert l'ordre et le dernier jour, pas le rang ni le début (contrat de `GET /trends`, `docs/specs-api.md`).
-   Les calculer dans `web/trends.py`, sans entrée ni sortie, les rend testables seuls (`test_trends.py:99`,
-   `:111`), sans changer l'API, que tient une autre piste.
+   Les calculer dans `web/trends.py`, sans entrée ni sortie, les rend testables seuls (`test_trends.py:112`,
+   `:124`), sans changer l'API, que tient une autre piste.
 2. **« Un tableau de 560 px sur un téléphone de 320 px, ce n'est pas un défaut d'accessibilité ? »**
    WCAG 1.4.10 (*Reflow*) exempte le contenu qui demande une mise en page en deux dimensions, comme un tableau de
    données. La page ne défile pas en largeur : seul le cadre défile, au clavier aussi (`tabindex="0"`, région
@@ -268,6 +289,8 @@ Les comptes sont écrits à la française, les milliers groupés par une espace 
   14/11. Des comptes de cette taille sont la borne du contrat (2⁶³ − 1), pas une valeur observée.
 - **Le lecteur d'écran réel** (VoiceOver, NVDA) n'a pas été essayé : l'annonce du `th scope="row"` et de la région
   est attendue d'après RGAA et WCAG, pas entendue.
+- **Opquast 81, tenue en partie** : un jour refusé ne revient pas dans le champ ; un jour valide que l'API refuserait
+  (même règle `WrittenDay`, chemin défensif jamais vu) vide le champ sans être nommé.
 - **Les mesures ont été faites en iframes** : Chrome sans interface a une largeur minimale de fenêtre, et une
   capture directe à 390 px montre une page plus large que l'écran. La capture dans un iframe de 390 px est
   conforme à la mesure.
@@ -276,6 +299,8 @@ Les comptes sont écrits à la française, les milliers groupés par une espace 
 
 - #617 : les messages de date du fil et des tendances disent `AAAA-MM-JJ`, alors que le champ montre `JJ/MM/AAAA`
   dans un Chrome en français (Opquast 80).
+- #618 : une ombre au bord du cadre tant que le tableau continue, pour qu'on voie sur un téléphone que des colonnes
+  restent à droite.
 - #614 : les milliers groupés sur tout le site, pas seulement dans les tendances.
 - #615 : la règle du nom de dépôt (`is_repository_name`) à l'import des tendances, pour qu'un `owner/..` n'entre
   pas en base.
