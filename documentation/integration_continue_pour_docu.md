@@ -30,7 +30,7 @@ PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jo
 | pip-audit 2.10.1 | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes | `ci.yml:24-25` |
 | PostgreSQL 18.6 | un service du job `tests-postgresql`, épinglé par son digest | `ci.yml:68-82` |
 | Docker Buildx | construit l'image `linux/amd64` de K-B et la contrôle | `image.yml` |
-| Grype v0.121.2 (Anchore) | cherche dans l'image les vulnérabilités connues des paquets Debian, des paquets Python de l'environnement virtuel et de CPython; refuse une haute ou critique qui a un correctif | `image.yml:39-56` |
+| Grype v0.121.2 (Anchore) | cherche dans l'image les vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip` de l'image de base) et de CPython; refuse une haute ou critique qui a un correctif | `image.yml:64-82` |
 | Azure CLI et Bicep v0.48.1 | compile `infra/main.bicep`, sans connexion à Azure | `infra.yml` |
 | Dependabot | ouvre chaque semaine les PR de mise à jour des actions et des images de base du `Dockerfile` | `.github/dependabot.yml` |
 | Ruleset « Basic-rules-main-protect » | dit quels contrôles une PR doit passer pour fusionner | réglages du dépôt (plus bas) |
@@ -79,12 +79,12 @@ read`, `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`) et ne lit aucun secret
 | 2 | (l. 24-28) | plante des fichiers que `.dockerignore` doit écarter, à la racine (`.env`, `.env.decoy`, `temp/decoy`, `reports/decoy`, `.venv/decoy`) et dans `src/k_b/` (`.env.decoy`, `decoy.sqlite`, `decoy.sqlite-wal`, `.DS_Store`, `__pycache__/decoy.pyc`) |
 | 3 | `Sends only what the Dockerfile copies to the build` (l. 31-37) | le contexte de construction ne contient, à sa racine, que `README.md`, `pyproject.toml`, `src` et `uv.lock` (l. 35), et nulle part un fichier planté ni un `__pycache__` (l. 36) |
 | 4 | (l. 38) | `docker buildx build --platform linux/amd64 --tag k-b:ci .` |
-| 5 | `Installs Grype v0.121.2` (l. 42-47) | télécharge l'archive de Grype de sa release et vérifie son SHA256 (l. 46), comme Bicep dans `Infra` |
-| 6 | `Has no high or critical vulnerability that has a fix` (l. 52-56) | `grype docker:k-b:ci --only-fixed --fail-on high`: Grype lit le système de fichiers final de l'image, tire sa base de vulnérabilités à chaque exécution (refusée si elle a plus de 5 jours, son défaut), garde les vulnérabilités qui ont un correctif (`--only-fixed`), puis échoue s'il en reste une haute ou critique (`--fail-on high`); le tableau des vulnérabilités gardées se lit dans le journal de l'étape |
-| 7 | `Runs as a non-root user` (l. 57-61) | l'utilisateur de l'image n'est pas root (`id -u` différent de 0) |
-| 8 | `Holds none of the planted files` (l. 63-66) | aucun chemin de l'image ne s'appelle `.env*`, `*.sqlite*`, `decoy`, `.DS_Store` ni `.git` (l. 65); `__pycache__` n'est cherché que dans le contexte (étape 3) |
-| 9 | `Refuses to start without KB_DATA_DIR` (l. 69-75) | `kb create-db` sans `KB_DATA_DIR` sort en code 2 avec `KB_DATA_DIR must point to the data directory` |
-| 10 | `Starts kb and creates the database` (l. 78-81) | `kb --help`, puis `kb create-db` dans le dossier de données de l'image |
+| 5 | `Runs as a non-root user` (l. 39-43) | l'utilisateur de l'image n'est pas root (`id -u` différent de 0) |
+| 6 | `Holds none of the planted files` (l. 45-48) | aucun chemin de l'image ne s'appelle `.env*`, `*.sqlite*`, `decoy`, `.DS_Store` ni `.git` (l. 47); `__pycache__` n'est cherché que dans le contexte (étape 3) |
+| 7 | `Refuses to start without KB_DATA_DIR` (l. 51-57) | `kb create-db` sans `KB_DATA_DIR` sort en code 2 avec `KB_DATA_DIR must point to the data directory` |
+| 8 | `Starts kb and creates the database` (l. 60-63) | `kb --help`, puis `kb create-db` dans le dossier de données de l'image |
+| 9 | `Installs Grype v0.121.2` (l. 67-72) | télécharge l'archive de Grype de sa release et vérifie son SHA256 (l. 71), comme Bicep dans `Infra` |
+| 10 | `Has no high or critical vulnerability that has a fix` (l. 78-82) | `grype docker:k-b:ci --only-fixed --fail-on high`: Grype lit le système de fichiers final de l'image, tire sa base de vulnérabilités à chaque exécution (refusée si elle a plus de 5 jours, son défaut), garde les vulnérabilités qui ont un correctif (`--only-fixed`), puis échoue s'il en reste une haute ou critique (`--fail-on high`); le tableau des vulnérabilités gardées se lit dans le journal de l'étape. En dernier, pour qu'un scan rouge ne cache pas le résultat des étapes 5 à 8 |
 
 L'image `k-b:ci` n'est poussée nulle part: celle qui part en ligne est construite par `Deploy`, depuis le commit du
 tag.
@@ -200,7 +200,7 @@ Rien ne se règle hors du dépôt, en dehors de l'étape précédente: aucun wor
 | image de PostgreSQL | `ci.yml:69`, tag et digest | à la main: d'après le commentaire de `ci.yml:63-64`, Dependabot ne la met pas à jour |
 | chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:35` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
 | version de Bicep | `infra.yml:22`, et son SHA256 à `infra.yml:24` | les deux ensemble, l'empreinte lue sur la release de Bicep |
-| version de Grype | `image.yml:42` et `:45` (deux fois), et son SHA256 à `image.yml:46` | à la main, ensemble: la dernière version publiée depuis 7 jours au moins (la même attente que Dependabot, qui ne voit pas un binaire téléchargé), l'empreinte lue sur sa release (le digest de `grype_<version>_linux_amd64.tar.gz`) et recoupée avec `grype_<version>_checksums.txt` |
+| version de Grype | `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71`; elle est aussi écrite dans les pages qui la citent (`grep -rn "Grype v0" README.md docs/fiches-veille.md documentation/`) | à la main, ensemble: la dernière version publiée depuis 7 jours au moins (la même attente que Dependabot, qui ne voit pas un binaire téléchargé), l'empreinte lue sur sa release (le digest de `grype_<version>_linux_amd64.tar.gz`) et recoupée avec `grype_<version>_checksums.txt` |
 | seuil de couverture | `fail_under`, `pyproject.toml:83` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
 | règles de lint | `[tool.ruff.lint]`, `pyproject.toml:48-67` | `uv run ruff check --no-cache` avant de pousser |
 | tests écartés par défaut | marqueurs `e2e` et `postgresql`, écartés sauf s'ils sont nommés par `-m` (`tests/conftest.py:118-130`) | un test marqué `postgresql` ne tourne que dans `tests-postgresql` |
@@ -223,7 +223,7 @@ d'`image-build` et de `bicep-build` ne refont qu'une partie du job:
 | `types` | `uv run mypy --strict` |
 | `tests-postgresql` | `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` |
 | `tests-data` | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py` |
-| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; avec Grype installé, `grype docker:k-b --only-fixed --fail-on high`; les autres étapes (`image.yml:24-81`) ne tournent que sur le runner: elles écrivent dans `$RUNNER_TEMP` et plantent des fichiers dans l'arbre de travail; leur résultat se lit dans le journal du job (`gh run view <id> --log`) |
+| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; avec Grype installé, `grype docker:k-b --only-fixed --fail-on high`; les autres étapes (`image.yml:24-82`) ne tournent que sur le runner: elles écrivent dans `$RUNNER_TEMP` et plantent des fichiers dans l'arbre de travail; leur résultat se lit dans le journal du job (`gh run view <id> --log`) |
 | `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:24`) |
 
 **Sur GitHub, une PR témoin**: [#533](https://github.com/SabineLaurent/K-B/pull/533), fusionnée le 2026-11-09, ne
@@ -262,19 +262,21 @@ Puis reproduire le job sur le poste (tableau plus haut), corriger, pousser un co
 | `types` | une erreur de mypy, avec son fichier et sa ligne | `uv run mypy --strict` |
 | `tests-postgresql` | un test en échec, ou le service qui ne démarre pas (`pg_isready` en échec 15 fois, 2 s d'écart, 5 s de délai chacune, `ci.yml:78-82`) | relancer le job; puis le test sur un serveur local |
 | `tests-data` | un test des données en échec | le même test, sur le poste |
-| `image-build` | l'étape en échec dit le contrôle: un fichier planté trouvé (son chemin), l'utilisateur root, un code de sortie inattendu, ou, pour le scan (étape 6), le tableau des vulnérabilités hautes ou critiques qui ont un correctif: le paquet, sa version, la version corrigée, son type, l'identifiant et la sévérité | `docker buildx build` en local, puis la commande de l'étape; pour le scan, « Une vulnérabilité dans l'image », ci-dessous |
+| `image-build` | l'étape en échec dit le contrôle: un fichier planté trouvé (son chemin), l'utilisateur root, un code de sortie inattendu, ou, pour le scan (étape 10), le tableau des vulnérabilités hautes ou critiques qui ont un correctif: le paquet, sa version, la version corrigée, son type, l'identifiant et la sévérité | `docker buildx build` en local, puis la commande de l'étape; pour le scan, « Une vulnérabilité dans l'image », ci-dessous |
 | `bicep-build` | une erreur de compilation, avec son fichier et sa ligne, ou une empreinte de Bicep différente (`sha256sum: WARNING`) | `az bicep build --file infra/main.bicep` en local; pour l'empreinte, vérifier la version et le SHA256 ensemble |
 
 Un échec du runner ou du réseau (téléchargement de uv, de pip-audit, de l'image `postgres`, de Grype ou de sa base)
 se relance tel quel.
 
-**Une vulnérabilité dans l'image** (étape 6 d'`image-build`, un contrôle exigé: elle bloque toute PR, et la mise en
+**Une vulnérabilité dans l'image** (étape 10 d'`image-build`, un contrôle exigé: elle bloque toute PR, et la mise en
 ligne, `deploy.yml:51-67`). Dans cet ordre:
 
-1. Un paquet Python (type `python`): `audit` échoue aussi. Monter le paquet dans `uv.lock` (ligne `audit` du tableau).
-2. Un paquet Debian (type `deb`) ou CPython (type `binary`), quand l'image amont a déjà le correctif: monter à la main
-   le digest des deux `FROM python:3.13-slim-trixie@sha256:…` du `Dockerfile` (l. 10 et 27), dans une PR, sans
-   attendre la PR hebdomadaire de Dependabot. Le digest du jour se lit par
+1. Un paquet Python de l'environnement virtuel (type `python`, sous `/app/.venv`): `audit` échoue aussi. Monter le
+   paquet dans `uv.lock` (ligne `audit` du tableau).
+2. Un paquet Debian (type `deb`), CPython (type `binary`) ou un paquet Python de l'image de base (type `python`, sous
+   `/usr/local/lib/python3.13`, `pip` notamment, hors d'`uv.lock` et que `audit` ne voit pas), quand l'image amont a
+   déjà le correctif: monter à la main le digest des deux `FROM python:3.13-slim-trixie@sha256:…` du `Dockerfile`
+   (l. 10 et 27), dans une PR, sans attendre la PR hebdomadaire de Dependabot. Le digest du jour se lit par
    `docker buildx imagetools inspect python:3.13-slim-trixie` (ligne `Digest:`); le scan de la PR dit si le
    correctif y est.
 3. Sinon, l'image amont n'ayant pas encore le correctif: une entrée dans `.grype.yaml`, à la racine du dépôt, le
@@ -319,10 +321,11 @@ Chaque parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2
   bloqué sinon. Public, il serait gratuit, mais coupé après 60 jours sans activité.
 - **Le scan ne voit pas tout** (#498, lu le 2026-11-14): avec `--only-fixed`, une vulnérabilité sans correctif ne
   le fait pas échouer et n'est pas listée; une vulnérabilité publiée après la dernière exécution d'`Image` sur `main`
-  n'est vue qu'à la PR suivante: l'image en ligne peut la porter d'ici là.
+  n'est vue qu'à la PR suivante: l'image en ligne, que `deploy.yml` reconstruit au tag (l. 102-117) sans la scanner,
+  peut la porter d'ici là.
   Pour réduire le risque: Dependabot propose chaque semaine le nouveau digest des images de base du `Dockerfile`
-  (`dependabot.yml:10-16`), qui apporte les correctifs de Debian et de CPython, et la CI le scanne (déjà fait). Un
-  déclenchement planifié d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une
+  (`dependabot.yml:10-16`), qui apporte les correctifs de Debian et de CPython, et la CI le scanne (déjà fait). Le
+  même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable avec nos droits. Un déclenchement planifié d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une
   PR: faisable avec nos droits, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`, lu
   le 2026-11-14).
 - **Une vulnérabilité publiée bloque toutes les PR** (#498): `image-build` étant exigé, une vulnérabilité haute ou

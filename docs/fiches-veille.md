@@ -1339,9 +1339,9 @@ dépend que du code garde son état et sa preuve.
   lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
   (`.github/workflows/ci.yml`), la construction du Bicep (`infra.yml`) et, depuis #498, le scan de
   l'image : Grype v0.121.2, vérifié par son SHA256, cherche dans l'image construite les
-  vulnérabilités connues des paquets Debian, des paquets Python de l'environnement virtuel et de
-  CPython, et fait échouer `image-build` sur une haute ou critique qui a un correctif
-  (`.github/workflows/image.yml:39-56`, `--only-fixed --fail-on high`). Un scan rouge sur `main`
+  vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
+  de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
+  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Un scan rouge sur `main`
   bloque aussi la mise en ligne : `deploy.yml` ne déploie qu'un commit dont toutes les exécutions
   sont vertes (l. 51-67). Après chaque déploiement, `deploy.yml` lance `caj-kb-smoke-test`
   (l. 204-209), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
@@ -1354,12 +1354,14 @@ dépend que du code garde son état et sa preuve.
   (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur
   l'environnement déployé. Faisable, déjà fait.
   **Limite du scan** : il ne voit ni une vulnérabilité sans correctif (`--only-fixed`), ni une
-  vulnérabilité publiée après la dernière exécution d'`Image` sur `main` : l'image en ligne peut en
-  porter une jusqu'à la PR suivante. **Pour réduire le risque** : Dependabot propose chaque semaine
+  vulnérabilité publiée après la dernière exécution d'`Image` sur `main` : l'image en ligne, que
+  `deploy.yml` reconstruit au tag (l. 102-117) sans la scanner, peut en porter une jusqu'à la PR
+  suivante. **Pour réduire le risque** : Dependabot propose chaque semaine
   le nouveau digest de l'image de base (`.github/dependabot.yml:10-16`), qui apporte les correctifs
-  de Debian et de CPython, et son scan ; faisable, déjà fait. Un déclenchement planifié d'`image.yml`
-  (`on: schedule`) scannerait `main` sans attendre une PR ; faisable avec nos droits, sur les
-  minutes du compte.
+  de Debian et de CPython, et son scan ; faisable, déjà fait. Le même scan dans `deploy.yml`, avant
+  la mise en ligne (#626), et un déclenchement planifié d'`image.yml` (`on: schedule`), qui
+  scannerait `main` sans attendre une PR : faisables avec nos droits, le second sur les minutes du
+  compte.
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
   `127.0.0.1`, joignable de la machine seule.
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,

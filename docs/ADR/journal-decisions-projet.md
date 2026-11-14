@@ -7246,19 +7246,22 @@ Sabine du 15/10.
 
 - **`image-build` scanne l'image construite par Grype (Anchore, Apache 2.0), le binaire de sa release vérifié par
   son SHA256 dans `image.yml`, comme Bicep dans `infra.yml` : `grype docker:k-b:ci --only-fixed --fail-on high`,
-  juste après la construction.** Pourquoi : `audit` ne lit que `uv.lock`, pas les paquets Debian de l'image de base.
+  en dernière étape du job.** Pourquoi : `audit` ne lit que `uv.lock`, pas les paquets Debian de l'image de base.
   Options écartées : Trivy, vecteur de l'attaque du 19/03/2026 (GHSA-69fq-xp46-6x23 : 76 tags de `trivy-action` sur
   77 réécrits, un binaire v0.69.4 piégé), et qui ne voit pas le CPython de l'image ; Docker Scout, qui demande un
   compte Docker ; une action GitHub (`anchore/scan-action`), du code de plus à croire, quand un binaire vérifié suffit.
-- **Grype scanne tout ce qu'il voit : paquets Debian, paquets Python de l'environnement virtuel et CPython.**
-  Pourquoi : l'image est ce qui part en ligne. Limite assumée : une vulnérabilité d'un paquet Python fait échouer
-  `audit` et le scan ensemble.
+  En dernière étape, pour qu'un scan rouge ne cache pas le résultat des autres contrôles de l'image (revue de code,
+  tranché par time-knight le 2026-11-14 ; le plan le plaçait juste après la construction).
+- **Grype scanne tout ce qu'il voit : paquets Debian, paquets Python (l'environnement virtuel, et `pip` de l'image
+  de base) et CPython.**
+  Pourquoi : l'image est ce qui part en ligne. Limite assumée : une vulnérabilité d'un paquet Python d'`uv.lock` fait
+  échouer `audit` et le scan ensemble ; celle de `pip`, hors d'`uv.lock`, le scan seul.
 - **Le seuil, celui de l'issue : une vulnérabilité haute ou critique qui a un correctif (`--only-fixed`, puis
-  `--fail-on high`).** Pourquoi (déduit, l'issue ne le dit pas ; à valider par Sabine) : la CI ne refuse que ce
-  qu'une PR peut corriger. Limites assumées : une vulnérabilité sans
-  correctif ne se voit pas ; une vulnérabilité publiée après le dernier scan de `main` n'est vue qu'à la PR suivante.
-  Pour réduire le risque : la PR hebdomadaire de Dependabot sur le digest de l'image de base, scannée ; un
-  déclenchement planifié d'`image.yml`, faisable avec nos droits, non retenu ici.
+  `--fail-on high`).** Comportement validé par Sabine avec le plan le 13/11 ; raison donnée par le plan : la CI ne
+  refuse que ce qu'une PR peut corriger. Limites assumées : une vulnérabilité sans correctif ne se voit pas ; une vulnérabilité publiée après le dernier scan de `main` n'est vue qu'à la PR suivante.
+  `deploy.yml` reconstruit l'image au tag sans la scanner. Pour réduire le risque : la PR hebdomadaire de Dependabot
+  sur le digest de l'image de base, scannée ; le même scan dans `deploy.yml` (#626) ; un déclenchement planifié
+  d'`image.yml`, faisable avec nos droits, non retenu ici.
 - **Grype v0.121.2, la dernière version publiée depuis 7 jours au moins, la même attente que Dependabot.** Écartée :
   v0.121.3 (2026-11-09), à 5 jours. Elle corrige 8 avis de ses dépendances (dont GO-2026-6888, critique), lus le
   2026-11-14 : ils visent le démon Docker, dont Grype n'est que client, ou sont des dénis de service à la
@@ -7267,10 +7270,9 @@ Sabine du 15/10.
 - **`image-build` devient un contrôle exigé du ruleset de `main`, posé par Sabine juste avant la fusion, comme
   `bicep-build` (#496).** Pourquoi : la limite « Deux contrôles ne bloquent pas la fusion » de la doc de la CI (lue
   le 2026-11-10) : non exigé, un scan rouge laisse fusionner, et ne bloque qu'au déploiement (`deploy.yml` exige
-  toutes les exécutions vertes). Limite assumée : une vulnérabilité corrigée publiée un matin
-  bloque toutes les PR, comme `audit` le 2026-11-13 (#606). D'où la marche à suivre écrite dans
-  `documentation/integration_continue_pour_docu.md` : un paquet Python, monté dans `uv.lock` ; sinon le digest de
-  l'image de base monté à la main si l'image amont a le correctif ; sinon une entrée de `.grype.yaml`, avec sa raison,
+  toutes les exécutions vertes). Limite assumée : une vulnérabilité corrigée publiée un matin bloque toutes les PR, comme `audit` le 2026-11-13 (#606). D'où la marche à suivre écrite dans
+  `documentation/integration_continue_pour_docu.md` : un paquet Python d'`uv.lock`, monté dans `uv.lock` ; sinon
+  (paquet Debian, CPython, `pip`) le digest de l'image de base monté à la main si l'image amont a le correctif ; sinon une entrée de `.grype.yaml`, avec sa raison,
   sa date et l'issue qui la retire, décidée par Sabine (une règle non tenue l'est par décision écrite). Écarté :
   `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image du jour de sa construction. — PR de #498
 
