@@ -17,7 +17,7 @@ from k_b.core.config import (
     DATA_API_MAX_SEARCH_LENGTH,
     FEED_PAGE_SIZE,
 )
-from k_b.items import NonEmptyText
+from k_b.items import NonEmptyText, WrittenDay
 from k_b.web.data_api_client import (
     FEED_KINDS,
     DataApiError,
@@ -80,8 +80,9 @@ NO_ITEM_TITLE = "Quoi de neuf, aucun item"
 PAGE_NUMBER = re.compile(r"[1-9][0-9]{0,2}")
 # The page at the offset 10,000, the last the data API serves.
 MAX_PAGE = DATA_API_MAX_OFFSET // FEED_PAGE_SIZE + 1
-# The form input type=date sends; another form is refused, never guessed.
-START_DAY = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+# The form input type=date sends, a day that exists: the rule of the routes of the data API
+# (items.py); another value is refused, never guessed.
+WRITTEN_DAY: TypeAdapter[date] = TypeAdapter(WrittenDay)
 # The rule of the data API for q: neither a NUL nor a lone surrogate.
 SEARCH_TEXT: TypeAdapter[str] = TypeAdapter(NonEmptyText)
 
@@ -221,9 +222,10 @@ def read_feed_form(params: QueryParams) -> FeedForm:
         q=drop_control_characters(received_q),
         kinds=kinds,
         period=period,
-        # Shown again only in its form: an input type=date holds a day or nothing, and a value
-        # received is never sent back raw, whatever its length (D4: kept when the radio ignores it).
-        start=start if START_DAY.fullmatch(start) else "",
+        # Shown again only if it is a day: an input type=date holds a valid day or nothing, and a
+        # value received is never sent back raw, whatever its length (D4: kept when the radio
+        # ignores it).
+        start=start if read_written_day(start) is not None else "",
         errors=tuple(error for error in errors if error is not None),
     )
 
@@ -251,17 +253,17 @@ def read_period(value: str | None) -> tuple[Period, FieldError | None]:
 def find_start_error(start: str) -> FieldError | None:
     if not start:
         return FieldError(START_ID, START_MISSING)
-    if read_start_day(start) is None:
+    if read_written_day(start) is None:
         return FieldError(START_ID, START_REFUSED)
     return None
 
 
-def read_start_day(start: str) -> date | None:
-    if not START_DAY.fullmatch(start):
-        return None
+def read_written_day(value: str) -> date | None:
+    """The day of a field input type=date, the start of the feed or the end of a window of the
+    trends; None for any other value."""
     try:
-        return date.fromisoformat(start)
-    except ValueError:
+        return WRITTEN_DAY.validate_python(value)
+    except ValidationError:
         return None
 
 
@@ -315,7 +317,7 @@ def build_query(form: FeedForm, now: datetime, page: int) -> FeedQuery:
 def find_since_day(form: FeedForm, now: datetime) -> date:
     """The start date, or the day N days before today in UTC: 1 day takes yesterday and today."""
     if form.period == DATE_PERIOD:
-        start_day = read_start_day(form.start)
+        start_day = read_written_day(form.start)
         if start_day is None:
             raise ValueError("start date refused by the form")
         return start_day

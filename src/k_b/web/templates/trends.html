@@ -1,0 +1,45 @@
+{%- from "links.html" import external_link -%}
+{% extends "base.html" %}
+{% block title %}{{ trends.title }}{% endblock %}
+{% block main_class %}page trends{% endblock %}
+{% block content %}
+<h1>Dépôts qui ont le vent en poupe</h1>
+<p class="page-intro">Étoiles et <span lang="en">forks</span> gagnés sur GitHub pendant une fenêtre de 3 jours, d’après GH Archive (l’archive des événements publics de GitHub), qui ne voit qu’environ 1&nbsp;% des étoiles et de 0,8 à 1,3&nbsp;% des <span lang="en">forks</span>, jusqu’à 4,2&nbsp;% (mesures du <time datetime="2026-10-29">29 octobre 2026</time>).</p>
+<form class="trends-filter" method="get" action="/tendances" aria-label="Fenêtre des tendances">
+<div class="field">
+<label for="window-end">Fenêtre se terminant le</label>
+<p id="window-end-help" class="field-help">Sans date: la fenêtre la plus récente.</p>
+{% if trends.error %}
+<p id="window-end-error" class="field-error">{{ trends.error.message }}</p>
+{% endif %}
+<input id="window-end" name="window_end" type="date" value="{{ trends.value }}" aria-describedby="{% if trends.error %}window-end-error {% endif %}window-end-help"{% if trends.error %} aria-invalid="true"{% endif %}>
+</div>
+<div class="form-actions">
+<button class="button" type="submit">Afficher</button>
+</div>
+</form>
+{% if trends.table %}
+{% set table = trends.table %}
+{#- The frame scrolls a table wider than the screen: it takes the focus, for the keyboard
+without script (WCAG 2.1.1), a region named by the caption. -#}
+<div class="table-frame" role="region" aria-labelledby="trends-caption" tabindex="0">
+<table class="trends-table">
+<caption id="trends-caption">Fenêtre du <time datetime="{{ table.start_day }}">{{ table.start_text }}</time> au <time datetime="{{ table.end_day }}">{{ table.end_text }}</time>: étoiles et <span lang="en">forks</span> gagnés sur GitHub, échantillon de GH Archive</caption>
+<thead>
+<tr><th scope="col">Rang</th><th scope="col">Dépôt</th><th scope="col" class="number">Étoiles gagnées</th><th scope="col" class="number"><span lang="en">Forks</span> gagnés</th></tr>
+</thead>
+<tbody>
+{% for row in table.rows %}
+<tr><td class="rank">{{ row.rank }}</td><th scope="row">{% if row.link %}{{ external_link(row.link, row.repository_name, link_note, "en") }}{% else %}{{ row.repository_name }}{% endif %}</th><td class="number">{{ row.stars }}</td><td class="number">{{ row.forks }}</td></tr>
+{% endfor %}
+</tbody>
+</table>
+</div>
+<p class="table-note">Les dépôts qui ont gagné le plus d’étoiles et ceux qui ont gagné le plus de <span lang="en">forks</span>, triés par étoiles gagnées, puis par <span lang="en">forks</span>.</p>
+{% elif trends.empty_text %}
+<p class="results-line">{{ trends.empty_text }}</p>
+{% if trends.latest_link %}
+<p class="empty-actions"><a class="button-secondary" href="{{ trends.latest_link }}">Voir la fenêtre la plus récente</a></p>
+{% endif %}
+{% endif %}
+{% endblock %}
