@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.12.0"
+    "version": "0.13.0"
   },
   "paths": {
     "/items": {
@@ -403,6 +403,313 @@
           },
           "404": {
             "description": "trend_window_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tops/{top}": {
+      "get": {
+        "tags": [
+          "tops"
+        ],
+        "summary": "Read Top",
+        "description": "The first repositories of the top of a day, the most recent when none is given.",
+        "operationId": "read_top_tops__top__get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "top",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "most_starred",
+                "most_forked"
+              ],
+              "type": "string",
+              "title": "Top"
+            }
+          },
+          {
+            "name": "day",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Day"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 10,
+              "title": "Limit"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidParameterSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "watch_listing_too_long, watch_production_refused, exchange_storage_unavailable, exchange_storage_no_token, exchange_storage_unauthorized, exchange_storage_forbidden, exchange_storage_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "watch_unconfigured, watch_production_changed, exchange_storage_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "exchange_storage_timeout",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "top_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/tops/{top}/days": {
+      "get": {
+        "tags": [
+          "tops"
+        ],
+        "summary": "List Top Days",
+        "description": "The days of the top, the most recent first, and their total.",
+        "operationId": "list_top_days_tops__top__days_get",
+        "security": [
+          {
+            "HTTPBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "top",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "enum": [
+                "most_starred",
+                "most_forked"
+              ],
+              "type": "string",
+              "title": "Top"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 100,
+              "minimum": 1,
+              "default": 30,
+              "title": "Limit"
+            }
+          },
+          {
+            "name": "offset",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "maximum": 5000,
+              "minimum": 0,
+              "default": 0,
+              "title": "Offset"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TopDaysSchema"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "invalid_api_key",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "invalid_parameter",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/InvalidParameterSchema"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "client_not_allowed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "rate_limit_exceeded",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "500": {
+            "description": "internal_error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "502": {
+            "description": "watch_listing_too_long, watch_production_refused, exchange_storage_unavailable, exchange_storage_no_token, exchange_storage_unauthorized, exchange_storage_forbidden, exchange_storage_failed",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "watch_unconfigured, watch_production_changed, exchange_storage_not_found",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorSchema"
+                }
+              }
+            }
+          },
+          "504": {
+            "description": "exchange_storage_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -1450,6 +1757,118 @@
           "body"
         ],
         "title": "ReleaseDetailSchema"
+      },
+      "TopDaysSchema": {
+        "properties": {
+          "days": {
+            "items": {
+              "type": "string",
+              "format": "date"
+            },
+            "type": "array",
+            "title": "Days"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "The days of the top, every page counted."
+          }
+        },
+        "type": "object",
+        "required": [
+          "days",
+          "total"
+        ],
+        "title": "TopDaysSchema"
+      },
+      "TopRepositorySchema": {
+        "properties": {
+          "rank": {
+            "type": "integer",
+            "title": "Rank"
+          },
+          "repository_name": {
+            "type": "string",
+            "title": "Repository Name"
+          },
+          "url": {
+            "type": "string",
+            "title": "Url",
+            "description": "https://github.com/ followed by repository_name."
+          },
+          "description": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Description",
+            "description": "Shown as text: on one line, without a hidden character, never escaped."
+          },
+          "description_truncated": {
+            "type": "boolean",
+            "title": "Description Truncated",
+            "description": "The description was cut at 1000 characters."
+          },
+          "count": {
+            "type": "integer",
+            "title": "Count",
+            "description": "Its stars in most_starred, its forks in most_forked, at ranked_at."
+          }
+        },
+        "type": "object",
+        "required": [
+          "rank",
+          "repository_name",
+          "url",
+          "description",
+          "description_truncated",
+          "count"
+        ],
+        "title": "TopRepositorySchema"
+      },
+      "TopSchema": {
+        "properties": {
+          "top": {
+            "type": "string",
+            "enum": [
+              "most_starred",
+              "most_forked"
+            ],
+            "title": "Top"
+          },
+          "day": {
+            "type": "string",
+            "format": "date",
+            "title": "Day",
+            "description": "The day of the twin, the day of ranked_at in UTC."
+          },
+          "ranked_at": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Ranked At",
+            "description": "The moment the ranking of the top was collected from GitHub."
+          },
+          "repositories": {
+            "items": {
+              "$ref": "#/components/schemas/TopRepositorySchema"
+            },
+            "type": "array",
+            "title": "Repositories",
+            "description": "By rank, the first limit of 100 at most."
+          }
+        },
+        "type": "object",
+        "required": [
+          "top",
+          "day",
+          "ranked_at",
+          "repositories"
+        ],
+        "title": "TopSchema"
       },
       "TrendSchema": {
         "properties": {

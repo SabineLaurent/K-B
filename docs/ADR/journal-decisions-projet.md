@@ -7093,6 +7093,52 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   route, il n'a jamais été rouge avant le code ; son rouge a été montré par deux mutations sur une copie (lien du
   titre retiré, route cassée). — PR de #564
 
+### API de données : les tops servis au site, du jumeau JSON de leur fiche dans `watch` (#559)
+
+Plan de la session K-B validé par Sabine le 2026-11-11 ; les écarts et les points de revue, tranchés par time-knight
+sous la délégation de Sabine du 15/10.
+
+- **L'API de données lit aussi le conteneur `watch` : `GET /tops/{top}` et `GET /tops/{top}/days` servent au site,
+  au seul client `WEB`, les tops GitHub du jour et leurs jours passés. Elle les lit dans un jumeau JSON que
+  `kb write-tops` écrit une fois à côté de chaque fiche (`tops/<top>/<jour>.json`), relu par un schéma fermé commun à
+  l'écrivain et au lecteur (`TopProduction`, `items.py`).** Décision de Sabine du 2026-11-11 : c'est la forme du
+  POC, et la cible reste un index en base des productions (#531). **Étend la décision du 2026-10-14 (« API de
+  données »)** : l'API servait jusqu'ici la seule base (items, tendances) ; elle sert désormais aussi ce que les jobs
+  publient dans `watch`, en lecture seule, par l'identité que lui donne #571. Pourquoi le jumeau plutôt que relire
+  la fiche Markdown : le site ne lit que l'API de données et ne rend plus aucun Markdown (`markdown-it-py` et `nh3`
+  retirées : ni dépendance ni risque XSS d'un rendu), et les fiches sont échappées pour Obsidian (`neutralize_text`,
+  `post/vault_files.py`), donc illisibles brutes. Conséquence : le jumeau se revalide à la lecture par un schéma
+  fermé, comme toute sortie que K-B sert (règle 8 de `poc.md`). Limites assumées, chacune avec sa parade écrite
+  dans `docs/specs-api.md` (« Lecture de `watch` ») : (a) une requête froide peut dépasser les 30 s de lecture du
+  site ; (b) des requêtes froides simultanées vont chacune au stockage ; (c) sur le Mac, sans `AZURE_CLIENT_ID`, les
+  tops répondent 503 ; (d) l'historique commence au premier jumeau ; (e) une fiche écrite avant #559 peut recevoir
+  le jumeau d'un relevé plus tardif du même jour, une fois, pour le dernier jour de chaque top. — PR de #559
+- **Le marqueur d'une page de liste coupée court est suivi : 5 000 noms au plus, sur 2 pages au plus
+  (`MAX_WATCH_FOLDER_NAMES`, `MAX_WATCH_FOLDER_PAGES`), au-delà 502 `watch_listing_too_long`.** Tranché par
+  time-knight le 2026-11-12. Pourquoi : List Blobs peut rendre une page de moins de noms que demandé avec un
+  `NextMarker` (Microsoft Learn, « List Blobs », « Remarks », lu le 2026-11-12). **Modifie le plan validé**, qui
+  répondait 502 à tout marqueur : il aurait refusé une liste légitime. — PR de #559
+- **L'heure d'un jumeau se nomme `ranked_at`, dans le jumeau comme dans la réponse ; l'en-tête Markdown de la fiche
+  garde `collected_at`.** Tranché par time-knight le 2026-11-12 (option B). Pourquoi : l'API ne sert jamais une date
+  de collecte (OWASP API3, `test_no_route_documents_a_raw_file_path_or_a_collection_date`), et ce test reste tel
+  quel. Option écartée : servir `collected_at` en exemptant les tops du test, ce qui affaiblirait une preuve d'API3
+  « Tenue » (`docs/specs-api.md`) pour sauver un nom, et donnerait deux sens à un même nom dans une API qui écrit
+  `collected_at` « jamais servi ». Conséquence : l'exemption se serait ouverte à chaque production suivante (#560,
+  #561). — PR de #559
+- **Ce que le jumeau refuse, la collecte des plus étoilés et des plus forkés le refuse avant, par la page entière :
+  un compte hors de 0 à 2^63 − 1, un nom de plus de 255 caractères.** Tranché par time-knight le 2026-11-12 (revue de
+  #559). Pourquoi : un relevé que la source acceptait et que le jumeau refusait n'avait plus de fiche, et
+  `kb write-tops` échouait à chaque passage en gardant le relevé ; la page entière, car retirer un dépôt décalerait
+  les rangs du top (exception de la règle 1 de `conventions.md`). Le refus du jumeau reste un filet, tenu par son
+  test. Prolonge la règle 4 de `conventions.md` (« Tout ce que la base refuse, l'item le refuse avant ») au jumeau.
+  — PR de #559
+- **Pendant une requête de l'API de données, tout échec du jeton de l'identité est 502 `exchange_storage_no_token`,
+  la règle de `check_identity` des jobs ; jamais un 500, ni l'état d'un stockage qui n'a pas été joint.** Tranché
+  par time-knight le 2026-11-12 (revue de #559). Pourquoi : l'API demande son jeton au milieu d'une requête, non
+  avant comme un job, et azure-identity 1.27.0 laisse passer un `ValueError` ou un `AttributeError` sur une réponse
+  qui n'est pas du JSON. Limite assumée : un délai de l'identité est aussi `exchange_storage_no_token`, et non
+  `exchange_storage_timeout`. — PR de #559
+
 ## 2026-11-13
 
 ### Dépendances : `soupsieve` et OpenTelemetry montés pour des vulnérabilités publiées (#606)
@@ -7130,6 +7176,67 @@ la session C1 à C17 et points de revue tranchés par time-knight, sous la dél�
   (une seule personne au dépôt, et une auteure ne peut pas approuver sa PR). Chacun a sa limite, son « Pour lever
   l'écart » et son « Pour réduire le risque » dans `docs/fiches-veille.md`, API8. Limite assumée : la mesure n'est
   tenue qu'une fois `bicep-build` exigé et vu vert sur une PR qui ne touche pas `infra/`. — PR de #496, à venir
+
+## 2026-11-14
+
+### Site : les tendances (#596)
+
+Plan validé par Sabine le 2026-11-11 (partie « PR 2 » du plan de #564) ; deux décisions de Sabine du 2026-11-14 ;
+points de revue tranchés par time-knight, sous la délégation de Sabine du 15/10.
+
+- **`/tendances` montre une fenêtre de 3 jours de GH Archive par `GET /trends` : la plus récente, ou celle qui se
+  termine le jour du formulaire. Le site calcule le rang (l'ordre de l'API, à partir de 1), le premier jour
+  (`window_end` − 2 jours) et le lien vers GitHub ; il n'écrit pas « jusqu'à 60 dépôts ».** Pourquoi : la mission du
+  11/11, qui relève ces écarts entre la maquette et l'API. L'API, tenue par une autre piste, reste inchangée, et
+  `web/trends.py` calcule sans entrée ni sortie, donc testable seul. Le jour est lu par `WrittenDay`, la règle des
+  routes de l'API, désormais commune au fil : `2026-02-30` n'est plus réaffiché dans le champ du fil. — PR de #596
+- **Le tableau a 560 px de large au moins (`35rem`), comme la maquette, et défile dans son cadre sur un écran plus
+  étroit. Le cadre prend le focus (`tabindex="0"`) : c'est une région nommée par la légende. Il est le conteneur de
+  la légende (`container-type: inline-size`), qui garde sa largeur (`max-inline-size: 100cqi`).** Décision de Sabine
+  du 2026-11-14 pour les 560 px ; le cadre (C7 de #564) et la légende, tris de time-knight. Pourquoi : la maquette
+  (`min-width: 560px`) ; WCAG 1.4.10 exempte un tableau de données ; WCAG 2.1.1 demande le clavier, sans script. Sans
+  borne, la légende, qui fait partie du tableau, sortirait de l'écran. `cqi` est retenu parce que la fonction
+  « Container queries » est Baseline « widely available » depuis le 2025-08-14 (web-features explorer ; unités dans
+  Chrome et Edge 105, Firefox 110, Safari 16, caniuse, lus le 14/11). Options écartées : la largeur naturelle du
+  tableau, qui ne défilait qu'avec un nom aux longueurs maximales de GitHub mais tassait les colonnes sur un
+  téléphone, loin de la maquette ; pour la légende, `calc(100vw - …)`, qui dépend des marges de la page et compte la
+  barre de défilement de la page. Limite assumée : sous 600 px environ, les colonnes des comptes ne se voient qu'en
+  faisant défiler le cadre (à 390 px, le cadre en montre 356 px sur 560), et une barre de défilement superposée
+  (macOS, iOS) n'apparaît qu'au défilement. Pour réduire le risque : une ombre au bord du cadre quand le tableau
+  continue, en CSS seul (`background-attachment: local`, technique de Lea Verou, 2012 ; le cadre a un fond uni,
+  condition de la technique, CSS-Tricks), faisable avec nos droits : #618 (XS, au Backlog, tri de time-knight). Un
+  auteur la dit peu fiable sur mobile ; support des navigateurs non vérifié ce jour. — PR de #596
+- **L'annonce « (en anglais, site externe, nouvel onglet) » reste visible dans chaque lien du tableau, comme
+  ailleurs sur le site.** Décision de Sabine du 2026-11-14, sur l'option (a) que recommandait time-knight après la
+  relecture d'accessibilité. Confirme la décision de #587 (2026-11-11). Option écartée (b) : la flèche seule visible
+  dans le tableau, l'annonce dans le nom accessible et expliquée sous le tableau. Les lignes seraient plus basses,
+  mais une personne voyante ne lirait pas l'annonce au moment du clic (G201), et le tableau ferait autrement que le
+  reste du site (Opquast 138). Limite assumée : à 390 px, l'annonce passe sur deux lignes et rend chaque ligne plus
+  haute. À l'impression, la flèche et l'annonce sont retirées du seul tableau. — PR de #596
+- **Le champ du jour reste un `input type=date` ; un jour refusé n'y revient pas, et son message le nomme quand il a
+  la forme d'un jour (`DAY_SHAPE`, chiffres ASCII et tirets seuls : « Date invalide: 2026-02-30 n’existe pas. ») ;
+  toute autre valeur n'atteint jamais la page.** Tri de time-knight du 2026-11-14 (Opquast 81 : les données
+  refusées restent modifiables). Pourquoi : un champ date natif ne peut pas tenir une valeur invalide (WHATWG), et
+  le sélecteur de date du navigateur n'envoie qu'un jour valide : une valeur refusée ne vient que d'une adresse
+  écrite à la main. Ne nommer que des chiffres et des tirets : un lien qui ferait dire à la page un texte choisi
+  (usurpation de contenu) n'a rien à y mettre, et la longueur est fixe. Options écartées : un champ texte, qui
+  perdrait le sélecteur de date ; nommer toute valeur reçue, ce que le fil s'interdit déjà (« a value received is
+  never sent back raw », `web/feed.py`). Limite assumée : Opquast 81 tenue en partie, la valeur ne revient pas dans
+  le champ ; un jour valide que l'API refuserait (même règle `WrittenDay` que le site) vide aussi le champ, sans
+  être nommé. — PR de #596
+- **Le dépôt est l'en-tête de sa ligne (`th scope="row"`), en graisse normale ; les colonnes portent les mots de la
+  maquette, « Étoiles gagnées » et « *Forks* gagnés ».** Tris de time-knight (relecture d'accessibilité). Pourquoi :
+  RGAA 5.7, un lecteur d'écran annonce le dépôt avec chacun de ses comptes ; « gagnées » reste dit avec son
+  échantillon, dans la légende et l'introduction (GH Archive ne voit qu'environ 1 % des étoiles). Option écartée :
+  le rang en en-tête de ligne, un numéro qui ne nomme pas la ligne. — PR de #596
+- **Un nom que `is_repository_name` refuse (un segment `.` ou `..`, ou `..` en son sein) garde sa ligne et son
+  rang, écrit sans lien ; une fenêtre d'un autre jour que celui demandé est hors contrat (page 500).** Tris de
+  time-knight sur les deux `/code-review`. Le premier tri renvoyait toute la fenêtre en page 500 pour un tel nom ;
+  le second l'a révisé : un seul nom ne doit ni cacher 59 lignes justes ni fausser le rang des autres. Un navigateur
+  résoudrait `https://github.com/owner/..` vers une autre page de GitHub, d'où l'absence de lien. Une fenêtre d'un
+  autre jour, affichée, ferait dire à la page une fenêtre et en montrer une autre. Limite assumée : un tel nom peut
+  entrer en base. Pour réduire le risque : la même règle à l'import des tendances (#615, faisable avec nos droits).
+  — PR de #596
 
 ## Décisions encore ouvertes
 

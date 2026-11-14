@@ -11,6 +11,7 @@ comme son client `WEB` (`KB_DATA_API_KEY_WEB`). Le paquet `src/k_b/web/` n'impor
 |---|---|
 | `/` | « Quoi de neuf », le fil de veille (« Fil », ci-dessous) |
 | `/items/<id>` | le détail d'un item du fil (« Détail », ci-dessous) |
+| `/tendances` | « Dépôts qui ont le vent en poupe », les tendances d'une fenêtre (« Tendances », ci-dessous) |
 | `/sources` | « Sources et conditions d'utilisation » |
 | `/accessibilite` | « Accessibilité » |
 | `/static/site.css`, `/static/favicon.svg` | la feuille de style et l'icône |
@@ -33,7 +34,7 @@ Chaque page fait un seul `GET /items` (`web/data_api_client.py`), avec `kind` to
 | Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus (la règle de `q` de l'API) ; un caractère de contrôle (catégorie Unicode `Cc`) est refusé, et la saisie réaffichée sans lui |
 | Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq, ce que dit l'aide du groupe ; une autre valeur est refusée, sans appel à l'API |
 | Depuis | `period` : `1`, `3`, `7` ou `date` | `1` par défaut (D3, Sabine, 2026-11-11) ; N jours donne minuit UTC du jour J−N : « 1 jour » prend hier et aujourd'hui |
-| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; réaffichée seulement sous cette forme, jamais brute |
+| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; un jour qui existe, lu par `WrittenDay` (`items.py`), le type des routes de l'API ; réaffichée seulement si c'est un jour (pas `2026-02-30`, #596), jamais brute |
 | page | `page` | `[1-9][0-9]{0,2}`, 501 au plus (l'`offset` 10 000 de l'API) ; absente, la page 1 |
 
 La route lit `request.query_params` brut, jamais des paramètres typés par FastAPI : un `page=abc` partirait
@@ -147,6 +148,65 @@ d'une *release* (125 000 caractères au plus) et les auteurs d'un papier (1 000 
 **La preuve de bout en bout** (C17.3) : `tests/web/test_site_on_the_data_api.py` sert le site sur la vraie API
 de données de la base de test, en mémoire : une date du fil refusée sous son champ, un filtre gardé, puis le
 détail par le lien du titre d'une carte. Il tourne dans `uv run pytest`, donc en CI.
+
+## Tendances
+
+`/tendances` (#596) montre les dépôts d'une fenêtre de 3 jours de GH Archive, par `GET /trends` de l'API de
+données, avec la clé du client `WEB` : la plus récente, ou celle qui se termine le jour du formulaire. Maquette
+du 09/11 : `Maquette-tendances`. `web/trends.py` lit le jour et bâtit la page, sans entrée ni sortie.
+
+**Le formulaire** (GET, sans JavaScript) a un champ, « Fenêtre se terminant le » (`window_end`,
+`type=date`), et son aide, « Sans date: la fenêtre la plus récente. ». Le jour est lu par `read_written_day`
+(`web/feed.py`), la règle de la date de début du fil : `WrittenDay`, `AAAA-MM-JJ`, un jour qui existe. Vide ou
+absent, la fenêtre la plus récente ; répété, sa dernière valeur. Le champ montre le dernier jour de la fenêtre
+affichée, ou le jour demandé d'une fenêtre absente ; jamais une valeur refusée (la valeur d'un `type=date` est un
+jour valide ou rien : WHATWG, RGAA 8.2). Le message nomme donc une valeur refusée qui a la forme d'un jour, chiffres
+ASCII et tirets seuls (`DAY_SHAPE`, « Date invalide: 2026-02-30 n’existe pas. ») ; toute autre valeur n'atteint
+jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Limite (Opquast 81) : la valeur refusée ne revient
+pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
+
+**Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
+le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
+Archive. Ses colonnes sont en `th scope="col"`, avec les mots de la maquette : « Rang » (la position dans l'ordre
+de l'API), « Dépôt », « Étoiles gagnées » et « *Forks* gagnés », ces deux derniers alignés à droite en chiffres
+tabulaires, les milliers groupés par une espace fine insécable (U+202F). Le dépôt de chaque ligne est son en-tête
+(`th scope="row"`, RGAA 5.7), écrit comme les autres cellules : un lien vers `https://github.com/<owner>/<repo>`,
+bâti d'un `RepositoryName` validé, par la macro `external_link` (nouvel onglet, « (en anglais, site externe, nouvel
+onglet) », gardée visible : décision de Sabine du 2026-11-14). Le tableau a 560 px de large au moins (`35rem`),
+comme la maquette (décision de Sabine du 2026-11-14) : sur un écran plus étroit, il défile dans son cadre, sans
+élargir la page. Le cadre prend le focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ;
+WCAG 2.1.1) ; il est le conteneur de la légende (`container-type: inline-size`), qui garde sa largeur
+(`max-inline-size: 100cqi`) et reste lisible sans défiler ; sous le tableau, 6 px gardent en vue l'anneau de focus du
+dernier lien, que le cadre couperait. À l'impression, le cadre ne défile plus, et la flèche et l'annonce des liens
+du tableau sont retirées.
+
+**L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
+*forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
+tableau (étoiles gagnées, puis *forks*). Pas de « jusqu'à 60 dépôts » (mission du 2026-11-11).
+
+**Les états** :
+
+| État | Statut | Page |
+|---|---|---|
+| une fenêtre | 200 | le tableau |
+| un jour refusé par le site | 422 | le message sous le champ, qui nomme une valeur de la forme d'un jour, `aria-invalid`, « Tendances, date à corriger », sans tableau ni appel à l'API |
+| un 422 `invalid_parameter` de l'API sur `window_end` seul | 422 | le même, « La base de K-B refuse cette date » |
+| un 404 `trend_window_not_found` avec un jour | 200 | « Aucune tendance pour la fenêtre qui se termine le … », et « Voir la fenêtre la plus récente » |
+| un 404 `trend_window_not_found` sans jour | 200 | « Aucune tendance en base. » |
+| tout autre échec, une réponse hors contrat | 500 | journalisée comme au fil (`data_api_failed: …`), sans le jour |
+
+Une réponse est hors contrat sans ligne, au-delà de 60 lignes, avec un nom hors de `RepositoryName`, un compte
+négatif ou au-delà de 64 bits, une fenêtre qui finirait avant le 3 janvier de l'an 1 (son premier jour
+n'existerait pas), ou une autre fenêtre que celle du jour demandé. Un nom que `is_repository_name` refuse (un
+segment `.` ou `..`, ou `..` en son sein) garde sa ligne et son rang, écrit sans lien : un navigateur résoudrait
+`https://github.com/owner/..` vers une autre page de GitHub, et un seul nom ne cache pas les autres lignes. Le
+journal des requêtes écrit `route=/tendances`, jamais le jour.
+
+**La navigation** mène au fil (« Veille ») et aux tendances, visibles à toutes les largeurs, sans menu replié
+(D2 de #564, décision de Sabine du 2026-11-11) ; la page 404 propose aussi « Voir les tendances ».
+
+**Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés, 60 lignes aux noms de 140 caractères
+(`tests/web/test_trends_page.py`), pesé par la même aide que le fil et le détail (`tests/web/screen_weight.py`).
 
 ## Accès
 
@@ -286,6 +346,12 @@ sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément
 `aria-invalid` d'un champ refusé, le résumé qui mène à chaque champ, les cartes en liste et leurs titres en
 `h2`, les titres en anglais marqués (`lang="en"`), la date de chaque carte en `<time>`, la pastille écrite en
 mots, et la pagination nommée.
+
+Sur les tendances (une fenêtre, un jour refusé, une fenêtre absente, la base vide), il vérifie : le `label` et
+l'aide du champ, le message et `aria-invalid` d'un jour refusé, la légende du tableau, un `th scope="col"`
+par colonne et un `th scope="row"` par ligne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
+l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une région nommée par sa légende. Sur
+chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
 vérifie l'anneau de focus, la taille du lien d'évitement et la feuille d'impression.

@@ -1,13 +1,13 @@
 """The feed on the home page, its data API simulated: the cards, the filters kept, the pages, the
 errors, the empty feed, and a value received always escaped (docs/site-web.md, "Fil")."""
 
-import gzip
 import logging
 import re
 
 import httpx2
 import pytest
 from feed_fixture import ITEMS_PAGE, make_page
+from screen_weight import SCREEN_BUDGET_BYTES, SCREEN_RESOURCES, weigh_screen
 from site_client import OPERATOR_HEADERS, make_client, serve
 
 from k_b.web.feed import FEED_PATH
@@ -361,13 +361,8 @@ def test_the_screen_of_the_feed_holds_three_requests_and_30_kb_at_most():
     """D2 (Sabine, 2026-11-11; RGESN 6.1): the page, the stylesheet and the icon, cache empty,
     compressed, on 20 items of the fixture."""
     client = make_client(handler=serve(make_page(20, total=45)))
-    headers = {**OPERATOR_HEADERS, "Accept-Encoding": "gzip"}
-    page = client.get(FEED_PATH, headers=headers)
-    resources = re.findall(r"<(?:link|img|script|iframe|source)\b[^>]*>", page.text)
-    paths = [re.search(r'(?:href|src)="([^"]+)"', tag).group(1) for tag in resources]
 
-    assert paths == ["/static/site.css", "/static/favicon.svg"]
-    weights = [len(gzip.compress(page.content))] + [
-        client.get(path, headers=headers).num_bytes_downloaded for path in paths
-    ]
-    assert sum(weights) <= 30_000
+    screen = weigh_screen(client, FEED_PATH)
+
+    assert screen.resources == SCREEN_RESOURCES
+    assert screen.weight <= SCREEN_BUDGET_BYTES

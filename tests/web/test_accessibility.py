@@ -23,6 +23,7 @@ from item_fixture import (
     make_detail,
 )
 from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_app, make_client, serve
+from trends_fixture import TRENDS
 
 HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 # Once each; nav at least once, each named.
@@ -53,6 +54,17 @@ ADVISORY_PAGES = (
     "item-advisory-without-cve",
 )
 VULNERABILITY_PAGES = ("item-vulnerability", "item-vulnerability-withdrawn")
+TRENDS_NOT_FOUND = {"error": "trend_window_not_found"}
+# The trends in each state, by name: their address, and the answer of the data API.
+TREND_PAGES = {
+    "/tendances": ("/tendances", serve(TRENDS)),
+    "trends-refused": ("/tendances?window_end=2026-02-30", serve(TRENDS)),
+    "trends-absent": (
+        "/tendances?window_end=2026-10-11",
+        serve(TRENDS_NOT_FOUND, status_code=404),
+    ),
+    "trends-empty": ("/tendances", serve(TRENDS_NOT_FOUND, status_code=404)),
+}
 
 
 @dataclass
@@ -165,6 +177,8 @@ def fetch_every_page():
         pages[name] = make_client(handler=serve(detail)).get(
             f"/items/{detail['id']}", headers=OPERATOR_HEADERS
         )
+    for name, (path, handler) in TREND_PAGES.items():
+        pages[name] = make_client(handler=handler).get(path, headers=OPERATOR_HEADERS)
     return {name: response.text for name, response in pages.items()}
 
 
@@ -223,6 +237,8 @@ def test_the_first_link_skips_to_the_content(name):
         ("404", []),
         # The detail of an item is not the feed (Veille).
         ("item-paper", []),
+        ("/tendances", ["/tendances"]),
+        ("trends-refused", ["/tendances"]),
     ],
 )
 def test_only_the_link_of_the_current_page_is_marked(name, current):
@@ -413,7 +429,7 @@ def test_the_accessibility_statement_gives_its_date():
     """Opquast 2025, rule 6: established, then updated."""
     assert outline(PAGES["/accessibilite"]).find_all("time") == [
         {"datetime": "2026-11-11"},
-        {"datetime": "2026-11-12"},
+        {"datetime": "2026-11-13"},
     ]
 
 
@@ -639,3 +655,161 @@ def test_the_statement_says_its_limits_of_the_detail():
     assert "hypothèse" in text
     assert "le sens de chaque sigle" not in text
     assert "TLDR, nom de la newsletter, n’est pas développé" in text
+
+
+@pytest.mark.parametrize("name", sorted(PAGES))
+def test_the_navigation_leads_to_the_feed_and_to_the_trends(name):
+    """Sabine, 2026-11-11: both links in sight at every width, no menu folded."""
+    navigation = re.search(
+        r'<div class="site-nav-links">(.*?)</div>', PAGES[name], flags=re.DOTALL
+    )
+
+    assert navigation is not None
+    assert [
+        (link.attributes["href"], link.text)
+        for link in outline(navigation.group(1)).links
+    ] == [("/", "Veille"), ("/tendances", "Tendances")]
+
+
+def test_the_page_not_found_leads_to_the_feed_and_to_the_trends():
+    """C10: the tree of the mockups (Maquette-404.dc.html)."""
+    actions = re.search(
+        r'<div class="error-actions">(.*?)</div>', PAGES["404"], flags=re.DOTALL
+    )
+
+    assert actions is not None
+    assert [
+        (link.attributes["href"], " ".join(link.text.split()))
+        for link in outline(actions.group(1)).links
+    ] == [("/", "← Retour au fil de veille"), ("/tendances", "Voir les tendances")]
+
+
+def test_the_sources_name_gh_archive_for_the_trends():
+    assert "Tendances: GH Archive" in outline(PAGES["/sources"]).text
+
+
+def test_the_table_of_the_trends_has_its_caption_and_a_header_for_each_column():
+    """RGAA 5.4, 5.6 and 5.7; WCAG 1.3.1: the caption first in the table, a th scope="col" for each
+    column, with the words of Maquette-tendances.dc.html, and in each row its repository in a
+    th scope="row" between three cells."""
+    table = re.search(
+        r"<table\b[^>]*>(.*?)</table>", PAGES["/tendances"], flags=re.DOTALL
+    )
+
+    assert table is not None
+    assert re.match(r"\s*<caption\b", table.group(1))
+    head = re.search(r"<thead>(.*?)</thead>", table.group(1), flags=re.DOTALL)
+    assert head is not None
+    headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", head.group(1), flags=re.DOTALL)
+    assert [" ".join(re.sub(r"<[^>]+>", "", text).split()) for _, text in headers] == [
+        "Rang",
+        "Dépôt",
+        "Étoiles gagnées",
+        "Forks gagnés",
+    ]
+    assert all('scope="col"' in attributes for attributes, _ in headers)
+    body = re.search(r"<tbody>(.*?)</tbody>", table.group(1), flags=re.DOTALL)
+    assert body is not None
+    rows = re.findall(r"<tr>(.*?)</tr>", body.group(1), flags=re.DOTALL)
+    assert [re.findall(r"<(td|th)\b([^>]*)>", row)[:4] for row in rows] == [
+        [
+            ("td", ' class="rank"'),
+            ("th", ' scope="row"'),
+            ("td", ' class="number"'),
+            ("td", ' class="number"'),
+        ]
+    ] * 5
+
+
+def test_the_window_of_the_trends_is_given_by_two_time_elements():
+    """Opquast 2025, rules 4 and 231: its first and its last day, the month in letters."""
+    caption = re.search(
+        r"<caption\b[^>]*>(.*?)</caption>", PAGES["/tendances"], flags=re.DOTALL
+    )
+
+    assert caption is not None
+    assert re.findall(
+        r'<time datetime="([0-9-]+)">([^<]+)</time>', caption.group(1)
+    ) == [
+        ("2026-10-08", "8 octobre 2026"),
+        ("2026-10-10", "10 octobre 2026"),
+    ]
+
+
+def test_the_trends_say_their_sample_and_their_order():
+    """C6: never stars gained from GH Archive without saying it (docs/specs-collecte.md, "Limite
+    mesurée le 2026-10-29"); the order of GET /trends (docs/specs-api.md)."""
+    text = outline(PAGES["/tendances"]).text
+
+    assert (
+        "qui ne voit qu’environ 1 % des étoiles et de 0,8 à 1,3 % des forks, jusqu’à 4,2 %"
+        in text
+    )
+    assert "triés par étoiles gagnées, puis par forks" in text
+    assert "Jusqu’à 60" not in text
+
+
+@pytest.mark.parametrize("name", sorted(TREND_PAGES))
+def test_gh_archive_is_explained_at_its_first_occurrence(name):
+    """Opquast 2025, rule 5: in the words of /sources."""
+    text = outline(PAGES[name]).text
+
+    assert text[text.index("GH Archive") :].startswith(
+        "GH Archive (l’archive des événements publics de GitHub)"
+    )
+
+
+def test_the_word_forks_is_marked_in_english():
+    """Absent from the dictionaries of French (RGAA 8.7)."""
+    english = outline(PAGES["/tendances"]).texts_in_english
+
+    assert "forks" in english
+    assert "Forks" in english
+
+
+@pytest.mark.parametrize("name", sorted(TREND_PAGES))
+def test_the_field_of_the_trends_has_its_label_and_its_help(name):
+    """RGAA 11.1 and 11.10; WCAG 1.3.1, 3.3.2 and 4.1.2."""
+    page = outline(PAGES[name])
+    labelled = {label.get("for") for label in page.find_all("label")}
+    [field] = page.find_all("input")
+
+    assert field.get("id") in labelled
+    assert field.get("type") == "date"
+    assert "window-end-help" in (field.get("aria-describedby") or "").split()
+    assert [button.get("type") for button in page.find_all("button")] == ["submit"]
+
+
+def test_the_day_refused_says_why_under_its_field():
+    """RGAA 11.10 and 11.11; WCAG 3.3.1: the message tied to its field, heard first, the field
+    marked invalid; one field, no summary."""
+    page = outline(PAGES["trends-refused"])
+    [field] = page.find_all("input")
+
+    assert field.get("aria-describedby") == "window-end-error window-end-help"
+    assert field.get("aria-invalid") == "true"
+    assert "error-summary" not in PAGES["trends-refused"]
+
+
+def test_the_statement_says_what_the_tests_check_of_the_table():
+    assert (
+        "le tableau des tendances, avec sa légende et l’en-tête de chaque colonne"
+        in (outline(PAGES["/accessibilite"]).text)
+    )
+
+
+def test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption():
+    """A table of 560 px at least, as Maquette-tendances.dc.html, scrolls in its frame on a narrower
+    screen; WCAG 2.1.1 asks the keyboard, without script: the frame takes the focus, a region
+    named by the caption."""
+    page = outline(PAGES["/tendances"])
+    [frame] = [
+        attributes
+        for tag, attributes in page.tags
+        if tag == "div" and attributes.get("class") == "table-frame"
+    ]
+    [caption] = page.find_all("caption")
+
+    assert (frame.get("role"), frame.get("tabindex")) == ("region", "0")
+    assert frame.get("aria-labelledby") == caption.get("id")
+    assert caption.get("id")

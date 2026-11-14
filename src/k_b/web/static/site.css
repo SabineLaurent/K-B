@@ -42,6 +42,8 @@
     --color-chip: #EEF0EC;
     /* A card under the pointer (Maquettes-fil.dc.html, version (c)). */
     --color-card-hover: #E6F0F1;
+    /* The line between two rows of a table (Maquette-tendances.dc.html), a decoration. */
+    --color-row-rule: #EEF0EC;
     --color-field-border: #8A8F96;
     --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-code: ui-monospace, Menlo, Consolas, monospace;
@@ -877,6 +879,118 @@
     }
   }
 
+  /* The form of the trends, as in Maquette-tendances.dc.html: the field, its button at its foot. */
+  .trends-filter {
+    margin-block: 1.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 0.75rem 1rem;
+
+    & .field {
+      flex: 0 1 18rem;
+    }
+  }
+
+  /* The table of a window in its frame, which scrolls rather than widen the page: WCAG 1.4.10
+     exempts a table of data (Maquette-tendances.dc.html). Its container: the caption keeps its
+     width. Under the table, room for the focus ring of the last link, which the frame would clip. */
+  .table-frame {
+    margin-block-end: 1rem;
+    padding-block-end: 0.375rem;
+    overflow-x: auto;
+    container-type: inline-size;
+    background: var(--color-card);
+    border: 1px solid var(--color-stone);
+    border-radius: 8px;
+  }
+
+  /* 560 px at least, as the mockup (Sabine, 2026-11-14). */
+  .trends-table {
+    inline-size: 100%;
+    min-inline-size: 35rem;
+    border-collapse: collapse;
+
+    /* In sight on a screen narrower than the table: it wraps in the width of the frame. */
+    & caption {
+      max-inline-size: 100cqi;
+      padding: 1rem 0.5rem 0.5rem;
+      text-align: start;
+      font-weight: 600;
+    }
+
+    /* The padding of a cell is its sides only: the link of a row gives it its height, 44 px. */
+    & th,
+    & td {
+      padding-inline: 0.5rem;
+      text-align: start;
+      vertical-align: middle;
+    }
+
+    & thead th {
+      padding-block: 0.75rem;
+    }
+
+    /* The repository names its row, written as the other cells. */
+    & tbody th {
+      font-weight: normal;
+    }
+
+    & thead tr {
+      border-block-end: 1px solid var(--color-stone);
+    }
+
+    & tbody tr + tr {
+      border-block-start: 1px solid var(--color-row-rule);
+    }
+
+    & .rank {
+      color: var(--color-slate);
+    }
+
+    @media (width >= 48rem) {
+      & caption,
+      & th,
+      & td {
+        padding-inline: 1.25rem;
+      }
+    }
+  }
+
+  /* On the right, in tabular figures, as in the mockup. */
+  .trends-table .number {
+    text-align: end;
+    font-variant-numeric: tabular-nums;
+  }
+
+  /* A count is never cut; the header of its column wraps. */
+  .trends-table td.number {
+    white-space: nowrap;
+  }
+
+  /* A target of 44 px in height by its padding (Opquast 2025, rule 186); a name of 140 characters
+     holds at 320 px. */
+  .trends-table a {
+    display: inline-block;
+    padding-block: 0.75rem;
+    overflow-wrap: anywhere;
+
+    /* Visited in another colour of the chart (Opquast 2025, rule 141): which repositories are
+       read. */
+    &:visited {
+      color: var(--color-slate);
+    }
+
+    &:hover {
+      color: var(--color-teal-deep);
+    }
+  }
+
+  .table-note {
+    color: var(--color-slate);
+    font-size: 0.875rem;
+  }
+
   /* A page prints its content alone (Opquast 2025, rules 195 and 196). */
   @media print {
     .skip-link,
@@ -886,7 +1000,19 @@
     .back-link,
     .illustration,
     .feed-filters,
+    .trends-filter,
     .pagination {
+      display: none;
+    }
+
+    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns. */
+    .table-frame {
+      overflow: visible;
+    }
+
+    /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */
+    .trends-table a > span[aria-hidden="true"],
+    .trends-table .link-note {
       display: none;
     }
   }

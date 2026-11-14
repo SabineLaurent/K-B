@@ -99,6 +99,12 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   `X-MS-CLIENT-PRINCIPAL-ID` posé par Azure Container Apps ; `KB_WEB_AUTH=off` seulement sur
   `127.0.0.1` et hors d'Azure (`CONTAINER_APP_NAME` absente). Un gabarit n'écrit jamais `|safe`,
   `url_for`, un script ni un style en ligne (tests de `tests/web/`).
+- Depuis #559, l'API de données lit aussi le conteneur `watch` (`data_api/watch_reading.py`, ouvert par `kb serve-data`
+  avec `KB_EXCHANGE_BLOB_URL` et `AZURE_CLIENT_ID`, sinon 503 `watch_unconfigured`) : `GET /tops/{top}` et
+  `GET /tops/{top}/days`, réservées au client `WEB` (`DATA_API_CLIENT_BY_ROUTE`, `check_client_allowed` sur leur
+  routeur). Elles lisent le jumeau JSON que `kb write-tops` écrit à côté de chaque fiche d'un top, `TopProduction`
+  (`items.py`). Son heure est `ranked_at`, jamais `collected_at`, que l'API ne sert pas
+  (`test_no_route_documents_a_raw_file_path_or_a_collection_date`).
 - `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
   `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve-data` et `kb serve-ai` doivent tourner (journal ADR,
   2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).

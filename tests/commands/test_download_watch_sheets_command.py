@@ -288,6 +288,17 @@ def test_a_blob_changed_since_the_listing_is_left_to_the_next_run(
     assert "1 left to the next run" in capsys.readouterr().out
 
 
+def test_a_container_removed_since_the_listing_stops_the_download(
+    monkeypatch, vault_dir, capsys
+):
+    container = make_watch(monkeypatch, {MODELS_SHEET: b"# models"})
+    container.status_of_next_get[MODELS_SHEET] = (404, "ContainerNotFound")
+
+    assert download() == ExitCode.FAILED
+    assert not (vault_dir / "veille" / MODELS_SHEET).exists()
+    assert "0 left to the next run" in capsys.readouterr().out
+
+
 def test_without_an_account_logged_in_nothing_is_listed_and_kb_exits_with_1(
     monkeypatch, vault_dir, caplog
 ):

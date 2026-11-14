@@ -75,10 +75,10 @@ def test_a_sheet_already_in_the_container_is_not_sent_again(watch_dir):
 class ContainerListedEmpty(FakeContainer):
     """A container whose blobs were created after its listing."""
 
-    def answer_listing(self):
+    def answer_listing(self, query):
         blobs, self.blobs = self.blobs, {}
         try:
-            return super().answer_listing()
+            return super().answer_listing(query)
         finally:
             self.blobs = blobs
 

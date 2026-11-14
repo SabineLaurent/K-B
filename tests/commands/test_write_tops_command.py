@@ -48,12 +48,20 @@ def test_write_tops_writes_the_sheets_of_each_top_then_deletes_the_older_ranking
         "veille/tops/most_starred/2026-10-05.md",
         "veille/tops/most_starred/2026-10-12.md",
     ]
+    assert sorted(
+        path.relative_to(vault_dir).as_posix() for path in vault_dir.rglob("*.json")
+    ) == [
+        "veille/tops/most_forked/2026-10-05.json",
+        "veille/tops/most_forked/2026-10-12.json",
+        "veille/tops/most_starred/2026-10-05.json",
+        "veille/tops/most_starred/2026-10-12.json",
+    ]
     for older, last in rankings.values():
         assert (older.exists(), last.exists()) == (False, True)
     output = capsys.readouterr()
     assert output.out == (
-        "\nmost_starred: ok, 2 sheets written\n"
-        "most_forked: ok, 2 sheets written\n"
+        "\nmost_starred: ok, 2 sheets and 2 twins written\n"
+        "most_forked: ok, 2 sheets and 2 twins written\n"
         "Older raw files deleted: 2\n"
         "Sheets vault path: veille/tops/\n\n"
     )
@@ -75,6 +83,23 @@ def test_write_tops_again_writes_nothing_new(data_and_vault_dirs, test_tops, cap
     assert cli.main(["write-tops"]) == 0
     assert capsys.readouterr().out.startswith(
         "\nmost_starred: ok, 0 sheets written, the sheet of the day already exists\n"
+    )
+
+
+def test_write_tops_says_the_twins_written_beside_sheets_already_there(
+    data_and_vault_dirs, test_tops, capsys
+):
+    """The first run that writes twins: the sheets of the last rankings are there already."""
+    data_dir, vault_dir = data_and_vault_dirs
+    write_rankings_of_each_top(data_dir, "2026-10-05T093000Z")
+    cli.main(["write-tops"])
+    for twin in vault_dir.rglob("*.json"):
+        twin.unlink()
+    capsys.readouterr()
+
+    assert cli.main(["write-tops"]) == 0
+    assert capsys.readouterr().out.startswith(
+        "\nmost_starred: ok, 0 sheets and 1 twin written\n"
     )
 
 
@@ -169,7 +194,7 @@ def test_a_sheet_not_written_keeps_its_rankings_exits_4_and_the_other_top_is_wri
     # deleted, as the top stopped may have deleted some.
     assert output.out == (
         "\nmost_starred: failed (PermissionError)\n"
-        "most_forked: ok, 2 sheets written\n"
+        "most_forked: ok, 2 sheets and 2 twins written\n"
         "Sheets vault path: veille/tops/\n\n"
     )
 
@@ -213,7 +238,8 @@ def test_an_unreadable_ranking_is_kept_and_write_tops_exits_4_with_the_sheets_wr
     assert len(list_sheets(vault_dir)) == 2
     # The sheet written does not hide the ranking kept unread: the top failed.
     assert capsys.readouterr().out.startswith(
-        "\nmost_starred: failed (ranking_unreadable)\nmost_forked: ok, 1 sheet written\n"
+        "\nmost_starred: failed (ranking_unreadable)\n"
+        "most_forked: ok, 1 sheet and 1 twin written\n"
     )
 
 
