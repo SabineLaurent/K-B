@@ -49,8 +49,9 @@ par un aplat, suivi de son code, de son nom et de son usage.
 | `#8A8F96` | Gris galet | Bordure des champs de saisie |
 
 Sous ces couleurs, un bouton « Filtrer » porte l'anneau de focus, avec sa légende: « Anneau de focus: trait de 3 px en
-#0F5E6B, décalé de 2 px, sur tout élément atteint au clavier ». Un encadré rouille, sur fond pêche pâle, signale une
-couleur: « Couleur signalée: #8A8F96 en texte. 3,26:1 sur blanc, sous le seuil AA de 4,5:1. Réservée aux bordures de
+#0F5E6B, décalé de 2 px, sur tout élément atteint au clavier ». Un encadré bordé de rouille, sur fond pêche pâle,
+signale une couleur. Son titre, en gras et en rouille sombre (`#7C2D12`): « Couleur signalée: #8A8F96 en texte ». Son
+texte, en 14 px et en brun brûlé (`#5B2410`): « 3,26:1 sur blanc, sous le seuil AA de 4,5:1. Réservée aux bordures de
 champs, où le critère 1.4.11 demande 3:1 (atteint). Correction: le texte d'aide et les indications passent en #4A4F57
 (8,24:1). »
 
@@ -68,12 +69,12 @@ champs, où le critère 1.4.11 demande 3:1 (atteint). Correction: le texte d'aid
 
 ### Polices de caractères et tailles
 
-Deux polices, chacune avec un exemple:
+Deux polices, chacune montrée par ses exemples, puis nommée en 14 px et en gris ardoise:
 
-- « Quoi de neuf » en 30 px gras, puis « Texte courant, sans empattement »: system-ui, -apple-system, Segoe UI, Roboto,
-  sans-serif, la police du système. « Aucun fichier de police à télécharger (éco-conception). »
-- « CVE-2026-45134 » et « GHSA-3644-q5cj-c5c7 » en chasse fixe: ui-monospace, Menlo, Consolas, monospace, « les
-  identifiants seulement (CVE, GHSA, arXiv) ».
+- « Quoi de neuf » en 30 px gras, puis « Texte courant, sans empattement » en 16 px: system-ui, -apple-system, Segoe UI,
+  Roboto, sans-serif, la police du système. « Aucun fichier de police à télécharger (éco-conception). »
+- « CVE-2026-45134 » en 20 px et « GHSA-3644-q5cj-c5c7 » en 16 px, en chasse fixe: ui-monospace, Menlo, Consolas,
+  monospace, « les identifiants seulement (CVE, GHSA, arXiv) ».
 
 | Niveau | Taille | Graisse | Exemple |
 |---|---|---|---|
@@ -83,6 +84,9 @@ Deux polices, chacune avec un exemple:
 | Texte courant | 1 rem (16 px), interligne 1,5 | 400 | Collecte automatique |
 | Métadonnées | 0,875 rem (14 px) | 400 | 14/10/2026 · arXiv 2609.00002 |
 
+Sur la planche, chaque exemple de la colonne « Exemple » est écrit à sa taille et à sa graisse, celui des métadonnées
+en gris ardoise.
+
 Sous le tableau: « Tailles en rem: le texte suit la taille choisie dans le navigateur. Texte courant à 16 px au
 minimum, 14 px pour les seules métadonnées. »
 
@@ -90,7 +94,7 @@ minimum, 14 px pour les seules métadonnées. »
 
 Quatre icônes au trait, chacune suivie de son sens:
 
-- trois traits horizontaux: « Menu (mobile et tablette), nommé « Ouvrir le menu » »;
+- trois traits horizontaux, en noir encre: « Menu (mobile et tablette), nommé « Ouvrir le menu » »;
 - une flèche oblique vers le haut et la droite, en bleu canard: « Lien vers la source, ouverte dans un nouvel onglet »;
 - une flèche vers la gauche, en bleu canard: « Retour au fil »;
 - une coche, en vert forêt: « État « OK » du suivi, toujours suivi du mot ».
@@ -130,7 +134,7 @@ texte » écrit dans le couple de couleurs.
 | `#8A8F96` / `#FFFFFF` | Bordure d'un champ (composant, pas du texte) | 3,26:1 | Échoue en texte; 3:1 composant atteint |
 | `#DADCD6` / `#FFFFFF` | Contour de carte, décor sans information | 1,38:1 | Décor, non soumis |
 
-Les couleurs du site suivent cette charte: `src/k_b/web/static/site.css` les déclare, et
+Les couleurs du site suivent cette charte: `web/static/site.css` les déclare, et
 `tests/web/test_stylesheet.py` recalcule les contrastes des couples qu'il utilise.
 
 ## Les maquettes du fil de veille
@@ -148,13 +152,15 @@ dans un cadre gris et avec sa légende: « (a) Maquette - version mobile (390 px
 De haut en bas, sur le fond blanc papier:
 
 1. **L'en-tête**, sur fond blanc. À gauche, « K-B », qui mène au fil. En mobile et en tablette, à droite, un bouton
-   carré de 44 px à trois traits, nommé « Ouvrir le menu ». En desktop, à la place, « Veille » (la page courante, en
-   gras et soulignée), « Tendances », et à droite « Back office », en petit et en gris ardoise.
+   carré de 44 px à trois traits, nommé « Ouvrir le menu ». En desktop, pas de bouton de menu: juste après « K-B », les liens « Veille » et
+   « Tendances », en bleu canard et soulignés, « Veille », la page courante, en gras et soulignée plus bas; à droite,
+   « Back office », en 14 px, en gris ardoise et souligné.
 2. **Le titre**, « Quoi de neuf » (26 px en mobile, 28 en tablette, 30 en desktop), et sous lui « Collecte
    automatique: arXiv, catalogue CISA KEV, alertes GitHub, releases, newsletters. »
 3. **Le formulaire des filtres**, sur une carte blanche bordée:
-   - « Rechercher », un champ qui contient « langchain » (200 caractères au plus). En desktop, il porte l'anneau de
-     focus;
+   - « Rechercher », un champ de recherche qui contient « langchain », avec à son bout la petite icône ronde qui
+     l'efface, dessinée par le navigateur. En desktop, il porte l'anneau de focus. Le code de la maquette le limite à
+     200 caractères (`maxlength`), ce que l'image ne montre pas;
    - « Sortes », cinq cases toutes cochées: « Papiers », « Failles », « Alertes », « Releases », « Articles de
      newsletters »;
    - « Depuis », quatre boutons radio: « 1 jour » (choisi), « 3 jours », « 7 jours », « Date », puis le champ « Date de
@@ -180,11 +186,14 @@ Les cartes de la maquette (les titres entre crochets sont des emplacements):
 
 ### Ce qui change d'une largeur à l'autre
 
-| | Mobile (390 px) | Tablette (820 px) | Desktop (1280 px) |
+| Élément | Mobile (390 px) | Tablette (820 px) | Desktop (1280 px) |
 |---|---|---|---|
 | Navigation | « K-B » et le bouton du menu | « K-B » et le bouton du menu | « K-B », « Veille », « Tendances », « Back office » |
+| Champ « Rechercher » | pleine largeur | 480 px au plus | 480 px au plus |
 | Sortes | deux colonnes | trois colonnes | une ligne |
 | Depuis | deux colonnes, « Date de début » dessous | une ligne, « Date de début » à droite | une ligne, avec « Date de début » |
+| Libellé « Date de début » | au-dessus de son champ | au-dessus de son champ | à gauche de son champ |
+| Titre d'une carte | 18 px | 19 px | 19 px |
 | Ligne d'une carte | la pastille après la date, les identifiants sur leur propre ligne | les identifiants, puis la pastille, sur une ligne | comme la tablette |
 | Cartes | les trois premières | les trois premières | les cinq; la première est survolée, sur fond canard brume (`#E6F0F1`) |
 | Contenu | pleine largeur | pleine largeur | 1120 px au plus, centré |
@@ -198,15 +207,19 @@ La sorte, l'état « Exploitée » et la page courante s'écrivent en mots, jama
 Le site est privé: seule l'opératrice, Sabine, y entre. La plateforme Azure Container Apps demande la connexion
 Microsoft Entra, puis le site vérifie, à chaque requête, que la personne connectée est l'opératrice
 (`web/operator_check.py`). Le schéma suit ses écrans et les liens qui les relient, d'après les routes de
-`web/pages.py` et les gabarits de `web/templates/`. Un rectangle est un écran du site, un rectangle arrondi un écran
-hors du site, un losange une vérification. Chaque flèche porte le lien ou l'événement qui mène d'un écran à l'autre.
+`web/pages.py` et les gabarits de `web/templates/`. Un rectangle est un écran du site; un rectangle arrondi, le point
+de départ, la plateforme ou un écran hors du site; un losange, une vérification. Chaque flèche porte, entre guillemets,
+le libellé exact du lien ou du bouton (« Retour au fil »), ou, sans guillemets, l'action ou l'événement qui mène d'un
+écran à l'autre (titre d'une carte).
 
 ```mermaid
 flowchart TD
     open("L'opératrice ouvre l'adresse du site")
     entra("Connexion Microsoft Entra<br>(plateforme Container Apps)")
-    check{"La personne connectée<br>est-elle l'opératrice ?"}
-    refused["Accès réservé<br>(page 403)"]
+    platform{"La plateforme admet-elle ce compte ?<br>(tenant du déploiement,<br>puis compte de Sabine seul)"}
+    platformRefused("Refus de la plateforme<br>(le 403 d'un autre compte du tenant<br>n'est pas constaté)")
+    check{"Le site: la personne connectée<br>est-elle l'opératrice ?"}
+    refused["Accès réservé<br>(page 403 du site)"]
     feed["Fil de veille<br>/"]
     detail["Détail d'un item<br>/items/{id}"]
     trends["Tendances<br>/tendances"]
@@ -217,46 +230,59 @@ flowchart TD
     failed["Erreur du serveur<br>(page 500)"]
     out("Session fermée<br>/.auth/logout")
     open -->|"sans session"| entra
-    entra -->|"connectée"| check
-    open -->|"session ouverte"| check
+    entra -->|"connectée"| platform
+    open -->|"session ouverte"| platform
+    platform -->|"non"| platformRefused
+    platform -->|"oui"| check
     check -->|"non"| refused
-    refused -->|"Se déconnecter"| out
+    refused -->|"« Se déconnecter »"| out
     check -->|"oui"| feed
-    feed -->|"Filtrer, Page suivante, Page précédente, Élargir à 7 jours"| feed
+    feed -->|"« Filtrer », « Page suivante », « Page précédente », « Élargir à 7 jours »"| feed
     feed -->|"titre d'une carte"| detail
     feed -->|"lien de la source d'une carte"| source
-    detail -->|"Retour au fil"| feed
+    detail -->|"« Retour au fil »"| feed
     detail -->|"bouton de la source"| source
-    feed -->|"Tendances"| trends
-    trends -->|"Afficher une autre fenêtre"| trends
+    feed -->|"« Tendances »"| trends
+    trends -->|"« Afficher » une autre fenêtre, « Voir la fenêtre la plus récente »"| trends
     trends -->|"nom d'un dépôt"| github
-    trends -->|"Veille"| feed
+    trends -->|"« Veille »"| feed
     feed -->|"pied de page"| info
     feed -->|"adresse ou item inconnu"| notFound
-    notFound -->|"Retour au fil de veille"| feed
-    notFound -->|"Voir les tendances"| trends
-    feed -->|"API de données en échec"| failed
-    failed -->|"Retour au fil de veille, Réessayer"| feed
-    feed -->|"Se déconnecter"| out
+    notFound -->|"« Retour au fil de veille »"| feed
+    notFound -->|"« Voir les tendances »"| trends
+    feed -->|"API de données en échec, erreur imprévue"| failed
+    failed -->|"« Retour au fil de veille », « Réessayer »"| feed
+    feed -->|"« Se déconnecter »"| out
 ```
 
 **Description du schéma.** L'opératrice ouvre l'adresse du site. Sans session, la plateforme l'envoie à la connexion
-Microsoft Entra; connectée, ou déjà en session, elle passe la vérification du site. Si la personne connectée n'est pas
-l'opératrice, le site répond la page « Accès réservé » (403), dont le seul bouton, « Se déconnecter », ferme la
-session. Sinon, elle arrive sur le fil de veille.
+Microsoft Entra. La plateforme n'admet que les comptes du tenant du déploiement (`openIdIssuer`), et parmi eux le seul
+compte de Sabine (`allowedPrincipals`, `infra/modules/api-container-app.bicep:216-226`): elle refuse tout autre compte.
+Limite: le 403 que la plateforme rend à un autre compte du tenant n'est pas constaté, faute d'un second compte pour
+l'essayer (`infra/README.md:1530-1531`). Parade: le site vérifie lui-même, à chaque requête, que la personne connectée
+est l'opératrice (`web/operator_check.py`), le second verrou. Sinon, il répond la page « Accès réservé » (403), dont le
+seul bouton, « Se déconnecter », ferme la session. Sur cette page, « K-B », « Veille » et les liens du pied repassent
+par la même vérification, et rendent de nouveau la page 403. Si la personne est l'opératrice, elle arrive sur le fil
+de veille.
 
 Depuis le fil, « Filtrer », « Page suivante », « Page précédente » et « Élargir à 7 jours » (quand le fil est vide sur
 1 ou 3 jours) rechargent le fil. Le titre d'une carte mène au détail de l'item, d'où « Retour au fil » ramène au fil.
 Le lien de la source, sur une carte comme sur le détail, ouvre la source dans un nouvel onglet. « Tendances », dans
-l'en-tête, mène aux tendances, où « Afficher » montre une autre fenêtre et le nom d'un dépôt ouvre sa page GitHub
-dans un nouvel onglet; « Veille » ramène au fil. Le pied de chaque page mène aux sources et à l'accessibilité.
+l'en-tête, mène aux tendances. « Afficher » y montre une autre fenêtre, et « Voir la fenêtre la plus récente », quand
+la fenêtre demandée n'a pas de tendances, la plus récente. Le nom d'un dépôt ouvre sa page GitHub dans un nouvel
+onglet; « Veille » ramène au fil. Le pied de chaque page mène aux sources et à l'accessibilité.
 
 Une adresse ou un item inconnus donnent la page 404, qui propose « Retour au fil de veille » et « Voir les tendances ».
-Un échec de l'API de données donne la page 500, qui propose « Retour au fil de veille » et « Réessayer ». Sur chaque
-page, « Se déconnecter », à la fin de l'en-tête, ferme la session (`/.auth/logout`, servi par la plateforme). Pour la
-lisibilité, le schéma ne trace ces deux pages d'erreur et la déconnexion que depuis le fil, et les pages « Sources » et
-« Accessibilité » que depuis lui; « K-B » et « Veille », sur chaque page, ramènent au fil.
+Un échec de l'API de données, ou toute erreur imprévue du site, donne la page 500. Elle propose « Retour au fil de
+veille », et « Réessayer », qui recharge l'adresse qui a échoué. Si le gabarit de la page 500 échoue lui aussi, une
+page de repli, sans en-tête, ne propose que « Retour au fil de veille ».
 
-Les écrans à venir (les comptes rendus de veille, le top 10, le rapport de tendances, le back office) ne sont pas dans
-ce schéma, qui ne montre que le site construit. La planche « Arborescence de l'application » du canevas du 09/11/2026
-montre ceux que les maquettes prévoient.
+Sur chaque page sauf la 403, « Se déconnecter », à la fin de l'en-tête, ferme la session (`/.auth/logout`, servi par
+la plateforme); la page 403 le porte en bouton, et la page de repli ne le porte pas. Quand le contrôle du site est
+coupé (`KB_WEB_AUTH=off`, sur le Mac seulement), aucune page ne le porte. Pour la lisibilité, le schéma ne trace les
+pages d'erreur, les pages « Sources » et « Accessibilité » et la déconnexion que depuis le fil: la page 500 n'y vient
+que du fil, et « Réessayer » y ramène donc au fil. « K-B » et « Veille », sur chaque page, ramènent au fil.
+
+Les écrans à venir ne sont pas dans ce schéma, qui ne montre que le site construit. Parmi eux, la planche
+« Arborescence de l'application » du canevas du 09/11/2026 montre le back office prévu; les comptes rendus de veille,
+le top 10 et le rapport de tendances n'ont pas encore de maquette.
