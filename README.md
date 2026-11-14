@@ -165,15 +165,19 @@ je fusionne. Les décisions et leur pourquoi sont consignées dans le
 ### Planning
 
 Les jalons et leurs issues sont sur la
-[page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons à venir, relevés
-le 18/10/2026 :
+[page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons encore ouverts,
+relevés le 14/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
 
-| Jalon | Échéance |
-|---|---|
-| POC 25/10 | 25/10/2026 |
-| Comptes rendus de veille tous les 3 jours | 01/11/2026 |
-| Mise en ligne 08/11 | 08/11/2026 |
-| Wiki : ingest des clips | sans date, après le 29/10 |
+| Jalon | Échéance | Issues fermées | Issues ouvertes |
+|---|---|---|---|
+| POC 25/10 | 25/10/2026 | 54 | 8 |
+| Oral blanc E1 E3 29/10 | 29/10/2026 | 6 | 2 |
+| Fiches de veille tous les 3 jours | 01/11/2026 | 0 | 2 |
+| Mise en ligne 08/11 | 08/11/2026 | 8 | 7 |
+| Wiki : ingest des clips | sans date | 0 | 1 |
+
+Les quatre premiers jalons, « Cadrage et socle », « Fusion et base », « API « quoi de neuf » » et
+« Collecte multi-sources », sont fermés.
 
 ### Le POC du 25/10 et la suite
 
