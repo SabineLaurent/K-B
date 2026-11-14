@@ -160,7 +160,10 @@ du 09/11 : `Maquette-tendances`. `web/trends.py` lit le jour et bâtit la page, 
 (`web/feed.py`), la règle de la date de début du fil : `WrittenDay`, `AAAA-MM-JJ`, un jour qui existe. Vide ou
 absent, la fenêtre la plus récente ; répété, sa dernière valeur. Le champ montre le dernier jour de la fenêtre
 affichée, ou le jour demandé d'une fenêtre absente ; jamais une valeur refusée (la valeur d'un `type=date` est un
-jour valide ou rien : WHATWG, RGAA 8.2).
+jour valide ou rien : WHATWG, RGAA 8.2). Le message nomme donc une valeur refusée qui a la forme d'un jour, chiffres
+ASCII et tirets seuls (`DAY_SHAPE`, « Date invalide: 2026-02-30 n’existe pas. ») ; toute autre valeur n'atteint
+jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Limite (Opquast 81) : la valeur refusée ne revient
+pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
 
 **Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
 le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
@@ -186,7 +189,7 @@ tableau (étoiles gagnées, puis *forks*). Pas de « jusqu'à 60 dépôts » (mi
 | État | Statut | Page |
 |---|---|---|
 | une fenêtre | 200 | le tableau |
-| un jour refusé par le site | 422 | le message sous le champ, `aria-invalid`, « Tendances, date à corriger », sans tableau ni appel à l'API |
+| un jour refusé par le site | 422 | le message sous le champ, qui nomme une valeur de la forme d'un jour, `aria-invalid`, « Tendances, date à corriger », sans tableau ni appel à l'API |
 | un 422 `invalid_parameter` de l'API sur `window_end` seul | 422 | le même, « La base de K-B refuse cette date » |
 | un 404 `trend_window_not_found` avec un jour | 200 | « Aucune tendance pour la fenêtre qui se termine le … », et « Voir la fenêtre la plus récente » |
 | un 404 `trend_window_not_found` sans jour | 200 | « Aucune tendance en base. » |

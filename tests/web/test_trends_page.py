@@ -99,14 +99,29 @@ def test_a_day_refused_gives_the_page_in_422_without_asking_the_data_api():
     assert requests == []
     assert "<title>Tendances, date à corriger · K-B</title>" in response.text
     assert (
-        '<p id="window-end-error" class="field-error">Date invalide: un jour attendu,'
-        " sous la forme AAAA-MM-JJ.</p>" in response.text
+        '<p id="window-end-error" class="field-error">Date invalide: 2026-02-30'
+        " n’existe pas. Un jour attendu, sous la forme AAAA-MM-JJ.</p>" in response.text
     )
     field = read_field(response)
     assert 'aria-invalid="true"' in field
     assert 'aria-describedby="window-end-error window-end-help"' in field
     assert 'value=""' in field
     assert "<table" not in response.text
+
+
+def test_a_value_refused_out_of_the_form_of_a_day_never_reaches_the_page():
+    """Only digits and dashes are named: a link could otherwise make the page say any text."""
+    handler, requests = record(TRENDS)
+
+    response = get(f"{TRENDS_PATH}?window_end=Appelez%20le%200800%20000%20000", handler)
+
+    assert response.status_code == 422
+    assert requests == []
+    assert "Appelez" not in response.text
+    assert (
+        '<p id="window-end-error" class="field-error">Date invalide: un jour attendu,'
+        " sous la forme AAAA-MM-JJ.</p>" in response.text
+    )
 
 
 def test_a_window_end_refused_by_the_data_api_is_said_under_its_field():

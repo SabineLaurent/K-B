@@ -749,6 +749,16 @@ def test_the_trends_say_their_sample_and_their_order():
     assert "Jusqu’à 60" not in text
 
 
+@pytest.mark.parametrize("name", sorted(TREND_PAGES))
+def test_gh_archive_is_explained_at_its_first_occurrence(name):
+    """Opquast 2025, rule 5: in the words of /sources."""
+    text = outline(PAGES[name]).text
+
+    assert text[text.index("GH Archive") :].startswith(
+        "GH Archive (l’archive des événements publics de GitHub)"
+    )
+
+
 def test_the_word_forks_is_marked_in_english():
     """Absent from the dictionaries of French (RGAA 8.7)."""
     english = outline(PAGES["/tendances"]).texts_in_english

@@ -48,26 +48,22 @@ def test_a_day_is_read_as_the_last_day_of_its_window():
 @pytest.mark.parametrize(
     "value",
     [
-        "2026-02-30",
         "20261010",
         "2026-1-7",
         "10/10/2026",
         "2026-10-10T00:00",
         "x" * 3000,
         "2026-10-10%01",
-        "0000-01-01",
         # A digit of full width, which Python reads as a digit.
         "%EF%BC%92026-10-10",
     ],
     ids=[
-        "no-such-day",
         "without-dashes",
         "short",
         "french-form",
         "with-time",
         "long",
         "control",
-        "year-zero",
         "full-width-digit",
     ],
 )
@@ -75,6 +71,23 @@ def test_a_value_that_is_not_a_day_is_refused_on_its_field(value):
     """The rule of the route of the data API, WrittenDay: YYYY-MM-DD, a day that exists."""
     assert read(f"window_end={value}") == TrendsForm(
         None, FieldError(WINDOW_END_ID, WINDOW_END_REFUSED)
+    )
+
+
+@pytest.mark.parametrize("value", ["2026-02-30", "2026-13-01", "0000-01-01"])
+def test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_message(
+    value,
+):
+    """Opquast 2025, rule 81: an input type=date holds a valid day or nothing, so its field cannot
+    show the value refused again; its message names it. Digits and dashes only: no other text
+    received reaches the page."""
+    assert read(f"window_end={value}") == TrendsForm(
+        None,
+        FieldError(
+            WINDOW_END_ID,
+            f"Date invalide: {value} n’existe pas. Un jour attendu, sous la forme"
+            " AAAA-MM-JJ.",
+        ),
     )
 
 
