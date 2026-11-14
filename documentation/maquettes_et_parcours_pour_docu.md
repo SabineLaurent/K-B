@@ -102,11 +102,12 @@ Quatre icônes au trait, chacune suivie de son sens:
 Sous elles: « SVG en ligne, au trait, décoratifs (aria-hidden): le texte à côté porte le sens. Aucune image
 décorative. »
 
-### Contrastes WCAG 2.1 des couples texte / fond
+### Contrastes WCAG 2.2 des couples texte / fond
 
-« Calculés par un script (luminance relative de WCAG 2.1). Seuils: AA 4,5:1 pour le texte courant, 3:1 pour un
-composant d'interface ou un texte de 24 px; AAA 7:1. » Sur la planche, chaque ligne montre aussi un aperçu, « Aa
-texte » écrit dans le couple de couleurs.
+« Calculés par un script (luminance relative de WCAG 2.2). Seuils: AA 4,5:1 pour le texte courant, 3:1 pour un
+composant d'interface ou un texte de 24 px; AAA 7:1. » Puis, en 14 px: « Note: critères de contraste (1.4.3, 1.4.6,
+1.4.11) et formule de la luminance relative identiques à WCAG 2.1, base du RGAA 4.1.2 en vigueur. » Sur la planche,
+chaque ligne montre aussi un aperçu, « Aa texte » écrit dans le couple de couleurs.
 
 | Texte / fond | Usage | Ratio | Niveau |
 |---|---|---|---|
