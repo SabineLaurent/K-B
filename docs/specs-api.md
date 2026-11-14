@@ -631,10 +631,12 @@ Les paramètres et la réponse de `GET /tops/{top}/days` : `limit` de 1 à 100 (
   là, le site ne montre aucun compte rendu ; sur le Mac, sans `AZURE_CLIENT_ID`, les routes répondent 503
   `watch_unconfigured` (limite (c) des tops). Pour réduire le risque : lancer le job une fois à la main après le
   tag, geste de tn-codeur, possible seulement l'abonnement rétabli.
-- (c) Une `OSError` entre la fiche et son jumeau perd ce jour sur le site : la fiche existe, et le compte rendu
-  suivant du sujet part de son `until`. Le sujet est compté en échec et `kb digest` sort en erreur
-  (`twin not written`, `commands/digest_command.py`), vu au journal du job. Pour réduire le risque : réécrire ce
-  jumeau depuis la fiche, par l'outil de (a), sans `item_id` ; faisable en code, non planifié.
+- (c) Un jumeau non écrit après sa fiche perd ce jour sur le site, sans réparation : une `OSError`, un temporaire
+  trouvé (`temporary_file_found`), ou un arrêt de `kb digest` entre les deux écritures (SIGTERM). La fiche existe :
+  le compte rendu suivant du sujet part de son `until`, et un nouveau lancement du même jour est refusé
+  (`sheet_exists`). Sauf l'arrêt, le sujet est compté en échec et `kb digest` sort en erreur (`twin not written`,
+  `commands/digest_command.py`), vu au journal du job. Pour réduire le risque : réécrire ce jumeau depuis la fiche,
+  par l'outil de (a), sans `item_id` ; faisable en code, non planifié.
 - (d) `item_id` est une clé de substitution : une base refaite renumérote ses items, et le lien du site mène sans
   erreur à un autre item ; un item purgé répond 404 `item_not_found`. Pour réduire le risque : le site ne mène à
   l'item que si son titre est celui de la source, sinon à l'URL de la source ; faisable, geste de la session du site.
@@ -645,6 +647,12 @@ Les paramètres et la réponse de `GET /tops/{top}/days` : `limit` de 1 à 100 (
 - (f) Les textes du modèle et les titres des sources peuvent nommer des personnes (« Données personnelles »). Pour
   réduire le risque : ni l'API ni le journal ne les citent
   (`test_a_twin_out_of_its_schema_is_refused_and_its_text_never_logged`), et le site est privé (Entra, #571).
+- (g) Une affirmation dont le texte n'a aucun caractère visible (que des blancs ou des caractères cachés) passe
+  l'API IA, qui mesure sa longueur brute (`ai_api/stages/writing.py`, `is_within_claim_bounds`), puis le jumeau la
+  refuse vide : le sujet n'a ni fiche ni jumeau pour ce lancement (`twin_refused`). Il garde son début, et son
+  compte rendu suivant recouvre la fenêtre : rien n'est perdu, le compte rendu est retardé. Pour réduire le risque :
+  l'API IA mesure le texte visible et retire l'affirmation vide comme un texte hors bornes (#624, XS ; faisable en
+  code). Tranché par time-knight le 2026-11-14, revue de #560.
 
 ## Erreurs
 

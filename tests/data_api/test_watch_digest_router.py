@@ -2,6 +2,7 @@
 read in watch (#560; docs/specs-api.md, "GET /digests/{subject}"). The storage, its errors and the
 listing of a folder are those of the tops (test_top_router.py): one reader for both kinds."""
 
+import dataclasses
 import json
 import logging
 import secrets
@@ -41,6 +42,7 @@ from k_b.core.config import (
 )
 from k_b.data_api.app import create_app
 from k_b.data_api.schemas.watch_digest_schema import DigestSubjectName
+from k_b.data_api.watch_reading import DIGEST_TWINS
 from k_b.items import (
     MAX_DIGEST_SOURCE_TITLE_CHARS,
     MAX_DIGEST_SOURCE_URL_CHARS,
@@ -548,3 +550,16 @@ def test_the_digests_read_never_push_a_top_out_of_the_reader(
     digest_client.get("/tops/most_starred", headers=web_headers)
 
     assert watch.downloaded_names().count("tops/most_starred/2026-11-10.json") == 1
+
+
+def test_a_kind_the_reader_was_not_built_with_is_read_and_kept(watch, clock):
+    # A kind added later (#561) needs no list of kinds in the reader.
+    kind = dataclasses.replace(DIGEST_TWINS, kept_count=1)
+    put_twin(watch)
+    reader = make_reader(watch.handle, clock)
+
+    first = reader.read_production(kind, SUBJECT, None)
+    again = reader.read_production(kind, SUBJECT, None)
+
+    assert (first.day, again.day) == (date(2026, 11, 10), date(2026, 11, 10))
+    assert watch.downloaded_names() == [name_twin("2026-11-10")]

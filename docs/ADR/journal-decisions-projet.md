@@ -7231,10 +7231,12 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   (le site ne lit que l'API de données et ne rend aucun Markdown) ; la cible reste un index en base (#531).
   L'`item_id`, pour que le site mène de la source à l'item du fil (issue #560). Limites assumées, chacune avec sa
   parade dans `docs/specs-api.md` (« `GET /digests/{subject}` ») : (a) l'historique commence au premier jumeau ;
-  (b) en ligne, rien avant le tag, une exécution de `caj-kb-digest-watch` et l'abonnement Azure rétabli ; (c) une
-  `OSError` entre la fiche et son jumeau perd ce jour sur le site ; (d) `item_id` est une clé de substitution,
-  qu'une base refaite renumérote ; (e) un sujet retiré rend ses comptes rendus inaccessibles ; (f) les textes du
-  modèle et les titres des sources peuvent nommer une personne. — PR de #560
+  (b) en ligne, rien avant le tag, une exécution de `caj-kb-digest-watch` et l'abonnement Azure rétabli ; (c) un
+  jumeau non écrit après sa fiche perd ce jour sur le site ; (d) `item_id` est une clé de substitution, qu'une base
+  refaite renumérote ; (e) un sujet retiré rend ses comptes rendus inaccessibles ; (f) les textes du modèle et les
+  titres des sources peuvent nommer une personne ; (g) une affirmation sans caractère visible fait refuser le
+  jumeau, et le compte rendu du sujet attend le lancement suivant (parade : #624, tranché par time-knight, revue de
+  code de #560). — PR de #560
 - **Le jumeau est construit et relu par son schéma avant la fiche : refusé, ni fiche ni jumeau, le sujet échoue
   (`twin_refused`) et garde son début ; sinon la fiche, puis le jumeau.** Plan validé (point 1), comme #559 : rien
   n'est écrit que l'API refuserait, et le sujet gardant son début (#565), son compte rendu suivant recouvre la

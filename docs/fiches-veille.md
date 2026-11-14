@@ -2356,7 +2356,7 @@ en base (#531).
   téléchargement échoue. Pour réduire le risque : recompter les noms d'une journée dans le commentaire de
   `MAX_WATCH_LISTED_BLOBS` (`core/config.py`) à chaque production nouvelle, et monter la borne quand l'horizon
   approche ; faisable en code (décision de time-knight du 2026-11-14, déléguée par Sabine).
-- **Limites** : celles de la route ([specs-api.md](specs-api.md), « `GET /digests/{subject}` », (a) à (f)) ; un
+- **Limites** : celles de la route ([specs-api.md](specs-api.md), « `GET /digests/{subject}` », (a) à (g)) ; un
   jumeau non écrit après sa fiche perd ce jour sur le site (limite (c)).
 
 ## Sources

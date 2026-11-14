@@ -82,6 +82,10 @@ class TwinKind[Production: BaseModel]:
     max_bytes: int
     kept_count: int
 
+    def find_prefix(self, folder: str) -> str:
+        """The prefix of the names of the twins of folder."""
+        return f"{self.parent}{folder}/"
+
 
 TOP_TWINS = TwinKind(
     parent=f"{TOPS_DIR_NAME}/",
@@ -153,11 +157,9 @@ class WatchReader:
         self.lock = threading.Lock()
         # By the prefix of a folder: the folders are a closed set, the tops and the subjects.
         self.listings: dict[str, FolderListing] = {}
-        # Each kind with its own productions read, by name and etag: a production of a kind is of
-        # its schema, or its refusal.
-        self.productions: dict[TwinKind[Any], OrderedDict[tuple[str, str], Any]] = {
-            kind: OrderedDict() for kind in (TOP_TWINS, DIGEST_TWINS)
-        }
+        # Each kind with its own productions read, by name and etag, made at its first reading: a
+        # production of a kind is of its schema, or its refusal (Any, as one dict holds every kind).
+        self.productions: dict[TwinKind[Any], OrderedDict[tuple[str, str], Any]] = {}
 
     def list_days(self, kind: TwinKind[Any], folder: str) -> list[date]:
         """The days of the twins of the folder of kind, the most recent first, none after today
@@ -181,7 +183,7 @@ class WatchReader:
     def list_twins(self, kind: TwinKind[Any], folder: str) -> list[ListedTwin]:
         """The twins of the listing of the folder kept, or listed again once WATCH_CACHE_SECONDS
         have passed; a twin of a day after today is left aside."""
-        prefix = f"{kind.parent}{folder}/"
+        prefix = kind.find_prefix(folder)
         moment = self.monotonic()
         with self.lock:
             listing = self.listings.get(prefix)
@@ -201,7 +203,7 @@ class WatchReader:
         often as it is asked."""
         key = (twin.blob.name, twin.blob.etag)
         with self.lock:
-            kept = self.productions[kind]
+            kept = self.productions.setdefault(kind, OrderedDict())
             production: Production | TwinRefusal | None = kept.get(key)
             if production is not None:
                 kept.move_to_end(key)
@@ -232,7 +234,7 @@ class WatchReader:
         )
         if content is None:
             with self.lock:
-                self.listings.pop(f"{kind.parent}{folder}/", None)
+                self.listings.pop(kind.find_prefix(folder), None)
             raise WatchReadingError(
                 "watch_production_changed", f"{folder} of {twin.day}"
             )
