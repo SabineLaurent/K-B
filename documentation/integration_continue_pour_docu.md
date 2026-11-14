@@ -14,8 +14,8 @@ d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livr
 ## La chaîne en bref
 
 Chaque PR vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
-couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et, quand `infra/`
-change, le Bicep. Une PR ne fusionne que si ses cinq contrôles requis sont verts sur une branche à jour avec `main`
+couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Une
+PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
 (le ruleset, plus bas). La CI ne pousse rien et ne déploie rien: elle n'a aucun droit sur Azure.
 
 ### Les outils
@@ -38,8 +38,8 @@ change, le Bicep. Une PR ne fusionne que si ses cinq contrôles requis sont vert
 
 | Déclencheur | Ce qui tourne |
 |---|---|
-| une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI` et `Image` (`ci.yml:3-7`, `image.yml:3-7`); `Infra` aussi si la PR touche `infra/**` ou `.github/workflows/infra.yml` (`infra.yml:7-9`) |
-| un push sur `main`, c'est-à-dire une fusion | les mêmes, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-6`) |
+| une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI`, `Image` et `Infra` (`ci.yml:3-7`, `image.yml:3-7`, `infra.yml:3-7`); `Infra` sans filtre de chemin depuis #496 |
+| un push sur `main`, c'est-à-dire une fusion | les mêmes, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`) |
 | « Re-run all jobs » ou « Re-run failed jobs » sur une exécution, ou `gh run rerun <id>` | la même exécution, sur le même commit |
 | le planning de Dependabot, chaque semaine (`dependabot.yml:6-7`, `:13-14`) | une PR de mise à jour, qui lance la CI comme toute PR |
 | une alerte de Dependabot, à tout moment (mises à jour de sécurité, activées plus bas) | une PR de sécurité, sans attente, qui lance la CI comme toute PR |
@@ -55,7 +55,7 @@ pas annulée.
 
 Les jobs d'un même workflow tournent en parallèle, chacun sur un runner neuf. Dans un job, les étapes s'enchaînent,
 et la première qui échoue arrête le job. Chaque workflow n'a qu'un jeton qui lit le dépôt (`permissions: contents:
-read`, `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:11-12`) et ne lit aucun secret.
+read`, `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`) et ne lit aucun secret.
 
 **`CI`** (`.github/workflows/ci.yml`). Chaque job récupère le dépôt, installe uv 0.13.6, puis
 `uv sync --locked`, qui refuse un `uv.lock` qui ne suit plus le `pyproject.toml`. Seul `tests` garde le cache de uv
@@ -86,9 +86,9 @@ read`, `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:11-12`) et ne lit aucun secre
 L'image `k-b:ci` n'est poussée nulle part: celle qui part en ligne est construite par `Deploy`, depuis le commit du
 tag.
 
-**`Infra`** (`.github/workflows/infra.yml`), un job, `bicep-build`, non requis à la fusion: il récupère le dépôt
-(l. 20), demande à `az` d'utiliser son propre Bicep (l. 22), installe Bicep v0.48.1 (l. 23), vérifie son SHA256
-(l. 25), affiche sa version (l. 26), puis compile `infra/main.bicep` (l. 27). Il ne se connecte pas à Azure:
+**`Infra`** (`.github/workflows/infra.yml`), un job, `bicep-build`, requis à la fusion depuis #496: il récupère le
+dépôt (l. 19), demande à `az` d'utiliser son propre Bicep (l. 21), installe Bicep v0.48.1 (l. 22), vérifie son
+SHA256 (l. 24), affiche sa version (l. 25), puis compile `infra/main.bicep` (l. 26). Il ne se connecte pas à Azure:
 Sabine applique le Bicep à la main (`infra/README.md`).
 
 **Après la CI**: `Deploy` ne met en ligne qu'un commit dont toutes les exécutions des workflows du dépôt sont finies
@@ -107,13 +107,13 @@ gh pr create --repo SabineLaurent/K-B --base main
 gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin, puis un contrôle par ligne
 ```
 
-Une PR qui ne touche ni `infra/` ni `.github/workflows/infra.yml` reçoit sept contrôles: les six jobs de `CI` et
-`image-build`. Celle qui touche l'un des deux en reçoit un huitième, `bicep-build`.
+Une PR reçoit huit contrôles: les six jobs de `CI`, `image-build` et `bicep-build`, que `infra.yml` lance sur toute
+PR depuis #496, qu'elle touche `infra/` ou non.
 
-**Fusionner**: possible quand les cinq contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`) sont
-verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour (`git fetch origin`,
-puis `git rebase origin/main` et `git push --force-with-lease`, ou « Update branch » sur la PR): la CI repasse sur
-le nouveau commit. La fusion se fait par un commit de fusion, la seule méthode permise par le ruleset.
+**Fusionner**: possible quand les six contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
+`bicep-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
+(`git fetch origin`, puis `git rebase origin/main` et `git push --force-with-lease`, ou « Update branch » sur la
+PR): la CI repasse sur le nouveau commit. La fusion se fait par un commit de fusion, la seule méthode permise par le ruleset.
 
 **Relancer** une exécution, par exemple après un échec du réseau: « Re-run failed jobs » sur la page de l'exécution,
 ou:
@@ -195,7 +195,7 @@ Rien ne se règle hors du dépôt, en dehors de l'étape précédente: aucun wor
 | version de pip-audit | `ci.yml:25` | à la main |
 | image de PostgreSQL | `ci.yml:69`, tag et digest | à la main: d'après le commentaire de `ci.yml:63-64`, Dependabot ne la met pas à jour |
 | chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:33` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
-| version de Bicep | `infra.yml:23`, et son SHA256 à `infra.yml:25` | les deux ensemble, l'empreinte lue sur la release de Bicep |
+| version de Bicep | `infra.yml:22`, et son SHA256 à `infra.yml:24` | les deux ensemble, l'empreinte lue sur la release de Bicep |
 | seuil de couverture | `fail_under`, `pyproject.toml:83` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
 | règles de lint | `[tool.ruff.lint]`, `pyproject.toml:48-67` | `uv run ruff check --no-cache` avant de pousser |
 | tests écartés par défaut | marqueurs `e2e` et `postgresql`, écartés sauf s'ils sont nommés par `-m` (`tests/conftest.py:118-130`) | un test marqué `postgresql` ne tourne que dans `tests-postgresql` |
@@ -219,17 +219,18 @@ d'`image-build` et de `bicep-build` ne refont qu'une partie du job:
 | `tests-postgresql` | `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` |
 | `tests-data` | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py` |
 | `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; les autres étapes (`image.yml:22-61`) ne tournent que sur le runner: elles écrivent dans `$RUNNER_TEMP` et plantent des fichiers dans l'arbre de travail; leur résultat se lit dans le journal du job (`gh run view <id> --log`) |
-| `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:25`) |
+| `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:24`) |
 
 **Sur GitHub, une PR témoin**: [#533](https://github.com/SabineLaurent/K-B/pull/533), fusionnée le 2026-11-09, ne
 touche pas `infra/`. Elle a reçu sept contrôles, tous verts (`gh pr checks 533 --repo SabineLaurent/K-B`): `audit`
 (13 s), `tests` (1 min 21 s), `lint` (11 s), `types` (15 s), `tests-postgresql` (1 min 1 s), `tests-data` (30 s),
 dans l'exécution 42617081839 de `CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`;
-`bicep-build` n'y a pas tourné.
+`bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi `bicep-build`, un huitième contrôle.
 
 **Un push témoin**: la fusion `89ef7fb` sur `main`, le 2026-11-10, a lancé `CI` (42815479408) et `Image`
-(42815479369), toutes deux `success`; `Infra` n'a pas tourné, `infra/` n'ayant pas changé. La dernière exécution
-d'`Infra` sur `main` est 42750689052, `success`, sur `cad8328` (2026-11-10).
+(42815479369), toutes deux `success`; `Infra` n'y a pas tourné, `infra/` n'ayant pas changé, avant #496, qui le
+lance sur tout push sur `main`. La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`, sur
+`cad8328` (2026-11-10).
 
 **Un refus témoin**: l'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards`
 (2026-10-31), a eu `audit` en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
@@ -271,16 +272,11 @@ Chaque parade a été vérifiée à la source le 2026-11-10 (sources en fin de l
   dépôt), mais « Pull request authors cannot approve their own pull requests »: avec une seule personne au dépôt et
   aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de Dependabot, d'un autre
   auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
-- **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `bicep-build` ne sont pas dans le
-  ruleset. `bicep-build`, filtré par chemin, bloquerait toute PR qui ne touche pas `infra/` (`infra.yml:15`). Ils
-  comptent à la livraison (`deploy.yml:51-67`).
+- **Deux contrôles ne bloquent pas la fusion**: `tests-data` et `image-build` ne sont pas dans le ruleset. Ils
+  comptent à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis #496: `infra.yml` n'a plus de filtre de
+  chemin, car un workflow sauté par son filtre laisse ses contrôles « Pending » et bloque la fusion.
   Pour réduire le risque: ajouter `tests-data` et `image-build` aux contrôles requis du ruleset (faisable avec nos
-  droits). Pour `bicep-build`, GitHub conseille de ne pas exiger un workflow qui peut être sauté: un workflow sauté par
-  son filtre de chemins laisse ses contrôles « Pending » et bloque la fusion, alors qu'un job sauté par une condition
-  (`if:`) rend « Success ». Le filtre passerait du déclencheur d'`infra.yml` à une condition du job, calculée par un
-  job préalable; `bicep-build` devrait alors échouer si ce préalable n'a pas réussi (`always()` et un test de
-  `needs.<id>.result`), car sinon il est sauté, et un job sauté peut ne pas bloquer la fusion (faisable avec nos
-  droits, un changement d'`infra.yml`).
+  droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
   services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
   Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
@@ -305,7 +301,7 @@ Chaque parade a été vérifiée à la source le 2026-11-10 (sources en fin de l
   #533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
   Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-  lance la CI et attend ses cinq contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+  lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
   lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,

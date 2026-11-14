@@ -18,8 +18,8 @@ Une version part en ligne quand un tag `vX.Y.Z` est poussé sur un commit de `ma
 Une fusion ne déploie rien. La chaîne a trois temps.
 
 1. **La CI**, sur chaque PR vers `main` et sur chaque push sur `main`: `ci.yml` (tests, lint, typage, audit),
-   `image.yml` (l'image se construit et se contrôle, sans être poussée), et `infra.yml` quand `infra/` change (le
-   Bicep se compile). Son détail est l'affaire de la fiche de l'intégration continue.
+   `image.yml` (l'image se construit et se contrôle, sans être poussée), et `infra.yml` (le Bicep se compile, sur
+   toute PR depuis #496). Son détail est l'affaire de la fiche de l'intégration continue.
 2. **Le tag**: une administratrice du dépôt pose `vX.Y.Z` sur un commit de `main` et le pousse.
 3. **Le workflow `Deploy`** (`.github/workflows/deploy.yml`): le job `check` vérifie le tag et la CI de son commit,
    puis le job `deploy` construit l'image du tag, migre la base, met les deux API et les jobs à cette image, attend
