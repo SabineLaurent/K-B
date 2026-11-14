@@ -17,16 +17,16 @@
   - le rôle de lecture de `watch` est posé par [la mise en ligne du site
     privé](2026-11-11-mettre-en-ligne-le-site-prive.md) (#571).
 
-Commits de la branche, sur `origin/main` `1b6e0b8` :
+Commits de la branche, sur `origin/main` `690a63f` :
 
 | Commit | Contenu |
 |---|---|
-| `f0d8875` | phase A, le téléchargement borné |
-| `2747a34` | phase B, le jumeau |
-| `fe0780b` | phase C, les routes |
-| `b0cf3ae` | la documentation |
-| `65ccd0f` | les corrections du premier passage de revue |
-| `ad04fde` | les corrections du second passage |
+| `9113cd0` | phase A, le téléchargement borné |
+| `657254f` | phase B, le jumeau |
+| `d971372` | phase C, les routes |
+| `dd045e2` | la documentation |
+| `5bd90df` | les corrections du premier passage de revue |
+| `88923b5` | les corrections du second passage |
 
 La liste des fichiers donnée à la note compte aussi des fichiers que cette branche ne touche pas : `src/k_b/web/`,
 `infra/`, `observability/`, `tests/database/`, `tests/web/` et trois autres notes. Elle a été calculée depuis une base
@@ -59,7 +59,7 @@ Le jumeau est décrit une fois, dans `items.py`, le vocabulaire commun à toutes
 `.claude/rules/conventions.md`) :
 
 ```python
-# src/k_b/items.py:689-695
+# src/k_b/items.py:690-696
     model_config = ConfigDict(strict=True, extra="forbid")
 
     top: TopName
@@ -76,10 +76,10 @@ Le jumeau est décrit une fois, dans `items.py`, le vocabulaire commun à toutes
 **Ce que le modèle exige :**
 - `extra="forbid"` refuse un champ en plus ;
 - `strict=True` refuse une conversion silencieuse, par exemple la chaîne `"3"` pour un entier ;
-- `check_ranks_follow_each_other` (`items.py:697-703`) exige les rangs 1 à n, dans l'ordre ;
+- `check_ranks_follow_each_other` (`items.py:698-704`) exige les rangs 1 à n, dans l'ordre ;
 - chaque dépôt (`TopRepository`) porte une `url` égale à `https://github.com/` suivi de son nom, et un nom de
   255 caractères au plus ;
-- la description est un `VisibleText` (`items.py:254`), qui refuse tout caractère caché sauf U+200D, le joint
+- la description est un `VisibleText` (`items.py:255`), qui refuse tout caractère caché sauf U+200D, le joint
   des emojis.
 
 **L'écrivain rend la description lisible avant le schéma** (`make_visible`, `post/top_sheets.py:236-243`) :
@@ -271,7 +271,7 @@ Sans `KB_EXCHANGE_BLOB_URL` ou sans `AZURE_CLIENT_ID`, `kb serve-data` démarre 
 | `test_an_invalid_repository_is_refused_with_its_rank`, `test_a_count_out_of_its_bounds_names_the_bound_it_crossed` (les deux sources) | Rouges montrés : 6 `DID NOT RAISE`, puis 4 messages « out of 0 to … » ; la collecte refuse ce que le jumeau refuse, par la borne franchie |
 | `test_a_ranking_whose_twin_its_schema_refuses_is_kept_without_its_values` (`tests/post/test_top_sheets.py`) | Le filet du jumeau tient : relevé gardé, ni fiche ni jumeau, aucune valeur au journal |
 | `test_serve_without_a_setting_of_the_storage_starts_and_says_the_tops_unconfigured` (3 cas) | Rouge montré : la ligne nommait une seule variable, ou écrivait l'ERROR ; désormais INFO, avec les variables absentes |
-| `uv run pytest` → 4929 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles du dépôt passent |
+| `uv run pytest` → 5267 passed, après le rebase sur `690a63f` ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles du dépôt passent |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -279,7 +279,7 @@ Sans `KB_EXCHANGE_BLOB_URL` ou sans `AZURE_CLIENT_ID`, `kb serve-data` démarre 
    - C'est la forme du POC, choisie par Sabine le 11/11 ; la base est la cible (#531).
    - Le jumeau se produit au même endroit que la fiche (`kb write-tops`). Un fait du dépôt l'appuie, sans être la
      raison donnée : une table nouvelle en ligne demanderait une migration, que K-B n'a pas encore (#186).
-   - L'API le relit par le même schéma que l'écrivain (`items.py:685`).
+   - L'API le relit par le même schéma que l'écrivain (`items.py:686`).
 2. **Un job compromis écrit un faux jumeau dans `watch`. Que voit le site ?**
    - Rien de ce qui sort du schéma : il est refusé (502), jamais servi (`watch_reading.py:186-198`).
    - Un jumeau conforme mais faux serait servi. Le schéma prouve la forme, pas la vérité : la défense est le droit
