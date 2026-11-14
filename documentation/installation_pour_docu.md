@@ -67,7 +67,7 @@ KB_DATA_DIR=~/.knowledge_base uv run kb create-db
 
 `kb create-db` affiche `database created: <KB_DATA_DIR>/k-b.sqlite` et sort en code 0. Sans `KB_DATABASE_URL`, la
 base est ce fichier SQLite; avec elle, `kb create-db` crée les tables dans la base PostgreSQL de l'URL, qui doit déjà
-exister, en UTF8 et en collation C ([docs/stockage.md](../docs/stockage.md), « Le SGBD »).
+exister, en UTF8 et en collation C ([docs/stockage.md](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « Le SGBD »).
 
 Chaque commande écrit aussi son journal dans `<KB_DATA_DIR>/logs/`: `kb.log`, ou `kb-serve-data.log`,
 `kb-serve-ai.log` et `kb-serve-web.log` pour les deux API et le site (`core/config.py`). Deux exceptions n'écrivent aucun journal: `kb openapi`, et

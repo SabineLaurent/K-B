@@ -206,11 +206,11 @@ la couverture. Mesure du 2026-11-08 (18:41 UTC) au commit `852dad4`, par la comm
 ## Plan de tests de `POST /digests`
 
 `POST /digests` rend les fiches de veille d'une fenêtre: l'API IA lit les items par l'API de données, les classe par
-sujet, puis rédige chaque sujet. Son contrat est [docs/fiches-veille.md](../docs/fiches-veille.md). Le plan ci-dessous
+sujet, puis rédige chaque sujet. Son contrat est [docs/fiches-veille.md](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md). Le plan ci-dessous
 dit, composante par composante, les cas testés, le type de test, la stratégie et le fichier. Les tests de
-`POST /trend-reports` sont listés dans [docs/tendances.md](../docs/tendances.md#ce-qui-le-prouve), « Ce qui le
+`POST /trend-reports` sont listés dans [docs/tendances.md](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md#ce-qui-le-prouve), « Ce qui le
 prouve ». Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
-[docs/2026-11-08-tests-api-ia.md](../docs/2026-11-08-tests-api-ia.md).
+[docs/2026-11-08-tests-api-ia.md](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
 
 **Types de test.**
 
@@ -391,4 +391,4 @@ Intégration, mesures et traces en mémoire: `tests/ai_api/test_digest_router.py
 
 Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors du bout en bout, les dépendances de
 production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
-[docs/2026-11-08-tests-api-ia.md](../docs/2026-11-08-tests-api-ia.md).
+[docs/2026-11-08-tests-api-ia.md](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).

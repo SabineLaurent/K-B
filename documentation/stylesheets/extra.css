@@ -1,0 +1,5 @@
+/* The accent of the theme colours a link under the pointer or the focus: #526cfe gives 4.26:1 on white,
+   under the 4.5:1 of RGAA 3.2; #303f9f (indigo 700) gives 8.98:1. */
+:root {
+  --md-accent-fg-color: #303f9f;
+}

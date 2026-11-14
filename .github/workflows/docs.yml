@@ -1,0 +1,45 @@
+name: Docs
+
+# The site of documentation/ (mkdocs.yml): built in strict mode on each pull request, so a broken link, a
+# missing anchor or a sheet left out of the navigation fails it; published on GitHub Pages only by hand
+# (documentation/accessibilite_pour_docu.md, "Publier").
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Actions are pinned by full commit SHA, version in the comment (Dependabot updates both).
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
+          save-cache: false # the jobs share one cache key: only tests saves it
+      # The docs group only, pinned by uv.lock: neither K-B nor its dev tools.
+      - run: uv run --locked --only-group docs mkdocs build --strict
+      - if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+        uses: actions/upload-pages-artifact@fc324d3547104276b827a68afc52ff2a11cc49c9 # v5.0.0
+        with:
+          path: site/
+
+  deploy:
+    # Launched by hand, and from main only: a dispatch can name any branch.
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    # Only this job writes to Pages, with the token of the deployment.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@368f82528645a54fb793d4d04e342629a3f51346 # v5.0.1

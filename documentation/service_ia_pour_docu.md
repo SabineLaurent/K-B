@@ -17,7 +17,7 @@ l'abonnement. La fiche ne les nomme pas: les commandes les notent `<ressource Fo
 (« Relire l'état »). C'est le seul compte Cognitive Services du groupe, la famille de ressources Azure dont fait
 partie une ressource Foundry (`az cognitiveservices account list`, lu le 2026-11-09 à 23:54 UTC). Elle est sur
 l'abonnement Azure de l'organisme de formation de l'opératrice, qui la lui fournit pour son projet de certification:
-le client de Microsoft est l'organisme ([registre des traitements](../docs/registre-traitements.md), « Fondement de
+le client de Microsoft est l'organisme ([registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md), « Fondement de
 la sous-traitance »).
 
 La ressource porte deux déploiements (`az cognitiveservices account deployment list`, lu le 2026-11-09 à 23:41 et
@@ -31,7 +31,7 @@ La ressource porte deux déploiements (`az cognitiveservices account deployment 
 - **La capacité** se lit dans les en-têtes des réponses: pour `gpt-6-luna`, 140 000 jetons et 140 requêtes par
   minute (`x-ratelimit-limit-tokens`, `x-ratelimit-limit-requests`); pour `DeepSeek-V4-Flash`, 20 000 jetons et
   20 requêtes par minute (essai du 2026-10-17,
-  [note du branchement](../docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md), « Preuve »).
+  [note du branchement](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md), « Preuve »).
 - **`DeepSeek-V4-Flash`** a été essayé comme candidat juge le 2026-10-17, pour le seul mode strict, sur des données
   fabriquées (même note, « Choix
   faits et options écartées »). Aucun fichier du code, de l'infrastructure, des tests ni de la configuration ne le
@@ -174,7 +174,7 @@ support policy »).
 ### Le branchement de K-B
 
 L'API IA ne connaît du service que des réglages; aucune branche du code n'est propre à Azure
-([architecture de l'API IA](../docs/architecture-api-ia.md), « Vue d'ensemble »).
+([architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « Vue d'ensemble »).
 
 | Réglage | Valeur pour ce service | Sur le Mac (`.env`, `.env.example:89-100`) | En ligne (`infra/main.bicep`) |
 |---|---|---|---|
@@ -223,7 +223,7 @@ az cognitiveservices account list -g "$RG" --query "[].{nom:name, region:locatio
 - **Le 2026-10-28**, par `kb serve-ai` dans le bac à sable, l'environnement d'essai que nomme
   `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, distinct de la production (`.env.example:135-138`): une demande de fiches,
   10 requêtes au modèle, 200 en 56,8 s
-  ([note du contenu des appels](../docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel »).
+  ([note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel »).
 - **Le 2026-11-10**, par les deux commandes ci-dessous, lancées à la main: avec la clé, vers 00:03 UTC, le
   déploiement répond `gpt-6-luna-2026-09-22 stop`; sans clé, à 00:03 UTC, il refuse: `HTTP 401`, avec le code
   `"401"` et le message « Access denied due to invalid subscription key or wrong API endpoint […] ».
@@ -260,7 +260,7 @@ voient les autres processus.
    Attendu: `gpt-6-luna-2026-09-22`, puis `stop` ou `length`. La commande n'affiche ni la clé ni la réponse du
    modèle. Lancée le 2026-11-10 vers 00:03 UTC, avec le `.env` du dépôt: `gpt-6-luna-2026-09-22 stop`.
 
-3. **La chaîne de K-B**: `kb serve-data` et `kb serve-ai` ([README](../README.md), « Lancer l'API » et « Lancer
+3. **La chaîne de K-B**: `kb serve-data` et `kb serve-ai` ([README](https://github.com/SabineLaurent/K-B/blob/main/README.md), « Lancer l'API » et « Lancer
    l'API IA »), puis `kb digest` (même README, « Écrire les comptes rendus de veille dans le coffre », le coffre
    Obsidian). Elle envoie une veille réelle au modèle, et coûte ses jetons.
 
@@ -290,7 +290,7 @@ flowchart LR
   (`infra/main.bicep:218-253`), mais rien ne lui demande de fiche: les jobs déployés sont `caj-kb-smoke-test` et
   `caj-kb-migrate-database` (`infra/deployment.json`). Le premier n'appelle de l'API IA que `GET /health`, qui
   répond sans appeler le modèle (`core/api_health.py:12-13`). Le job qui lancerait `kb digest` en ligne n'est pas
-  déclaré dans `infra/` ([architecture de l'API IA](../docs/architecture-api-ia.md), « En ligne, sur Azure
+  déclaré dans `infra/` ([architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « En ligne, sur Azure
   Container Apps »).
 - **Le coffre de secrets**, en ligne: il porte la clé; l'identité managée de l'API IA la lit (« La clé de K-B »).
 - **Grafana Cloud** reçoit les mesures de chaque appel au modèle, et, sous réglage, son contenu (« Les données
@@ -430,8 +430,8 @@ Lectures par `az`, en lecture seule, le 2026-11-09 (UTC): la liste des déploiem
 (23:42:29), les rôles de l'opératrice (`az role assignment list`), la ressource (23:54:30); puis, le 2026-11-10 vers
 00:03 UTC, l'appel avec la clé et l'appel sans clé (« Le test »).
 
-Dans le dépôt: [la note du branchement de gpt-6-luna](../docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md)
-(2026-10-17), [la note du contenu des appels](../docs/journaling/2026-10-28-contenu-des-appels-au-modele.md)
-(2026-10-28), [le registre des traitements](../docs/registre-traitements.md),
-[l'architecture de l'API IA](../docs/architecture-api-ia.md), le journal ADR (`docs/ADR/journal-decisions-projet.md`),
-`infra/README.md`, et le [README](../README.md), « Lancer l'API IA ».
+Dans le dépôt: [la note du branchement de gpt-6-luna](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md)
+(2026-10-17), [la note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md)
+(2026-10-28), [le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
+[l'architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), le journal ADR (`docs/ADR/journal-decisions-projet.md`),
+`infra/README.md`, et le [README](https://github.com/SabineLaurent/K-B/blob/main/README.md), « Lancer l'API IA ».

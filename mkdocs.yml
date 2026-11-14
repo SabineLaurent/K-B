@@ -1,0 +1,49 @@
+# The site of the sheets of documentation/: built by `uv run --only-group docs mkdocs build --strict`
+# (docs.yml), published on GitHub Pages by hand (documentation/accessibilite_pour_docu.md).
+site_name: Documentation de K-B
+# The address GitHub Pages gives the repository; with it, Mermaid is loaded only by a page with a diagram.
+site_url: https://sabinelaurent.github.io/K-B/
+docs_dir: documentation
+
+nav:
+  - index.md
+  - accessibilite_pour_docu.md
+  - installation_pour_docu.md
+  - architecture_pour_docu.md
+  - import_et_base_pour_docu.md
+  - api_ia_pour_docu.md
+  - service_ia_pour_docu.md
+  - monitoring_pour_docu.md
+  - tests_pour_docu.md
+  - integration_continue_pour_docu.md
+  - livraison_continue_pour_docu.md
+
+theme:
+  name: material
+  language: fr
+  # No Google Fonts: the fonts of the system, no request out of the site.
+  font: false
+
+# The colour of a link under the pointer, darker for its contrast (documentation/accessibilite_pour_docu.md).
+extra_css:
+  - stylesheets/extra.css
+
+plugins:
+  - search
+  # Downloads at the build what the theme would load from elsewhere (Mermaid from unpkg), served with the site.
+  - privacy
+
+markdown_extensions:
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+
+# Each of these is a warning, so a failure of `mkdocs build --strict`.
+validation:
+  nav:
+    omitted_files: warn
+  links:
+    anchors: warn
+    unrecognized_links: warn
