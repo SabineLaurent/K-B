@@ -74,7 +74,7 @@ type SheetRefusal = Literal[
 # line (a quote or a list item opens one too), an embed (a remote image, a note), HTML (a tag, a
 # command of Templater), a character reference CommonMark would decode (&#x202E;, even in an
 # autolink), a backslash in an autolink, which would leave a reference after it decoded. kb writes
-# < only to open an autolink, and no backslash in it (URL_CHARACTERS, post/digest_sheets.py). A [
+# < only to open an autolink, and no backslash in it (URL_CHARACTERS, items.py). A [
 # after a ! is never escaped.
 ACTIVE_MARKDOWN: tuple[tuple[re.Pattern[str], SheetRefusal], ...] = (
     (re.compile(NOT_ESCAPED + "`"), "sheet_text_with_code"),

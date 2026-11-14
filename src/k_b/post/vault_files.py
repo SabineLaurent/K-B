@@ -1,6 +1,7 @@
 """The files kb writes in the vault, under veille/: written once, never through a symbolic link
-kb sees, each text of a source as text, each path named in the vault, never whole; and the head
-of a sheet kb reads back, without following a link nor waiting on a pipe.
+kb sees, each text of a source as text, each path named in the vault, never whole; the texts of a
+twin made visible; and the head of a sheet kb reads back, without following a link nor waiting on
+a pipe.
 
 Limits accepted by Sabine: a folder replaced by a symbolic link after refuse_linked_folders is
 followed (CWE-59), though a share of Azure Files mounted without mfsymlinks has no symbolic link;
@@ -15,6 +16,7 @@ from pathlib import Path
 
 from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
 from k_b.core.config import BIDI_CONTROLS, CHARACTER_REFERENCE
+from k_b.items import is_hidden_character
 
 # The characters a text loses: the controls (Cc) and the lone surrogates (Cs), which UTF-8
 # cannot encode.
@@ -150,6 +152,16 @@ def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
         if character in escaped_characters or position in references
         else character
         for position, character in enumerate(line)
+    )
+
+
+def make_visible(text: str) -> str:
+    """The text on one line, each character a reader would not see a space
+    (is_hidden_character)."""
+    return " ".join(
+        "".join(
+            " " if is_hidden_character(character) else character for character in text
+        ).split()
     )
 
 

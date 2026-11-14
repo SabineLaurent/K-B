@@ -35,7 +35,11 @@ from post.test_ai_api_client import (
 from post.test_digest_sheets import FIXED_WINDOW_SHEET
 
 from k_b import cli
-from k_b.ai_api.schemas.digest_schema import FailedSubjectSchema, WindowSchema
+from k_b.ai_api.schemas.digest_schema import (
+    ClaimSchema,
+    FailedSubjectSchema,
+    WindowSchema,
+)
 from k_b.commands import (
     digest_command,
     wait_display,
@@ -705,6 +709,85 @@ def test_a_sheet_not_written_exits_4_and_the_other_sheet_is_written(
         "agent_tools: sheet not written: PermissionError (Permission denied)"
     ) in error_output
     assert str(vault_dir) not in error_output
+
+
+def list_twins(vault_dir):
+    return sorted(
+        path.relative_to(vault_dir).as_posix() for path in vault_dir.rglob("*.json")
+    )
+
+
+def test_digest_writes_the_twin_beside_each_sheet(monkeypatch, digest_environment):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch, answer_with(make_response([AGENT_DIGEST, RESEARCH_DIGEST]))
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.SUCCEEDED
+    assert list_twins(vault_dir) == [
+        "veille/agent_tools/2026-10-21.json",
+        "veille/research/2026-10-21.json",
+        "veille/security_alerts/2026-10-21.json",
+    ]
+
+
+def test_a_digest_its_twin_refuses_writes_neither_sheet_nor_twin_and_fails_its_subject(
+    monkeypatch, digest_environment, capsys
+):
+    _, vault_dir = digest_environment
+    refused = AGENT_DIGEST.model_copy(
+        update={"claims": [ClaimSchema(text="a" * 401, item_ids=[6])]}
+    )
+    answer_digests(monkeypatch, answer_with(make_response([refused, RESEARCH_DIGEST])))
+
+    assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert list_sheets(vault_dir) == [
+        "veille/research/2026-10-21.md",
+        "veille/security_alerts/2026-10-21.md",
+    ]
+    assert list_twins(vault_dir) == [
+        "veille/research/2026-10-21.json",
+        "veille/security_alerts/2026-10-21.json",
+    ]
+    captured = capsys.readouterr()
+    assert (
+        "agent_tools: twin_refused, no sheet written: claims.0.text (too_long)\n"
+    ) in captured.err
+    assert "a" * 401 not in captured.err
+    assert "agent_tools      twin refused\n" in captured.out
+    assert "total            written 2, failed 1\n" in captured.out
+
+
+def test_a_twin_not_written_fails_its_subject_and_its_sheet_stays(
+    monkeypatch, digest_environment, capsys
+):
+    _, vault_dir = digest_environment
+    answer_digests(
+        monkeypatch, answer_with(make_response([AGENT_DIGEST, RESEARCH_DIGEST]))
+    )
+    write_file_atomically = vault_files.write_file_atomically
+
+    def refuse_the_twin_of_agent_tools(path, content, **options):
+        if "agent_tools" in path.parts and path.suffix == ".json":
+            raise PermissionError(13, "Permission denied", str(path))
+        write_file_atomically(path, content, **options)
+
+    monkeypatch.setattr(
+        vault_files, "write_file_atomically", refuse_the_twin_of_agent_tools
+    )
+
+    assert cli.main(["digest"]) == cli.ExitCode.PARTIAL_FAILURE
+    assert "veille/agent_tools/2026-10-21.md" in list_sheets(vault_dir)
+    assert "veille/agent_tools/2026-10-21.json" not in list_twins(vault_dir)
+    captured = capsys.readouterr()
+    assert (
+        "agent_tools: twin not written: PermissionError (Permission denied)\n"
+    ) in captured.err
+    assert str(vault_dir) not in captured.err
+    assert (
+        "agent_tools      twin not written        veille/agent_tools/2026-10-21.md\n"
+    ) in captured.out
+    assert "total            written 2, failed 1\n" in captured.out
 
 
 def test_a_temporary_file_left_of_a_sheet_fails_its_subject_and_digest_exits_4(

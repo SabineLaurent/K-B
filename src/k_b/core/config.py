@@ -419,6 +419,13 @@ MAX_ITEMS_PER_DIGEST_REQUEST = 300
 # their fields once masked.
 MAX_ITEMS_PER_DIGEST = 60
 MAX_FIELD_CHARS_FOR_WRITING = 2000
+# The bounds of a digest the AI API checks in the output of the model (ai_api/stages/writing.py) and
+# kb reads again in the twin of its sheet (DigestProduction, items.py): of structure (MAX_CLAIMS,
+# ITEMS_PER_CLAIM), which fail the output, and of the text of a claim (TEXT_CHARS), which removes
+# the claim.
+MAX_CLAIMS = 12
+ITEMS_PER_CLAIM = (1, 5)
+TEXT_CHARS = (1, 400)
 
 # The classification of the items of a request (ai_api/stages/classification.py): batches in the order
 # of the reading, each of 45 items and 36,000 characters of user message at most, about 9,000
@@ -678,7 +685,7 @@ CLIP_MIRROR_CLOCK_SLACK = timedelta(seconds=5)
 # twice as long; assumed, not measured. A blob larger is refused.
 MAX_WATCH_SHEET_BYTES = 4_000_000
 # The blobs of watch listed by a download: a sheet is named by its folder and its day, one a day in
-# each of 12 folders today (9 subjects, 2 tops, tendances), and the twin of each sheet of a top: 14 a
-# day, about 4 years of them; beyond, the listing stops and the download fails, the sheets listed
-# copied (OWASP API4:2023).
+# each of 12 folders today (9 subjects, 2 tops, tendances), and the twin of each sheet of a digest
+# (#560) and of a top (#559): 23 a day, about 2 years and 4 months of them; beyond, the listing stops
+# and the download fails, the sheets listed copied (OWASP API4:2023).
 MAX_WATCH_LISTED_BLOBS = 20_000

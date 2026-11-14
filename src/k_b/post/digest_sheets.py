@@ -1,40 +1,37 @@
-"""The digests of the watch in the vault: one Markdown sheet per subject and per day, written
-once by kb digest from the response of the AI API, with the limit of post/vault_files.py.
+"""The digests of the watch in the vault: one Markdown sheet per subject and per day, and its twin
+in JSON for the data API (#560), written once by kb digest from the response of the AI API, with
+the limit of post/vault_files.py.
 
 Its path is made of constants, a subject of the closed list and a day; each text of the response
 is written as text, as the response is untrusted (OWASP LLM10)."""
 
 import json
 import re
-import unicodedata
 from collections.abc import Sequence
 from datetime import date, datetime
 from pathlib import Path
-from urllib.parse import unquote
 
-from k_b.core.config import CHARACTER_REFERENCE, WATCH_DIR_NAME
+from k_b.core.config import SHEET_TWIN_SUFFIX, WATCH_DIR_NAME
 from k_b.core.dates import format_date
-from k_b.items import convert_to_utc, parse_aware_datetime
+from k_b.items import (
+    DigestOutcome,
+    DigestProduction,
+    convert_to_utc,
+    is_writable_url,
+    parse_aware_datetime,
+)
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
 from k_b.post.vault_files import (
     VaultEntryRefusedError,
     has_sheet,
     list_sheet_names,
+    make_visible,
     neutralize_digest_text,
     read_sheet_head,
     refuse_linked_folders,
     write_new_sheet,
 )
 
-URL_SCHEMES = ("http://", "https://")
-# A URL is written, as an autolink, only when it is made of the characters of RFC 3986 (unreserved,
-# delimiters, a percent and two hexadecimal digits), less [ ] and $, a wikilink and a formula of
-# Obsidian: it cannot leave its <…>, where a backslash escapes nothing (CommonMark 0.31.2, 6.5).
-URL_CHARACTERS = re.compile(r"(?:[A-Za-z0-9._~:/?#@!&'()*+,;=-]|%[0-9A-Fa-f]{2})+")
-# What a URL may not hold once its percents are decoded (markdown-it shows them decoded): a control,
-# a format character (the bidirectional ones, U+200B to U+200F, U+FEFF, U+00AD), a surrogate, a line
-# or paragraph separator. A link would read otherwise than it leads (CWE-451).
-HIDDEN_CATEGORIES = frozenset({"Cc", "Cf", "Cs", "Zl", "Zp"})
 NO_CLAIM = "Aucune affirmation retenue."
 NO_ITEM = "Aucun item classé dans ce sujet."
 # The name of a sheet kb writes: a note of Sabine or a temporary file in the folder is not one.
@@ -54,15 +51,22 @@ def find_sheet_path(vault_dir: Path, subject: str, day: date) -> Path:
     return find_sheets_dir(vault_dir, subject) / f"{day.isoformat()}.md"
 
 
+def find_twin_path(vault_dir: Path, subject: str, day: date) -> Path:
+    return find_sheets_dir(vault_dir, subject) / f"{day.isoformat()}{SHEET_TWIN_SUFFIX}"
+
+
 def refuse_written_sheets(
     vault_dir: Path, subject_names: Sequence[str], day: date
 ) -> None:
-    """Before the request, refuse a sheet of a subject already written for day, or a folder down
-    to it that is a symbolic link; creates nothing."""
+    """Before the request, refuse a sheet or a twin of a subject already written for day, or a
+    folder down to it that is a symbolic link; creates nothing."""
     for subject in subject_names:
         sheets_dir = find_sheets_dir(vault_dir, subject)
         refuse_linked_folders(vault_dir, sheets_dir)
         refuse_existing_sheet(find_sheet_path(vault_dir, subject, day), vault_dir)
+        twin_path = find_twin_path(vault_dir, subject, day)
+        if has_sheet(twin_path, vault_dir):
+            raise find_twin_exists_error(twin_path, vault_dir)
 
 
 def refuse_existing_sheet(sheet_path: Path, vault_dir: Path) -> None:
@@ -76,6 +80,13 @@ def find_sheet_exists_error(
     return VaultEntryRefusedError(
         f"sheet_exists: {sheet_path.relative_to(vault_dir).as_posix()} is there;"
         " kb digest never rewrites a sheet"
+    )
+
+
+def find_twin_exists_error(twin_path: Path, vault_dir: Path) -> VaultEntryRefusedError:
+    return VaultEntryRefusedError(
+        f"twin_exists: {twin_path.relative_to(vault_dir).as_posix()} is there;"
+        " kb digest never rewrites a twin"
     )
 
 
@@ -165,6 +176,65 @@ def write_sheet(
     return sheet_path.relative_to(vault_dir).as_posix()
 
 
+def build_digest_twin(
+    response: DigestsResponse, subject: str, digest: Digest | None
+) -> DigestProduction:
+    """The twin of the sheet of subject, digest None for a subject without items: what the sheet
+    says, each text visible on one line, each source with its item_id; a ValidationError when its
+    schema refuses it."""
+    window = response.window
+    claims = [] if digest is None else digest.claims
+    return DigestProduction.model_validate(
+        {
+            "subject": subject,
+            "since": response.since_by_subject[subject],
+            "until": window.until,
+            "model": response.model,
+            "items_capped": response.items_capped,
+            "capped_kind": window.capped_kind,
+            "covered_after": window.covered_after,
+            "outcome": find_outcome(digest),
+            "claims": [
+                {"text": make_visible(claim.text), "item_ids": list(claim.item_ids)}
+                for claim in claims
+            ],
+            # As the sheet: no source without a claim.
+            "sources": [
+                build_twin_source(source)
+                for source in ([] if digest is None or not claims else digest.sources)
+            ],
+        }
+    )
+
+
+def find_outcome(digest: Digest | None) -> DigestOutcome:
+    if digest is None:
+        return "no_item"
+    return "written" if digest.claims else "no_claim"
+
+
+def build_twin_source(source: Source) -> dict[str, object]:
+    return {
+        "item_id": source.item_id,
+        "title": make_visible(source.title),
+        "url": find_writable_url(source),
+    }
+
+
+def write_digest_twin(vault_dir: Path, twin: DigestProduction) -> str:
+    """Write the twin beside the sheet of its subject and of the day of its until; return its path
+    in the vault. A twin there is refused (twin_exists), never replaced."""
+    twin_path = find_twin_path(vault_dir, twin.subject, twin.until.date())
+    if not write_new_sheet(
+        vault_dir,
+        find_sheets_dir(vault_dir, twin.subject),
+        twin_path,
+        twin.model_dump_json(),
+    ):
+        raise find_twin_exists_error(twin_path, vault_dir)
+    return twin_path.relative_to(vault_dir).as_posix()
+
+
 def render_empty_sheet(response: DigestsResponse, subject: str) -> str:
     return "\n".join([*render_heading(response, subject), NO_ITEM]) + "\n"
 
@@ -221,32 +291,14 @@ def cite_sources(numbers: list[int]) -> str:
 
 def render_source(source: Source) -> str:
     title = neutralize_digest_text(source.title)
-    if source.url is None or not is_writable_url(source.url):
+    url = find_writable_url(source)
+    if url is None:
         return f"{title} (sans URL)"
-    return f"{title} — <{source.url}>"
+    return f"{title} — <{url}>"
 
 
-def is_writable_url(url: str) -> bool:
-    """Whether the URL can be written as an autolink, never rewritten: :: would make a field of
-    Dataview, a character reference is decoded even in an autolink, and kb download-watch-sheets
-    refuses ~~~ anywhere in a line."""
-    return (
-        url.startswith(URL_SCHEMES)
-        and URL_CHARACTERS.fullmatch(url) is not None
-        and "::" not in url
-        and "~~~" not in url
-        and CHARACTER_REFERENCE.search(url) is None
-        and not has_hidden_character(url)
-    )
-
-
-def has_hidden_character(url: str) -> bool:
-    """Whether the URL, its percents decoded, holds a character not shown as itself; a
-    percent-encoding that is not UTF-8 counts as one."""
-    try:
-        decoded = unquote(url, errors="strict")
-    except UnicodeDecodeError:
-        return True
-    return any(
-        unicodedata.category(character) in HIDDEN_CATEGORIES for character in decoded
-    )
+def find_writable_url(source: Source) -> str | None:
+    """The URL of the source the sheet writes as a link, and its twin serves; None otherwise."""
+    if source.url is None or not is_writable_url(source.url):
+        return None
+    return source.url
