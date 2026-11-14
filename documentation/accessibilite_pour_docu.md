@@ -18,7 +18,7 @@ GitHub Pages, à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
 l'outil, MkDocs avec Material, la sienne du 2026-11-12 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-2026-11-14, « Documentation: un site MkDocs publié sur GitHub Pages »). Les deux outils sont dans un groupe de
+2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »). Les deux outils sont dans un groupe de
 dépendances à part, `docs` (`pyproject.toml`), que ni les tests ni l'image de K-B n'installent.
 
 ## Les recommandations suivies
