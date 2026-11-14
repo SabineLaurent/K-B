@@ -1,6 +1,7 @@
-"""The twins of the sheets of the tops (#559) the data API reads in the container watch: the folder of
-a top listed by its prefix, a twin downloaded as listed and read again by its closed schema, the
-listings and the last productions kept in memory a short while.
+"""The twins of the sheets of the tops (#559) and of the digests (#560) the data API reads in the
+container watch: a folder listed by its prefix, a twin downloaded as listed and read again by the
+closed schema of its kind, the listings and the last productions of each kind kept in memory a short
+while.
 
 The jobs write in watch: its names and its texts are inputs, never trusted, and never logged
 (conventions.md, rule 3)."""
@@ -13,22 +14,24 @@ from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import UTC, date, datetime
-from typing import Literal, cast
+from typing import Any, Literal, cast
 
 from azure.core.paging import PageIterator
 from azure.storage.blob import BlobProperties, ContainerClient
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 
 from k_b.core.config import (
     DATA_API_STORAGE_CONNECT_TIMEOUT_SECONDS,
     DATA_API_STORAGE_READ_TIMEOUT_SECONDS,
+    MAX_DIGEST_TWIN_BYTES,
     MAX_WATCH_FOLDER_NAMES,
     MAX_WATCH_FOLDER_PAGES,
     MAX_WATCH_SHEET_BYTES,
     SHEET_TWIN_SUFFIX,
     TOPS_DIR_NAME,
     WATCH_CACHE_SECONDS,
-    WATCH_CACHED_PRODUCTIONS,
+    WATCH_CACHED_DIGESTS,
+    WATCH_CACHED_TOPS,
     WATCH_CONTAINER,
 )
 from k_b.core.quoting import locate_first_error
@@ -41,7 +44,7 @@ from k_b.exchange.storage import (
     naming_storage_errors,
     open_container_client,
 )
-from k_b.items import TopName, TopProduction
+from k_b.items import DigestProduction, TopProduction
 
 # The day in the name of a twin, after the prefix of its folder: ASCII digits, matched whole
 # (fullmatch), as $ would let a line feed end it.
@@ -62,6 +65,45 @@ class WatchReadingError(Exception):
         super().__init__(f"{state}: {measure}")
         self.state: WatchReadingState = state
         self.measure = measure
+
+
+@dataclass(frozen=True)
+class TwinKind[Production: BaseModel]:
+    """A kind of twin in watch: the folder of its folders, its closed schema, what of a production
+    names its folder and its day, the states of a production of another folder or day, its largest
+    size, and how many productions read are kept."""
+
+    parent: str
+    schema: type[Production]
+    read_folder: Callable[[Production], str]
+    read_moment: Callable[[Production], datetime]
+    folder_refusal: str
+    day_refusal: str
+    max_bytes: int
+    kept_count: int
+
+
+TOP_TWINS = TwinKind(
+    parent=f"{TOPS_DIR_NAME}/",
+    schema=TopProduction,
+    read_folder=lambda production: production.top,
+    read_moment=lambda production: production.ranked_at,
+    folder_refusal="top_not_its_folder",
+    day_refusal="ranked_at_not_its_day",
+    max_bytes=MAX_WATCH_SHEET_BYTES,
+    kept_count=WATCH_CACHED_TOPS,
+)
+# The folders of the subjects are at the root of watch, as in veille/ (post/digest_sheets.py).
+DIGEST_TWINS = TwinKind(
+    parent="",
+    schema=DigestProduction,
+    read_folder=lambda production: production.subject,
+    read_moment=lambda production: production.until,
+    folder_refusal="subject_not_its_folder",
+    day_refusal="until_not_its_day",
+    max_bytes=MAX_DIGEST_TWIN_BYTES,
+    kept_count=WATCH_CACHED_DIGESTS,
+)
 
 
 @dataclass(frozen=True)
@@ -88,16 +130,16 @@ class TwinRefusal:
 
 
 @dataclass(frozen=True)
-class TopOfDay:
-    """The twin of a top served, and its day."""
+class ProductionOfDay[Production: BaseModel]:
+    """The production of a twin served, and its day."""
 
     day: date
-    production: TopProduction
+    production: Production
 
 
 class WatchReader:
-    """The twins of the tops in watch, read through one client of the container; safe for the
-    threads of the routes, its lock never held during a request to the storage."""
+    """The twins of watch, read through one client of the container; safe for the threads of the
+    routes, its lock never held during a request to the storage."""
 
     def __init__(
         self,
@@ -109,101 +151,114 @@ class WatchReader:
         self.now = now
         self.monotonic = monotonic
         self.lock = threading.Lock()
-        self.listings: dict[TopName, FolderListing] = {}
-        self.productions: OrderedDict[tuple[str, str], TopProduction | TwinRefusal] = (
-            OrderedDict()
-        )
+        # By the prefix of a folder: the folders are a closed set, the tops and the subjects.
+        self.listings: dict[str, FolderListing] = {}
+        # Each kind with its own productions read, by name and etag: a production of a kind is of
+        # its schema, or its refusal.
+        self.productions: dict[TwinKind[Any], OrderedDict[tuple[str, str], Any]] = {
+            kind: OrderedDict() for kind in (TOP_TWINS, DIGEST_TWINS)
+        }
 
-    def list_days(self, top: TopName) -> list[date]:
-        """The days of the twins of top, the most recent first, none after today (UTC)."""
-        return [twin.day for twin in self.list_twins(top)]
+    def list_days(self, kind: TwinKind[Any], folder: str) -> list[date]:
+        """The days of the twins of the folder of kind, the most recent first, none after today
+        (UTC)."""
+        return [twin.day for twin in self.list_twins(kind, folder)]
 
-    def read_top(self, top: TopName, day: date | None) -> TopOfDay | None:
-        """The twin of top of day, or of its most recent day; None when it has none."""
-        twins = self.list_twins(top)
+    def read_production[Production: BaseModel](
+        self, kind: TwinKind[Production], folder: str, day: date | None
+    ) -> ProductionOfDay[Production] | None:
+        """The twin of the folder of kind of day, or of its most recent day; None when it has
+        none."""
+        twins = self.list_twins(kind, folder)
         if day is None:
             twin = twins[0] if twins else None
         else:
             twin = next((twin for twin in twins if twin.day == day), None)
         if twin is None:
             return None
-        return TopOfDay(twin.day, self.read_twin(top, twin))
+        return ProductionOfDay(twin.day, self.read_twin(kind, folder, twin))
 
-    def list_twins(self, top: TopName) -> list[ListedTwin]:
-        """The twins of the listing of top kept, or listed again once WATCH_CACHE_SECONDS have
-        passed; a twin of a day after today is left aside."""
+    def list_twins(self, kind: TwinKind[Any], folder: str) -> list[ListedTwin]:
+        """The twins of the listing of the folder kept, or listed again once WATCH_CACHE_SECONDS
+        have passed; a twin of a day after today is left aside."""
+        prefix = f"{kind.parent}{folder}/"
         moment = self.monotonic()
         with self.lock:
-            listing = self.listings.get(top)
+            listing = self.listings.get(prefix)
         if listing is None or moment - listing.listed_at >= WATCH_CACHE_SECONDS:
             listing = FolderListing(
-                list_folder_twins(self.container_client, top), moment
+                list_folder_twins(self.container_client, prefix), moment
             )
             with self.lock:
-                self.listings[top] = listing
+                self.listings[prefix] = listing
         today = self.now().astimezone(UTC).date()
         return [twin for twin in listing.twins if twin.day <= today]
 
-    def read_twin(self, top: TopName, twin: ListedTwin) -> TopProduction:
+    def read_twin[Production: BaseModel](
+        self, kind: TwinKind[Production], folder: str, twin: ListedTwin
+    ) -> Production:
         """The production of the twin, read once for its name and its etag; a refusal raised as
         often as it is asked."""
         key = (twin.blob.name, twin.blob.etag)
         with self.lock:
-            production = self.productions.get(key)
+            kept = self.productions[kind]
+            production: Production | TwinRefusal | None = kept.get(key)
             if production is not None:
-                self.productions.move_to_end(key)
+                kept.move_to_end(key)
         if production is None:
-            production = self.download_twin(top, twin)
+            production = self.download_twin(kind, folder, twin)
             with self.lock:
-                self.productions[key] = production
-                while len(self.productions) > WATCH_CACHED_PRODUCTIONS:
-                    self.productions.popitem(last=False)
+                kept[key] = production
+                while len(kept) > kind.kept_count:
+                    kept.popitem(last=False)
         if isinstance(production, TwinRefusal):
             raise WatchReadingError(
-                "watch_production_refused", f"{top} of {twin.day}: {production.reason}"
+                "watch_production_refused",
+                f"{folder} of {twin.day}: {production.reason}",
             )
         return production
 
-    def download_twin(
-        self, top: TopName, twin: ListedTwin
-    ) -> TopProduction | TwinRefusal:
+    def download_twin[Production: BaseModel](
+        self, kind: TwinKind[Production], folder: str, twin: ListedTwin
+    ) -> Production | TwinRefusal:
         """The production of the twin as listed, or why it is refused; when it was changed or
         removed since the listing, the listing is forgotten and the request fails."""
-        if twin.blob.size > MAX_WATCH_SHEET_BYTES:
+        if twin.blob.size > kind.max_bytes:
             return TwinRefusal(
-                f"twin_too_large, {twin.blob.size} bytes, maximum {MAX_WATCH_SHEET_BYTES}"
+                f"twin_too_large, {twin.blob.size} bytes, maximum {kind.max_bytes}"
             )
         content = download_listed_version(
-            self.container_client, twin.blob, MAX_WATCH_SHEET_BYTES
+            self.container_client, twin.blob, kind.max_bytes
         )
         if content is None:
             with self.lock:
-                self.listings.pop(top, None)
-            raise WatchReadingError("watch_production_changed", f"{top} of {twin.day}")
-        return read_twin_production(content, top, twin.day)
+                self.listings.pop(f"{kind.parent}{folder}/", None)
+            raise WatchReadingError(
+                "watch_production_changed", f"{folder} of {twin.day}"
+            )
+        return read_twin_production(content, kind, folder, twin.day)
 
 
-def read_twin_production(
-    content: bytes, top: TopName, day: date
-) -> TopProduction | TwinRefusal:
-    """The production of a twin, refused out of its schema, of another top than its folder, or
-    ranked another day (UTC) than its name."""
+def read_twin_production[Production: BaseModel](
+    content: bytes, kind: TwinKind[Production], folder: str, day: date
+) -> Production | TwinRefusal:
+    """The production of a twin, refused out of the schema of its kind, of another folder than its
+    own, or of another day (UTC) than its name."""
     try:
-        production = TopProduction.model_validate_json(content)
+        production = kind.schema.model_validate_json(content)
     except ValidationError as error:
         return TwinRefusal(locate_first_error(error))
-    if production.top != top:
-        return TwinRefusal("top_not_its_folder")
-    if production.ranked_at.astimezone(UTC).date() != day:
-        return TwinRefusal("ranked_at_not_its_day")
+    if kind.read_folder(production) != folder:
+        return TwinRefusal(kind.folder_refusal)
+    if kind.read_moment(production).astimezone(UTC).date() != day:
+        return TwinRefusal(kind.day_refusal)
     return production
 
 
 def list_folder_twins(
-    container_client: ContainerClient, top: TopName
+    container_client: ContainerClient, prefix: str
 ) -> tuple[ListedTwin, ...]:
-    """The twins of the folder of top, the most recent first; any other name is left aside."""
-    prefix = f"{TOPS_DIR_NAME}/{top}/"
+    """The twins of the folder of prefix, the most recent first; any other name is left aside."""
     twin_name = re.compile(re.escape(prefix) + TWIN_DAY)
     twins = []
     for blob in list_folder(container_client, prefix):

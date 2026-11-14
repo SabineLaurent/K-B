@@ -258,7 +258,7 @@ def test_every_route_answers_get_only_and_405_to_any_other_method(
         (route.path, method): read_status_allow_and_body(
             client.request(
                 method,
-                route.path.format(item_id=1, top="most_starred"),
+                route.path.format(item_id=1, top="most_starred", subject="models"),
                 headers=authorization,
             )
         )

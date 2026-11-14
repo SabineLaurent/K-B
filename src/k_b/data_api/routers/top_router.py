@@ -21,6 +21,7 @@ from k_b.data_api.schemas.top_schema import (
     TopRepositorySchema,
     TopSchema,
 )
+from k_b.data_api.watch_reading import TOP_TWINS
 from k_b.items import TopName, WrittenDay
 
 # After the key and the limit of the app: a route of the site refuses every other client.
@@ -44,7 +45,7 @@ def read_top(
     limit: Annotated[int, Query(ge=1, le=MAX_TOP_LIMIT)] = TOP_LIMIT,
 ) -> TopSchema:
     """The first repositories of the top of a day, the most recent when none is given."""
-    found = watch.read_top(top, day)
+    found = watch.read_production(TOP_TWINS, top, day)
     if found is None:
         raise ApiError(404, "top_not_found")
     production = found.production
@@ -67,5 +68,5 @@ def list_top_days(
     offset: Annotated[int, Query(ge=0, le=MAX_DAYS_OFFSET)] = 0,
 ) -> TopDaysSchema:
     """The days of the top, the most recent first, and their total."""
-    days = watch.list_days(top)
+    days = watch.list_days(TOP_TWINS, top)
     return TopDaysSchema(days=days[offset : offset + limit], total=len(days))

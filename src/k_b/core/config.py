@@ -345,20 +345,26 @@ AI_API_RATE_LIMITS = {
 }
 # By the most read in a minute in the same logs: 804 details, 21 lists. The details hold 4 digests
 # at MAX_ITEMS_PER_DIGEST_REQUEST, the trends 3 trend reports at their 32 readings.
-# The tops, as the lists: the site reads one page of each at a time.
+# The tops, as the lists: the site reads one page of each at a time. The digests too: an index of the
+# 9 subjects takes 9 requests of /digests/{subject}/days, apart from /digests of the AI API, the call
+# to the model.
 DATA_API_RATE_LIMITS = {
     "/items": RateLimit(requests=120, window_seconds=60),
     "/items/{item_id}": RateLimit(requests=1200, window_seconds=60),
     "/trends": RateLimit(requests=120, window_seconds=60),
     "/tops/{top}": RateLimit(requests=120, window_seconds=60),
     "/tops/{top}/days": RateLimit(requests=120, window_seconds=60),
+    "/digests/{subject}": RateLimit(requests=120, window_seconds=60),
+    "/digests/{subject}/days": RateLimit(requests=120, window_seconds=60),
 }
 # The client of the site (web/settings.py, KB_DATA_API_KEY_WEB), the only one the routes of the tops
-# open to; the items stay open to every client (OWASP API5:2023).
+# and of the digests open to; the items stay open to every client (OWASP API5:2023).
 WEB_CLIENT = "WEB"
 DATA_API_CLIENT_BY_ROUTE = {
     "/tops/{top}": WEB_CLIENT,
     "/tops/{top}/days": WEB_CLIENT,
+    "/digests/{subject}": WEB_CLIENT,
+    "/digests/{subject}/days": WEB_CLIENT,
 }
 # The bounds of the parameters of the tops (docs/specs-api.md, "GET /tops/{top}"): the repositories
 # of a top, a twin holding GITHUB_RANKING_SIZE at most, and its days.
@@ -373,10 +379,16 @@ MAX_DAYS_OFFSET = 5_000
 # that pages without a name do not hold a request. Beyond either bound, 502 watch_listing_too_long.
 MAX_WATCH_FOLDER_NAMES = 5_000
 MAX_WATCH_FOLDER_PAGES = 2
-# The listing of each folder kept 60 s, and the last productions read, by name and etag, refusals
-# included: 32 MB at most, MAX_WATCH_SHEET_BYTES each.
+# The listing of each folder kept 60 s, and the last productions read of each kind, by name and etag,
+# refusals included: the tops, 32 MB at most, MAX_WATCH_SHEET_BYTES each; the digests, the last day of
+# the 9 subjects and a margin, 6.4 MB at most, MAX_DIGEST_TWIN_BYTES each.
 WATCH_CACHE_SECONDS = 60
-WATCH_CACHED_PRODUCTIONS = 8
+WATCH_CACHED_TOPS = 8
+WATCH_CACHED_DIGESTS = 16
+# The largest twin of a digest (DigestProduction, items.py): 389,968 bytes, measured on 2026-11-14 on
+# the largest twin its schema lets kb write, under the 1 MB of the site (MAX_WEB_DATA_API_BODY_BYTES;
+# test_watch_digest_router.py). A larger twin is refused before its download.
+MAX_DIGEST_TWIN_BYTES = 400_000
 # The waits of a request of the data API to the storage and to its identity, shorter than those of a
 # job (EXCHANGE_STORAGE_*): the site waits 30 s (WEB_DATA_API_READ_TIMEOUT_SECONDS).
 DATA_API_STORAGE_CONNECT_TIMEOUT_SECONDS = 5

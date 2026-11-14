@@ -46,13 +46,13 @@ from k_b.core.config import (
     MAX_WEB_DATA_API_BODY_BYTES,
     TOP_LIMIT,
     WATCH_CACHE_SECONDS,
-    WATCH_CACHED_PRODUCTIONS,
+    WATCH_CACHED_TOPS,
     WATCH_CONTAINER,
     WEB_CLIENT,
 )
 from k_b.data_api import watch_reading
 from k_b.data_api.app import create_app
-from k_b.data_api.watch_reading import WatchReader, open_watch_reader
+from k_b.data_api.watch_reading import TOP_TWINS, WatchReader, open_watch_reader
 from k_b.etl.raw_store import RawStore
 from k_b.etl.sources.github import most_starred as github_most_starred
 from k_b.etl.tops import Top
@@ -711,7 +711,7 @@ def test_the_oldest_twin_read_is_forgotten_beyond_the_productions_kept(
 ):
     days = [
         (date(2026, 11, 1) + timedelta(days=offset)).isoformat()
-        for offset in range(WATCH_CACHED_PRODUCTIONS + 1)
+        for offset in range(WATCH_CACHED_TOPS + 1)
     ]
     for day in days:
         put_twin(watch, day)
@@ -754,7 +754,7 @@ def test_the_reader_of_kb_serve_data_waits_its_timeouts_and_sends_a_request_once
         ) as reader,
         pytest.raises(ExchangeStorageError) as raised,
     ):
-        reader.list_days("most_starred")
+        reader.list_days(TOP_TWINS, "most_starred")
 
     assert raised.value.state == "exchange_storage_failed"
     assert (

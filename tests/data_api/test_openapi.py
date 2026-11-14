@@ -8,6 +8,7 @@ import pytest
 from openapi_spec_validator import OpenAPIV31SpecValidator
 
 from k_b.core.api_access import BEARER_SCHEME_DESCRIPTION
+from k_b.core.config import DIGEST_SUBJECTS
 from k_b.data_api.app import ARXIV_ACKNOWLEDGEMENT, create_app
 
 OPENAPI_PATH = Path(__file__).parents[2] / "docs" / "api" / "openapi-donnees.json"
@@ -28,7 +29,7 @@ def test_the_versioned_openapi_is_valid_and_declares_its_security_scheme():
     openapi = read_versioned_openapi()
 
     OpenAPIV31SpecValidator(openapi).validate()
-    assert openapi["info"]["version"] == "0.13.0"
+    assert openapi["info"]["version"] == "0.14.0"
     assert openapi["info"]["description"] == ARXIV_ACKNOWLEDGEMENT
     assert openapi["components"]["securitySchemes"] == {
         "HTTPBearer": {
@@ -105,6 +106,40 @@ def test_each_top_route_documents_its_errors_and_its_two_tops(path, not_found):
         parameter for parameter in operation["parameters"] if parameter["name"] == "top"
     ]
     assert top["schema"]["enum"] == ["most_starred", "most_forked"]
+
+
+@pytest.mark.parametrize(
+    ("path", "not_found"),
+    [("/digests/{subject}", "digest_not_found"), ("/digests/{subject}/days", None)],
+)
+def test_each_digest_route_documents_its_errors_and_its_subjects(path, not_found):
+    operation = read_versioned_openapi()["paths"][path]["get"]
+
+    expected = {
+        "401": "invalid_api_key",
+        "403": "client_not_allowed",
+        "422": "invalid_parameter",
+        "429": "rate_limit_exceeded",
+        "500": "internal_error",
+        "502": "watch_listing_too_long, watch_production_refused, exchange_storage_unavailable,"
+        " exchange_storage_no_token, exchange_storage_unauthorized, exchange_storage_forbidden,"
+        " exchange_storage_failed",
+        "503": "watch_unconfigured, watch_production_changed, exchange_storage_not_found",
+        "504": "exchange_storage_timeout",
+    }
+    if not_found is not None:
+        expected["404"] = not_found
+    assert {
+        status: response["description"]
+        for status, response in operation["responses"].items()
+        if status != "200"
+    } == expected
+    [subject] = [
+        parameter
+        for parameter in operation["parameters"]
+        if parameter["name"] == "subject"
+    ]
+    assert subject["schema"]["enum"] == [subject.name for subject in DIGEST_SUBJECTS]
 
 
 def test_the_detail_is_a_union_discriminated_by_kind():
