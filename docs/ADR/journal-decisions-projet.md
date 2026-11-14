@@ -7238,10 +7238,10 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
 - **Le jumeau est construit et relu par son schéma avant la fiche : refusé, ni fiche ni jumeau, le sujet échoue
   (`twin_refused`) et garde son début ; sinon la fiche, puis le jumeau.** Plan validé (point 1), comme #559 : rien
   n'est écrit que l'API refuserait, et le sujet gardant son début (#565), son compte rendu suivant recouvre la
-  fenêtre, sans perte. La fiche avant le jumeau (raison déduite du code par la session, soumise à time-knight) :
-  la fiche seule fait avancer le début du sujet (`find_previous_until`) ; un jumeau écrit avant une fiche en échec
-  montrerait au site un compte rendu absent du coffre, dont le suivant relirait la fenêtre, et refuserait un nouveau
-  lancement du même jour (`twin_exists`). Le revers est la limite (c). — PR de #560
+  fenêtre, sans perte. La fiche avant le jumeau (raison déduite du code par la session, validée par time-knight
+  le 2026-11-14) : la fiche seule fait avancer le début du sujet (`find_previous_until`) ; un jumeau écrit avant une
+  fiche en échec montrerait au site un compte rendu absent du coffre, dont le suivant relirait la fenêtre, et
+  refuserait un nouveau lancement du même jour (`twin_exists`). Le revers est la limite (c). — PR de #560
 - **Un seul lecteur de `watch` pour toutes les sortes de jumeaux : une `TwinKind` par sorte (`TOP_TWINS`,
   `DIGEST_TWINS` : dossier, schéma, contrôle du dossier et du jour, borne en octets, nombre gardé), et à chaque
   sorte son cache des productions lues.** Plan validé (point 4). Écarté : un second lecteur copié, que #561 aurait
@@ -7258,8 +7258,9 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   relevée qui ferait dépasser les 400 000 octets le fait échouer. — PR de #560
 - **`subject` est un `Literal` de l'API de données, `DigestSubjectName`, tenu égal à `DIGEST_SUBJECTS` par un
   test ; un autre sujet répond 422.** Plan validé (point 5). Pourquoi un `Literal` écrit en clair (raison de la
-  session, soumise à time-knight) : il donne l'`enum` des sujets dans l'OpenAPI, et mypy le vérifie ; un type
-  construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e) ci-dessus. — PR de #560
+  session, validée par time-knight le 2026-11-14) : il donne l'`enum` des sujets dans l'OpenAPI, et mypy le
+  vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
+  ci-dessus. — PR de #560
 
 ## Décisions encore ouvertes
 
