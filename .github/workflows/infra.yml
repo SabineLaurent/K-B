@@ -3,16 +3,15 @@ name: Infra
 on:
   push:
     branches: [main]
-    paths: ["infra/**", ".github/workflows/infra.yml"]
   pull_request:
     branches: [main]
-    paths: ["infra/**", ".github/workflows/infra.yml"]
 
 permissions:
   contents: read
 
 # Builds the Bicep of infra/ without any Azure right: Sabine applies it by hand (infra/README.md).
-# Not a required check: with its path filter, it would block every pull request that leaves infra/ alone.
+# A required check of main (#496): it runs on every pull request, with no path filter, since a check that
+# a filter skips stays pending and blocks the merge.
 jobs:
   bicep-build:
     runs-on: ubuntu-latest
