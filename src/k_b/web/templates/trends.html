@@ -26,11 +26,11 @@ without script (WCAG 2.1.1), a region named by the caption. -#}
 <table class="trends-table">
 <caption id="trends-caption">Fenêtre du <time datetime="{{ table.start_day }}">{{ table.start_text }}</time> au <time datetime="{{ table.end_day }}">{{ table.end_text }}</time>: étoiles et <span lang="en">forks</span> gagnés sur GitHub, échantillon de GH Archive</caption>
 <thead>
-<tr><th scope="col">Rang</th><th scope="col">Dépôt</th><th scope="col" class="number">Étoiles</th><th scope="col" class="number"><span lang="en">Forks</span></th></tr>
+<tr><th scope="col">Rang</th><th scope="col">Dépôt</th><th scope="col" class="number">Étoiles gagnées</th><th scope="col" class="number"><span lang="en">Forks</span> gagnés</th></tr>
 </thead>
 <tbody>
 {% for row in table.rows %}
-<tr><td class="rank">{{ row.rank }}</td><td>{% if row.link %}{{ external_link(row.link, row.repository_name, link_note, "en") }}{% else %}{{ row.repository_name }}{% endif %}</td><td class="number">{{ row.stars }}</td><td class="number">{{ row.forks }}</td></tr>
+<tr><td class="rank">{{ row.rank }}</td><th scope="row">{% if row.link %}{{ external_link(row.link, row.repository_name, link_note, "en") }}{% else %}{{ row.repository_name }}{% endif %}</th><td class="number">{{ row.stars }}</td><td class="number">{{ row.forks }}</td></tr>
 {% endfor %}
 </tbody>
 </table>

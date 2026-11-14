@@ -164,13 +164,18 @@ jour valide ou rien : WHATWG, RGAA 8.2).
 
 **Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
 le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
-Archive. Ses colonnes sont en `th scope="col"` : « Rang » (la position dans l'ordre de l'API), « Dépôt » (un
-lien vers `https://github.com/<owner>/<repo>`, bâti d'un `RepositoryName` validé, par la macro `external_link` :
-nouvel onglet, « (en anglais, site externe, nouvel onglet) »), « Étoiles » et « *Forks* », alignés à droite en
-chiffres tabulaires, les milliers groupés par une espace fine insécable (U+202F). Il garde sa largeur naturelle
-et ne déborde pas de la page de 320 à 1280 px (mesuré pour #596) ; un nom aux longueurs que permet GitHub (39 et
-100 caractères) ou un compte de 19 chiffres l'élargit au-delà de son cadre, qui défile alors : le cadre prend le
-focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ; WCAG 2.1.1).
+Archive. Ses colonnes sont en `th scope="col"`, avec les mots de la maquette : « Rang » (la position dans l'ordre
+de l'API), « Dépôt », « Étoiles gagnées » et « *Forks* gagnés », ces deux derniers alignés à droite en chiffres
+tabulaires, les milliers groupés par une espace fine insécable (U+202F). Le dépôt de chaque ligne est son en-tête
+(`th scope="row"`, RGAA 5.7), écrit comme les autres cellules : un lien vers `https://github.com/<owner>/<repo>`,
+bâti d'un `RepositoryName` validé, par la macro `external_link` (nouvel onglet, « (en anglais, site externe, nouvel
+onglet) », gardée visible : décision de Sabine du 2026-11-14). Le tableau a 560 px de large au moins (`35rem`),
+comme la maquette (décision de Sabine du 2026-11-14) : sur un écran plus étroit, il défile dans son cadre, sans
+élargir la page. Le cadre prend le focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ;
+WCAG 2.1.1) ; il est le conteneur de la légende (`container-type: inline-size`), qui garde sa largeur
+(`max-inline-size: 100cqi`) et reste lisible sans défiler ; sous le tableau, 6 px gardent en vue l'anneau de focus du
+dernier lien, que le cadre couperait. À l'impression, le cadre ne défile plus, et la flèche et l'annonce des liens
+du tableau sont retirées.
 
 **L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
 *forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
@@ -340,8 +345,8 @@ sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément
 mots, et la pagination nommée.
 
 Sur les tendances (une fenêtre, un jour refusé, une fenêtre absente, la base vide), il vérifie : le `label` et
-l'aide du champ, le message et `aria-invalid` d'un jour refusé, la légende du tableau et un `th scope="col"`
-par colonne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
+l'aide du champ, le message et `aria-invalid` d'un jour refusé, la légende du tableau, un `th scope="col"`
+par colonne et un `th scope="row"` par ligne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
 l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une région nommée par sa légende. Sur
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 

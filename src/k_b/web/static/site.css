@@ -893,20 +893,27 @@
   }
 
   /* The table of a window in its frame, which scrolls rather than widen the page: WCAG 1.4.10
-     exempts a table of data (Maquette-tendances.dc.html). */
+     exempts a table of data (Maquette-tendances.dc.html). Its container: the caption keeps its
+     width. Under the table, room for the focus ring of the last link, which the frame would clip. */
   .table-frame {
     margin-block-end: 1rem;
+    padding-block-end: 0.375rem;
     overflow-x: auto;
+    container-type: inline-size;
     background: var(--color-card);
     border: 1px solid var(--color-stone);
     border-radius: 8px;
   }
 
+  /* 560 px at least, as the mockup (Sabine, 2026-11-14). */
   .trends-table {
     inline-size: 100%;
+    min-inline-size: 35rem;
     border-collapse: collapse;
 
+    /* In sight on a screen narrower than the table: it wraps in the width of the frame. */
     & caption {
+      max-inline-size: 100cqi;
       padding: 1rem 0.5rem 0.5rem;
       text-align: start;
       font-weight: 600;
@@ -920,8 +927,13 @@
       vertical-align: middle;
     }
 
-    & th {
+    & thead th {
       padding-block: 0.75rem;
+    }
+
+    /* The repository names its row, written as the other cells. */
+    & tbody th {
+      font-weight: normal;
     }
 
     & thead tr {
@@ -945,10 +957,14 @@
     }
   }
 
-  /* On the right, in tabular figures, as in the mockup; a count is never cut. */
+  /* On the right, in tabular figures, as in the mockup. */
   .trends-table .number {
     text-align: end;
     font-variant-numeric: tabular-nums;
+  }
+
+  /* A count is never cut; the header of its column wraps. */
+  .trends-table td.number {
     white-space: nowrap;
   }
 
@@ -992,6 +1008,12 @@
     /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns. */
     .table-frame {
       overflow: visible;
+    }
+
+    /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */
+    .trends-table a > span[aria-hidden="true"],
+    .trends-table .link-note {
+      display: none;
     }
   }
 }

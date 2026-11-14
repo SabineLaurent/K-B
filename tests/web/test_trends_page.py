@@ -225,5 +225,5 @@ def test_a_name_without_a_link_is_written_as_text_in_its_cell():
     response = get(TRENDS_PATH, serve(trends))
 
     assert response.status_code == 200
-    assert "<td>owner/..</td>" in response.text
+    assert '<th scope="row">owner/..</th>' in response.text
     assert response.text.count('<td class="rank">') == 5

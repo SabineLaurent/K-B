@@ -326,12 +326,29 @@ def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
 
 
 def test_the_counts_of_the_trends_are_aligned_as_numbers():
-    """Maquette-tendances.dc.html: on the right, in tabular figures, a count never cut."""
+    """Maquette-tendances.dc.html: on the right, in tabular figures, a count never cut; the header
+    of its column, « Étoiles gagnées », wraps on a narrow screen."""
     rule = strip_nested_rules(read_rule(".trends-table .number"))
 
     assert "text-align: end;" in rule
     assert "font-variant-numeric: tabular-nums;" in rule
-    assert "white-space: nowrap;" in rule
+    assert "white-space: nowrap;" not in rule
+    assert "white-space: nowrap;" in strip_nested_rules(
+        read_rule(".trends-table td.number")
+    )
+
+
+def test_the_header_of_a_row_is_written_as_its_cells():
+    """The repository names its row (RGAA 5.7), in the weight and on the side of the other cells;
+    the padding of 44 px is the one of the headers of the columns, the link of a row gives its
+    height."""
+    shared = re.search(r"& th,\s*& td\s*\{([^}]*)\}", STYLESHEET)
+
+    assert shared is not None
+    assert "text-align: start;" in shared.group(1)
+    assert "font-weight: normal;" in strip_nested_rules(read_rule("tbody th"))
+    assert "padding-block: 0.75rem;" in strip_nested_rules(read_rule("thead th"))
+    assert not re.search(r"^\s*& th\s*\{", STYLESHEET, re.MULTILINE)
 
 
 def test_the_name_of_a_repository_wraps_anywhere():
@@ -342,9 +359,27 @@ def test_the_name_of_a_repository_wraps_anywhere():
 
 
 def test_the_table_of_the_trends_scrolls_in_its_frame_rather_than_widen_the_page():
-    """Maquette-tendances.dc.html; measured at 320 px, a name at the lengths GitHub allows
-    widens the table beyond its frame by 12 px. WCAG 1.4.10 exempts a table of data."""
+    """Maquette-tendances.dc.html: a table of 560 px at least (Sabine, 2026-11-14), which scrolls in
+    its frame on a narrower screen. WCAG 1.4.10 exempts a table of data."""
+    assert "min-inline-size: 35rem;" in strip_nested_rules(read_rule(".trends-table"))
     assert "overflow-x: auto;" in strip_nested_rules(read_rule(".table-frame"))
+
+
+def test_the_caption_of_the_table_wraps_in_the_width_of_its_frame():
+    """Wider than the screen, the table would carry its caption out of sight: the caption keeps the
+    width of the frame, its container."""
+    assert "container-type: inline-size;" in strip_nested_rules(
+        read_rule(".table-frame")
+    )
+    assert "max-inline-size: 100cqi;" in strip_nested_rules(read_rule("caption"))
+
+
+def test_the_frame_keeps_the_focus_ring_of_its_last_link_in_sight():
+    """A frame that scrolls clips what passes its edges: the ring of the last link, 3 px at 2 px
+    from it, holds in the 6 px under the table."""
+    assert "padding-block-end: 0.375rem;" in strip_nested_rules(
+        read_rule(".table-frame")
+    )
 
 
 def test_a_table_wider_than_the_page_prints_all_its_columns():
@@ -354,3 +389,16 @@ def test_a_table_wider_than_the_page_prints_all_its_columns():
     )
 
     assert "overflow: visible;" in rule
+
+
+def test_a_table_printed_drops_the_announcement_of_its_links():
+    """On paper, a link opens no tab: its arrow and its announcement go, in the table only, where
+    they would repeat on each row."""
+    print_rules = read_block(STYLESHEET, r"@media print\s*\{")
+    rule = re.search(
+        r'\.trends-table a > span\[aria-hidden="true"\],\s*\.trends-table \.link-note\s*\{'
+        r"\s*display:\s*none;",
+        print_rules,
+    )
+
+    assert rule is not None

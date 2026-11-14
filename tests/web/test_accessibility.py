@@ -690,23 +690,35 @@ def test_the_sources_name_gh_archive_for_the_trends():
 
 def test_the_table_of_the_trends_has_its_caption_and_a_header_for_each_column():
     """RGAA 5.4, 5.6 and 5.7; WCAG 1.3.1: the caption first in the table, a th scope="col" for each
-    column, and four cells in each row."""
+    column, with the words of Maquette-tendances.dc.html, and in each row its repository in a
+    th scope="row" between three cells."""
     table = re.search(
         r"<table\b[^>]*>(.*?)</table>", PAGES["/tendances"], flags=re.DOTALL
     )
 
     assert table is not None
     assert re.match(r"\s*<caption\b", table.group(1))
-    headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", table.group(1), flags=re.DOTALL)
+    head = re.search(r"<thead>(.*?)</thead>", table.group(1), flags=re.DOTALL)
+    assert head is not None
+    headers = re.findall(r"<th\b([^>]*)>(.*?)</th>", head.group(1), flags=re.DOTALL)
     assert [" ".join(re.sub(r"<[^>]+>", "", text).split()) for _, text in headers] == [
         "Rang",
         "Dépôt",
-        "Étoiles",
-        "Forks",
+        "Étoiles gagnées",
+        "Forks gagnés",
     ]
     assert all('scope="col"' in attributes for attributes, _ in headers)
-    rows = re.findall(r"<tr>(.*?)</tr>", table.group(1), flags=re.DOTALL)
-    assert [row.count("<td") for row in rows[1:]] == [4] * 5
+    body = re.search(r"<tbody>(.*?)</tbody>", table.group(1), flags=re.DOTALL)
+    assert body is not None
+    rows = re.findall(r"<tr>(.*?)</tr>", body.group(1), flags=re.DOTALL)
+    assert [re.findall(r"<(td|th)\b([^>]*)>", row)[:4] for row in rows] == [
+        [
+            ("td", ' class="rank"'),
+            ("th", ' scope="row"'),
+            ("td", ' class="number"'),
+            ("td", ' class="number"'),
+        ]
+    ] * 5
 
 
 def test_the_window_of_the_trends_is_given_by_two_time_elements():
@@ -777,9 +789,9 @@ def test_the_statement_says_what_the_tests_check_of_the_table():
 
 
 def test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption():
-    """Measured at 320 px: a name of the length GitHub allows widens the table beyond
-    its frame, which scrolls (Maquette-tendances.dc.html); WCAG 2.1.1 asks the keyboard, without
-    script: the frame takes the focus, a region named by the caption."""
+    """A table of 560 px at least, as Maquette-tendances.dc.html, scrolls in its frame on a narrower
+    screen; WCAG 2.1.1 asks the keyboard, without script: the frame takes the focus, a region
+    named by the caption."""
     page = outline(PAGES["/tendances"])
     [frame] = [
         attributes
