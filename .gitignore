@@ -3,6 +3,7 @@
 .env.*
 !.env.example
 !.env.e2e_test.example
+!.env.bench.example
 
 # Environnement Python
 .venv/
