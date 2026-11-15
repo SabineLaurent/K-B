@@ -408,11 +408,13 @@ def build_request_body(
             "json_schema": {"name": schema_name, "strict": True, "schema": json_schema},
         },
         "max_completion_tokens": max_completion_tokens,
-        # Explicit mode without a breakpoint: no prompt cache written, so the items are not kept
-        # for its 30 minutes or more (GPT-5.6 and later cache the last message by default;
-        # docs/registre-traitements.md). A model before GPT-5.6 refuses the field with a 400.
-        "prompt_cache_options": PROMPT_CACHE_OFF,
     }
+    # Explicit mode without a breakpoint: no prompt cache written, so the items are not kept for
+    # its 30 minutes or more (GPT-5.6 and later cache the last message by default;
+    # docs/registre-traitements.md). A model before GPT-5.6 refuses the field with a 400: it is
+    # left out under KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false.
+    if settings.send_prompt_cache_options:
+        body["prompt_cache_options"] = PROMPT_CACHE_OFF
     # A reasoning model takes no temperature (docs/fiches-veille.md, "Réglages d'appel").
     if settings.reasoning_effort is None:
         body["temperature"] = 0

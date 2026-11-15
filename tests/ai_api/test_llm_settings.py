@@ -83,13 +83,88 @@ def test_an_empty_reasoning_effort_is_not_set():
     assert settings.reasoning_effort is None
 
 
-def test_reasoning_effort_none_is_read():
+@pytest.mark.parametrize("effort", ["none", "minimal"])
+def test_a_reasoning_effort_allowed_is_read(effort):
     settings = read_llm_settings_or_refusal(
-        PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "none"}
+        PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": effort}
     )
 
     assert isinstance(settings, LlmSettings)
-    assert settings.reasoning_effort == "none"
+    assert settings.reasoning_effort == effort
+
+
+@pytest.mark.parametrize(
+    ("environment", "is_sent"),
+    [
+        (PROVIDER_ENVIRONMENT, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": ""}, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true"}, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"}, False),
+    ],
+    ids=["not-set", "empty", "true", "false"],
+)
+def test_the_prompt_cache_options_are_sent_unless_set_to_false(environment, is_sent):
+    settings = read_llm_settings_or_refusal(environment)
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.send_prompt_cache_options is is_sent
+
+
+def test_the_replay_reads_whether_the_prompt_cache_options_are_sent(
+    replay_environment,
+):
+    settings = read_llm_settings_or_refusal(
+        replay_environment | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"}
+    )
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.send_prompt_cache_options is False
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["gpt-5-mini", "google/gemini-2.5-flash", f"{'p' * 100}/{'m' * 100}"],
+    ids=["without-publisher", "with-publisher", "longest-of-each-side"],
+)
+def test_a_model_with_or_without_its_publisher_is_read(model):
+    settings = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": model}
+    )
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.model == model
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "google/gemini/2.5",
+        "google//gemini",
+        "/gemini-2.5-flash",
+        "google/",
+        "google/-gemini",
+        "google /gemini",
+        f"{'p' * 101}/gemini",
+        f"google/{'m' * 101}",
+    ],
+    ids=[
+        "two-slashes",
+        "double-slash",
+        "no-publisher",
+        "no-model",
+        "model-starting-with-a-dash",
+        "space-before-the-slash",
+        "publisher-too-long",
+        "model-too-long",
+    ],
+)
+def test_a_model_out_of_the_publisher_form_is_refused(model):
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": model}
+    )
+
+    assert isinstance(refusal, str)
+    assert refusal.startswith("KB_LLM_MODEL: ")
 
 
 @pytest.mark.parametrize(
@@ -143,11 +218,18 @@ def test_reasoning_effort_none_is_read():
         ),
         (
             PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": "gpt 5\n"},
-            r"KB_LLM_MODEL: 'gpt 5\n' not [A-Za-z0-9][A-Za-z0-9._:-]{0,99}",
+            (
+                r"KB_LLM_MODEL: 'gpt 5\n' not [A-Za-z0-9][A-Za-z0-9._:-]{0,99}"
+                r"(?:/[A-Za-z0-9][A-Za-z0-9._:-]{0,99})?"
+            ),
         ),
         (
             PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "low"},
-            "KB_LLM_REASONING_EFFORT: 'low' not none",
+            "KB_LLM_REASONING_EFFORT: 'low' not none nor minimal",
+        ),
+        (
+            PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "no"},
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: 'no' not true nor false",
         ),
     ],
     ids=[
@@ -164,7 +246,8 @@ def test_reasoning_effort_none_is_read():
         "port-not-digits",
         "host-out-of-pattern",
         "model-out-of-pattern",
-        "reasoning-effort-other-than-none",
+        "reasoning-effort-other-than-none-or-minimal",
+        "prompt-cache-options-other-than-true-or-false",
     ],
 )
 def test_a_setting_refused_gives_its_reason(environment, message):
