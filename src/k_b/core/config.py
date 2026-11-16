@@ -254,8 +254,9 @@ LLM_RETRY_WAIT_SECONDS = 2
 LLM_RETRY_AFTER_MAX_SECONDS = 20
 # Not set: temperature=0. "none" or "minimal" for a reasoning model, which takes no temperature
 # alone (gpt-6-luna refuses temperature 0 without it: 400 unsupported_value, #158); "minimal" for
-# gpt-5-nano and gpt-5-mini, whose effort goes no lower.
-type ReasoningEffort = Literal["none", "minimal"]
+# gpt-5-nano and gpt-5-mini, whose effort goes no lower; low for Gemini 3.8 Flash and Gemini 4
+# Hydrogen on Google Cloud, whose effort goes no lower either (bench of C7).
+type ReasoningEffort = Literal["none", "minimal", "low"]
 REASONING_EFFORTS: tuple[ReasoningEffort, ...] = get_args(ReasoningEffort.__value__)
 LLM_REASONING_EFFORT: ReasoningEffort | None = None
 # Not set: each request sends prompt_cache_options, which writes no prompt cache on GPT-5.6 and

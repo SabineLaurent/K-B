@@ -232,7 +232,7 @@ def test_the_user_message_keeps_its_text_unescaped():
     assert user_messages(sent_bodies(transport)[0]) == ['{"title": "Modèle européen"}']
 
 
-@pytest.mark.parametrize("effort", ["none", "minimal"])
+@pytest.mark.parametrize("effort", ["none", "minimal", "low"])
 def test_a_reasoning_model_gets_its_reasoning_effort_and_no_temperature(effort):
     settings = replace(REPLAY_SETTINGS, reasoning_effort=effort)
 

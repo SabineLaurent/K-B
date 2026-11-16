@@ -83,7 +83,7 @@ def test_an_empty_reasoning_effort_is_not_set():
     assert settings.reasoning_effort is None
 
 
-@pytest.mark.parametrize("effort", ["none", "minimal"])
+@pytest.mark.parametrize("effort", ["none", "minimal", "low"])
 def test_a_reasoning_effort_allowed_is_read(effort):
     settings = read_llm_settings_or_refusal(
         PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": effort}
@@ -224,8 +224,8 @@ def test_a_model_out_of_the_publisher_form_is_refused(model):
             ),
         ),
         (
-            PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "low"},
-            "KB_LLM_REASONING_EFFORT: 'low' not none nor minimal",
+            PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "medium"},
+            "KB_LLM_REASONING_EFFORT: 'medium' not none nor minimal nor low",
         ),
         (
             PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "no"},
@@ -246,7 +246,7 @@ def test_a_model_out_of_the_publisher_form_is_refused(model):
         "port-not-digits",
         "host-out-of-pattern",
         "model-out-of-pattern",
-        "reasoning-effort-other-than-none-or-minimal",
+        "reasoning-effort-other-than-none-minimal-or-low",
         "prompt-cache-options-other-than-true-or-false",
     ],
 )
