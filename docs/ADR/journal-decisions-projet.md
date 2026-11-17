@@ -7304,8 +7304,17 @@ testé sur la branche du banc du 16/11.
   2026-10-17 (« Appel du modèle : cache de prompt coupé »), qui écartait une variable « sans second usage
   aujourd'hui » et annonçait un réglage « avec le second modèle, si besoin » : le banc de C7 en est le second usage.
   Le défaut garde la décision de 2026-10-17 en production : sans la variable, rien ne change pour gpt-6-luna.
-  Limite assumée : à `false`, le fournisseur peut garder les items dans son cache de prompt ; un modèle qui en a
-  besoin a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »). — PR de #627
+  Limite assumée : à `false`, le fournisseur peut garder les items dans son cache de prompt, d'où l'entrée
+  suivante. — PR de #627
+- **`kb serve-ai` refuse de démarrer avec `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false` et
+  `KB_DEPLOYMENT_ENVIRONMENT=production` ; `false` reste accepté en local et en bac à sable.** Tranché par
+  time-knight le 2026-11-17 après un relecteur neuf (délégation de Sabine du 15/10), sur le constat C2 de la revue
+  de code. Pourquoi : à `false`, le cache de prompt du fournisseur garde le texte des items (données personnelles
+  possibles) au moins 30 minutes, alors que le registre dit le cache coupé ; le même refus que `KB_TRACE_CONTENT=all`
+  en production (`metrics_export.py`) ; aucun usage bloqué, gpt-6-luna et gpt-6.1-sol acceptant le champ (banc du
+  16/11). Option écartée : une garde par l'écrit seul (registre, `MEMORY.md`), la recommandation de la session, que
+  rien ne fait respecter. Limite assumée : un Gemini en production demanderait sa ligne au registre et la levée de
+  ce refus. — PR de #627
 - **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
   côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
   sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un

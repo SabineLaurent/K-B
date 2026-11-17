@@ -334,8 +334,12 @@ prompt (`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journ
 modèle : cache de prompt coupé »). Selon la doc, un modèle d'avant GPT-5.6 refuse ce champ par
 un 400, comme un autre fournisseur qui ne le connaît pas : `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false`
 le retire de chaque requête (#627 ; `true`, ou rien, l'envoie). Le fournisseur peut alors garder
-les items dans son cache de prompt : ce réglage n'est posé pour un modèle qu'après sa ligne au
-registre des traitements (« Usage par le fournisseur »), jamais pour gpt-6-luna. `KB_LLM_MODEL`
+les items dans son cache de prompt : `false` est refusé au démarrage avec
+`KB_DEPLOYMENT_ENVIRONMENT=production`, comme `KB_TRACE_CONTENT=all`, et accepté en local et en
+bac à sable. gpt-6-luna et gpt-6.1-sol acceptent le champ (banc de C7) ; un modèle qui en aurait
+besoin en production a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »),
+puis la levée de ce refus. Le démarrage de `kb serve-ai` journalise l'effort et l'envoi du champ
+(`LLM reasoning effort low, prompt_cache_options sent`). `KB_LLM_MODEL`
 accepte un modèle derrière son éditeur, `<éditeur>/<modèle>` (`google/<modèle>` sur Google Cloud),
 une barre oblique au plus, chaque côté au motif d'un nom de modèle (`MODEL_NAME`, `core/config.py`) ;
 le nom ne part que dans le corps JSON, jamais dans l'URL ni un en-tête. Sur Azure AI Foundry,

@@ -44,10 +44,10 @@ changer cette ligne. Le dépôt fait déjà ainsi pour `GITHUB_ECOSYSTEMS` et `T
 def is_reasoning_effort(value: str) -> TypeIs[ReasoningEffort]:
     return value in REASONING_EFFORTS
 ```
-(`src/k_b/ai_api/connectors/llm_settings.py:98`)
+(`src/k_b/ai_api/connectors/llm_settings.py:109`)
 
 La variable d'environnement est une `str`. Après `if effort is not None and not is_reasoning_effort(effort):`
-(`llm_settings.py:70`), qui renvoie un refus, mypy sait que `effort` est un `ReasoningEffort` : `TypeIs` (Python
+(`llm_settings.py:71`), qui renvoie un refus, mypy sait que `effort` est un `ReasoningEffort` : `TypeIs` (Python
 3.13) affine le type dans la branche où la fonction rend `True`. Sans lui, il faudrait un `cast`, que mypy ne
 vérifie pas. Une valeur hors liste (`medium`) arrête le démarrage avec un message qui la cite, tronquée et échappée
 par `quote_value`, et nomme les valeurs permises : `KB_LLM_REASONING_EFFORT: 'medium' not none nor minimal nor low`.
@@ -57,7 +57,7 @@ par `quote_value`, et nomme les valeurs permises : `KB_LLM_REASONING_EFFORT: 'me
 ```python
 SEND_PROMPT_CACHE_OPTIONS_VALUES = {"true": True, "false": False}
 ```
-(`llm_settings.py:37`)
+(`llm_settings.py:38`)
 
 Seuls les textes `true` et `false` sont acceptés ; vide ou absent vaut `true` (`LLM_SEND_PROMPT_CACHE_OPTIONS`,
 `config.py:266`), toute autre valeur (`no`, `0`, `False`) est refusée au démarrage. Échouer fermé : un `yes` mal tapé
@@ -76,7 +76,7 @@ Le champ n'est plus écrit en dur dans le dictionnaire : il n'y entre que si le 
 ```python
 send_prompt_cache_options: bool = LLM_SEND_PROMPT_CACHE_OPTIONS
 ```
-(`llm_settings.py:60`)
+(`llm_settings.py:61`)
 
 Dans une `dataclass`, un champ avec une valeur par défaut doit venir après ceux qui n'en ont pas. Le défaut est
 celui qui coupe le cache : un `LlmSettings` construit sans ce champ (dans un test, par exemple) garde le comportement
@@ -105,6 +105,14 @@ barre oblique ne peut donc pas modifier le chemin de l'URL appelée.
   (cache de prompt coupé, une correction de minimisation). Cette décision écartait une variable « sans second usage
   aujourd'hui » et annonçait un réglage avec le second modèle : le banc en est le second usage (journal ADR,
   2026-11-17). Option écartée de fait : ne plus jamais envoyer le champ, qui rouvrirait le cache pour gpt-6-luna.
+- **`false` refusé en production** (`KB_DEPLOYMENT_ENVIRONMENT=production`), accepté en local et en bac à sable :
+  tranché par time-knight après un relecteur neuf, sur le constat C2 de la revue de code. Pourquoi : le même refus
+  que `KB_TRACE_CONTENT=all`, et aucun usage bloqué (gpt-6-luna et gpt-6.1-sol acceptent le champ). Option
+  écartée : une garde par l'écrit seul (le registre), que proposait la session et que rien ne fait respecter. Le
+  refus vit dans `read_llm_settings_or_refusal`, là où le réglage est lu, plutôt que dans le démarrage de
+  `kb serve-ai` (qui ne porte aucune règle d'un réglage) ou dans l'export des mesures (qui ne lit
+  `KB_DEPLOYMENT_ENVIRONMENT` que si l'export est actif) ; il compare la valeur telle quelle, comme `is_sandbox`
+  (`core/api_settings.py`).
 - **`true` et `false` seulement**, plutôt que les mille façons d'écrire un booléen : échouer fermé.
 - **Une barre oblique au plus dans le nom du modèle** : la forme `éditeur/modèle` de Google Cloud, rien de plus.
   Les autres options n'ont pas été consignées par la session du banc.
@@ -117,25 +125,27 @@ barre oblique ne peut donc pas modifier le chemin de l'URL appelée.
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `test_a_reasoning_effort_allowed_is_read` (`tests/ai_api/test_llm_settings.py:87`), paramétré `none`, `minimal`, `low` | les trois efforts sont lus |
-| `test_a_setting_refused_gives_its_reason`, cas `medium` et `no` (`test_llm_settings.py:253`) | un effort ou un interrupteur hors liste arrête le démarrage, avec son message |
+| `test_a_setting_refused_gives_its_reason`, cas `medium` et `no` (`test_llm_settings.py:297`) | un effort ou un interrupteur hors liste arrête le démarrage, avec son message |
 | `test_the_prompt_cache_options_are_sent_unless_set_to_false` (`test_llm_settings.py:106`) | absent, vide ou `true` : envoyé ; `false` : retiré |
-| `test_the_replay_reads_whether_the_prompt_cache_options_are_sent` (`:113`) | le fournisseur simulé lit le réglage comme le vrai |
-| `test_a_model_with_or_without_its_publisher_is_read` et `test_a_model_out_of_the_publisher_form_is_refused` (`:129`, `:161`) | la forme `éditeur/modèle` passe ; deux barres, une barre au bord, un côté trop long ou un espace sont refusés |
+| `test_the_replay_reads_whether_the_prompt_cache_options_are_sent` (`:157`) | le fournisseur simulé lit le réglage comme le vrai |
+| `test_a_model_with_or_without_its_publisher_is_read` et `test_a_model_out_of_the_publisher_form_is_refused` (`:173`, `:205`) | la forme `éditeur/modèle` passe ; deux barres, une barre au bord, un côté trop long ou un espace sont refusés |
 | `test_a_reasoning_model_gets_its_reasoning_effort_and_no_temperature` (`tests/ai_api/test_llm_client.py:236`) | la requête porte l'effort choisi, sans `temperature` |
 | `test_a_model_that_refuses_the_prompt_cache_options_is_called_without_them` (`test_llm_client.py:247`) | à `false`, le champ est absent de la requête |
 | `test_the_name_of_a_model_behind_its_publisher_goes_in_the_body_only` (`test_llm_client.py:257`) | le nom part dans le corps, l'URL reste la même, aucun en-tête ne le porte |
 | `test_serve_ai_logs_its_reasoning_effort_and_whether_it_sends_the_prompt_cache_options` (`tests/ai_api/test_serve_ai.py`), écrit rouge avant le code (revue de code, C3) | le démarrage de `kb serve-ai` dit l'effort et si `prompt_cache_options` part : un mode où le fournisseur peut garder un cache se voit dans le journal |
-| `uv run pytest` : 5 607 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts (2026-11-17) | rien d'autre n'a bougé |
+| `test_the_prompt_cache_options_left_out_are_refused_in_production` et `test_the_prompt_cache_options_are_refused_left_out_in_production_only` (`tests/ai_api/test_llm_settings.py`), le premier écrit rouge avant le code (revue de code, C2) | `false` arrête le démarrage en production, avec un message qui nomme les deux variables ; il passe en bac à sable et en local, et `true` ou rien passe en production |
+| `uv run pytest` : 5 612 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts (2026-11-17) | rien d'autre n'a bougé |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **« Pourquoi ne pas laisser passer n'importe quel effort au fournisseur ? »** Une entrée externe se valide à la
    frontière par un type fermé ; une faute de frappe arrête le démarrage au lieu de donner un 400 à chaque appel,
-   lu `llm_unavailable`. (`config.py:260`, `llm_settings.py:70`)
+   lu `llm_unavailable`. (`config.py:260`, `llm_settings.py:71`)
 2. **« À `false`, que deviennent les données ? »** Le fournisseur peut garder les items dans son cache de prompt,
-   selon ses règles. C'est pourquoi le réglage par défaut reste `true`, qu'il n'est jamais posé pour gpt-6-luna, et
-   qu'un modèle qui en a besoin a d'abord sa ligne au registre des traitements (`docs/registre-traitements.md`,
-   « Usage par le fournisseur »).
+   selon ses règles. C'est pourquoi le réglage par défaut reste `true`, que `false` est refusé au démarrage en
+   production (`llm_settings.py`, `read_llm_settings_or_refusal`), et qu'un modèle qui en aurait besoin en
+   production a d'abord sa ligne au registre des traitements (`docs/registre-traitements.md`, « Usage par le
+   fournisseur »), puis la levée de ce refus. Le démarrage le journalise dans tous les cas.
 3. **« Une barre oblique dans un nom, n'est-ce pas un risque d'injection de chemin ? »** Le nom ne part que dans le
    corps JSON, jamais dans l'URL : un test le vérifie (`test_llm_client.py:257`). Le motif n'admet qu'une barre, au
    milieu, entre deux noms sans espace ni contrôle.
