@@ -127,6 +127,25 @@ def test_the_prompt_cache_options_left_out_are_refused_in_production():
     )
 
 
+@pytest.mark.parametrize("environment", ["Production", "prod", " production"])
+def test_the_prompt_cache_options_left_out_are_refused_with_an_environment_out_of_the_list(
+    environment,
+):
+    """Fail closed: a deployment environment misspelled must not let them be left out in
+    production."""
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT
+        | {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": environment,
+        }
+    )
+
+    assert refusal == (
+        f"KB_DEPLOYMENT_ENVIRONMENT: {environment!r} not sandbox nor production"
+    )
+
+
 @pytest.mark.parametrize(
     "settings",
     [

@@ -17,7 +17,10 @@ from k_b.ai_api.connectors.llm_replay import (
     ReplayStep,
     read_replay_steps,
 )
-from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
+from k_b.core.api_settings import (
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
+    DEPLOYMENT_ENVIRONMENTS,
+)
 from k_b.core.config import (
     LLM_REASONING_EFFORT,
     LLM_REPLAY_BASE_URL,
@@ -85,16 +88,10 @@ def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | st
         if send_value is None
         else SEND_PROMPT_CACHE_OPTIONS_VALUES[send_value]
     )
-    # Left out, the provider may keep a prompt cache of the items: refused in production, as
-    # KB_TRACE_CONTENT=all (docs/registre-traitements.md, "Usage par le fournisseur").
-    if (
-        not send_prompt_cache_options
-        and environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) == "production"
-    ):
-        return (
-            f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: false refused"
-            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} production"
-        )
+    if not send_prompt_cache_options:
+        refusal = find_prompt_cache_options_refusal(environ)
+        if refusal is not None:
+            return refusal
     if provider == "replay":
         return read_replay_settings(
             environ, reasoning_effort, send_prompt_cache_options
@@ -104,6 +101,27 @@ def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | st
             environ, reasoning_effort, send_prompt_cache_options
         )
     return f"{PROVIDER_VARIABLE}: {quote_value(provider)} not {' nor '.join(PROVIDERS)}"
+
+
+def find_prompt_cache_options_refusal(environ: Mapping[str, str]) -> str | None:
+    """Why the prompt cache options cannot be left out, or None: the provider may then keep a
+    prompt cache of the items, refused in production as KB_TRACE_CONTENT=all
+    (docs/registre-traitements.md, "Usage par le fournisseur"). An environment out of the list
+    is refused too, so that a misspelled production fails closed; not set is a local run."""
+    environment = environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) or None
+    if environment is None:
+        return None
+    if environment not in DEPLOYMENT_ENVIRONMENTS:
+        return (
+            f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: {quote_value(environment)}"
+            f" not {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
+        )
+    if environment == "production":
+        return (
+            f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: false refused"
+            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} {environment}"
+        )
+    return None
 
 
 def is_reasoning_effort(value: str) -> TypeIs[ReasoningEffort]:
