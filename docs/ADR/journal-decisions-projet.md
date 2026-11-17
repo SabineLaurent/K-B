@@ -7306,8 +7306,9 @@ testé sur la branche du banc du 16/11.
 - **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
   côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
   sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un
-  en-tête (un test) ; `MODEL_NAME` contrôle aussi le nom lu dans la réponse du fournisseur avant qu'il n'entre dans
-  une fiche, qui admet donc lui aussi une barre oblique. Options écartées : non consignées par la session du banc.
+  en-tête (un test) ; `MODEL_NAME` contrôle aussi le nom que `kb digest` et `kb trend-report` lisent dans la
+  réponse de l'API IA (qui le tient de `KB_LLM_MODEL`, jamais du fournisseur) avant qu'il n'entre dans une fiche,
+  et l'admet donc lui aussi avec une barre oblique. Options écartées : non consignées par la session du banc.
   — PR de #627
 
 ## Décisions encore ouvertes

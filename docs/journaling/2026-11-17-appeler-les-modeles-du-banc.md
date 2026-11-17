@@ -138,10 +138,12 @@ barre oblique ne peut donc pas modifier le chemin de l'URL appelée.
 3. **« Une barre oblique dans un nom, n'est-ce pas un risque d'injection de chemin ? »** Le nom ne part que dans le
    corps JSON, jamais dans l'URL : un test le vérifie (`test_llm_client.py:257`). Le motif n'admet qu'une barre, au
    milieu, entre deux noms sans espace ni contrôle.
-4. **« Le nom du modèle lu dans la réponse du fournisseur est-il contrôlé ? »** Oui, par le même `MODEL_NAME`
-   (`post/ai_api_client.py:156`, `items.py:809`), avant d'entrer dans une fiche ou son jumeau ; la fiche l'écrit
-   comme une chaîne JSON, que YAML lit telle quelle (`post/digest_sheets.py:249`). Il accepte désormais lui aussi
-   une barre oblique.
+4. **« Le nom du modèle écrit dans une fiche est-il contrôlé ? »** Il ne vient jamais de la réponse du
+   fournisseur : l'API IA renvoie celui de `KB_LLM_MODEL` (`ai_api/routers/digest_router.py:205`). `kb digest`
+   relit la réponse de l'API IA comme une entrée non fiable, par le même `MODEL_NAME` (`post/ai_api_client.py:156`,
+   `items.py:809`), avant d'écrire la fiche et son jumeau ; la fiche l'écrit comme une chaîne JSON, que YAML lit
+   telle quelle (`post/digest_sheets.py:249`). Avec une seule barre oblique au milieu, il ne forme ni `..` entier
+   ni `//`, et aucun chemin de fichier ne le contient (revue de sécurité de #627).
 5. **« La production change-t-elle ? »** Non : sans les nouvelles variables, effort et cache restent ceux d'avant
    (`LLM_REASONING_EFFORT = None`, `LLM_SEND_PROMPT_CACHE_OPTIONS = True`).
 
