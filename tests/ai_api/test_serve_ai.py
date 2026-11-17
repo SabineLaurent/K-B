@@ -410,6 +410,34 @@ def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(
         assert environment[name] not in error_output
 
 
+@pytest.mark.parametrize(
+    ("settings", "line"),
+    [
+        (
+            {},
+            "LLM reasoning effort not set, prompt_cache_options sent",
+        ),
+        (
+            {
+                "KB_LLM_REASONING_EFFORT": "low",
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            },
+            "LLM reasoning effort low, prompt_cache_options left out",
+        ),
+    ],
+    ids=["default", "low-without-prompt-cache-options"],
+)
+def test_serve_ai_logs_its_reasoning_effort_and_whether_it_sends_the_prompt_cache_options(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment, settings, line
+):
+    """Left out, the provider may keep a prompt cache of the items: the log says it."""
+    set_environment(monkeypatch, environment | settings)
+
+    cli.main(["serve-ai"])
+
+    assert line in capsys.readouterr().err
+
+
 def test_serve_ai_writes_its_own_log_file_under_kb_data_dir(
     monkeypatch, data_dir, uvicorn_calls, environment
 ):
