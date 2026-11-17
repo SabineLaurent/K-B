@@ -7283,6 +7283,33 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
   ci-dessus. — PR de #560
 
+## 2026-11-17
+
+### Appel du modèle : les réglages des modèles du banc de C7 (#627)
+
+Mission de time-knight du 2026-11-17, avec l'accord de Sabine (« OK PR de la branche du banc ») ; le code, écrit et
+testé sur la branche du banc du 16/11.
+
+- **`KB_LLM_REASONING_EFFORT` accepte `none`, `minimal` et `low` ; toute autre valeur arrête le démarrage.**
+  Pourquoi : gpt-6.1-sol, le service que préconise le banc de C7 pour C8, refuse `none` et `minimal` et demande
+  `low` ; gpt-5-nano et gpt-5-mini ne descendent pas sous `minimal`. Sur `main`, seul `none` passait : C8 aurait
+  décrit un réglage que le code refuse. La liste reste fermée (`ReasoningEffort`, `core/config.py`), comme avant :
+  une valeur au-delà de `low` n'a pas d'usage. Limite assumée : à `minimal` ou `low`, le modèle raisonne, et le
+  coût et le délai d'un appel n'ont pas été mesurés par K-B. — PR de #627
+- **`KB_LLM_SEND_PROMPT_CACHE_OPTIONS` (`true` par défaut) : à `false`, `prompt_cache_options` ne part plus, pour
+  un modèle d'avant GPT-5.6 ou un autre fournisseur, qui le refusent par un 400.** Revient en partie sur l'entrée du
+  2026-10-17 (« Appel du modèle : cache de prompt coupé »), qui écartait une variable « sans second usage
+  aujourd'hui » et annonçait un réglage « avec le second modèle, si besoin » : le banc de C7 en est le second usage.
+  Le défaut garde la décision de 2026-10-17 en production : sans la variable, rien ne change pour gpt-6-luna.
+  Limite assumée : à `false`, le fournisseur peut garder les items dans son cache de prompt ; un modèle qui en a
+  besoin a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »). — PR de #627
+- **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
+  côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
+  sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un
+  en-tête (un test) ; `MODEL_NAME` contrôle aussi le nom lu dans la réponse du fournisseur avant qu'il n'entre dans
+  une fiche, qui admet donc lui aussi une barre oblique. Options écartées : non consignées par la session du banc.
+  — PR de #627
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
