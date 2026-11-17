@@ -124,7 +124,8 @@ barre oblique ne peut donc pas modifier le chemin de l'URL appelée.
 | `test_a_reasoning_model_gets_its_reasoning_effort_and_no_temperature` (`tests/ai_api/test_llm_client.py:236`) | la requête porte l'effort choisi, sans `temperature` |
 | `test_a_model_that_refuses_the_prompt_cache_options_is_called_without_them` (`test_llm_client.py:247`) | à `false`, le champ est absent de la requête |
 | `test_the_name_of_a_model_behind_its_publisher_goes_in_the_body_only` (`test_llm_client.py:257`) | le nom part dans le corps, l'URL reste la même, aucun en-tête ne le porte |
-| `uv run pytest` : 5 605 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts (2026-11-17) | rien d'autre n'a bougé |
+| `test_serve_ai_logs_its_reasoning_effort_and_whether_it_sends_the_prompt_cache_options` (`tests/ai_api/test_serve_ai.py`), écrit rouge avant le code (revue de code, C3) | le démarrage de `kb serve-ai` dit l'effort et si `prompt_cache_options` part : un mode où le fournisseur peut garder un cache se voit dans le journal |
+| `uv run pytest` : 5 607 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts (2026-11-17) | rien d'autre n'a bougé |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -151,8 +152,10 @@ barre oblique ne peut donc pas modifier le chemin de l'URL appelée.
 
 - Les refus des fournisseurs (gpt-6.1-sol qui refuse `none` et `minimal`, Google Cloud qui refuse
   `prompt_cache_options`, le nommage `google/<modèle>`) viennent du banc de C7 ; ils n'ont pas été reproduits dans K-B.
-- Le coût et le délai d'un appel à `minimal` ou `low` (le modèle raisonne) n'ont pas été mesurés par K-B, ni leur
-  effet sur la borne de `max_completion_tokens`.
+- À `minimal` ou `low`, le raisonnement compte dans `max_completion_tokens` (référence de l'API OpenAI). Le banc de
+  C7 l'a mesuré hors de K-B (gpt-6.1-sol à `low` : aucun appel coupé sur 5 passages ; gemini-4-hydrogen : choix des
+  dépôts coupé 2 fois sur 5 au plafond de 1 024) ; aucun test de K-B ne le couvre, l'essai de bout en bout de C8 le
+  remesure.
 - Le jeu de référence de `POST /digests` reste enregistré avec gpt-6-luna à `none` : il ne dit rien d'un autre
   modèle.
 

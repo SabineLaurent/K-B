@@ -7294,8 +7294,11 @@ testé sur la branche du banc du 16/11.
   Pourquoi : gpt-6.1-sol, le service que préconise le banc de C7 pour C8, refuse `none` et `minimal` et demande
   `low` ; gpt-5-nano et gpt-5-mini ne descendent pas sous `minimal`. Sur `main`, seul `none` passait : C8 aurait
   décrit un réglage que le code refuse. La liste reste fermée (`ReasoningEffort`, `core/config.py`), comme avant :
-  une valeur au-delà de `low` n'a pas d'usage. Limite assumée : à `minimal` ou `low`, le modèle raisonne, et le
-  coût et le délai d'un appel n'ont pas été mesurés par K-B. — PR de #627
+  une valeur au-delà de `low` n'a pas d'usage. Limite assumée : à `minimal` ou `low`, le raisonnement compte dans
+  `max_completion_tokens`, que K-B ne relève pas (1 024 pour la sélection des tendances) ; tri de la revue de code
+  par time-knight le 2026-11-17 : pas de code, la mesure du banc à l'appui (gpt-6.1-sol à `low`, aucun appel coupé
+  sur 5 passages ; gemini-4-hydrogen, choix coupé 2 fois sur 5 ; `docs/fiches-veille.md`, « Réglages d'appel »),
+  remesurée par l'essai de bout en bout de C8. — PR de #627
 - **`KB_LLM_SEND_PROMPT_CACHE_OPTIONS` (`true` par défaut) : à `false`, `prompt_cache_options` ne part plus, pour
   un modèle d'avant GPT-5.6 ou un autre fournisseur, qui le refusent par un 400.** Revient en partie sur l'entrée du
   2026-10-17 (« Appel du modèle : cache de prompt coupé »), qui écartait une variable « sans second usage
