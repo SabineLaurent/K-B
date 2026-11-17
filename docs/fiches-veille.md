@@ -335,8 +335,11 @@ modèle : cache de prompt coupé »). Selon la doc, un modèle d'avant GPT-5.6 r
 un 400, comme un autre fournisseur qui ne le connaît pas : `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false`
 le retire de chaque requête (#627 ; `true`, ou rien, l'envoie). Le fournisseur peut alors garder
 les items dans son cache de prompt : `false` est refusé au démarrage avec
-`KB_DEPLOYMENT_ENVIRONMENT=production`, comme `KB_TRACE_CONTENT=all`, et accepté en local et en
-bac à sable. gpt-6-luna et gpt-6.1-sol acceptent le champ (banc de C7) ; un modèle qui en aurait
+`KB_DEPLOYMENT_ENVIRONMENT=production`, comme `KB_TRACE_CONTENT=all`, ou avec une valeur hors de
+`sandbox` et `production` (une faute de frappe échoue fermé), et accepté en local et en bac à
+sable. Accepté ne veut pas dire sans condition : avant le premier envoi de données réelles à un
+fournisseur, son contrat est lu et le registre à jour (`docs/registre-traitements.md`,
+« Destinataire » ; `.claude/rules/conformite.md`, « RGPD : sous-traitance et transferts »). gpt-6-luna et gpt-6.1-sol acceptent le champ (banc de C7) ; un modèle qui en aurait
 besoin en production a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »),
 puis la levée de ce refus. Le démarrage de `kb serve-ai` journalise l'effort et l'envoi du champ
 (`LLM reasoning effort low, prompt_cache_options sent`). `KB_LLM_MODEL`

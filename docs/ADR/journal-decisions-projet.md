@@ -7313,8 +7313,10 @@ testé sur la branche du banc du 16/11.
   possibles) au moins 30 minutes, alors que le registre dit le cache coupé ; le même refus que `KB_TRACE_CONTENT=all`
   en production (`metrics_export.py`) ; aucun usage bloqué, gpt-6-luna et gpt-6.1-sol acceptant le champ (banc du
   16/11). Option écartée : une garde par l'écrit seul (registre, `MEMORY.md`), la recommandation de la session, que
-  rien ne fait respecter. Limite assumée : un Gemini en production demanderait sa ligne au registre et la levée de
-  ce refus. — PR de #627
+  rien ne fait respecter. Une valeur de `KB_DEPLOYMENT_ENVIRONMENT` posée hors de `sandbox` et `production` est
+  refusée elle aussi avec `false` (constat R1 de la seconde revue, tranché par time-knight après un relecteur neuf) :
+  une faute de frappe échoue fermé au lieu de faire sauter le refus ; non posée, c'est un poste local. Limite
+  assumée : un Gemini en production demanderait sa ligne au registre et la levée de ce refus. — PR de #627
 - **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
   côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
   sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un
