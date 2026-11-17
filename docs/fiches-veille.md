@@ -318,11 +318,36 @@ faudrait alors des lots plus petits.
 la sortie ; `reasoning_tokens` vaut 0. Le client envoie donc `reasoning_effort: "none"` seul ;
 option écartée : envoyer les deux (effet non prouvé). Pour gpt-6-luna,
 `KB_LLM_REASONING_EFFORT=none` est donc **obligatoire** : sans lui, chaque appel rend un 400, lu
-`llm_unavailable`, alors que l'API IA démarre. Chaque requête coupe aussi le cache de prompt
-(`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
-modèle : cache de prompt coupé ») : le client exige donc un modèle qui accepte ce champ (selon
-la doc, un modèle d'avant GPT-5.6 le refuse par un 400) ; un réglage viendra avec un modèle qui
-le refuse. Sur Azure AI Foundry, l'URL de base est
+`llm_unavailable`, alors que l'API IA démarre. Depuis #627, `KB_LLM_REASONING_EFFORT` accepte
+aussi `minimal` et `low`, pour les modèles du banc de C7 dont l'effort ne descend pas plus bas :
+`minimal` pour gpt-5-nano et gpt-5-mini, `low` pour gpt-6.1-sol, Gemini 3.8 Flash et Gemini 4
+Hydrogen ; toute autre valeur arrête le démarrage. À `minimal` ou `low`, le modèle raisonne, et ses
+jetons de raisonnement comptent dans `max_completion_tokens` (référence de l'API OpenAI,
+`chat/completions`, lue le 2026-11-17) : la sélection des tendances (1 024), la classification et
+la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_invalid_output`.
+Mesure du banc de C7 (16/11, `wip/banc-c7/results/passages.jsonl` de time-knight) : gpt-6.1-sol à
+`low`, lancement `20261116T142308Z`, 5 passages complets, choix des dépôts valide 5 fois sur 5, 274
+à 588 jetons de raisonnement par passage, toutes étapes comprises (textes : 91 à 207, lancement
+`20261116T143412Z`), aucun appel coupé ; gemini-4-hydrogen à `low` a vu son choix coupé 2 fois sur
+5 au plafond de 1 024. L'essai de bout en bout de C8 le remesure. Chaque requête coupe aussi le cache de
+prompt (`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
+modèle : cache de prompt coupé »). Selon la doc, un modèle d'avant GPT-5.6 refuse ce champ par
+un 400, comme un autre fournisseur qui ne le connaît pas : `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false`
+le retire de chaque requête (#627 ; `true`, ou rien, l'envoie). Le fournisseur peut alors garder
+les items dans son cache de prompt : `false` est refusé au démarrage avec
+`KB_DEPLOYMENT_ENVIRONMENT=production`, comme `KB_TRACE_CONTENT=all`, ou avec une valeur hors de
+`sandbox` et `production` (une faute de frappe échoue fermé), et accepté en local et en bac à
+sable. Accepté ne veut pas dire sans condition : avant le premier envoi de données réelles à un
+fournisseur, son contrat est lu et le registre à jour (`docs/registre-traitements.md`,
+« Destinataire » ; `.claude/rules/conformite.md`, « RGPD : sous-traitance et transferts »).
+gpt-6-luna et gpt-6.1-sol acceptent le champ (banc de C7) ; un modèle qui en aurait
+besoin en production a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »),
+puis la levée de ce refus. Le démarrage de `kb serve-ai` journalise l'effort et l'envoi du champ
+(`LLM reasoning effort low, prompt_cache_options sent`). `KB_LLM_MODEL`
+accepte un modèle derrière son éditeur, `<éditeur>/<modèle>` (`google/<modèle>` sur Google Cloud),
+une barre oblique au plus, chaque côté au motif d'un nom de modèle (`MODEL_NAME`, `core/config.py`) ;
+le nom ne part que dans le corps JSON, jamais dans l'URL ni un en-tête. Sur Azure AI Foundry,
+l'URL de base est
 `https://<ressource>.openai.azure.com/openai/v1`, sans `api-version`, et la clé part en
 `Authorization: Bearer` (mesure de #158). Le déploiement est figé sur une version du modèle. Le
 fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux, l'API IA ne

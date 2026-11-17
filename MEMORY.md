@@ -134,6 +134,11 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   Ce qu'est une anomalie (D1, précisée le 2026-10-28) ne se change que par Sabine, dans
   `is_anomaly` (`ai_api/connectors/llm_client.py`) ; une étape nouvelle qui appelle le modèle appelle
   `trace_contents(llm_call, tracing=tracing)` après avoir jugé l'appel.
+- Depuis #627, l'API IA appelle les modèles du banc de C7 : `KB_LLM_REASONING_EFFORT` à `none`, `minimal` ou `low`
+  (gpt-6.1-sol demande `low`), `KB_LLM_MODEL` en `<éditeur>/<modèle>`. `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false`
+  (le fournisseur peut alors garder les items dans son cache de prompt) est refusé avec
+  `KB_DEPLOYMENT_ENVIRONMENT=production` ; lever ce refus demande d'abord la ligne du modèle au registre des
+  traitements (`docs/fiches-veille.md`, « Réglages d'appel »).
 - Le compte rendu des tendances (`kb trend-report`, #364 à #370) : contrat dans `docs/tendances.md`,
   écrit avant le code ; #365 à #370 sont codées par time-knight (organisation de Sabine du
   2026-10-30). Sortie dans `veille/tendances/<date>.md` ; période tenue par

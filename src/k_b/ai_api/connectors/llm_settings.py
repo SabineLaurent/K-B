@@ -8,7 +8,7 @@ import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Literal
+from typing import Literal, TypeIs
 
 from pydantic import SecretStr
 
@@ -17,7 +17,18 @@ from k_b.ai_api.connectors.llm_replay import (
     ReplayStep,
     read_replay_steps,
 )
-from k_b.core.config import LLM_REASONING_EFFORT, LLM_REPLAY_BASE_URL, MODEL_NAME
+from k_b.core.api_settings import (
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
+    DEPLOYMENT_ENVIRONMENTS,
+)
+from k_b.core.config import (
+    LLM_REASONING_EFFORT,
+    LLM_REPLAY_BASE_URL,
+    LLM_SEND_PROMPT_CACHE_OPTIONS,
+    MODEL_NAME,
+    REASONING_EFFORTS,
+    ReasoningEffort,
+)
 from k_b.core.outbound import find_url_refusal
 from k_b.core.quoting import quote_value
 
@@ -26,6 +37,8 @@ BASE_URL_VARIABLE = "KB_LLM_BASE_URL"
 MODEL_VARIABLE = "KB_LLM_MODEL"
 API_KEY_VARIABLE = "KB_LLM_API_KEY"
 REASONING_EFFORT_VARIABLE = "KB_LLM_REASONING_EFFORT"
+SEND_PROMPT_CACHE_OPTIONS_VARIABLE = "KB_LLM_SEND_PROMPT_CACHE_OPTIONS"
+SEND_PROMPT_CACHE_OPTIONS_VALUES = {"true": True, "false": False}
 REPLAY_FILE_VARIABLE = "KB_LLM_REPLAY_FILE"
 
 type LlmProvider = Literal["openai_compatible", "replay"]
@@ -43,10 +56,12 @@ class LlmSettings:
     model: str
     # None for the replay, which sends no key.
     api_key: SecretStr | None
-    reasoning_effort: Literal["none"] | None
+    reasoning_effort: ReasoningEffort | None
     # The steps of the replay, read with the settings: a file missing or out of the model stops
     # the start, not the first call. None for a provider.
     replay_steps: tuple[ReplayStep, ...] | None
+    # Last, with its default: a settings made without it keeps the field that writes no cache.
+    send_prompt_cache_options: bool = LLM_SEND_PROMPT_CACHE_OPTIONS
 
 
 def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | str:
@@ -55,21 +70,67 @@ def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | st
     if not provider:
         return f"{PROVIDER_VARIABLE}: not set, {' or '.join(PROVIDERS)}"
     # Empty is not set, as for every variable here.
-    reasoning_effort = environ.get(REASONING_EFFORT_VARIABLE) or None
-    if reasoning_effort is not None and reasoning_effort != "none":
-        return f"{REASONING_EFFORT_VARIABLE}: {quote_value(reasoning_effort)} not none"
-    effort: Literal["none"] | None = (
-        "none" if reasoning_effort else LLM_REASONING_EFFORT
+    effort = environ.get(REASONING_EFFORT_VARIABLE) or None
+    if effort is not None and not is_reasoning_effort(effort):
+        return (
+            f"{REASONING_EFFORT_VARIABLE}: {quote_value(effort)}"
+            f" not {' nor '.join(REASONING_EFFORTS)}"
+        )
+    send_value = environ.get(SEND_PROMPT_CACHE_OPTIONS_VARIABLE) or None
+    if send_value is not None and send_value not in SEND_PROMPT_CACHE_OPTIONS_VALUES:
+        return (
+            f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: {quote_value(send_value)}"
+            f" not {' nor '.join(SEND_PROMPT_CACHE_OPTIONS_VALUES)}"
+        )
+    reasoning_effort = LLM_REASONING_EFFORT if effort is None else effort
+    send_prompt_cache_options = (
+        LLM_SEND_PROMPT_CACHE_OPTIONS
+        if send_value is None
+        else SEND_PROMPT_CACHE_OPTIONS_VALUES[send_value]
     )
+    if not send_prompt_cache_options:
+        refusal = find_prompt_cache_options_refusal(environ)
+        if refusal is not None:
+            return refusal
     if provider == "replay":
-        return read_replay_settings(environ, effort)
+        return read_replay_settings(
+            environ, reasoning_effort, send_prompt_cache_options
+        )
     if provider == "openai_compatible":
-        return read_provider_settings(environ, effort)
+        return read_provider_settings(
+            environ, reasoning_effort, send_prompt_cache_options
+        )
     return f"{PROVIDER_VARIABLE}: {quote_value(provider)} not {' nor '.join(PROVIDERS)}"
 
 
+def find_prompt_cache_options_refusal(environ: Mapping[str, str]) -> str | None:
+    """Why the prompt cache options cannot be left out here, or None: the provider may then keep
+    the items in its cache. Refused in production and, failing closed, out of the list."""
+    environment = environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) or None
+    if environment is None:
+        return None
+    if environment not in DEPLOYMENT_ENVIRONMENTS:
+        return (
+            f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: {quote_value(environment)}"
+            f" not {' nor '.join(DEPLOYMENT_ENVIRONMENTS)},"
+            f" with {SEND_PROMPT_CACHE_OPTIONS_VARIABLE} false"
+        )
+    if environment == "production":
+        return (
+            f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: false refused"
+            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} production"
+        )
+    return None
+
+
+def is_reasoning_effort(value: str) -> TypeIs[ReasoningEffort]:
+    return value in REASONING_EFFORTS
+
+
 def read_replay_settings(
-    environ: Mapping[str, str], reasoning_effort: Literal["none"] | None
+    environ: Mapping[str, str],
+    reasoning_effort: ReasoningEffort | None,
+    send_prompt_cache_options: bool,
 ) -> LlmSettings | str:
     replay_file = environ.get(REPLAY_FILE_VARIABLE)
     if not replay_file:
@@ -91,11 +152,14 @@ def read_replay_settings(
         api_key=None,
         reasoning_effort=reasoning_effort,
         replay_steps=tuple(replay_steps),
+        send_prompt_cache_options=send_prompt_cache_options,
     )
 
 
 def read_provider_settings(
-    environ: Mapping[str, str], reasoning_effort: Literal["none"] | None
+    environ: Mapping[str, str],
+    reasoning_effort: ReasoningEffort | None,
+    send_prompt_cache_options: bool,
 ) -> LlmSettings | str:
     for variable in (BASE_URL_VARIABLE, MODEL_VARIABLE, API_KEY_VARIABLE):
         if not environ.get(variable):
@@ -117,6 +181,7 @@ def read_provider_settings(
         api_key=SecretStr(api_key),
         reasoning_effort=reasoning_effort,
         replay_steps=None,
+        send_prompt_cache_options=send_prompt_cache_options,
     )
 
 

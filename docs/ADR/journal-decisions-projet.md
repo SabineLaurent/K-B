@@ -7283,6 +7283,48 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
   ci-dessus. — PR de #560
 
+## 2026-11-17
+
+### Appel du modèle : les réglages des modèles du banc de C7 (#627)
+
+Mission de time-knight du 2026-11-17, avec l'accord de Sabine (« OK PR de la branche du banc ») ; le code, écrit et
+testé sur la branche du banc du 16/11.
+
+- **`KB_LLM_REASONING_EFFORT` accepte `none`, `minimal` et `low` ; toute autre valeur arrête le démarrage.**
+  Pourquoi : gpt-6.1-sol, le service que préconise le banc de C7 pour C8, refuse `none` et `minimal` et demande
+  `low` ; gpt-5-nano et gpt-5-mini ne descendent pas sous `minimal`. Sur `main`, seul `none` passait : C8 aurait
+  décrit un réglage que le code refuse. La liste reste fermée (`ReasoningEffort`, `core/config.py`), comme avant :
+  une valeur au-delà de `low` n'a pas d'usage. Limite assumée : à `minimal` ou `low`, le raisonnement compte dans
+  `max_completion_tokens`, que K-B ne relève pas (1 024 pour la sélection des tendances) ; tri de la revue de code
+  par time-knight le 2026-11-17 : pas de code, la mesure du banc à l'appui (gpt-6.1-sol à `low`, aucun appel coupé
+  sur 5 passages ; gemini-4-hydrogen, choix coupé 2 fois sur 5 ; `docs/fiches-veille.md`, « Réglages d'appel »),
+  remesurée par l'essai de bout en bout de C8. — PR de #627
+- **`KB_LLM_SEND_PROMPT_CACHE_OPTIONS` (`true` par défaut) : à `false`, `prompt_cache_options` ne part plus, pour
+  un modèle d'avant GPT-5.6 ou un autre fournisseur, qui le refusent par un 400.** Revient en partie sur l'entrée du
+  2026-10-17 (« Appel du modèle : cache de prompt coupé »), qui écartait une variable « sans second usage
+  aujourd'hui » et annonçait un réglage « avec le second modèle, si besoin » : le banc de C7 en est le second usage.
+  Le défaut garde la décision de 2026-10-17 en production : sans la variable, rien ne change pour gpt-6-luna.
+  Limite assumée : à `false`, le fournisseur peut garder les items dans son cache de prompt, d'où l'entrée
+  suivante. — PR de #627
+- **`kb serve-ai` refuse de démarrer avec `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false` et
+  `KB_DEPLOYMENT_ENVIRONMENT=production` ; `false` reste accepté en local et en bac à sable.** Tranché par
+  time-knight le 2026-11-17 après un relecteur neuf (délégation de Sabine du 15/10), sur le constat C2 de la revue
+  de code. Pourquoi : à `false`, le cache de prompt du fournisseur garde le texte des items (données personnelles
+  possibles) au moins 30 minutes, alors que le registre dit le cache coupé ; le même refus que `KB_TRACE_CONTENT=all`
+  en production (`metrics_export.py`) ; aucun usage bloqué, gpt-6-luna et gpt-6.1-sol acceptant le champ (banc du
+  16/11). Option écartée : une garde par l'écrit seul (registre, `MEMORY.md`), la recommandation de la session, que
+  rien ne fait respecter. Une valeur de `KB_DEPLOYMENT_ENVIRONMENT` posée hors de `sandbox` et `production` est
+  refusée elle aussi avec `false` (constat R1 de la seconde revue, tranché par time-knight après un relecteur neuf) :
+  une faute de frappe échoue fermé au lieu de faire sauter le refus ; non posée, c'est un poste local. Limite
+  assumée : un Gemini en production demanderait sa ligne au registre et la levée de ce refus. — PR de #627
+- **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
+  côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
+  sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un
+  en-tête (un test) ; `MODEL_NAME` contrôle aussi le nom que `kb digest` et `kb trend-report` lisent dans la
+  réponse de l'API IA (qui le tient de `KB_LLM_MODEL`, jamais du fournisseur) avant qu'il n'entre dans une fiche,
+  et l'admet donc lui aussi avec une barre oblique. Options écartées : non consignées par la session du banc.
+  — PR de #627
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

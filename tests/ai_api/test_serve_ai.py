@@ -229,6 +229,16 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             },
             "KB_TRACE_CONTENT: all refused in production, anomalies or none",
         ),
+        (
+            {
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+                "KB_DEPLOYMENT_ENVIRONMENT": "production",
+            },
+            (
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: false refused"
+                " with KB_DEPLOYMENT_ENVIRONMENT production"
+            ),
+        ),
         ({"KB_AI_GITHUB_TOKEN": None}, "KB_AI_GITHUB_TOKEN: not set"),
         (
             {"KB_AI_GITHUB_TOKEN": CLASSIC_GITHUB_TOKEN},
@@ -261,6 +271,7 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "otel-variable",
         "content-without-export",
         "content-all-in-production",
+        "prompt-cache-options-left-out-in-production",
         "no-github-token",
         "classic-github-token",
         "github-token-with-a-dash",
@@ -408,6 +419,34 @@ def test_serve_ai_logs_its_clients_its_provider_and_its_model_never_a_key(
     assert "digest window by default: 3 days" in error_output
     for name in ("KB_AI_API_KEY_KB_DIGEST", "KB_DATA_API_KEY_AI_DIGEST"):
         assert environment[name] not in error_output
+
+
+@pytest.mark.parametrize(
+    ("settings", "line"),
+    [
+        (
+            {},
+            "LLM reasoning effort not set, prompt_cache_options sent",
+        ),
+        (
+            {
+                "KB_LLM_REASONING_EFFORT": "low",
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            },
+            "LLM reasoning effort low, prompt_cache_options left out",
+        ),
+    ],
+    ids=["default", "low-without-prompt-cache-options"],
+)
+def test_serve_ai_logs_its_reasoning_effort_and_whether_it_sends_the_prompt_cache_options(
+    monkeypatch, capsys, data_dir, uvicorn_calls, environment, settings, line
+):
+    """Left out, the provider may keep a prompt cache of the items: the log says it."""
+    set_environment(monkeypatch, environment | settings)
+
+    cli.main(["serve-ai"])
+
+    assert line in capsys.readouterr().err
 
 
 def test_serve_ai_writes_its_own_log_file_under_kb_data_dir(
