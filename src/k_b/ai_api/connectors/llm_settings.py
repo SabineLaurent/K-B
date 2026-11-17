@@ -17,6 +17,7 @@ from k_b.ai_api.connectors.llm_replay import (
     ReplayStep,
     read_replay_steps,
 )
+from k_b.core.api_settings import DEPLOYMENT_ENVIRONMENT_VARIABLE
 from k_b.core.config import (
     LLM_REASONING_EFFORT,
     LLM_REPLAY_BASE_URL,
@@ -84,6 +85,16 @@ def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | st
         if send_value is None
         else SEND_PROMPT_CACHE_OPTIONS_VALUES[send_value]
     )
+    # Left out, the provider may keep a prompt cache of the items: refused in production, as
+    # KB_TRACE_CONTENT=all (docs/registre-traitements.md, "Usage par le fournisseur").
+    if (
+        not send_prompt_cache_options
+        and environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) == "production"
+    ):
+        return (
+            f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: false refused"
+            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} production"
+        )
     if provider == "replay":
         return read_replay_settings(
             environ, reasoning_effort, send_prompt_cache_options

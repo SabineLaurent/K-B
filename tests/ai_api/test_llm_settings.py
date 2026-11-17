@@ -110,6 +110,50 @@ def test_the_prompt_cache_options_are_sent_unless_set_to_false(environment, is_s
     assert settings.send_prompt_cache_options is is_sent
 
 
+def test_the_prompt_cache_options_left_out_are_refused_in_production():
+    """Left out, the provider may keep a prompt cache of the items, as KB_TRACE_CONTENT=all
+    would send them: both refused in production."""
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT
+        | {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": "production",
+        }
+    )
+
+    assert refusal == (
+        "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: false refused"
+        " with KB_DEPLOYMENT_ENVIRONMENT production"
+    )
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": "sandbox",
+        },
+        {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"},
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true",
+            "KB_DEPLOYMENT_ENVIRONMENT": "production",
+        },
+        {"KB_DEPLOYMENT_ENVIRONMENT": "production"},
+    ],
+    ids=[
+        "false-in-sandbox",
+        "false-local",
+        "true-in-production",
+        "default-in-production",
+    ],
+)
+def test_the_prompt_cache_options_are_refused_left_out_in_production_only(settings):
+    settings_read = read_llm_settings_or_refusal(PROVIDER_ENVIRONMENT | settings)
+
+    assert isinstance(settings_read, LlmSettings)
+
+
 def test_the_replay_reads_whether_the_prompt_cache_options_are_sent(
     replay_environment,
 ):
