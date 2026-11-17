@@ -152,6 +152,9 @@ def test_the_prompt_cache_options_are_refused_left_out_in_production_only(settin
     settings_read = read_llm_settings_or_refusal(PROVIDER_ENVIRONMENT | settings)
 
     assert isinstance(settings_read, LlmSettings)
+    assert settings_read.send_prompt_cache_options is (
+        settings.get("KB_LLM_SEND_PROMPT_CACHE_OPTIONS") != "false"
+    )
 
 
 def test_the_replay_reads_whether_the_prompt_cache_options_are_sent(

@@ -229,6 +229,16 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
             },
             "KB_TRACE_CONTENT: all refused in production, anomalies or none",
         ),
+        (
+            {
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+                "KB_DEPLOYMENT_ENVIRONMENT": "production",
+            },
+            (
+                "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: false refused"
+                " with KB_DEPLOYMENT_ENVIRONMENT production"
+            ),
+        ),
         ({"KB_AI_GITHUB_TOKEN": None}, "KB_AI_GITHUB_TOKEN: not set"),
         (
             {"KB_AI_GITHUB_TOKEN": CLASSIC_GITHUB_TOKEN},
@@ -261,6 +271,7 @@ def test_serve_ai_reads_the_host_the_port_and_the_window_of_the_environment(
         "otel-variable",
         "content-without-export",
         "content-all-in-production",
+        "prompt-cache-options-left-out-in-production",
         "no-github-token",
         "classic-github-token",
         "github-token-with-a-dash",

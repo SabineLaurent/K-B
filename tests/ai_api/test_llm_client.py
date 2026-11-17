@@ -264,7 +264,6 @@ def test_the_name_of_a_model_behind_its_publisher_goes_in_the_body_only():
     assert json.loads(request.content)["model"] == model
     assert str(request.url) == "https://models.example/openai/v1/chat/completions"
     for side in model.split("/"):
-        assert side not in str(request.url)
         for name, value in request.headers.items():
             assert side not in name.lower()
             assert side not in value.lower()
