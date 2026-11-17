@@ -142,7 +142,8 @@ def test_the_prompt_cache_options_left_out_are_refused_with_an_environment_out_o
     )
 
     assert refusal == (
-        f"KB_DEPLOYMENT_ENVIRONMENT: {environment!r} not sandbox nor production"
+        f"KB_DEPLOYMENT_ENVIRONMENT: {environment!r} not sandbox nor production,"
+        " with KB_LLM_SEND_PROMPT_CACHE_OPTIONS false"
     )
 
 
@@ -159,12 +160,19 @@ def test_the_prompt_cache_options_left_out_are_refused_with_an_environment_out_o
             "KB_DEPLOYMENT_ENVIRONMENT": "production",
         },
         {"KB_DEPLOYMENT_ENVIRONMENT": "production"},
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true",
+            "KB_DEPLOYMENT_ENVIRONMENT": "prod",
+        },
+        {"KB_DEPLOYMENT_ENVIRONMENT": "prod"},
     ],
     ids=[
         "false-in-sandbox",
         "false-local",
         "true-in-production",
         "default-in-production",
+        "true-with-an-environment-out-of-the-list",
+        "default-with-an-environment-out-of-the-list",
     ],
 )
 def test_the_prompt_cache_options_are_refused_left_out_in_production_only(settings):

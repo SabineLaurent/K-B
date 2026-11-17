@@ -104,22 +104,21 @@ def read_llm_settings_or_refusal(environ: Mapping[str, str]) -> LlmSettings | st
 
 
 def find_prompt_cache_options_refusal(environ: Mapping[str, str]) -> str | None:
-    """Why the prompt cache options cannot be left out, or None: the provider may then keep a
-    prompt cache of the items, refused in production as KB_TRACE_CONTENT=all
-    (docs/registre-traitements.md, "Usage par le fournisseur"). An environment out of the list
-    is refused too, so that a misspelled production fails closed; not set is a local run."""
+    """Why the prompt cache options cannot be left out here, or None: the provider may then keep
+    the items in its cache. Refused in production and, failing closed, out of the list."""
     environment = environ.get(DEPLOYMENT_ENVIRONMENT_VARIABLE) or None
     if environment is None:
         return None
     if environment not in DEPLOYMENT_ENVIRONMENTS:
         return (
             f"{DEPLOYMENT_ENVIRONMENT_VARIABLE}: {quote_value(environment)}"
-            f" not {' nor '.join(DEPLOYMENT_ENVIRONMENTS)}"
+            f" not {' nor '.join(DEPLOYMENT_ENVIRONMENTS)},"
+            f" with {SEND_PROMPT_CACHE_OPTIONS_VARIABLE} false"
         )
     if environment == "production":
         return (
             f"{SEND_PROMPT_CACHE_OPTIONS_VARIABLE}: false refused"
-            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} {environment}"
+            f" with {DEPLOYMENT_ENVIRONMENT_VARIABLE} production"
         )
     return None
 
