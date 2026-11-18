@@ -6,7 +6,7 @@ C20.7
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-14: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
+visent le dépôt au 2026-11-18: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
 arrivent avec cette fiche.
 
 ## Le format
@@ -63,7 +63,7 @@ suivent (« Limites »).
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
 | La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:23`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:51-53`). | Le contrôle du HTML construit |
-| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:33-34`). | Le contrôle du HTML construit |
+| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:33-34`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
@@ -92,7 +92,7 @@ règle de la notice, son résultat, et comment il a été vérifié.
 | 1. Ne pas utiliser les sauts de lignes multiples | Tenue: aucune balise `br` hors des schémas Mermaid, aucun paragraphe vide. | Le HTML construit |
 | 2. Utiliser correctement la hiérarchie des titres | Tenue: un titre de niveau 1 par page, puis aucun saut de niveau. | Le HTML construit |
 | 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
-| 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Le lien du logo du thème en porte un, le nom du site (« Limites »). | Le HTML construit |
+| 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Les deux liens du logo du thème, dans l'en-tête et dans le menu, en portent un, le nom du site (« Limites »). | Le HTML construit |
 | 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
 | 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour le seul schéma des quatre fiches, celui du service d'IA: un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et la liste qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
@@ -156,7 +156,8 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     le service d'IA et l'intégration continue. Les autres fiches gardent, le 2026-11-18, des listes en retrait de deux
     ou trois espaces, mal rendues, des schémas sans phrase d'annonce, et, pour le monitorage, un second titre de
     niveau 1; la PR suivante de la mise en forme les corrige.
-- **Le lien du logo du thème porte un attribut `title`**, le nom du site, sur chaque page (règle 3.2 d'AcceDe Web).
+- **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
+    dans le menu (règle 3.2 d'AcceDe Web).
     Il vient du thème, hors du texte des fiches.
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne

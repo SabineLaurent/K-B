@@ -7,9 +7,11 @@ Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6.
 comment il s'installe et se teste, de quoi il dépend, et quelles données il reçoit. L'API IA, qui l'appelle, a sa
 propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `f1eac19c`
 (2026-11-17). Ce qui est hors du code vient de trois relevés: la ressource, ses déploiements et les rôles de
-l'opératrice, lus avec `az`, en lecture seule, le 2026-11-18 (« Relire l'état »); le type du déploiement de
-`gpt-6.1-sol`, captures du portail Foundry du 2026-11-17; l'essai de bout en bout du 2026-11-17 (« Le test »). Les chemins du code de K-B (`ai_api/…`, `core/…`)
-partent de `src/k_b/`, les autres de la racine du dépôt.
+l'opératrice, lus avec `az`, en lecture seule, le 2026-11-18 (« Relire l'état »); le catalogue des modèles et le
+formulaire de déploiement de `gpt-6.1-sol` (son type, sa limite de jetons par minute, la zone de données),
+captures du portail Foundry du 2026-11-17; l'essai de bout en bout du 2026-11-17 (« Le test »). Une lecture plus
+ancienne, du 2026-11-09, n'est citée que pour `DeepSeek-V4-Flash`. Les chemins du code de K-B (`ai_api/…`,
+`core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est le service
 
@@ -82,7 +84,7 @@ dans Azure Service Health (même page).
 
 `DefaultV2` (`Microsoft.DefaultV2` pour `az`) est le jeu de garde-fous par défaut de Foundry. Pour un modèle de
 texte, il filtre la haine, la violence, le contenu sexuel et l'automutilation dans la demande et dans la réponse, à
-partir du niveau de gravité moyen; il détecte les attaques par la consigne (*jailbreak*) dans la demande, et le
+partir du niveau de gravité moyen; il détecte les attaques par la consigne (*<span lang="en">jailbreak</span>*) dans la demande, et le
 texte ou le code protégés dans la réponse (« <span lang="en">Default safety policies in Microsoft Foundry</span> », `ms.date` 2026-10-08, relue le
 2026-11-09). Une demande bloquée rend un 400 `content_filter`; une réponse filtrée se termine par `finish_reason`
 `content_filter`. Le client de K-B lit l'un et l'autre `llm_content_filtered`, sans nouvelle tentative
@@ -97,9 +99,9 @@ jeton Microsoft Entra ID.
 
 ### Les rôles de l'opératrice
 
-Les rôles de l'opératrice sur le groupe de ressources du service, dont la ressource hérite, et sur le coffre de
-secrets de K-B (`az role assignment list`, lu le 2026-11-18). Seuls ceux qui portent sur le service et sur sa clé
-sont listés. Chaque définition est celle de Microsoft Learn, relue le 2026-11-09 (pages
+Le tableau suivant donne les rôles de l'opératrice sur le groupe de ressources du service, dont la ressource
+hérite, et sur le coffre de secrets de K-B (`az role assignment list`, lu le 2026-11-18). Seuls ceux qui portent sur
+le service et sur sa clé y sont. Chaque définition est celle de Microsoft Learn, relue le 2026-11-09 (pages
 « <span lang="en">Azure built-in roles</span> », catégories <span lang="en">Privileged</span>,
 <span lang="en">AI + Machine Learning</span> et <span lang="en">Security</span>, `ms.date` 2026-07-01).
 
@@ -108,7 +110,7 @@ sont listés. Chaque définition est celle de Microsoft Learn, relue le 2026-11-
 | Owner (Propriétaire) | le groupe de ressources | « <span lang="en">Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.</span> » | tout gérer, attribuer des rôles, lire les clés (action `*`) |
 | Contributor (Contributeur) | le groupe | « <span lang="en">Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC […]</span> » | tout gérer sauf les rôles, déployer un modèle, lire les clés (action `*`) |
 | Foundry User | le groupe | « <span lang="en">Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project.</span> » | lire la ressource, lire les clés (`Microsoft.CognitiveServices/accounts/listkeys/action`), appeler le modèle par Entra ID (actions de données `Microsoft.CognitiveServices/*`) |
-| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | « <span lang="en">Perform any action on the secrets of a key vault, except manage permissions.</span> » | poser et lire le secret `kb-llm-api-key`, la clé du service (« Changer la clé ») |
+| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | « <span lang="en">Perform any action on the secrets of a key vault, except manage permissions.</span> » | poser et lire le secret `kb-llm-api-key`, la clé du service (« La clé de K-B ») |
 
 L'opératrice a donc plus que le nécessaire pour l'usage courant: appeler le modèle demande la clé ou Foundry User,
 et Owner, Contributor et Foundry User suffisent chacun à lire la clé. D'autres qu'elle peuvent en faire autant: tout
@@ -201,8 +203,8 @@ L'API IA ne connaît du service que des réglages; aucune branche du code n'est 
 
 Les trois lectures du 2026-11-18, en lecture seule. Aucune n'affiche de clé. En `-o table`, `az` ne montre aucune
 colonne nommée `type` (ni `id`, ni `etag`): le type des déploiements n'apparaît donc pas dans la sortie de la
-première. La dernière affiche des portées complètes, avec les noms de l'abonnement et des groupes: la fiche n'en
-garde que le rôle et le type de portée. Le groupe et la ressource sont deux variables, à remplir d'abord.
+première. La dernière affiche des portées complètes, avec l'identifiant de l'abonnement et les noms des groupes: la fiche
+n'en garde que le rôle et le type de portée. Le groupe et la ressource sont deux variables, à remplir d'abord.
 
 ```sh
 RG=<groupe de ressources>
@@ -210,9 +212,9 @@ RESOURCE=<ressource Foundry>
 # Les déploiements: nom, type, capacité, version, mise à jour de la version, filtre de contenu.
 az cognitiveservices account deployment list -g "$RG" -n "$RESOURCE" \
   --query "[].{nom:name, type:sku.name, capacite:sku.capacity, version:properties.model.version, maj:properties.versionUpgradeOption, filtre:properties.raiPolicyName}" -o table
-# La ressource: région, accès public, authentification par clé, stockage de la surveillance des abus.
+# La ressource: région, accès public, authentification par clé (sortie du 2026-11-18: francecentral, Enabled, False).
 az cognitiveservices account show -g "$RG" -n "$RESOURCE" \
-  --query "{region:location, acces_public:properties.publicNetworkAccess, cle_coupee:properties.disableLocalAuth, journal_abus:join(',', properties.capabilities[?name=='ContentLogging'].value)}" -o table
+  --query "{region:location, acces_public:properties.publicNetworkAccess, cle_coupee:properties.disableLocalAuth}" -o table
 # Les rôles du compte connecté, et leur portée.
 az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all \
   --query "[].{role:roleDefinitionName, portee:scope}" -o table
@@ -237,7 +239,7 @@ az role assignment list --assignee "$(az ad signed-in-user show --query id -o ts
     - Aucune issue `llm_content_filtered` ni `llm_truncated` sur les 18 requêtes.
     - Une condition de l'essai: sur le Mac, `kb serve-ai` a tourné avec un réglage d'OpenSSL qui retire de TLS
         l'échange de clés ML-KEM; sans lui, aucune requête n'atteignait le modèle (#629, « Limites »).
-- **Sur `gpt-6-luna`, le modèle d'avant**:
+- **Sur `gpt-6-luna`, le modèle de K-B avant `gpt-6.1-sol`**:
     - le 2026-10-17 (note du branchement, « Preuve »): un appel avec la clé rend 200 et le `model`
         `gpt-6-luna-2026-09-22`; 6 classements, 5 rédactions et 3 jugements d'une veille réelle passent, avec le schéma
         strict de K-B; aucun cache n'est écrit (`cache_write_tokens` vaut 0 sur 20 réponses);
@@ -419,7 +421,14 @@ registre (« Envoi des mesures à Grafana Cloud »).
 - **Des réglages restent sans lecture par `az`.** Le type du déploiement de `gpt-6.1-sol` vient de la capture de son
     formulaire, du 2026-11-17; celui de `gpt-6-luna` n'a pas été relu. Le stockage de la surveillance des abus
     (`ContentLogging`) n'a pas été relu sur la ressource: qu'il soit actif ou coupé n'est pas vérifié. Parade: les
-    lectures de « Relire l'état », en `-o json` pour le type.
+    lectures de « Relire l'état », en `-o json` pour le type, et avec
+    `properties.capabilities[?name=='ContentLogging'].value` pour le stockage.
+- **Les rôles reçus par un groupe ne sont pas lus.** `az role assignment list` ne montre les rôles qu'un groupe
+    Microsoft Entra donne à ses membres qu'avec l'option `--include-groups`, que la lecture du 2026-11-18 n'avait pas
+    (référence de la commande, Microsoft Learn, lue le 2026-11-18).
+- **Les deux commandes de « Refaire le test » n'ont pas été relancées sur `gpt-6.1-sol`.** L'essai du 2026-11-17
+    l'a appelé par `kb serve-ai`; sans clé, seul un `GET` de la liste des modèles a été essayé ce jour-là, et `curl`
+    a reçu le `401` attendu.
 - **Un contournement de TLS a été nécessaire pour l'essai du 2026-11-17** (#629). Sur le Mac, le Python de K-B
     (OpenSSL 3.5.6) a reçu une `SSLEOFError` sur 8 à 9 appels sur 10 vers la ressource, sans clé; `curl` (LibreSSL),
     ou ce même Python en TLS 1.2, ou sans l'échange de clés ML-KEM, a reçu les `401` attendus. Deux hypothèses, non
@@ -461,10 +470,14 @@ Pages de Microsoft Learn, relues le 2026-11-09 (en UTC):
     [<span lang="en">Security</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/security) (Key Vault Secrets Officer)
 
 Lectures par `az`, en lecture seule, le 2026-11-18: les déploiements, la ressource et les rôles de l'opératrice
-(« Relire l'état »). Appels du 2026-11-10 vers 00:03 UTC, avec la clé et sans clé, sur `gpt-6-luna` (« Le test »).
+(« Relire l'état »). Une lecture des déploiements du 2026-11-09, dont la ressource n'est pas établie, pour
+`DeepSeek-V4-Flash` seulement (« Ce qu'est le service »). Appels du 2026-11-10 vers 00:03 UTC, avec la clé et sans
+clé, sur `gpt-6-luna` (« Le test »). Microsoft Learn, référence de
+[<span lang="en">az role assignment</span>](https://learn.microsoft.com/en-us/cli/azure/role/assignment?view=azure-cli-latest),
+lue le 2026-11-18, pour l'option `--include-groups`.
 
 Hors du dépôt: les captures du portail Foundry du 2026-11-17 (le catalogue des modèles, le formulaire de
-déploiement de `gpt-6.1-sol`), et le relevé de l'essai de bout en bout du 2026-11-17 (« Le test »).
+déploiement de `gpt-6.1-sol` avec ses réglages), et le relevé de l'essai de bout en bout du 2026-11-17 (« Le test »).
 
 Dans le dépôt: [la note du branchement de gpt-6-luna](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md)
 (2026-10-17), [la note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md)

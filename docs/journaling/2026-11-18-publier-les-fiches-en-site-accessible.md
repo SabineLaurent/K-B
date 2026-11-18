@@ -33,7 +33,8 @@ theme:
 
 `mkdocs.yml:21-25`. `language: fr` donne `lang="fr"` à chaque page (RGAA 8.3). `font: false` retire Google Fonts. Le
 plugin `privacy` (`mkdocs.yml:31-34`) télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid
-compris, et le sert avec le site : une lectrice ne charge rien d'un tiers.
+compris, et le sert avec le site : une lectrice ne charge rien d'un tiers, sauf dans deux cas écrits en limites de
+la fiche (un correctif pour un vieux navigateur, et Mermaid tant que Pages n'est pas activé).
 
 ### La construction stricte, et l'empreinte de Mermaid
 
@@ -83,7 +84,8 @@ La fiche de l'intégration continue l'écrit, avec la parade : relancer `Docs`, 
 
 Les déploiements, la ressource et les rôles de l'opératrice viennent de lectures `az` du 2026-11-18 ; le type du
 déploiement, d'une capture du portail du 2026-11-17 ; que le déploiement réponde, de l'essai de bout en bout du
-même jour. Une lecture du 2026-11-09, dont la ressource n'est pas établie, n'est plus citée. Le schéma
+même jour. Une lecture du 2026-11-09, dont la ressource n'est pas établie, n'est citée que pour un déploiement
+qu'elle listait et que celle du 2026-11-18 ne liste plus. Le schéma
 porte un titre et une description courts pour un lecteur d'écran :
 
 ```text
@@ -124,10 +126,9 @@ porte un titre et une description courts pour un lecteur d'écran :
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `uv run --locked --only-group docs mkdocs build --strict` : « Documentation built », aucun avertissement | aucun lien, aucune ancre cassés ; chaque fiche est dans la navigation |
-| le contrôle du HTML construit : 0 constat sur `index`, `service_ia` et `integration_continue` | un titre de niveau 1, aucun saut de niveau, des tableaux à `th`, aucun lien vague, aucune ressource externe |
-| sur les quatre pages : 0 `br` hors Mermaid, 0 attribut `title` ou `target` sur un lien, 0 `q` ni `blockquote` | les règles 1, 3.2 et la bonne pratique des fenêtres d'AcceDe Web sont tenues ; la 6.1 ne l'est pas |
+| le contrôle du HTML construit : 0 constat sur `index`, `service_ia` et `integration_continue` ; sur `accessibilite`, seulement la règle qu'elle cite elle-même | un titre de niveau 1, aucun saut de niveau, des tableaux à `th`, aucun lien vague, aucune ressource externe |
+| dans le texte des quatre fiches (`article`) : 0 `br` hors Mermaid, 0 attribut `title` ou `target` sur un lien, 0 `q` ni `blockquote` ; sur toute la page, 0 `target`, et un `title` sur les deux liens du logo du thème | les règles 1, 3.2 et la bonne pratique des fenêtres d'AcceDe Web sont tenues dans le texte ; la 6.1 ne l'est pas |
 | `uv export --frozen --no-emit-project` sans `--all-groups` : ni `mkdocs` ni `mkdocs-material` ; avec : les deux | l'option est nécessaire pour qu'`audit` voie le groupe `docs` |
-| `grep -niE "organisme\|école"` sur la fiche du service d'IA : aucune occurrence | la fiche ne nomme ni l'école ni l'organisme |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -137,9 +138,10 @@ porte un titre et une description courts pour un lecteur d'écran :
    (`docs.yml:29`) : rien n'est publié. La parade est écrite dans la fiche de l'intégration continue.
 3. **Pourquoi le site n'est-il pas en ligne ?** Un site Pages publié depuis un dépôt privé est public : le publier
    avant la mise en public publierait toutes les fiches.
-4. **Comment savez-vous que `gpt-6.1-sol` est déployé, sans `az` ?** L'essai du 2026-11-17 l'a appelé : 18 requêtes,
-   dont 17 `ok`. Ses réglages viennent des captures du formulaire ; la fiche écrit en limite qu'ils ne sont pas relus
-   par `az`.
+4. **Comment savez-vous que `gpt-6.1-sol` est déployé, et avec quels réglages ?** La lecture `az` des déploiements
+   du 2026-11-18 le liste, avec sa capacité, sa version, sa mise à jour figée et son filtre ; son type vient de la
+   capture du formulaire, car `az` en tableau ne le montre pas. L'essai du 2026-11-17 l'a appelé : 18 requêtes, dont
+   17 `ok`.
 5. **Pourquoi une règle d'AcceDe Web n'est-elle pas tenue ?** C'est un choix daté et écrit : la 6.1 demande un tri
    des citations dans toutes les fiches, prévu dans la PR B.
 

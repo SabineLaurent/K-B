@@ -24,7 +24,7 @@ theme:
   # No Google Fonts: the fonts of the system, no request out of the site.
   font: false
 
-# A link underlined, and its colour under the pointer darker, for their contrast (documentation/accessibilite_pour_docu.md).
+# A link underlined, not told by its colour alone, and darker under the pointer (documentation/accessibilite_pour_docu.md).
 extra_css:
   - stylesheets/extra.css
 
