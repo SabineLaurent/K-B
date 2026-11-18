@@ -1,20 +1,27 @@
 # Les tests de K-B
 
-« Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests. » — C12
+> Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests.
 
-« Rédaction de la documentation technique. » — C17
+— C12
+
+> Rédaction de la documentation technique.
+
+— C17
 
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de
-`main` au commit `852dad4` (2026-11-08). Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`,
-les autres de la racine du dépôt.
+`main` au commit `852dad4` (2026-11-08), et le test de l'export des mesures d'après `main` au commit `fd956430`
+(2026-11-18). Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du
+dépôt.
 
 ## Installer l'environnement de test
 
-**Prérequis**: Python 3.13 ou plus récent (`requires-python = ">=3.13"`, `pyproject.toml`) et
-[uv](https://docs.astral.sh/uv/). La CI installe uv 0.13.6 (`astral-sh/setup-uv`, `.github/workflows/ci.yml`).
+### Prérequis
 
-**Installer**:
+Python 3.13 ou plus récent (`requires-python = ">=3.13"`, `pyproject.toml`) et [uv](https://docs.astral.sh/uv/).
+L'intégration continue (CI) installe uv 0.13.6 (`astral-sh/setup-uv`, `.github/workflows/ci.yml`).
+
+### Installer
 
 ```sh
 git clone https://github.com/SabineLaurent/K-B.git
@@ -23,10 +30,12 @@ uv sync
 ```
 
 `uv sync` installe K-B, ses dépendances et le groupe `dev` du `pyproject.toml`, que uv installe par défaut
-(documentation de uv, « Default groups », lue par Context7 le 2026-11-08). La CI lance `uv sync --locked`: les
-versions de `uv.lock`, sans le mettre à jour.
+(documentation de uv, « <span lang="en">Default groups</span> », lue par Context7 le 2026-11-08). La CI lance
+`uv sync --locked`: les versions de `uv.lock`, sans le mettre à jour.
 
-**Sans `.env`**: aucun test ne lit de `.env`. Les cibles `make test*` lancent pytest sans `--env-file`
+### Sans `.env`
+
+Aucun test ne lit de `.env`. Les cibles `make test*` lancent pytest sans `--env-file`
 (`Makefile`). Avant chaque test, la fixture `no_kb_setting_of_the_terminal` (`tests/conftest.py`) retire les
 réglages de `kb` qu'un terminal peut exporter (`KB_SETTINGS_VARIABLES`, dont `KB_DATABASE_URL` et
 `KB_DEPLOYMENT_ENVIRONMENT`) et les variables que lit libpq (`LIBPQ_VARIABLES`): une variable de ces deux listes,
@@ -34,7 +43,9 @@ exportée par le terminal, ne change ni ce que les tests vérifient, ni la base 
 retire pas les autres variables d'un `.env` exporté; `tests/commands/conftest.py`, `tests/jobs/conftest.py` et
 `tests/exchange/conftest.py` en retirent d'autres, pour leurs seuls tests.
 
-**Pour les tests marqués `postgresql`**: un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
+### Pour les tests marqués `postgresql`
+
+Un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
 un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
 base de production. Son rôle doit pouvoir créer et supprimer une base (`make_postgresql_base`), et créer des rôles
 pour les tests des droits de la base en ligne (`identity_roles`, `tests/conftest.py`). Une base de test est créée
@@ -43,8 +54,10 @@ demander d'autres réglages (`make_postgresql_base`). Dans la CI, le job
 `tests-postgresql` démarre `postgres:18.6`, épinglé par son digest, sans mot de passe (`POSTGRES_HOST_AUTH_METHOD:
 trust`, joignable du seul runner), avec `KB_TEST_POSTGRESQL_URL=postgresql://kb@127.0.0.1:5432/postgres`.
 
-**Pour les tests de bout en bout** (marqués `e2e`): copier `.env.e2e_test.example` en `.env.e2e_test` (ignoré
-par git, `.gitignore`) et le remplir. Il ne porte que leurs variables:
+### Pour les tests de bout en bout
+
+Pour les tests marqués `e2e`, copier `.env.e2e_test.example` en `.env.e2e_test` (ignoré par git, `.gitignore`) et
+le remplir. Il ne porte que leurs variables:
 
 | Variable | Sans elle |
 |---|---|
@@ -53,7 +66,7 @@ par git, `.gitignore`) et le remplir. Il ne porte que leurs variables:
 | `KB_VAULT_DIR` | le test des clips est sauté |
 | `GOOGLE_APPLICATION_CREDENTIALS` | le test de `gh_archive` est sauté; avec elle, il lance une vraie requête BigQuery |
 | `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté |
-| `KB_DEPLOYMENT_ENVIRONMENT` | avec les deux précédentes, le test de l'export échoue (`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`); il échoue aussi avec elle tant que #495 est ouverte (« Les tests de bout en bout »); `sandbox` dans le modèle |
+| `KB_DEPLOYMENT_ENVIRONMENT` | avec `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`, le test de l'export échoue (`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`); posée, elle lui parvient ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)); `sandbox` dans le modèle |
 
 Ils se lancent depuis un terminal sans `.env` exporté. Si l'environnement porte une autre variable de
 `.env.example` (hors de celles que le test pose lui-même, `KB_DATA_DIR` et `KB_COLLECT_ONLY`, et de celles que
@@ -63,7 +76,7 @@ noms, jamais leurs valeurs.
 
 ## Les dépendances installées
 
-Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions planchers ci-dessous; versions exactes dans
+Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions planchers dans le tableau suivant; versions exactes dans
 `uv.lock`). L'image n'en installe aucun: ses deux `uv sync` portent l'option `--no-dev` (`Dockerfile`).
 
 | Paquet | Version plancher | Rôle |
@@ -94,12 +107,16 @@ en mémoire du SDK OpenTelemetry (`tests/ai_api/conftest.py`).
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
 | `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache`; sur la machine, `--no-cache` est une précaution: `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie |
 
-**Sur PostgreSQL.** Un test qui écrit reçoit une base neuve, `kb_test_<hex>`, supprimée après les tests de son
+### Sur PostgreSQL
+
+Un test qui écrit reçoit une base neuve, `kb_test_<hex>`, supprimée après les tests de son
 module (`make_postgresql_base`); les tests de lecture partagent une base, construite une fois par session
 (`items_postgresql_base`). Un test de lecture prend la fixture `engine`: sa moitié `[sqlite]` tourne dans
 `uv run pytest`, sa moitié `[postgresql]` sous `-m postgresql` (`ENGINES`, `tests/conftest.py`).
 
-**Les rapports.** `restrict_report_to_user` (`tests/conftest.py`) crée le rapport de `--html` en `0600`, et son
+### Les rapports
+
+`restrict_report_to_user` (`tests/conftest.py`) crée le rapport de `--html` en `0600`, et son
 dossier en `0700` s'il le crée, avant que pytest-html l'écrive: il garde la sortie capturée de chaque test. Un rapport demandé
 dans le dépôt hors de `reports/`, que git ne laisserait pas de côté, arrête pytest. Chaque exécution écrase le
 rapport précédent.
@@ -109,26 +126,35 @@ rapport précédent.
 | Test | Ce qu'il fait |
 |---|---|
 | `test_kb_collects_and_imports_the_real_source` (`tests/e2e/test_real_sources.py`) | lance `kb` sur la vraie source, un test par source (paramétré par `SOURCE_KINDS`); pour les trois sources qui ont une variable (Zotero, clips, `gh_archive`), sauté sans elle; les autres ne sont jamais sautées |
-| `test_the_measures_of_a_request_reach_the_otlp_endpoint` (`tests/e2e/test_real_export.py`) | envoie au vrai point OTLP (Grafana Cloud) les mesures d'une demande à l'API IA sur le modèle rejoué, à l'arrêt de l'application; sauté sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` |
-| les quatre tests du bac à sable des alertes (`tests/e2e/test_sandbox_alerts.py`) | envoient chacun un scénario au bac à sable, dont trois visent une alerte du monitorage du modèle: les mesures de demandes à l'API IA sur le modèle rejoué partent au vrai point OTLP, avec l'environnement `sandbox`; sautés sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` (« Le bac à sable des alertes », ci-dessous) |
+| `test_the_measures_of_a_request_reach_the_otlp_endpoint` (`tests/e2e/test_real_export.py`) | envoie au vrai point OTLP (Grafana Cloud; OTLP, le protocole d'export d'OpenTelemetry) les mesures d'une demande à l'API IA sur le modèle rejoué, à l'arrêt de l'application; sauté sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` |
+| les quatre tests du bac à sable des alertes (`tests/e2e/test_sandbox_alerts.py`) | envoient chacun un scénario au bac à sable, dont trois visent une alerte du monitorage du modèle: les mesures de demandes à l'API IA sur le modèle rejoué partent au vrai point OTLP, avec l'environnement `sandbox`; sautés sans `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` ([Le bac à sable des alertes](#le-bac-a-sable-des-alertes)) |
 
-**Le test de l'export échoue dès que l'export est réglé, tant que #495 est ouverte.** `KB_DEPLOYMENT_ENVIRONMENT` est
-dans `KB_SETTINGS_VARIABLES`: `no_kb_setting_of_the_terminal` la retire avant que le test lise ses réglages dans
-`os.environ`. Constaté le 2026-11-08 au commit `852dad4`, avec des valeurs factices:
+#### Le test de l'export des mesures
 
-```sh
-env -i HOME="$HOME" PATH="$PATH" KB_OTLP_ENDPOINT=https://otlp.example.invalid/otlp \
-  KB_OTLP_HEADERS='Authorization=Basic%20AAAA' KB_DEPLOYMENT_ENVIRONMENT=sandbox \
-  uv run pytest -m e2e tests/e2e/test_real_export.py -q -p no:cacheprovider
-```
+Le test lit les réglages de l'export dans `os.environ` (`tests/e2e/test_real_export.py:63`), dont
+`KB_DEPLOYMENT_ENVIRONMENT`. La fixture `no_kb_setting_of_the_terminal` retire cette variable des autres tests, mais
+la garde pour un test marqué `e2e` (`END_TO_END_SETTINGS`, `tests/conftest.py:50`, `:156-163`). Un réglage refusé
+arrête le test avant toute demande (`tests/e2e/test_real_export.py:66`). Sinon, il ouvre l'API IA au client
+`DIGEST_CLIENT` (`:82`), le seul client que `POST /digests` accepte (`core/config.py:349`), lui envoie une demande
+(`tests/e2e/test_real_export.py:108-112`), et échoue si la réponse n'est pas 200, si aucun envoi de mesures n'a eu
+lieu, ou si l'un d'eux n'a pas réussi (`:117-119`).
 
-```text
-E       AssertionError: KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production
-tests/e2e/test_real_export.py:65: AssertionError
-1 failed
-```
+Il échouait avant la demande de fusion (PR, <span lang="en">pull request</span>) #527, fusionnée le 2026-11-09, qui
+a fermé #495: la fixture lui retirait `KB_DEPLOYMENT_ENVIRONMENT` (constaté le 2026-11-08 au commit `852dad4`:
+`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`), et il ouvrait l'API IA au client `TERMINAL`, que
+`POST /digests` refuse. Depuis, un test de la suite par défaut, donc de la CI, le lance dans un sous-processus avec
+`KB_DEPLOYMENT_ENVIRONMENT=staging` et une adresse factice, et attend son refus nommé,
+`KB_DEPLOYMENT_ENVIRONMENT: 'staging' not sandbox nor production`: la variable lui parvient, et il s'arrête avant
+toute demande (`test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal`,
+`tests/test_e2e_selection.py:175-193`).
 
-L'envoi réel des mesures n'est donc pas prouvé par ce test tant que #495 n'est pas corrigée.
+Lancé par Sabine le 2026-11-09 sur `9534048`, avec les vraies valeurs de `.env.e2e_test`
+(`uv run --env-file .env.e2e_test pytest -m e2e -k real_export -rs`), il a passé: `1 passed, 4422 deselected`
+(commentaire de la PR #527). Ce qu'il ne prouve pas: le SDK d'OpenTelemetry compte une réponse 3xx comme un succès,
+et les séries de cette exécution n'ont pas été lues dans Grafana Explore (`tests/e2e/test_real_export.py:7-8`;
+commentaire de la PR #527). Il n'a pas été relancé sur `fd956430`: son fichier n'a pas changé depuis `9534048`
+(`git log 9534048..fd956430 -- tests/e2e/test_real_export.py` ne rend rien), mais l'API IA qu'il sert, si
+(`git diff --stat 9534048 fd956430 -- src/k_b/ai_api/`: 9 fichiers).
 
 ### Le bac à sable des alertes
 
@@ -147,7 +173,8 @@ réglages, à la place de toute valeur du terminal (`tests/e2e/test_sandbox_aler
 
 Chaque test sert l'API de données sur la base de test et une API IA sur le modèle rejoué, avec des clés tirées au
 hasard, puis envoie ses demandes à `POST /digests` (`run_sandbox_requests`). Il échoue si un envoi de mesures n'est
-pas accepté, s'il y a eu moins d'envois que de demandes, ou si l'environnement n'est pas `sandbox`.
+pas accepté, s'il y a eu moins d'envois que de demandes, ou si l'environnement n'est pas `sandbox`. Le tableau
+suivant donne ce que vérifie chacun des quatre tests.
 
 | Test | Ce qu'il vérifie |
 |---|---|
@@ -162,13 +189,13 @@ scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclen
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
 `1d2f554`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
-Sabine: [monitoring_pour_docu.md](monitoring_pour_docu.md), « Le bac à sable » et « Relevé des alertes du bac à
-sable ».
+Sabine: [la fiche du monitorage](monitoring_pour_docu.md), sections « Le bac à sable » et « Relevé des alertes du
+bac à sable ».
 
 ### Ce que lance la CI
 
 Le workflow `CI` (`.github/workflows/ci.yml`) tourne sur chaque push sur `main` et chaque pull request vers `main`.
-Chaque job installe l'environnement par `uv sync --locked`, puis lance sa commande.
+Chaque job installe l'environnement par `uv sync --locked`, puis lance la commande que donne le tableau suivant.
 
 | Job | Commande |
 |---|---|
@@ -195,7 +222,7 @@ Les réglages sont dans `pyproject.toml`:
 | `[tool.coverage.run] source` | `["k_b"]` | mesure le code de `src/k_b/` |
 | `branch` | `true` | compte aussi les branches jamais prises d'un `if` |
 | `patch` | `["subprocess"]` | mesure aussi les sous-processus que lancent des tests (pytest-cov 7 ne le fait plus) |
-| `[tool.coverage.report] fail_under` | `96` | sous 96 %, lignes et branches, la commande échoue: un plancher contre la régression, pas une cible (journal ADR, 2026-11-08) |
+| `[tool.coverage.report] fail_under` | `96` | sous 96 %, lignes et branches, la commande échoue: un plancher contre la régression, pas une cible (journal des décisions d'architecture, ou ADR, 2026-11-08) |
 | `precision` | `2` | le total est arrondi à deux décimales avant d'être comparé au seuil |
 
 Seules les commandes avec `--cov` vérifient le seuil (`make test` et `uv run pytest`, non). Sur une partie de la
@@ -206,13 +233,15 @@ la couverture. Mesure du 2026-11-08 (18:41 UTC) au commit `852dad4`, par la comm
 ## Plan de tests de `POST /digests`
 
 `POST /digests` rend les fiches de veille d'une fenêtre: l'API IA lit les items par l'API de données, les classe par
-sujet, puis rédige chaque sujet. Son contrat est [docs/fiches-veille.md](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md). Le plan ci-dessous
-dit, composante par composante, les cas testés, le type de test, la stratégie et le fichier. Les tests de
-`POST /trend-reports` sont listés dans [docs/tendances.md](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md#ce-qui-le-prouve), « Ce qui le
-prouve ». Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
-[docs/2026-11-08-tests-api-ia.md](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+sujet, puis rédige chaque sujet. Son contrat est
+[la spécification des comptes rendus de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md).
+Les sections suivantes du plan disent, composante par composante, les cas testés, le type de test, la stratégie et le
+fichier. Les tests de `POST /trend-reports` sont listés dans
+[la section « Ce qui le prouve » de la spécification du compte rendu des tendances](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md#ce-qui-le-prouve).
+Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
+[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
 
-**Types de test.**
+### Types de test
 
 | Type | Ce qu'il exécute |
 |---|---|
@@ -222,7 +251,7 @@ prouve ». Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont 
 | `postgresql` | le même test sur un serveur PostgreSQL (job `tests-postgresql`) |
 | `e2e` | un vrai service extérieur, hors de la CI |
 
-**Stratégies.**
+### Stratégies
 
 | Stratégie | Ce qu'elle remplace | Où |
 |---|---|---|
@@ -237,7 +266,8 @@ Aucun test de la CI n'appelle le modèle, GitHub ni Grafana Cloud.
 ### 1. Données lues par l'API de données
 
 Intégration (vraie API de données sur la base de test, faux transport): `tests/ai_api/test_data_api_client.py`.
-`postgresql`: la route `GET /items` sur les deux moteurs, `tests/data_api/test_item_router.py`.
+`postgresql`: la route `GET /items` sur les deux moteurs, `tests/data_api/test_item_router.py`. Le tableau suivant
+donne chaque cas, ses tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -260,7 +290,8 @@ Unitaire: `tests/ai_api/test_watch_items.py`, `tests/ai_api/test_stages.py`. Int
 `tests/ai_api/test_digests.py` (modèle rejoué, base de test). Les bornes sont dans
 `core/config.py`: `MAX_ITEMS_PER_DIGEST_REQUEST = 300`, `MAX_ITEMS_PER_DIGEST = 60`,
 `MAX_FIELD_CHARS_FOR_WRITING = 2000`, `MAX_ITEMS_PER_CLASSIFICATION_CALL = 45`,
-`MAX_CLASSIFICATION_INPUT_CHARS = 36_000`, `MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500`.
+`MAX_CLASSIFICATION_INPUT_CHARS = 36_000`, `MAX_FIELD_CHARS_FOR_CLASSIFICATION = 500`. Le tableau suivant donne
+chaque cas, ses tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -275,7 +306,8 @@ Unitaire: `tests/ai_api/test_watch_items.py`, `tests/ai_api/test_stages.py`. Int
 ### 3. Consigne
 
 Unitaire: `tests/ai_api/test_stages.py` (fonctions seules), `tests/ai_api/test_llm_client.py` (modèle rejoué).
-Intégration: `tests/ai_api/test_digests.py` (modèle rejoué, base de test).
+Intégration: `tests/ai_api/test_digests.py` (modèle rejoué, base de test). Le tableau suivant donne chaque cas, ses
+tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -285,14 +317,15 @@ Intégration: `tests/ai_api/test_digests.py` (modèle rejoué, base de test).
 | chaque consigne dit que le message utilisateur est une donnée | `test_each_system_prompt_says_the_user_message_is_data` | `tests/ai_api/test_stages.py` |
 | la consigne de rédaction dit les bornes que le code vérifie | `test_the_writing_prompt_states_the_bounds_the_code_checks` | `tests/ai_api/test_stages.py` |
 | un rappel par contrôle refusé; la seconde demande ajoute le rappel, jamais la sortie refusée | `test_each_stage_gives_a_reminder_per_failed_check`, `test_the_second_request_adds_the_reminder_of_the_refused_check_never_the_output` | `tests/ai_api/test_stages.py`, `tests/ai_api/test_llm_client.py` |
-| la demande est un *chat completion* avec un schéma JSON strict, portable et dans les bornes du mode strict | `test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict`, `test_the_schema_sent_is_portable`, `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` | `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_stages.py` |
+| la demande est un *<span lang="en">chat completion</span>* avec un schéma JSON strict, portable et dans les bornes du mode strict | `test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict`, `test_the_schema_sent_is_portable`, `test_the_schema_of_a_full_batch_is_within_the_bounds_of_strict_mode` | `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_stages.py` |
 | chaque appel porte la version de sa consigne | `test_the_stage_calls_carry_their_prompt_version_and_counts` | `tests/ai_api/test_digests.py` |
 
 ### 4. Contrôles 1 à 6
 
 Les six contrôles de chaque sortie du modèle (`docs/fiches-veille.md`, « Contrôles »). Unitaire:
 `tests/ai_api/test_stages.py` (fonctions seules), `tests/ai_api/test_llm_client.py` (modèle rejoué). Intégration:
-`tests/ai_api/test_digests.py` (modèle rejoué, base de test).
+`tests/ai_api/test_digests.py` (modèle rejoué, base de test). Le tableau suivant donne, pour chaque contrôle, ses
+cas, leurs tests et leurs fichiers.
 
 | Contrôle | Cas | Test | Fichier |
 |---|---|---|---|
@@ -311,13 +344,14 @@ et `test_a_timeout_is_llm_timeout_without_retry`.
 ### 5. Fidélité
 
 Une fiche ne dit que ce que disent ses items (`docs/fiches-veille.md`, « Fidélité »). Unitaire:
-`tests/ai_api/test_fidelity.py`. Intégration (modèle rejoué, base de test): `tests/ai_api/test_digests.py`.
+`tests/ai_api/test_fidelity.py`. Intégration (modèle rejoué, base de test): `tests/ai_api/test_digests.py`. Le
+tableau suivant donne chaque cas, ses tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
 | le texte est normalisé avant toute recherche | `test_a_text_is_normalized_before_any_search` | `tests/ai_api/test_fidelity.py` |
 | une valeur n'est trouvée qu'entre ses limites, dans un seul champ | `test_a_value_is_found_only_between_its_limits`, `test_a_fact_is_found_in_one_field_never_across_two` | `tests/ai_api/test_fidelity.py` |
-| une CVE du texte égale à son fait par sa forme canonique | `test_a_cve_of_the_text_equals_its_fact_by_its_canonical_form` | `tests/ai_api/test_fidelity.py` |
+| une CVE (l'identifiant public d'une vulnérabilité) du texte égale à son fait par sa forme canonique | `test_a_cve_of_the_text_equals_its_fact_by_its_canonical_form` | `tests/ai_api/test_fidelity.py` |
 | un identifiant du texte non déclaré en fait retire l'affirmation | `test_an_identifier_of_the_text_not_declared_removes_the_claim` | `tests/ai_api/test_fidelity.py` |
 | le piège écrit en clair, puis déguisé, est retiré | `test_the_trap_written_plainly_is_removed`, `test_the_trap_disguised_is_removed` | `tests/ai_api/test_fidelity.py` |
 | un contrôle de direction en tête du texte retire l'affirmation | `test_a_control_of_direction_at_the_start_of_the_text_removes_the_claim` | `tests/ai_api/test_fidelity.py` |
@@ -330,7 +364,8 @@ Une fiche ne dit que ce que disent ses items (`docs/fiches-veille.md`, « Fidél
 Intégration: la vraie application de l'API IA (`create_app`), le `TestClient`, la vraie API de données sur la base
 de test et le modèle rejoué, `tests/ai_api/test_digest_router.py`; les étapes (`build_digests`, sans route, modèle
 rejoué, base de test), `tests/ai_api/test_digests.py`; l'OpenAPI, `tests/ai_api/test_ai_api_openapi.py`. Bout en
-bout, dans la CI: `tests/commands/test_live_apis.py`.
+bout, dans la CI: `tests/commands/test_live_apis.py`. Le tableau suivant donne chaque cas, ses tests et leur
+fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -350,7 +385,7 @@ bout, dans la CI: `tests/commands/test_live_apis.py`.
 Intégration: `tests/ai_api/test_digest_router.py`; le démarrage de `kb serve-ai`, `tests/ai_api/test_serve_ai.py`
 (les tests cités: `cli.main`, `uvicorn.run` remplacé, il ne tourne pas);
 la fenêtre de la limite de débit, code commun aux deux API, en unitaire sur une horloge réglée par le test,
-`tests/test_api_rate_limit.py`.
+`tests/test_api_rate_limit.py`. Le tableau suivant donne chaque cas, ses tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -366,7 +401,8 @@ la fenêtre de la limite de débit, code commun aux deux API, en unitaire sur un
 
 Intégration, mesures et traces en mémoire: `tests/ai_api/test_digest_router.py`. Unitaire: `tests/ai_api/test_tracing.py`,
 `tests/ai_api/test_metrics_export.py`, `tests/ai_api/test_trace_export.py` (sans réseau, sauf une socket locale).
-`e2e`, hors de la CI: `tests/e2e/test_real_export.py` (voir « Les tests de bout en bout » et #495).
+`e2e`, hors de la CI: `tests/e2e/test_real_export.py` ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)).
+Le tableau suivant donne chaque cas, ses tests et leur fichier.
 
 | Cas | Test | Fichier |
 |---|---|---|
@@ -386,9 +422,9 @@ Intégration, mesures et traces en mémoire: `tests/ai_api/test_digest_router.py
 |---|---|
 | le vrai modèle: aucun test de la CI ne l'appelle, toutes les sorties sont rejouées | #210 (essai des fiches sur la veille réelle avec gpt-6-luna), ouverte |
 | le juge de chaque affirmation, et son étalonnage | #223 et #224, ouvertes |
-| les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main (« Les tests de bout en bout »); celui de l'export échoue tant que #495 est ouverte |
-| le déclenchement des alertes du monitorage du modèle | le bac à sable, `make sandbox-alerts`, lancé à la main (« Le bac à sable des alertes ») |
+| les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main ([Les tests de bout en bout](#les-tests-de-bout-en-bout)); celui de l'export a passé le 2026-11-09, et n'a pas été relancé sur `fd956430` ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)) |
+| le déclenchement des alertes du monitorage du modèle | le bac à sable, `make sandbox-alerts`, lancé à la main ([Le bac à sable des alertes](#le-bac-a-sable-des-alertes)) |
 
 Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors du bout en bout, les dépendances de
 production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
-[docs/2026-11-08-tests-api-ia.md](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
