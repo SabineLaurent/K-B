@@ -1,12 +1,14 @@
 # L'intégration continue de K-B
 
-> Documentation des procédures d'installation et de test de la chaîne.
+!!! note "Compétences de la certification"
 
-— C18
+    > Documentation des procédures d'installation et de test de la chaîne.
 
-> Documentation utilisateur, pour le déclenchement de la chaîne.
+    — C18
 
-— C18
+    > Documentation utilisateur, pour le déclenchement de la chaîne.
+
+    — C18
 
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
@@ -144,7 +146,7 @@ tourne sur chaque PR vers `main` et quand on le lance à la main (`workflow_disp
 - `build` (l. 16-33) récupère le dépôt (l. 19) et installe uv 0.13.6, sans enregistrer le cache (l. 20-23). Il
     construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 24-25): le groupe `docs` seul, aux
     versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
-    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:43-49`). Puis
+    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:83-89`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
     11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 26-29). Lancé à la main depuis
     `main`, il dépose enfin `site/` en artefact de Pages (l. 30-33), que `deploy` publie.

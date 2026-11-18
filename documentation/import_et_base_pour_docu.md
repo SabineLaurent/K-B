@@ -1,21 +1,23 @@
 # L'agrégation, l'import et la base de K-B
 
-> Documentation des scripts.
+!!! note "Compétences de la certification"
 
-— C3
+    > Documentation des scripts.
 
-> Documentation de la procédure d'installation du système de gestion de base de données.
+    — C3
 
-— C4
+    > Documentation de la procédure d'installation du système de gestion de base de données.
 
-> Documentation du script d'import.
+    — C4
 
-— C4
+    > Documentation du script d'import.
 
-> Rédaction de la documentation technique d'accès à la base de données adaptée aux environnements techniques du
-> projet.
+    — C4
 
-— C5
+    > Rédaction de la documentation technique d'accès à la base de données adaptée aux environnements techniques du
+    > projet.
+
+    — C5
 
 Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment installer la base sur le Mac et en ligne,
 ce que fait le script d'agrégation et d'import (`kb import`) pas à pas, comment il nettoie et homogénéise les

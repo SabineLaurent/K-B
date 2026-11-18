@@ -1,8 +1,10 @@
 # Le service d'IA de K-B: le déploiement du modèle gpt-6.1-sol
 
-> Rédaction de la documentation.
+!!! note "Compétences de la certification"
 
-— C8
+    > Rédaction de la documentation.
+
+    — C8
 
 Cette fiche documente le service d'intelligence artificielle (IA) de K-B. Ce service est le déploiement d'un modèle
 de langage, `gpt-6.1-sol`, dans Microsoft Foundry. Un déploiement est la mise à disposition d'un modèle par une
