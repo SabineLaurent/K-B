@@ -1,10 +1,66 @@
-/* The accent of the theme colours a link under the pointer or the focus: #526cfe gives 4.26:1 on white,
-   under the 4.5:1 of RGAA 3.2; #303f9f (indigo 700) gives 8.98:1. */
+/* The colours of the back office of K-B (mockups of 2026-11-09, plate « Charte graphique »; issue 649), given to the
+   variables of Material 9.8.1. The ratio of each text on its background is in documentation/accessibilite_pour_docu.md,
+   « Les contrastes du thème ». */
 :root {
-  --md-accent-fg-color: #303f9f;
+  /* The header and the bar of tabs: white on ink. */
+  --md-primary-fg-color: #1C1E21;
+  --md-primary-fg-color--light: #4A4F57;
+  --md-primary-fg-color--dark: #1C1E21;
+  --md-primary-bg-color: #FFFFFF;
+  /* The placeholder of the search field, in the header: the colour of « ← Front office » in the mockup. */
+  --md-primary-bg-color--light: #CFE3E6;
+  /* The page: ink on linen grey, the secondary text in slate. */
+  --md-default-fg-color: #1C1E21;
+  --md-default-fg-color--light: #4A4F57;
+  --md-default-bg-color: #F4F5F2;
+  /* A link in teal; under the pointer or the focus, the deep teal of the front. */
+  --md-typeset-a-color: #0F5E6B;
+  --md-accent-fg-color: #0A434C;
+  --md-accent-fg-color--transparent: #0A434C1A;
+  /* The code on white, as a card of the mockups. */
+  --md-code-bg-color: #FFFFFF;
+  /* The footer white, as in the mockup. */
+  --md-footer-bg-color: #FFFFFF;
+  --md-footer-bg-color--dark: #FFFFFF;
+  --md-footer-fg-color: #1C1E21;
+  --md-footer-fg-color--light: #4A4F57;
+  --md-footer-fg-color--lighter: #4A4F57;
 }
 
-/* A link of a sheet is underlined: its colour alone gives 2.35:1 against the text, under the 3:1 of RGAA 10.6. */
+/* The tabs as the navigation of the back office: each part in white, where Material dims it to 0.7; the current one
+   in semi-bold and underlined, so not told by its weight alone; each link 2.4rem high, 48 px by default, over the
+   44 px of a target in the mockup. */
+.md-tabs__link {
+  margin-top: 0;
+  block-size: 2.4rem;
+  align-items: center;
+  opacity: 1;
+}
+
+.md-tabs__item--active .md-tabs__link {
+  font-weight: 600;
+  text-decoration: underline;
+  text-underline-offset: 0.25em;
+}
+
+/* On the ink of the header and of the tabs, the focus is outlined in white: the deep teal of the accent would give
+   1.53:1 there. */
+.md-header__button,
+.md-tabs__link {
+  outline-color: #FFFFFF;
+}
+
+/* A block of code and the footer are edged in stone, as the cards and the footer of the mockup: white on linen grey
+   alone draws no edge to see. */
+.md-typeset pre > code {
+  box-shadow: inset 0 0 0 1px #DADCD6;
+}
+
+.md-footer-meta {
+  border-top: 1px solid #DADCD6;
+}
+
+/* A link of a sheet is underlined: its colour alone, against the text, is under the 3:1 of RGAA 10.6. */
 .md-typeset a {
   text-decoration: underline;
 }
