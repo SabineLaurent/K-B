@@ -211,7 +211,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
    (`post/top_sheets.py:58`, `:70`, `:73`, `:92`). Seule la commande `kb` écrit dans le coffre, jamais une API.
 6. **Le stockage d'échange en ligne.** Aujourd'hui, seul le conteneur `smoke-test` existe en ligne
    (`infra/modules/exchange-storage.bicep:39-46`): `kb smoke-test` le liste et n'écrit que le nombre de blobs de sa
-   première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`, `core/config.py:552`). #420 prévoit le
+   première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:187`, `core/config.py:552`). #420 prévoit le
    reste, que rien ne crée encore: la lecture choisie, où le Mac déposera les clips et les copies de Zotero, et le
    conteneur `watch`, où les jobs publieront `veille/`. Les deux routines relancent les commandes dans le même processus
    (`commands/job_routine.py:4-6`). `kb daily-routine` copie les clips dans le coffre du job, puis lance `kb collect`,
@@ -241,7 +241,8 @@ leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnem
 (`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA écrit sur sa sortie standard pour chaque appel au modèle
 (`ai_api/observability/metrics.py:50`). Restent hors du dessin aussi deux appels qui ne portent pas de donnée de la
 veille: `GET /health`, par lequel `kb smoke-test` vérifie les deux API et `kb digest-watch` les réveille
-(`commands/smoke_test_command.py:80-81`, `commands/digest_watch_command.py:60-64`), et la demande d'un jeton à
+(`commands/smoke_test_command.py:95`, `:101`, `commands/digest_watch_command.py:60-64`), les sondes sans clé de
+`kb smoke-test`, refusées en 401, 404 et 405 (`jobs/api_probes.py`, #499), et la demande d'un jeton à
 l'identité managée (`exchange/storage.py:173`, `database/entra.py:57`). `kb openapi` écrit le contrat des deux API
 dans le dépôt, `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json` (`commands/openapi_command.py:30-32`,
 `:50`). Les contrôles du coffre avant une écriture restent hors du dessin aussi: ils ne lisent que l'état d'un fichier
@@ -378,7 +379,7 @@ principales:
 | `ca-kb-data-api` | lance `kb serve-data`, sur la base PostgreSQL en ligne, ouverte par l'identité managée (`KB_DATABASE_AUTH=entra`) | `infra/main.bicep:165-199` |
 | `ca-kb-ai-api` | lance `kb serve-ai`, qui lit `ca-kb-data-api` en HTTPS | `infra/main.bicep:200-235` |
 | `ca-kb-web` | lance `kb serve-web`, le site privé, qui lit `ca-kb-data-api` en HTTPS. La connexion Microsoft Entra de Container Apps n'admet que l'identifiant d'objet de l'opératrice, que le code vérifie aussi à chaque requête (`KB_WEB_OPERATOR_ID`, `web/operator_check.py:45`) | `infra/main.bicep:320-352`, au commit `5bbe3ce` |
-| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test` | `infra/main.bicep:237`, `commands/smoke_test_command.py:68-81` |
+| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API et leurs sondes sans clé (#499), puis la liste du conteneur `smoke-test` | `infra/main.bicep:237`, `commands/smoke_test_command.py:81-121` |
 | `caj-kb-migrate-database` | job manuel, lance `kb migrate-database` | `infra/main.bicep:277` |
 | `pgsql-kb-…` | le serveur PostgreSQL 18 flexible, par Entra ID seul | `infra/main.bicep:265` |
 | `stkbexchange…` | le stockage d'échange, Azure Blob Storage, avec le seul conteneur `smoke-test` | `infra/main.bicep:106`, `infra/modules/exchange-storage.bicep:39-46` |

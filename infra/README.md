@@ -342,9 +342,12 @@ az monitor log-analytics query -w "$WS" -o tsv \
   --query "[].[TimeGenerated, Log]"
 ```
 
-Attendu : `smoke test finished in … s: 3 of 3 checks passed`. Les API n'écrivent pas un `/health` réussi, seulement
+Attendu : `smoke test finished in … s: 9 of 9 checks passed`. Les API n'écrivent pas un `/health` réussi, seulement
 un échec : avec `ContainerAppName` à la place de `JobName`, aucune ligne `status=400 route=/health` ne doit
-apparaître. Le démarrage, le tirage de l'image et le réveil d'une app à 0 réplique sont dans
+apparaître. Les sondes sans clé (#499) y laissent chacune sa ligne : `method='GET' route=/items status=401` pour
+l'API de données, `method='POST' route=/digests status=401` pour l'API IA, et pour les deux
+`method='GET' route=/docs status=404` et `method='HEAD' route=/health status=405`, toutes avec `client=-` (lignes
+relevées le 2026-11-18 sur l'API de données construite hors `sandbox`). Le démarrage, le tirage de l'image et le réveil d'une app à 0 réplique sont dans
 `ContainerAppSystemLogs`, à interroger de la même façon.
 
 Mesuré le 06/11 : 1 s pour le test quand les API sont éveillées, 50 s quand elles sont au repos. L'API de données

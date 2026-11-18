@@ -83,7 +83,7 @@ tournent pas.
 | 6 | `Sets the apps to the image of the tag` | `az containerapp update` de chaque app de `deployment.json`, à l'image par son digest (`k-b@sha256:…`): une réplique qui se réveille tire l'image déployée, même si le tag était réécrit | `<app>: <tag> (sha256:…)` |
 | 7 | `Sets the jobs to the image of the tag` | `az containerapp job update` de chaque job de `deployment.json`, de même | `<job>: <tag> (sha256:…)` |
 | 8 | `Waits for the revisions of the apps at the image of the tag` | attend, pour chaque app, que sa dernière révision soit prête (`latestReadyRevisionName` égal à `latestRevisionName`) et que l'image de cette révision soit celle du tag. 40 lectures, 15 s d'écart. Sans cette attente, l'ancienne révision répond encore, et le test de fumée pourrait passer sur l'ancienne version | `the latest revision of each app is ready at <tag> (sha256:…)` |
-| 9 | `Runs the smoke test` | `run_job caj-kb-smoke-test 72`: `kb smoke-test` demande `GET /health` aux deux API et liste le conteneur `smoke-test` du stockage d'échange, par l'identité du job | `caj-kb-smoke-test: Succeeded` |
+| 9 | `Runs the smoke test` | `run_job caj-kb-smoke-test 72`: `kb smoke-test` demande `GET /health` aux deux API, leur envoie ses sondes sans clé (401, 404, 405, #499), et liste le conteneur `smoke-test` du stockage d'échange, par l'identité du job | `caj-kb-smoke-test: Succeeded` |
 
 `run_job` lit l'état d'une exécution jusqu'au `replicaTimeout` du job plus 180 s, pour le démarrage et le tirage de
 l'image: 600 s pour la migration (`infra/modules/migrate-database-job.bicep`), donc 52 lectures, et 900 s pour le
@@ -278,7 +278,7 @@ nouvelle livraison.
 | `Migrates the base` | la base a pu être migrée, et `caj-kb-migrate-database` est à l'image du tag | lire le journal du job dans `log-kb` (ci-dessous), corriger, livrer une version nouvelle; ou revenir au tag précédent |
 | `Sets the apps…`, `Sets the jobs…` | la base est migrée et `caj-kb-migrate-database` est à l'image du tag; les apps et les jobs déjà nommés par une ligne `<nom>: <tag> (sha256:…)` le sont aussi, et au plus celui dont la mise à jour était en cours | revenir au tag précédent, ou livrer une version corrigée |
 | `Waits for the revisions…` | la base est migrée; le modèle de chaque app et de chaque job est à l'image du tag, mais la révision prête d'une app peut encore être l'ancienne | lire l'état des révisions et les journaux système (ci-dessous), puis revenir au tag précédent |
-| `Runs the smoke test` | tout est à la nouvelle version | lire le journal du test de fumée (ci-dessous), puis revenir au tag précédent si une API ne répond pas |
+| `Runs the smoke test` | tout est à la nouvelle version | lire le journal du test de fumée (ci-dessous), puis revenir au tag précédent si une API ne répond pas ou si une sonde reçoit un autre statut |
 
 **L'état des révisions** d'une app (attendu: `Healthy`):
 
@@ -299,14 +299,17 @@ az monitor log-analytics query -w "$WS" -o tsv \
 Le démarrage d'une app, le tirage de l'image et le réveil d'une app à 0 réplique sont dans
 `ContainerAppSystemLogs`, à interroger de la même façon.
 
-**Le test de fumée** réussi écrit `smoke test finished in … s: 3 of 3 checks passed`. Ses trois contrôles tournent
+**Le test de fumée** réussi écrit `smoke test finished in … s: 9 of 9 checks passed`. Ses neuf contrôles tournent
 toujours, et chaque échec a sa ligne, avec son état:
-- pour une API: `health_failed`, `health_timeout`, `health_unavailable` ou `health_invalid_response`;
+- pour le `/health` d'une API: `health_failed`, `health_timeout`, `health_unavailable` ou `health_invalid_response`;
+- pour une sonde sans clé (#499, `src/k_b/jobs/api_probes.py`), trois par API: une route à clé (`GET /items`,
+    `POST /digests`) qui doit rendre 401, `GET /docs` qui doit rendre 404, et `HEAD /health` qui doit rendre 405:
+    `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`;
 - pour le stockage d'échange: `exchange_storage_no_token` (l'identité du job sans jeton, refusée ou injoignable),
   `exchange_storage_forbidden`, `exchange_storage_unauthorized`, `exchange_storage_not_found`,
   `exchange_storage_unavailable` ou `exchange_storage_failed`.
 
-Son code de sortie: 0 si les trois contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
+Son code de sortie: 0 si les neuf contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
 manque ou est refusée), rendus par `src/k_b/commands/smoke_test_command.py`; 143 sur SIGTERM et 130 sur SIGINT,
 rendus par `src/k_b/cli.py`, `kb smoke-test` étant dans `COMMANDS_STOPPED_BY_SIGTERM` (`src/k_b/commands/sigterm.py`).
 Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.

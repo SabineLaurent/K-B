@@ -1,5 +1,6 @@
 // The manual job caj-kb-smoke-test: kb smoke-test (#412) asks GET /health of both APIs by their
-// internal name, then lists the container smoke-test by the identity of the job.
+// internal name and sends them its probes without a key (#499), then lists the container smoke-test by
+// the identity of the job.
 param location string
 param tags object
 param environmentId string

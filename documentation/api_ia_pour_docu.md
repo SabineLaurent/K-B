@@ -321,8 +321,8 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
 - `KB_DEPLOYMENT_ENVIRONMENT=production`: ni `/docs` ni `/openapi.json` (`infra/main.bicep:216`).
 - De 0 à 1 réplique (`infra/modules/api-container-app.bicep:147-152`).
 - Les jobs en ligne sont `caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine` et
-  `caj-kb-digest-watch` (`infra/deployment.json`). Deux appellent l'API IA: la sonde, par `GET /health`
-  (`commands/smoke_test_command.py:80-81`, `:117-127`), et `caj-kb-digest-watch`, le lundi et le jeudi à 10:00 UTC,
+  `caj-kb-digest-watch` (`infra/deployment.json`). Deux appellent l'API IA: la sonde, par `GET /health` et ses sondes
+  sans clé, refusées en 401, 404 et 405 (`commands/smoke_test_command.py:101-106`, `:144-170`, #499), et `caj-kb-digest-watch`, le lundi et le jeudi à 10:00 UTC,
   qui demande les comptes rendus (`POST /digests`, `POST /trend-reports`) avec les clés des clients `KB_DIGEST` et
   `KB_TREND_REPORT` (#423, `infra/modules/digest-watch-job.bicep`).
 

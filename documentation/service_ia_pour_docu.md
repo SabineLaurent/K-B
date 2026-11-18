@@ -322,7 +322,8 @@ flowchart LR
     10:00 UTC (`infra/main.bicep:31-32`). Lancé à la main le 2026-11-11, il a donné les premiers points de la
     production dans Grafana Cloud, vers 16:00 UTC; lancé par son horaire le 2026-11-12, de 10:00:00 à 10:02:44 UTC, il
     a appelé le modèle (#522). Les autres jobs n'appellent pas le modèle: `caj-kb-smoke-test` n'appelle de l'API IA
-    que `GET /health`, qui répond sans lui (`core/api_health.py:12-13`).
+    que `GET /health`, qui répond sans lui (`core/api_health.py:12-13`), et ses sondes sans clé (#499): `POST /digests`
+    est refusé en 401 avant tout appel au modèle (`jobs/api_probes.py`, `tests/ai_api/test_digest_router.py`).
 - **Le coffre de secrets**, en ligne: il porte la clé; l'identité managée de l'API IA la lit (« La clé de K-B »).
 - **Grafana Cloud** reçoit, par OTLP (le protocole d'export d'OpenTelemetry), les mesures de chaque appel au modèle, et, sous réglage, son contenu (« Les données
     envoyées au modèle »). Le monitorage du modèle a sa fiche, [la fiche du monitorage](monitoring_pour_docu.md).
