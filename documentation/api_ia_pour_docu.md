@@ -1,13 +1,15 @@
 # L'API IA de K-B
 
-> Rédaction et/ou génération de la documentation de l'API.
+!!! note "Compétences de la certification"
 
-— C9
+    > Rédaction et/ou génération de la documentation de l'API.
 
-> Les éventuelles étapes d'authentification et de renouvellement de l'authentification (expiration des jetons par
-> exemple) sont intégrées correctement en suivant la documentation de l'API.
+    — C9
 
-— C10
+    > Les éventuelles étapes d'authentification et de renouvellement de l'authentification (expiration des jetons par
+    > exemple) sont intégrées correctement en suivant la documentation de l'API.
+
+    — C10
 
 Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait chacun de ses points de terminaison,
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est

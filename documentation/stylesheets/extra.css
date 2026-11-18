@@ -1,12 +1,199 @@
-/* The accent of the theme colours a link under the pointer or the focus: #526cfe gives 4.26:1 on white,
-   under the 4.5:1 of RGAA 3.2; #303f9f (indigo 700) gives 8.98:1. */
-:root {
-  --md-accent-fg-color: #303f9f;
+/* The colours of the back office of K-B (mockups of 2026-11-09, plate « Charte graphique »; issue 649), given to the
+   variables of Material 9.8.1, for its light scheme (default) and its dark one (slate). Each colour is written once,
+   by light-dark(): Material sets color-scheme to light or dark with the scheme. The charter has no dark variant: the
+   dark mode takes its colours where they exist, and adds --kb-night and the dark colours of Material's highlighted
+   code. The ratio of each text on its background
+   is in documentation/accessibilite_pour_docu.md, « Les contrastes du thème ». Material declares its colours on
+   [data-md-color-scheme]: these declarations come after its own, with the same weight. */
+/* A browser without light-dark() (before Chrome 123, Firefox 120, Safari 17.5) skips this block and keeps the colours
+   of Material: a colour written by light-dark() would be invalid there, and the white text of the header would stand
+   on no background. */
+@supports (color: light-dark(#000000, #FFFFFF)) {
+  :root,
+  [data-md-color-scheme] {
+    /* The charter. */
+    --kb-ink: #1C1E21;
+    --kb-slate: #4A4F57;
+    --kb-teal: #0F5E6B;
+    --kb-teal-deep: #0A434C;
+    --kb-linen: #F4F5F2;
+    --kb-stone: #DADCD6;
+    /* « Canard givré », the colour of a link on the ink of the header in the mockup. */
+    --kb-frost: #CFE3E6;
+    /* The light teal of a card under the pointer in the mockup. */
+    --kb-mist: #E6F0F1;
+    /* Out of the charter, from its hue: the header, the code blocks and the footer of the dark mode. */
+    --kb-night: #121416;
+
+    /* The header and the bar of tabs: white on ink. */
+    --md-primary-fg-color: light-dark(var(--kb-ink), var(--kb-night));
+    --md-primary-bg-color: #FFFFFF;
+    /* The placeholder of the search field, in the header. */
+    --md-primary-bg-color--light: var(--kb-frost);
+    /* The page and its secondary text. */
+    --md-default-fg-color: light-dark(var(--kb-ink), var(--kb-linen));
+    --md-default-fg-color--light: light-dark(var(--kb-slate), var(--kb-stone));
+    --md-default-fg-color--lighter: light-dark(#00000052, #F4F5F252);
+    /* The veil of a menu title and of a box of a diagram: 8 % in the dark mode, where a box three levels deep would
+       fall under 4.5:1 at the 12 % of Material. */
+    --md-default-fg-color--lightest: light-dark(#00000012, #F4F5F214);
+    --md-default-bg-color: light-dark(var(--kb-linen), var(--kb-ink));
+    /* A link, and the accent, which draws the focus ring and a link of the menu under the pointer. */
+    --md-typeset-a-color: light-dark(var(--kb-teal), var(--kb-frost));
+    --md-accent-fg-color: light-dark(var(--kb-teal), var(--kb-frost));
+    --md-accent-fg-color--transparent: light-dark(#0A434C1A, #CFE3E61A);
+    /* A table: its rules, and a row under the pointer. */
+    --md-typeset-table-color: light-dark(#0000001F, #F4F5F21F);
+    --md-typeset-table-color--light: light-dark(#00000009, #F4F5F209);
+    /* The code blocks; the inline code has its own background. */
+    --md-code-bg-color: light-dark(#FFFFFF, var(--kb-night));
+    --md-code-fg-color: light-dark(#36464E, var(--kb-stone));
+    /* The footer. */
+    --md-footer-bg-color: light-dark(#FFFFFF, var(--kb-night));
+    --md-footer-bg-color--dark: light-dark(#FFFFFF, var(--kb-night));
+    --md-footer-fg-color: var(--kb-link-hover);
+    --md-footer-fg-color--light: var(--md-typeset-a-color);
+
+    /* K-B's own: a link under the pointer, the inline code, the rules of a code block and of the footer. */
+    --kb-link-hover: light-dark(var(--kb-teal-deep), #FFFFFF);
+    --kb-code-inline-bg: light-dark(var(--kb-mist), var(--kb-teal-deep));
+    --kb-rule: light-dark(var(--kb-stone), var(--kb-slate));
+  }
 }
 
-/* A link of a sheet is underlined: its colour alone gives 2.35:1 against the text, under the 3:1 of RGAA 10.6. */
+/* The page wider, and the menu with it, so a title of the menu fits on fewer lines. */
+.md-grid {
+  max-inline-size: 70rem;
+}
+
+@media screen and (width >= 76.25em) {
+  .md-sidebar--primary {
+    inline-size: 15rem;
+
+    /* Material holds the menu at 11.5rem by a padding on its end side, whatever the width of its bar. */
+    & .md-sidebar__inner {
+      padding-inline-end: 0.6rem;
+    }
+  }
+}
+
+/* A link of a sheet: underlined, since its colour alone, against the text, is under the 3:1 of RGAA 10.6; under the
+   pointer or the focus, with the code it holds, in a colour of its own. */
 .md-typeset a {
   text-decoration: underline;
+
+  &:is(:focus, :hover),
+  &:is(:focus, :hover) code {
+    color: var(--kb-link-hover, var(--md-accent-fg-color));
+  }
+}
+
+/* The inline code on a light teal, not on the white of a code block. */
+.md-typeset :not(pre) > code {
+  background-color: var(--kb-code-inline-bg, var(--md-code-bg-color));
+}
+
+/* A code block and the footer are edged: white on linen grey alone draws no edge to see. */
+.md-typeset pre > code {
+  box-shadow: inset 0 0 0 1px var(--kb-rule, transparent);
+}
+
+.md-footer-meta {
+  border-block-start: 1px solid var(--kb-rule, transparent);
+}
+
+/* The links of the footer, in a list on one line: as heavy as the rules of Material on a list of the text, which the
+   footer is part of. */
+.md-typeset .kb-footer ul {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem 1.2rem;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+
+  & li {
+    margin: 0;
+  }
+}
+
+/* The box of the competences at the head of a sheet, as an alert of GitHub: a teal rule on its start side, a teal
+   title, no frame. The quotes it holds keep their blockquote, without their own rule. */
+.md-typeset .admonition.note {
+  padding-inline: 0.8rem 0;
+  font-size: inherit;
+  background: none;
+  border: none;
+  border-inline-start: 0.2rem solid var(--md-typeset-a-color);
+  border-radius: 0;
+  box-shadow: none;
+
+  & > .admonition-title {
+    margin-inline: -0.8rem 0;
+    color: var(--md-typeset-a-color);
+    background: none;
+
+    &::before {
+      background-color: var(--md-typeset-a-color);
+    }
+  }
+
+  & blockquote {
+    padding-inline-start: 0;
+    margin-block: 0.6em 0.2em;
+    border-inline-start: none;
+  }
+}
+
+/* The tabs as the navigation of the back office: each in white, where Material dims it to 0.7; the open one in
+   semi-bold and underlined, so not told by its weight alone; each link 2.4rem high, 48 px by default, over the 44 px
+   of a target in the mockup. A tab is as high as its list, which clips what overflows: its focus ring is drawn
+   inside it, and the space between two tabs moves from the item into the link, so the ring does not touch the
+   text. */
+.md-tabs__item {
+  padding-inline: 0.2rem;
+}
+
+.md-tabs__link {
+  margin-block-start: 0;
+  padding-inline: 0.4rem;
+  block-size: 2.4rem;
+  align-items: center;
+  opacity: 1;
+  outline-offset: -0.2rem;
+
+  .md-tabs__item--active & {
+    font-weight: 600;
+    text-decoration: underline;
+    text-underline-offset: 0.25em;
+  }
+}
+
+/* On the dark of the header, of the tabs, of the skip link and of the logo in the title of the narrow menu, the focus
+   is outlined in white: the teal of the light mode would give 2.25:1 there. */
+.md-header__button,
+.md-nav__button,
+.md-skip,
+.md-tabs__link {
+  outline-color: #FFFFFF;
+}
+
+/* The button of the mode is the visible label of a radio. Material outlines the label next to the focused radio,
+   which is hidden at each page load in the dark mode: the ring goes on the label shown. */
+.md-header__option:has(.md-option.focus-visible) > label:not([hidden]) {
+  outline-style: auto;
+  outline-color: #FFFFFF;
+}
+
+/* The rule beside the table of contents of the open page, its second sign: the colour of the header would give
+   1.11:1 on the page in the dark mode. */
+[dir] .md-nav--integrated > .md-nav__list > .md-nav__item--active .md-nav--secondary {
+  border-inline-start-color: var(--md-default-fg-color--light);
+}
+
+/* The list of the search results has no outline colour of the theme: the accent, not the blue of the browser. */
+.md-search__scrollwrap {
+  outline-color: var(--md-accent-fg-color);
 }
 
 /* An inline citation is a q element (AcceDe Web, rule 6.1; RGAA 9.4): the browser draws its marks, here the French

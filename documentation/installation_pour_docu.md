@@ -1,12 +1,14 @@
 # L'installation et l'environnement de développement de K-B
 
-> Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests.
+!!! note "Compétences de la certification"
 
-— C12
+    > Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests.
 
-> Rédaction de la documentation technique.
+    — C12
 
-— C17
+    > Rédaction de la documentation technique.
+
+    — C17
 
 Cette fiche dit comment installer l'environnement de développement de K-B sur une machine, le configurer, quelles
 dépendances il installe, puis comment y ajouter l'environnement de test, dont le détail est dans

@@ -1,16 +1,18 @@
 # La livraison continue de K-B
 
-> Documentation des procédures d'installation et de test de la chaîne.
+!!! note "Compétences de la certification"
 
-— C13
+    > Documentation des procédures d'installation et de test de la chaîne.
 
-> Documentation utilisateur, pour le déclenchement de la chaîne.
+    — C13
 
-— C13
+    > Documentation utilisateur, pour le déclenchement de la chaîne.
 
-> Documentation de la procédure de livraison continue: outils, configurations, exécution, débug.
+    — C13
 
-— C19
+    > Documentation de la procédure de livraison continue: outils, configurations, exécution, débug.
+
+    — C19
 
 Cette fiche dit ce que fait la chaîne de livraison continue de K-B, comment on la déclenche, comment elle
 s'installe, se configure et se teste, et que faire quand une livraison échoue. Elle est écrite d'après le code de

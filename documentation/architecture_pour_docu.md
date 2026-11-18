@@ -1,8 +1,10 @@
 # L'architecture de l'application K-B
 
-> Rédaction de la documentation technique.
+!!! note "Compétences de la certification"
 
-— C17
+    > Rédaction de la documentation technique.
+
+    — C17
 
 Cette fiche décrit l'architecture applicative de K-B: le flux des données de bout en bout, en bref puis en détail, les
 couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après `main` au commit
