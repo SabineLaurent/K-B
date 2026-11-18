@@ -6,7 +6,7 @@
 
 « La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du monitorage de l'application. » — C20
 
-Écrit le 2026-11-08 pour #164; le compte des noms de séries revu le 2026-11-18 d'après `main` au commit `1bef80f2`
+Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au commit `1bef80f2`
 (#623). Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
 tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq règles d'alerte,
 `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry

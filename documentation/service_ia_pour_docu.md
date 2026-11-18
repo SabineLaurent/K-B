@@ -44,14 +44,14 @@ que `az` ne l'affiche pas dans un tableau. Le type de `gpt-6.1-sol` vient donc d
 2026-11-17. La production désigne ici K-B en ligne, sur Azure. Elle est passée de `gpt-6-luna` à `gpt-6.1-sol` le
 2026-11-18, à la seconde passe de l'infrastructure, avec des réglages posés à la main (« Le branchement de K-B »).
 Cette passe a réussi à 11:26 UTC. La lecture de l'app de l'API IA, vers 11:28 UTC, montre sa révision
-`ca-kb-ai-api--0000013`, l'image `k-b:v0.1.6`, le modèle `gpt-6.1-sol` et l'effort `low` (« Relire l'état »).
+`ca-kb-ai-api--0000013`, l'image `k-b:v0.1.6` (écrite ici sans le nom du registre), le modèle `gpt-6.1-sol` et l'effort `low` (« Relire l'état »).
 
 Le tableau suivant décrit les deux déploiements.
 
 | Déploiement | Version | Type | Capacité | Mise à jour de la version | Filtre de contenu | Qui l'appelle |
 |---|---|---|---|---|---|---|
 | `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, sur le Mac depuis le 2026-11-17, et en ligne depuis le 2026-11-18 |
-| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18; plus personne depuis |
+| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18; l'API IA en ligne ne l'appelle plus depuis |
 
 Les sections suivantes expliquent le type, la version figée et le filtre de contenu. Trois points complètent le
 tableau.
@@ -281,7 +281,7 @@ Ces réglages appellent quatre remarques.
 Les quatre lectures du 2026-11-18 sont faites en lecture seule, et aucune n'affiche de clé. Dans son format tableau
 (`-o table`), `az` ne montre aucune colonne nommée `type`, ni `id`, ni `etag`. Le type des déploiements n'apparaît
 donc pas dans la sortie de la première lecture. Une portée est l'endroit où un rôle s'applique: un abonnement, un
-groupe ou une ressource. La dernière lecture affiche des portées complètes, avec l'identifiant de l'abonnement et les
+groupe ou une ressource. La troisième lecture affiche des portées complètes, avec l'identifiant de l'abonnement et les
 noms des groupes. La fiche n'en garde que le rôle et le type de portée. Avant de lancer les commandes, remplir les
 deux variables du groupe et de la ressource.
 
@@ -297,9 +297,12 @@ az cognitiveservices account show -g "$RG" -n "$RESOURCE" \
 # Les rôles du compte connecté, et leur portée.
 az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all \
   --query "[].{role:roleDefinitionName, portee:scope}" -o table
-# L'app de l'API IA en ligne: sa révision, son image et ses variables (sortie du 2026-11-18 vers 11:28 UTC:
-# ca-kb-ai-api--0000013, k-b:v0.1.6, KB_LLM_MODEL gpt-6.1-sol, KB_LLM_REASONING_EFFORT low).
-az containerapp show -g "$RG" -n ca-kb-ai-api
+# L'app de l'API IA en ligne: sa révision et les deux variables du modèle (sortie du 2026-11-18 vers 11:28 UTC:
+# ca-kb-ai-api--0000013, KB_LLM_MODEL gpt-6.1-sol, KB_LLM_REASONING_EFFORT low).
+az containerapp show -g "$RG" -n ca-kb-ai-api \
+  --query "{revision:properties.latestRevisionName, variables:properties.template.containers[0].env[?name=='KB_LLM_MODEL' || name=='KB_LLM_REASONING_EFFORT'].{nom:name, valeur:value}}" -o json
+# Son image, sans le nom du registre (sortie: k-b:v0.1.6).
+az containerapp show -g "$RG" -n ca-kb-ai-api --query "properties.template.containers[0].image" -o tsv | sed 's#.*/##'
 ```
 
 ## Le test
@@ -661,8 +664,8 @@ Pages de Microsoft Learn, relues le 2026-11-09 (en UTC):
     [<span lang="en">AI + Machine Learning</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning) (Foundry User) et
     [<span lang="en">Security</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/security) (Key Vault Secrets Officer)
 
-Lectures par `az`, en lecture seule, le 2026-11-18: les déploiements, la ressource et les rôles de l'opératrice
-(« Relire l'état »). Une lecture des déploiements du 2026-11-09, dont la ressource n'est pas établie, pour
+Lectures par `az`, en lecture seule, le 2026-11-18: les déploiements, la ressource, les rôles de l'opératrice et
+l'app de l'API IA en ligne, vers 11:28 UTC (« Relire l'état »). Une lecture des déploiements du 2026-11-09, dont la ressource n'est pas établie, pour
 `DeepSeek-V4-Flash` seulement (« Ce qu'est le service »). Appels du 2026-11-10 vers 00:03 UTC, avec la clé et sans
 clé, sur `gpt-6-luna` (« Le test »). Microsoft Learn, référence de
 [<span lang="en">az role assignment</span>](https://learn.microsoft.com/en-us/cli/azure/role/assignment?view=azure-cli-latest),

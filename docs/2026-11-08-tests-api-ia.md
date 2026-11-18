@@ -32,7 +32,9 @@ Aucun échec, aucun test sauté. Le périmètre compte **1705 tests** (1154 + 8 
 de vrais services, dont Grafana Cloud pour l'export des mesures : la relance se limite aux commandes locales, sans
 clé ni appel réseau. Les tests `postgresql` demandent un serveur PostgreSQL ; aucun des 1705 tests du périmètre ne
 porte ce marqueur. La CI les lance à chaque PR et à chaque fusion : sur `main` au commit `a7d7c309`, le job
-`tests-postgresql` a réussi (`gh run list --branch main --event push --workflow ci.yml --limit 1`).
+`tests-postgresql` a réussi (exécution 44281667496, `gh run view 44281667496`). Les tests `e2e` sont passés de 11 à
+15 depuis `f91bb97` : `tests/e2e/test_sandbox_alerts.py` (4 tests, #517, lancés par `make sandbox-alerts`) construit
+lui aussi l'API IA. La phrase « Un seul test `e2e` touche l'API IA », plus bas, vaut pour `f91bb97` seulement.
 
 Le tableau suivant recompte les groupes de la section « Les groupes » sur `a7d7c309`, fichier par fichier, avec la
 commande de comptage de « Rejouer ce compte rendu ».
@@ -59,6 +61,8 @@ chacune a ajoutés n'est pas compté.
 - #524 (#518) : les faits trouvés dans leur item et dans leur texte, comptés à part.
 - #539 (#295) : une fiche ou un brut écrit une seule fois, même quand deux lancements se chevauchent.
 - #548 (#424) : les fiches de la veille téléchargées dans le coffre du Mac.
+- #567 (#558) : le client du stockage d'échange passe dans le paquet `exchange/` ; dans les fichiers comptés, les
+  imports seulement.
 - #574 (#566, #569) : l'en-tête `Server` retiré de `kb serve-data` et de `kb serve-ai`.
 - #582 (#565) : chaque compte rendu d'un sujet commence au `until` de sa fiche précédente.
 - #625 (#560) : les comptes rendus servis au site depuis le jumeau JSON de leur fiche.
