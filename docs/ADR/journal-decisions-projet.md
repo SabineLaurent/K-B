@@ -7398,6 +7398,33 @@ par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrate
   réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
   restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
 
+### Infra : la relecture de la configuration en ligne et deux politiques d'audit (#497)
+
+Plan validé par Sabine le 2026-11-13 (§ 6, points 12 et 13), sur sa décision du 08/11 de tenir la « revue périodique
+des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10.
+
+- **Deux définitions intégrées d'Azure Policy, assignées au groupe de ressources par `infra/`
+  (`container-apps-policies.bicep`, `policyAssignments@2026-07-01`), sans paramètre : leur effet par défaut, `Audit`
+  (versions 1.1.0 et 1.0.1, lues dans `Azure/azure-policy` le 2026-11-18), signale sans rien refuser.** Pourquoi :
+  Sabine est propriétaire du groupe et seulement lectrice de l'abonnement (ses lectures `az` du 2026-11-18, relayées
+  par time-knight) ; une définition personnalisée se crée dans un groupe d'administration ou un abonnement, une
+  assignation de définition intégrée au niveau du groupe. L'effet `Audit` est celui de l'issue. Écartés : l'effet
+  `Deny`, qui refuserait aussi le déploiement des apps des autres projets du groupe ; une identité et une `location`,
+  que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
+  bloquée ; les apps des autres projets du groupe sont auditées aussi. — PR de #497
+- **`ca-kb-web` est hors de la politique « Container Apps should disable external network access », par
+  `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; son nom est une
+  seule variable de `main.bicep`, `webAppName`, lue par le site et par le module. Écartée : une exemption, visible
+  comme « Exempt », mais en API de préversion et avec un droit de plus. — PR de #497
+- **Le module s'applique aux deux passes, hors de `deployWorkloads`.** Pourquoi : il ne dépend ni de l'image ni des
+  apps ; `notScopes` vise le site par son identifiant, qu'il existe ou non. — PR de #497
+- **Les requêtes de la relecture du 2026-11-08 et leurs valeurs attendues vont dans `infra/README.md`, « 6. Vérifier
+  la mise en ligne », relancées par Sabine à chaque version déployée.** Pourquoi : c'est le texte de l'issue ; les
+  politiques ne voient ni le chiffrement entre les apps, ni les routes de l'environnement, ni les URL internes.
+  Écarté pour l'instant : les lancer dans un outil des passes (#455), qui pourrait les reprendre. Limite assumée : une
+  version déployée sans cette relecture n'est relue que par les politiques. Les gestes Azure de #497 attendent la
+  fusion de #630 (décision de Sabine du 2026-11-18). — PR de #497
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
