@@ -196,6 +196,12 @@
   outline-color: var(--md-accent-fg-color);
 }
 
+/* The header of the search results, hidden until a search opens, on an opaque background: the same colour as the
+   veil of Material over the page, whose transparency a contrast checker such as WAVE does not compose. */
+.md-search-result__meta {
+  background-color: light-dark(#E3E4E1, #2D2F31);
+}
+
 /* An inline citation is a q element (AcceDe Web, rule 6.1; RGAA 9.4): the browser draws its marks, here the French
    ones typed elsewhere in the sheets, with the same inner space. */
 .md-typeset q {
