@@ -71,6 +71,8 @@ var dataDir = '/var/lib/knowledge_base'
 var dataApiPort = 8000
 var aiApiPort = 8001
 var webPort = 8002
+// The site, open on purpose (#571): left out of the policy that audits an external ingress (#497).
+var webAppName = 'ca-kb-web'
 
 module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
@@ -154,6 +156,13 @@ module budget 'modules/budget.bicep' = {
   params: {
     contactEmail: budgetContactEmail
     project: tags.project
+  }
+}
+
+// Both passes: the policies audit the apps of the group, whatever the image (#497).
+module containerAppsPolicies 'modules/container-apps-policies.bicep' = {
+  params: {
+    webAppName: webAppName
   }
 }
 
@@ -321,7 +330,7 @@ module aiApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
 // has no right in Azure; it reads the data API only, by its key.
 module web 'modules/api-container-app.bicep' = if (deployWorkloads) {
   params: {
-    name: 'ca-kb-web'
+    name: webAppName
     location: location
     tags: tags
     environmentId: containerAppsEnvironment.outputs.id
