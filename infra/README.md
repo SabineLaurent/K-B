@@ -120,13 +120,16 @@ dans l'historique des déploiements du groupe, côté Azure, et dans la sortie d
 Le rôle de Lecteur de l'abonnement suffit pour cette lecture :
 
 ```sh
-for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL; do
+for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL Microsoft.PolicyInsights; do
   printf '%s ' "$ns"; az provider show -n "$ns" --query registrationState -o tsv
 done
 ```
 
-Les huit doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
-l'enregistrer.
+Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
+l'enregistrer. `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
+« `Microsoft.PolicyInsights` must be registered in your Azure subscription », et l'enregistrer demande le rôle
+Contributor ou Owner de l'abonnement (Learn, « Quickstart: Create a policy assignment to identify non-compliant
+resources by using a Bicep file », lu le 2026-11-18).
 
 ### 2. Première passe : le socle
 
@@ -350,15 +353,17 @@ false ; aucune route (`[]`).
 
 ```sh
 az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].{name:name, notScopes:notScopes}" -o json
-# L'évaluation à la demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h.
+# Cinq minutes au moins après la passe, le temps qu'une assignation nouvelle s'applique ; puis l'évaluation à la
+# demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h.
 az policy state trigger-scan -g "$RG"
 # Par le nom des assignations seulement : les deux ne visent que les apps (Microsoft.App/containerApps).
 az policy state list -g "$RG" \
-  --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, compliant:isCompliant}" -o table
+  --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, state:complianceState}" -o table
 ```
 
 Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
-`ca-kb-data-api` et `ca-kb-ai-api` conformes aux deux ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`. Les
+`ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
+référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`. Les
 apps des autres projets du groupe y figurent aussi. Une assignation nouvelle s'applique en cinq minutes environ ;
 la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
 triggers », lue le 2026-11-18).
@@ -594,7 +599,7 @@ Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus, d�
 l'application du 06/11, avec le bruit des étapes 2 et 5 (valeurs par défaut qu'Azure renvoie, sondes permutées,
 `reference(…)` non résolus).
 
-1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les huit fournisseurs).
+1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les fournisseurs).
 2. La première passe (étape 2). Aperçu attendu :
    - **à créer** : `pgsql-kb-<suffixe>`, son administratrice Entra, ses deux paramètres (`azure.extensions`,
      `log_error_verbosity`), sa règle de pare-feu `AllowAllAzureServicesAndResourcesWithinAzureIps`, l'identité
@@ -1668,7 +1673,9 @@ la première passe l'applique, la seconde aussi.
 
 1. Le critère rouge, avant la passe, par le nom des assignations (le nom affiché est celui de la définition, qu'un
    autre projet du groupe peut avoir assignée) :
-   `az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].name" -o tsv` ne rend rien.
+   `az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].name" -o tsv` ne rend rien. Et
+   `az provider show -n Microsoft.PolicyInsights --query registrationState -o tsv` rend `Registered` : sinon, son
+   enregistrement, un geste du propriétaire de l'abonnement, vient avant la passe.
 2. La première passe (étape 2). Aperçu attendu, déduit du Bicep : **à créer** `audit-kb-ca-external-ingress` et
    `audit-kb-ca-https-only` ; **à modifier** le bruit de l'étape 2.
 3. Les constats : « La relecture de la configuration » et « Les politiques d'audit » (étape 6).

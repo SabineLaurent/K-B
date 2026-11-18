@@ -7416,9 +7416,11 @@ des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, 
   `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; dans
   `main.bicep`, son nom est une variable, `webAppName`, lue par le site, par son hôte et par le module ;
   `infra/deployment.json`, que lit `deploy.yml`, l'écrit aussi. Écartée : une exemption, visible
-  comme « Exempt », mais en API de préversion et avec un droit de plus. — PR de #497
+  comme « Exempt », mais en API de préversion seulement. — PR de #497
 - **Le module s'applique aux deux passes, hors de `deployWorkloads`.** Pourquoi : il ne dépend ni de l'image ni des
-  apps ; `notScopes` vise le site par son identifiant, qu'il existe ou non. — PR de #497
+  apps ; `notScopes` vise le site par son identifiant. Qu'une exclusion vise une ressource qui n'existe pas encore,
+  sur un groupe neuf à la première passe, n'est pas vérifié ; en ligne, le site existe depuis le 2026-11-11
+  (#571). — PR de #497
 - **Les requêtes de la relecture du 2026-11-08 et leurs valeurs attendues vont dans `infra/README.md`, « 6. Vérifier
   la mise en ligne », relancées par Sabine à chaque version déployée.** Pourquoi : c'est le texte de l'issue ; les
   politiques ne voient ni le chiffrement entre les apps, ni les routes de l'environnement, ni les URL internes.
