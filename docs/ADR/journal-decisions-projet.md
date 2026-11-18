@@ -7493,8 +7493,9 @@ d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le 
   `trixie-security` ne porte qu'une version de zlib1g. Quand une `+deb13u2` la remplacera, `apt-get install` ne
   trouvera plus la version écrite, et la construction échouera dans `image-build` comme dans `deploy.yml`, jusqu'à
   une PR. Le scan reste vert tant que le bloc est là : c'est `dpkg-query -W zlib1g`, lu sur le digest de la base, qui
-  dit quand le retirer. Le bloc est placé juste avant `USER` et après `ENV`, pour qu'aucun renvoi `Dockerfile:<ligne>`
-  des fiches ne bouge, ni maintenant ni au retrait. — PR #643
+  dit quand le retirer. Le bloc est placé juste avant `USER` et après `ENV`, pour qu'aucun des renvois
+  `Dockerfile:<ligne>` antérieurs au bloc ne bouge, ni maintenant ni au retrait ; ceux qui citent le bloc lui-même
+  partent avec lui (#647). — PR #643
 
 ## Décisions encore ouvertes
 

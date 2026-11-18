@@ -91,7 +91,7 @@ plan le 14/11.
 Exigé par le ruleset, `image-build` bloque la fusion de toute PR tant qu'une vulnérabilité haute ou critique corrigée
 est dans l'image. Une vulnérabilité publiée un matin rend donc rouges toutes les PR, comme `audit` le 13/11 (#606).
 C'est le prix du contrôle. La doc de la CI donne la marche à suivre, dans cet ordre
-(`documentation/integration_continue_pour_docu.md:433-468`) :
+(`documentation/integration_continue_pour_docu.md:433-471`) :
 
 1. un paquet Python de l'environnement virtuel : `audit` échoue aussi, on monte le paquet dans `uv.lock` ;
 2. un paquet Debian, CPython ou un paquet Python de l'image de base, quand l'image `python` amont a déjà le
@@ -143,8 +143,8 @@ RUN apt-get update \
 `apt-get update` lit les index des sources de l'image de base. `apt-get install` remplace la zlib1g installée par la
 version écrite. Grype lit les paquets dans la base de `dpkg`, qui nomme alors la version corrigée. Les index sont
 retirés après coup : ils ne servent plus et alourdiraient l'image. Le bloc est placé juste avant `USER 10001:10001`,
-parce qu'installer un paquet demande root. Il est placé après `ENV` pour qu'aucun renvoi `Dockerfile:<ligne>` des
-fiches ne bouge, ni maintenant ni au retrait.
+parce qu'installer un paquet demande root. Il est placé après `ENV` pour qu'aucun des renvois `Dockerfile:<ligne>`
+antérieurs au bloc ne bouge, ni maintenant ni au retrait. Ceux qui citent le bloc lui-même partent avec lui (#647).
 
 La version est écrite en entier : l'image reste celle de son `Dockerfile`, pas celle du jour de sa construction.
 C'est pourquoi `apt-get upgrade` reste écarté. Le revers : l'index de `trixie-security`, lu le 18/11, ne porte

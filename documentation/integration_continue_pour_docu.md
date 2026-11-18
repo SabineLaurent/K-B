@@ -443,16 +443,19 @@ Dans cet ordre:
     (l. 10 et 27), dans une PR, sans attendre la PR hebdomadaire de Dependabot. Le digest du jour se lit par
     `docker buildx imagetools inspect python:3.13-slim-trixie` (ligne `Digest:`); le scan de la PR dit si le
     correctif y est.
-3. Un paquet Debian dont le correctif est dans l'archive de sécurité de Debian (`trixie-security`) mais pas encore
-    dans l'image amont: l'installer dans l'étape finale du `Dockerfile`, avant `USER`, à la version corrigée écrite en
-    entier (`apt-get install --yes --no-install-recommends <paquet>=<version>`), avec une issue qui retire le bloc dès
-    que l'étape 2 apporte le correctif. La version corrigée se lit sur la page de l'avis du
+3. Un paquet Debian dont la version corrigée s'installe depuis les sources d'APT de l'image (l'archive de sécurité,
+    `trixie-security`, pour un avis DSA) mais n'est pas encore dans l'image amont: l'installer dans l'étape finale du
+    `Dockerfile`, avant `USER`, à la version corrigée écrite en entier
+    (`apt-get install --yes --no-install-recommends <paquet>=<version>`), avec une issue qui retire le bloc dès que
+    l'étape 2 apporte le correctif. La version corrigée se lit sur la page de l'avis du
     [suivi de sécurité de Debian](https://security-tracker.debian.org/tracker/) (ligne `trixie (security)`). Fait
     pour zlib1g le 2026-11-18 (`Dockerfile:48-54`, retiré par #647).
-4. Sinon, aucune version corrigée n'étant publiée pour l'image: une entrée dans `.grype.yaml`, à la racine du dépôt,
-    le premier fichier de réglages que Grype cherche dans le dossier où il tourne. Chaque entrée est décidée par
-    Sabine (« Une règle non tenue l'est par décision écrite », `.claude/rules/conformite.md`), avec sa raison, sa
-    date et l'issue qui la retire dès que l'étape 2 ou 3 apporte le correctif:
+4. Sinon, aucune des étapes 1 à 3 ne s'appliquant (par exemple un paquet Debian dont le correctif est encore dans
+    `trixie-proposed-updates`, que `apt-get install` ne trouve pas, ou un CPython corrigé que l'image amont n'a pas
+    encore): une entrée dans `.grype.yaml`, à la racine du dépôt, le premier fichier de réglages que Grype cherche
+    dans le dossier où il tourne. Chaque entrée est décidée par Sabine (« Une règle non tenue l'est par décision
+    écrite », `.claude/rules/conformite.md`), avec sa raison, sa date et l'issue qui la retire dès que l'étape 2 ou 3
+    apporte le correctif:
 
 ```yaml
 ignore:
@@ -495,7 +498,11 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
 - **Le scan ne voit pas tout** (#498, lu le 2026-11-14): avec `--only-fixed`, une vulnérabilité sans correctif ne
     le fait pas échouer et n'est pas listée; une vulnérabilité publiée après la dernière exécution d'`Image` sur `main`
     n'est vue qu'à la PR suivante: l'image en ligne, que `deploy.yml` reconstruit au tag (l. 102-117) sans la scanner,
-    peut la porter d'ici là.
+    peut la porter d'ici là. Une bibliothèque compilée dans un module d'une wheel n'est vue ni par apt ni par le scan:
+    grpcio 1.84.0 compile sa propre zlib dans `cygrpc.so`, dans la plage de CVE-2026-85091 (zlib 1.2.11 à 1.3.2),
+    mais sans `gzwrite.c`, où est le code fautif `gz_write`: son `setup.py` compile la liste de
+    `grpc_core_dependencies.py`, qui ne compte que 11 fichiers de zlib, aucun `gz*.c` (l. 1562-1572 au tag v1.84.0,
+    lu le 2026-11-18).
     Pour réduire le risque: Dependabot propose chaque semaine le nouveau digest des images de base du `Dockerfile`
     (`dependabot.yml:10-16`), qui apporte les correctifs de Debian et de CPython, et la CI le scanne (déjà fait). Le
     même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable avec nos droits. Un déclenchement planifié
@@ -554,4 +561,10 @@ qu'elle corrige, [GHSA-q7gw-24fr-5p69](https://github.com/advisories/GHSA-q7gw-2
 (ordre de recherche de `.grype.yaml`, `db.max-allowed-built-age` à 120 h, `check-for-app-update`, règles `ignore` et
 `reason`); Context7 `/anchore/grype` (`--only-fixed`, `--fail-on`); GitHub Docs,
 [« Events that trigger workflows »](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
-(`schedule`: « Scheduled workflows run on the latest commit on the default branch »).
+(`schedule`: « Scheduled workflows run on the latest commit on the default branch »). Le 2026-11-18, pour zlib1g:
+le suivi de sécurité de Debian, [DSA-6613-1](https://security-tracker.debian.org/tracker/DSA-6613-1) et
+[CVE-2026-85091](https://security-tracker.debian.org/tracker/CVE-2026-85091) (versions touchées, version corrigée de
+trixie), l'index `Packages.xz` de `trixie-security` pour amd64 (une seule version de zlib1g), et, pour grpcio, son
+[`setup.py`](https://github.com/grpc/grpc/blob/v1.84.0/setup.py) et
+[`grpc_core_dependencies.py`](https://github.com/grpc/grpc/blob/v1.84.0/src/python/grpcio/grpc_core_dependencies.py)
+au tag v1.84.0.
