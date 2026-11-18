@@ -5,8 +5,8 @@
 Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6.1-sol` dans Microsoft Foundry
 (anciennement Azure AI Foundry), fait à la main dans le portail, hors du code de K-B. Elle dit qui y accède,
 comment il s'installe et se teste, de quoi il dépend, et quelles données il reçoit. L'API IA, qui l'appelle, a sa
-propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `f1eac19c`
-(2026-11-17). Ce qui est hors du code vient de trois relevés: la ressource, ses déploiements et les rôles de
+propre fiche, [la fiche de l'API IA](api_ia_pour_docu.md). Le code cité est celui de `main` au commit `cc3d8eaf`
+(2026-11-18). Ce qui est hors du code vient de trois relevés: la ressource, ses déploiements et les rôles de
 l'opératrice, lus avec `az`, en lecture seule, le 2026-11-18 (« Relire l'état »); le catalogue des modèles et le
 formulaire de déploiement de `gpt-6.1-sol` (son type, sa limite de jetons par minute, la zone de données),
 captures du portail Foundry du 2026-11-17; l'essai de bout en bout du 2026-11-17 (« Le test »). Une lecture plus
@@ -183,7 +183,7 @@ L'API IA ne connaît du service que des réglages; aucune branche du code n'est 
 | `KB_LLM_BASE_URL` | `https://<sous-domaine>.openai.azure.com/openai/v1` | à poser | paramètre `llmBaseUrl` de la passe 2 (`:22-23`, `:299`) |
 | `KB_LLM_MODEL` | `gpt-6.1-sol` | à poser | paramètre `llmModel` de la passe 2 (`:25-26`, `:300`) |
 | `KB_LLM_API_KEY` | la clé de la ressource | à poser | le secret `kb-llm-api-key` (`:181`) |
-| `KB_LLM_REASONING_EFFORT` | `low` | à poser: `.env.example` porte `none` (`:128`), la valeur de `gpt-6-luna` | fixé (`:302`) |
+| `KB_LLM_REASONING_EFFORT` | `low` | à poser: `.env.example` porte `none` (`:128`), la valeur de `gpt-6-luna` | fixé (`:304`) |
 | `KB_LLM_SEND_PROMPT_CACHE_OPTIONS` | non posée: `true` (`core/config.py:266`) | non posée (`.env.example:133`, en commentaire) | non posée |
 
 - `KB_LLM_REASONING_EFFORT=low` fait envoyer `reasoning_effort: "low"` au lieu de `temperature: 0`
@@ -194,7 +194,7 @@ L'API IA ne connaît du service que des réglages; aucune branche du code n'est 
     aucune requête refusée). À `false`, `kb serve-ai` refuse de démarrer en production
     (`ai_api/connectors/llm_settings.py:106-123`).
 - La passe 2, ses paramètres et le secret: `infra/README.md`, « 4. Poser les secrets » et « 5. Seconde passe ». Le
-    passage de la production à `gpt-6.1-sol` demande l'effort `low` en ligne (`infra/main.bicep:302`), et l'adresse
+    passage de la production à `gpt-6.1-sol` demande l'effort `low` en ligne (`infra/main.bicep:304`), et l'adresse
     (`llmBaseUrl`), le nom (`llmModel`) et la clé (`kb-llm-api-key`) de ce déploiement, posés à la main à la passe 2.
 - Le dépôt ne fixe pas la valeur de `KB_LLM_MODEL`: elle vient du `.env` sur le Mac et du paramètre `llmModel` en
     ligne.
@@ -316,7 +316,7 @@ flowchart LR
     script d'enregistrement du jeu de référence, `tests/ai_api/digests_reference.py`, lancé à la main, passe lui
     aussi par l'API IA, dans le même processus.
 - **En ligne, le modèle est appelé depuis le 2026-11-11.** L'app `ca-kb-ai-api` est réglée pour joindre le
-    déploiement que nomment `llmBaseUrl` et `llmModel` (`infra/main.bicep:280-315`): `gpt-6-luna` jusqu'au passage à
+    déploiement que nomment `llmBaseUrl` et `llmModel` (`infra/main.bicep:280-317`): `gpt-6-luna` jusqu'au passage à
     `gpt-6.1-sol` (« Le branchement de K-B »). Le job `caj-kb-digest-watch` (`infra/deployment.json:3`) lance
     `kb digest`, puis `kb trend-report` (`commands/digest_watch_command.py:59-75`), par défaut le lundi et le jeudi à
     10:00 UTC (`infra/main.bicep:31-32`). Lancé à la main le 2026-11-11, il a donné les premiers points de la
@@ -437,8 +437,9 @@ registre (« Envoi des mesures à Grafana Cloud »).
 - **À 300 items, une demande de comptes rendus dépasse son échéance avec `gpt-6.1-sol`**: le 2026-11-17, 4 fiches
     sur 9 en 200 s, les appels faits un par un. L'essai de `gpt-6-luna` du 2026-10-28 portait sur 3 jours: les deux
     ne se comparent pas directement.
-- **Le coût estimé par K-B est aux prix de `gpt-6-luna`** (`core/config.py:293-303`): le prix de `gpt-6.1-sol`
-    n'est pas dans le code.
+- **Le coût estimé par K-B est compté aux prix de `gpt-6.1-sol`** (`core/config.py:293-303`), en contexte court:
+    tout appel y est compté, quel que soit `KB_LLM_MODEL`, et le prix du contexte long n'est pas distingué (journal
+    ADR, 2026-11-18).
 - **`gpt-6-luna` reste déployé.** La production l'appelle jusqu'à son passage à `gpt-6.1-sol`; ensuite, K-B ne
     l'appelle plus, et la clé le permet encore.
 - **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union: « <span lang="en">that or any other
