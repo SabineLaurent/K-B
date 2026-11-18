@@ -192,7 +192,7 @@ L'API IA ne connaît du service que des réglages; aucune branche du code n'est 
     aucune requête refusée). À `false`, `kb serve-ai` refuse de démarrer en production
     (`ai_api/connectors/llm_settings.py:106-123`).
 - La passe 2, ses paramètres et le secret: `infra/README.md`, « 4. Poser les secrets » et « 5. Seconde passe ». Le
-    passage de la production à `gpt-6.1-sol` demande l'effort `low` en ligne (`:302`), et l'adresse
+    passage de la production à `gpt-6.1-sol` demande l'effort `low` en ligne (`infra/main.bicep:302`), et l'adresse
     (`llmBaseUrl`), le nom (`llmModel`) et la clé (`kb-llm-api-key`) de ce déploiement, posés à la main à la passe 2.
 - Le dépôt ne fixe pas la valeur de `KB_LLM_MODEL`: elle vient du `.env` sur le Mac et du paramètre `llmModel` en
     ligne.
