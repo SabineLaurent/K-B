@@ -48,8 +48,8 @@ par un aplat, suivi de son code, de son nom et de son usage.
 | `#FFF1E6` | Pêche pâle | Fond du bandeau CISA KEV |
 | `#8A8F96` | Gris galet | Bordure des champs de saisie |
 
-Sous ces couleurs, un bouton « Filtrer » porte l'anneau de focus, avec sa légende: « Anneau de focus: trait de 3 px en
-#0F5E6B, décalé de 2 px, sur tout élément atteint au clavier ». Un encadré bordé de rouille, sur fond pêche pâle,
+Sous ces couleurs, un bouton « Filtrer » porte l'anneau de focus, avec sa légende: « Anneau de focus: trait de 3 px
+en #0F5E6B, décalé de 2 px, sur tout élément atteint au clavier ». Un encadré bordé de rouille, sur fond pêche pâle,
 signale une couleur. Son titre, en gras et en rouille sombre (`#7C2D12`): « Couleur signalée: #8A8F96 en texte ». Son
 texte, en 14 px et en brun brûlé (`#5B2410`): « 3,26:1 sur blanc, sous le seuil AA de 4,5:1. Réservée aux bordures de
 champs, où le critère 1.4.11 demande 3:1 (atteint). Correction: le texte d'aide et les indications passent en #4A4F57
@@ -159,14 +159,14 @@ De haut en bas, sur le fond blanc papier:
 2. **Le titre**, « Quoi de neuf » (26 px en mobile, 28 en tablette, 30 en desktop), et sous lui « Collecte
    automatique: arXiv, catalogue CISA KEV, alertes GitHub, releases, newsletters. »
 3. **Le formulaire des filtres**, sur une carte blanche bordée:
-   - « Rechercher », un champ de recherche qui contient « langchain », avec à son bout la petite icône ronde qui
-     l'efface, dessinée par le navigateur. En desktop, il porte l'anneau de focus. Le code de la maquette le limite à
-     200 caractères (`maxlength`), ce que l'image ne montre pas;
-   - « Sortes », cinq cases toutes cochées: « Papiers », « Failles », « Alertes », « Releases », « Articles de
-     newsletters »;
-   - « Depuis », quatre boutons radio: « 1 jour » (choisi), « 3 jours », « 7 jours », « Date », puis le champ « Date de
-     début », vide;
-   - le bouton « Filtrer », en blanc sur bleu canard.
+    - « Rechercher », un champ de recherche qui contient « langchain », avec à son bout la petite icône ronde qui
+      l'efface, dessinée par le navigateur. En desktop, il porte l'anneau de focus. Le code de la maquette le limite à
+      200 caractères (`maxlength`), ce que l'image ne montre pas;
+    - « Sortes », cinq cases toutes cochées: « Papiers », « Failles », « Alertes », « Releases », « Articles de
+      newsletters »;
+    - « Depuis », quatre boutons radio: « 1 jour » (choisi), « 3 jours », « 7 jours », « Date », puis le champ « Date de
+      début », vide;
+    - le bouton « Filtrer », en blanc sur bleu canard.
 4. **La ligne des résultats**: « [n] items, du plus récent au plus ancien ».
 5. **Les cartes des items**, sur fond blanc, bordées de gris pierre. Chaque carte commence par une ligne en 14 px: la
    sorte en capitales, encadrée d'un trait noir, la date, les identifiants, et pour la faille la pastille « Exploitée
