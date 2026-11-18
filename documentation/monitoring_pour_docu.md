@@ -8,8 +8,8 @@
 
 Écrit le 2026-11-08 pour #164. Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
 tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq règles d'alerte,
-`observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry depuis
-#162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
+`observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry
+depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
 `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section « Journaux de
 l'application » (#165).
 

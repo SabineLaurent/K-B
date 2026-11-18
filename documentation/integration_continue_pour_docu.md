@@ -1,8 +1,12 @@
 # L'intégration continue de K-B
 
-« Documentation des procédures d'installation et de test de la chaîne. » — C18
+> Documentation des procédures d'installation et de test de la chaîne.
 
-« Documentation utilisateur, pour le déclenchement de la chaîne. » — C18
+— C18
+
+> Documentation utilisateur, pour le déclenchement de la chaîne.
+
+— C18
 
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
@@ -173,10 +177,10 @@ gh pr create --repo SabineLaurent/K-B --base main
 gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin, puis un contrôle par ligne
 ```
 
-Une PR reçoit neuf contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
-depuis #496, qu'elle touche `infra/` ou non, et `build` de `Docs`. Le job `deploy` de `Docs` est sauté sur une PR
-(`docs.yml:37`). Que GitHub le liste parmi les contrôles, comme sauté, n'est pas vérifié: le 2026-11-14, `Docs` ne
-figure pas encore dans la liste des workflows du dépôt (`gh api repos/SabineLaurent/K-B/actions/workflows`).
+Une PR reçoit dix contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
+depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Neuf tournent; `deploy`
+est sauté sur une PR (`docs.yml:37`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
+à `skipping` et les neuf autres à `pass`.
 
 ### Fusionner
 
@@ -365,7 +369,8 @@ echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/ass
 reçu sept contrôles, tous verts (`gh pr checks 533 --repo SabineLaurent/K-B`): `audit` (13 s), `tests` (1 min 21 s),
 `lint` (11 s), `types` (15 s), `tests-postgresql` (1 min 1 s), `tests-data` (30 s), dans l'exécution 42617081839 de
 `CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`; `bicep-build` n'y a pas tourné. Depuis #496,
-toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième.
+toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième, et
+`deploy`, sauté, un dixième.
 
 ### Un push témoin
 
@@ -378,7 +383,7 @@ La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`
 L'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards` (2026-10-31), a eu `audit`
 en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
 (`gh run view 41215069368 --repo SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`,
-puis `pyasn1 0.6.4`, quatre identifiants publics de vulnérabilités (CVE) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
+puis `pyasn1 0.6.4`, quatre CVE (<span lang="en">Common Vulnerabilities and Exposures</span>, l'identifiant public d'une vulnérabilité) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
 
 ## Quand la CI échoue
 
@@ -421,7 +426,7 @@ source le 2026-11-10 (sources en fin de liste).
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
     (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
     Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
-    dépôt), mais « <span lang="en">Pull request authors cannot approve their own pull requests</span> »: avec une seule
+    dépôt), mais <q lang="en">Pull request authors cannot approve their own pull requests</q>: avec une seule
     personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
     Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
 - **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `build` de `Docs` ne sont pas dans le

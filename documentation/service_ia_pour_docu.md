@@ -1,6 +1,8 @@
 # Le service d'IA de K-B: le déploiement du modèle gpt-6.1-sol
 
-« Rédaction de la documentation. » — C8
+> Rédaction de la documentation.
+
+— C8
 
 Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6.1-sol` dans Microsoft Foundry
 (anciennement Azure AI Foundry), fait à la main dans le portail, hors du code de K-B. Elle dit qui y accède,
@@ -43,23 +45,23 @@ La ressource porte deux déploiements (`az cognitiveservices account deployment 
 
 `DataZoneStandard` est le type « Zone de données standard »: le prix est à la consommation (par jeton), et le
 traitement reste dans une zone de données que Microsoft définit. Pour une ressource en France, c'est la zone de
-l'Union européenne; le portail l'a écrit au déploiement de `gpt-6.1-sol`: « Votre déploiement dans francecentral
-traitera les données dans la zone de données EUR » (capture du 2026-11-17). Ce que dit Microsoft Learn (page
+l'Union européenne; le portail l'a écrit au déploiement de `gpt-6.1-sol`: <q>Votre déploiement dans francecentral
+traitera les données dans la zone de données EUR</q> (capture du 2026-11-17). Ce que dit Microsoft Learn (page
 « <span lang="en">Understanding deployment types in Microsoft Foundry Models</span> », `ms.date` 2026-08-06, relue
 le 2026-11-09):
 
-- « <span lang="en">The EU Data Zone follows the Azure EU Data Boundary, which can include European Free Trade Association (EFTA)
-    countries and regions such as Norway and Switzerland in addition to EU member states.</span> » La zone de l'Union
+- <q lang="en">The EU Data Zone follows the Azure EU Data Boundary, which can include European Free Trade Association (EFTA)
+    countries and regions such as Norway and Switzerland in addition to EU member states.</q> La zone de l'Union
     peut donc compter, en plus des États membres, des pays de l'Association européenne de libre-échange (AELE), comme
     la Norvège ou la Suisse.
-- « <span lang="en">Microsoft can add regions to either data zone without prior notice</span> »: la zone peut s'étendre à d'autres
+- <q lang="en">Microsoft can add regions to either data zone without prior notice</q>: la zone peut s'étendre à d'autres
     régions sans préavis.
-- « <span lang="en">Data stored at rest remains in the designated Azure geography</span> »: les données au repos restent dans la
+- <q lang="en">Data stored at rest remains in the designated Azure geography</q>: les données au repos restent dans la
     géographie de la ressource.
 
 La page « <span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> » (`ms.date`
-2026-05-18, relue le 2026-11-09) le dit autrement: « <span lang="en">prompts and responses may be processed in that or any other
-European Union Member Nation</span> ». Les deux pages de Microsoft ne nomment donc pas le même périmètre (« Limites »).
+2026-05-18, relue le 2026-11-09) le dit autrement: <q lang="en">prompts and responses may be processed in that or any other
+European Union Member Nation</q>. Les deux pages de Microsoft ne nomment donc pas le même périmètre (« Limites »).
 
 Le type a été choisi le 2026-10-17, pour `gpt-6-luna`, et gardé pour `gpt-6.1-sol`, pour une règle du projet: le lieu
 du traitement est choisi et écrit, en zone de l'Union quand le fournisseur l'offre (`.claude/rules/conformite.md`,
@@ -72,12 +74,12 @@ Standard, écarté, peut traiter les données dans toute région Azure.
 `gpt-6.1-sol`: le modèle ne change pas sans qu'on le décide, et les mesures de l'essai du 2026-11-17 restent
 comparables. La page « <span lang="en">Foundry Models lifecycle and support policy</span> » (`ms.date` 2026-07-24,
 relue le 2026-11-09) dit ce qui se passe au retrait de la version, de deux façons (« Limites »): sa foire aux
-questions dit que, avec `NoAutoUpgrade`, le déploiement « <span lang="en">stops working at retirement</span> », et son tableau « <span lang="en">Lifecycle
+questions dit que, avec `NoAutoUpgrade`, le déploiement <q lang="en">stops working at retirement</q>, et son tableau « <span lang="en">Lifecycle
 stages</span> » qu'une version retirée rend `410 Gone` à toute requête; sa section « <span lang="en">Automatic upgrades</span> » s'ouvre sur
-« <span lang="en">For Global Standard, Data Zone Standard, and Standard deployment types, Microsoft manages automatic upgrades when
-a model version is retired</span> », sans exception pour `NoAutoUpgrade`. La date de retrait de `gpt-6.1-sol` n'a pas
+<q lang="en">For Global Standard, Data Zone Standard, and Standard deployment types, Microsoft manages automatic upgrades when
+a model version is retired</q>, sans exception pour `NoAutoUpgrade`. La date de retrait de `gpt-6.1-sol` n'a pas
 été lue (« Limites »). Microsoft prévient au moins 60 jours avant, par courriel aux propriétaires de l'abonnement
-qui ont un déploiement actif (« <span lang="en">Sent to subscription owners with active deployments</span> »), et
+qui ont un déploiement actif (<q lang="en">Sent to subscription owners with active deployments</q>), et
 dans Azure Service Health (même page).
 
 ### Le filtre de contenu `DefaultV2`
@@ -107,10 +109,10 @@ le service et sur sa clé y sont. Chaque définition est celle de Microsoft Lear
 
 | Rôle | Portée | Définition de Microsoft | Ce qu'il permet sur le service |
 |---|---|---|---|
-| Owner (Propriétaire) | le groupe de ressources | « <span lang="en">Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.</span> » | tout gérer, attribuer des rôles, lire les clés (action `*`) |
-| Contributor (Contributeur) | le groupe | « <span lang="en">Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC […]</span> » | tout gérer sauf les rôles, déployer un modèle, lire les clés (action `*`) |
-| Foundry User | le groupe | « <span lang="en">Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project.</span> » | lire la ressource, lire les clés (`Microsoft.CognitiveServices/accounts/listkeys/action`), appeler le modèle par Entra ID (actions de données `Microsoft.CognitiveServices/*`) |
-| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | « <span lang="en">Perform any action on the secrets of a key vault, except manage permissions.</span> » | poser et lire le secret `kb-llm-api-key`, la clé du service (« La clé de K-B ») |
+| Owner (Propriétaire) | le groupe de ressources | <q lang="en">Grants full access to manage all resources, including the ability to assign roles in Azure RBAC.</q> | tout gérer, attribuer des rôles, lire les clés (action `*`) |
+| Contributor (Contributeur) | le groupe | <q lang="en">Grants full access to manage all resources, but does not allow you to assign roles in Azure RBAC […]</q> | tout gérer sauf les rôles, déployer un modèle, lire les clés (action `*`) |
+| Foundry User | le groupe | <q lang="en">Grants reader access to Foundry projects, reader access to Foundry accounts, and data actions for an Foundry project.</q> | lire la ressource, lire les clés (`Microsoft.CognitiveServices/accounts/listkeys/action`), appeler le modèle par Entra ID (actions de données `Microsoft.CognitiveServices/*`) |
+| Key Vault Secrets Officer | le groupe, et le coffre de secrets de K-B | <q lang="en">Perform any action on the secrets of a key vault, except manage permissions.</q> | poser et lire le secret `kb-llm-api-key`, la clé du service (« La clé de K-B ») |
 
 L'opératrice a donc plus que le nécessaire pour l'usage courant: appeler le modèle demande la clé ou Foundry User,
 et Owner, Contributor et Foundry User suffisent chacun à lire la clé. D'autres qu'elle peuvent en faire autant: tout
@@ -124,8 +126,8 @@ K-B appelle le modèle par la clé de la ressource, envoyée dans l'en-tête `Au
 (`ai_api/connectors/llm_client.py:214`). L'API IA la lit dans la variable `KB_LLM_API_KEY`
 (`ai_api/connectors/llm_settings.py:38`, `:169`). L'authentification par clé est active sur la ressource
 (`disableLocalAuth` vaut `False`, lecture du 2026-11-18), et l'essai du 2026-11-17 a appelé
-`gpt-6.1-sol` par la clé. Microsoft Learn le rappelle: « <span lang="en">If you use key-based authentication instead,
-the key grants full access without role restrictions</span> » (« <span lang="en">Role-based access control for
+`gpt-6.1-sol` par la clé. Microsoft Learn le rappelle: <q lang="en">If you use key-based authentication instead,
+the key grants full access without role restrictions</q> (« <span lang="en">Role-based access control for
 Microsoft Foundry</span> », `ms.date` 2026-09-16, relue le 2026-11-09). Qui a la clé appelle donc les deux
 déploiements, quels que soient ses rôles.
 
@@ -159,8 +161,8 @@ refaire, sur une ressource Foundry d'une région de l'Union:
 1. Ouvrir le projet dans le portail Foundry, **Catalogue**, puis **Modèles**, et choisir `gpt-6.1-sol`; puis
     **Déployer**.
 2. **Nom du déploiement**: `gpt-6.1-sol`. C'est la valeur de `KB_LLM_MODEL`.
-3. **Type de déploiement**: « Zone de données standard ». Le portail affiche alors « Votre déploiement dans
-    francecentral traitera les données dans la zone de données EUR ».
+3. **Type de déploiement**: « Zone de données standard ». Le portail affiche alors <q>Votre déploiement dans
+    francecentral traitera les données dans la zone de données EUR</q>.
 4. **Paramètres de version du modèle**: version 2026-09-29; **Stratégie de mise à jour des versions de modèle**:
     « Refuser les mises à niveau automatiques des versions de modèle » (`NoAutoUpgrade`).
 5. **Limite de débit des jetons par minute**: 250 000.
@@ -168,8 +170,8 @@ refaire, sur une ressource Foundry d'une région de l'Union:
 
 Le 2026-11-17, le catalogue montre `gpt-6.1-sol` en « Disponibilité générale », et un nouveau déploiement est
 permis. Une fois la version au stade « <span lang="en">Deprecated</span> », 12 mois après sa sortie, ce déploiement ne se
-refera que sur un abonnement qui l'a déjà déployée (« <span lang="en">"Existing customer" is determined at the subscription level
-[…] A new subscription under the same tenant doesn't inherit access.</span> », page « <span lang="en">Foundry Models lifecycle and
+refera que sur un abonnement qui l'a déjà déployée (<q lang="en">"Existing customer" is determined at the subscription level
+[…] A new subscription under the same tenant doesn't inherit access.</q>, page « <span lang="en">Foundry Models lifecycle and
 support policy</span> »).
 
 ### Le branchement de K-B
@@ -227,7 +229,7 @@ az role assignment list --assignee "$(az ad signed-in-user show --query id -o ts
 - **Le 2026-11-17, sur `gpt-6.1-sol`**, par `kb serve-ai` sur le Mac, au commit `f1eac19c`, avec
     `KB_LLM_REASONING_EFFORT=low` et l'export des mesures vers Grafana Cloud dans le bac à sable
     (`KB_DEPLOYMENT_ENVIRONMENT=sandbox`), sans écrire de fiche dans le coffre. Sa ligne de démarrage dit
-    « `LLM provider openai_compatible, model gpt-6.1-sol` » et « `LLM reasoning effort low, prompt_cache_options sent` ».
+    `LLM provider openai_compatible, model gpt-6.1-sol` et `LLM reasoning effort low, prompt_cache_options sent`.
     - Une demande de comptes rendus de veille (`POST /digests`) sur 14 jours, 300 items (le plafond): 200 en 200,0 s,
         l'échéance de la demande. 4 fiches sur 9; les 5 autres sujets en `llm_timeout`, un appel coupé par l'échéance,
         puis quatre jamais appelés. 12 requêtes au modèle, chacune en une tentative: 11 `ok` (`finish_reason: stop`),
@@ -248,7 +250,7 @@ az role assignment list --assignee "$(az ad signed-in-user show --query id -o ts
         ([note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel »);
     - le 2026-11-10, par les deux commandes de [Refaire le test](#refaire-le-test): avec la clé, vers 00:03 UTC, le
         déploiement répond `gpt-6-luna-2026-09-22 stop`; sans clé, il refuse: `HTTP 401`, avec le code `"401"` et le
-        message « <span lang="en">Access denied due to invalid subscription key or wrong API endpoint […]</span> ».
+        message <q lang="en">Access denied due to invalid subscription key or wrong API endpoint […]</q>.
 
 ### Refaire le test
 
@@ -367,8 +369,8 @@ une personne; une adresse mail écrite dans les notes d'une release; un nom écr
 
 ### Ce que Microsoft en garde
 
-- **Le modèle ne garde rien et n'apprend rien**: « <span lang="en">The models are stateless: no prompts or completions are stored
-    in the model. Additionally, prompts and completions are not used to train, retrain, or improve the base models.</span> »
+- **Le modèle ne garde rien et n'apprend rien**: <q lang="en">The models are stateless: no prompts or completions are stored
+    in the model. Additionally, prompts and completions are not used to train, retrain, or improve the base models.</q>
     (« <span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> », relue le 2026-11-09).
 - **Le cache de la consigne est coupé**: à chaque requête, K-B envoie `prompt_cache_options: {"mode": "explicit"}`
     sans point d'arrêt, qui n'écrit aucun cache (`ai_api/connectors/llm_client.py:41`, `:416-417`). Vérifié une fois,
@@ -385,8 +387,8 @@ une personne; une adresse mail écrite dans les notes d'une release; un nom écr
 - **Cette surveillance est modifiable**, sur demande du titulaire de l'abonnement, s'il remplit les critères
     d'accès limité de Microsoft (« <span lang="en">modified abuse monitoring</span> », page « <span lang="en">Foundry Models sold by Azure abuse
     monitoring</span> »). Sur la ressource de K-B, la capacité `ContentLogging`, qui le dirait, n'a pas été relue
-    (« Limites »). Selon Microsoft, « <span lang="en">The value of "false" for the "ContentLogging" attribute appears
-    only if data storage for abuse monitoring is turned off. Otherwise, this property will not appear</span> » (« <span lang="en">Data,
+    (« Limites »). Selon Microsoft, <q lang="en">The value of "false" for the "ContentLogging" attribute appears
+    only if data storage for abuse monitoring is turned off. Otherwise, this property will not appear</q> (« <span lang="en">Data,
     privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span> », section « <span lang="en">How can a customer
     verify if data storage for abuse monitoring is off?</span> »).
 - **Ce qui relève du titulaire de l'abonnement**: s'il active la protection des services d'IA de Microsoft Defender
@@ -404,7 +406,7 @@ registre (« Envoi des mesures à Grafana Cloud »).
     (`ai_api/connectors/metrics_export.py:186-187`).
 - **Dans le bac à sable**, aucun fichier du dépôt ne le pose (`.env.example:173-178`, `.env.e2e_test.example`), et
     `make sandbox-alerts` tourne sur le rejeu, sans le modèle et sans traces (`tests/e2e/test_sandbox_alerts.py`).
-    L'essai du 2026-11-17 l'a gardé à `none` (« `model content none` » au démarrage).
+    L'essai du 2026-11-17 l'a gardé à `none` (`model content none` au démarrage).
 - **À la main**, `KB_TRACE_CONTENT=all` peut être posé pour un essai hors production. Le contenu des appels part
     alors dans Grafana Cloud, qui le garde 14 jours (registre, « Envoi des mesures à Grafana Cloud », « Durée de
     conservation »). Un essai l'a posé le 2026-10-28, avec 10 requêtes à `gpt-6-luna` (note du contenu des appels,
@@ -442,8 +444,8 @@ registre (« Envoi des mesures à Grafana Cloud »).
     ADR, 2026-11-18).
 - **`gpt-6-luna` reste déployé.** La production l'appelle jusqu'à son passage à `gpt-6.1-sol`; ensuite, K-B ne
     l'appelle plus, et la clé le permet encore.
-- **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union: « <span lang="en">that or any other
-    European Union Member Nation</span> » (« <span lang="en">Data, privacy, and security</span> »), ou la limite des données de l'Union, qui peut
+- **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union: <q lang="en">that or any other
+    European Union Member Nation</q> (« <span lang="en">Data, privacy, and security</span> »), ou la limite des données de l'Union, qui peut
     compter des pays de l'AELE (« <span lang="en">Understanding deployment types</span> »).
 - **Deux sections de la même page de Microsoft ne disent pas la même chose du retrait**: avec `NoAutoUpgrade`, le
     déploiement cesse de répondre (foire aux questions), ou il est mis à niveau d'office (« <span lang="en">Automatic upgrades</span> »,
