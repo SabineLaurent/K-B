@@ -7439,6 +7439,42 @@ par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrate
   réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
   restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
 
+### Fiches de veille : les sujets rédigés en parallèle, le délai par appel à l'échéance (#630, #640)
+
+Décisions de Sabine du 2026-11-17 (livrable E2, C7, partie 4.3) et du 2026-11-18, recopiées par la mission de
+time-knight ; plan de la session relu par time-knight, validé par Sabine le 2026-11-18 (« plan validé ; 429 :
+d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le calcul en commentaire »).
+
+- **Les sujets d'une demande de `POST /digests` sont rédigés en parallèle, un fil par sujet, tous à la fois ; le
+  classement reste en série.** **Inverse** l'option écartée le 2026-10-17 (« Fiches de veille : la durée d'une
+  demande », plan de #205 : « le parallèle […] pour un gain sans besoin mesuré »). Ce qui a changé : la mesure. Le
+  2026-11-17, sur 300 items et gpt-6.1-sol, la demande a atteint son échéance de 200 s avec 4 fiches sur 9, les
+  rédactions prenant 23,4 à 30,7 s chacune l'une après l'autre (#630). Pourquoi (Sabine) : plus simple et plus adapté
+  que le passage en asynchrone, qui ne viendra que si la parallélisation ne suffit pas (YAGNI). Les deux objections
+  du 17/10 tombent : le `replay` reste en série, donc tel quel (ses réponses suivent l'ordre des requêtes), et le
+  quota de gpt-6.1-sol, 250 000 jetons par minute, tient les 9 rédactions à la fois (environ 150 000 jetons
+  estimés). Le client d'httpx2 est partagé (pool sûr entre fils, doc d'httpx2 lue par Context7 le 2026-11-18) ;
+  chaque fil reçoit une copie du contexte, pour que son span reste sous la demande. Les fiches et les lignes de
+  métriques gardent l'ordre de la liste. Options écartées par la session : borner le nombre de fils (environ 60 s de
+  plus en trois vagues, pour peu de protection contre un 429) ; un `replay` apparié au sujet (du code et un
+  réenregistrement du jeu de référence, pour un replay que rien n'oblige à paralléliser). Limite assumée : le
+  `replay` ne passe pas par les fils ; seuls les tests du fournisseur simulé les exercent. — PR de #630
+- **Après un 429, « plus aucun envoi » ne vaut plus que pour un sujet pas encore parti.** Révise la règle du
+  2026-10-17 (#205, minimisation, RGPD art. 5.1.c) : en parallèle, les items de tous les sujets partent à la fois,
+  avant qu'un 429 puisse être connu. Accepté par Sabine le 2026-11-18, sur la recommandation de la session et de
+  time-knight : les 9 rédactions tiennent sous le quota, et borner les fils coûterait environ 60 s pour peu de
+  protection. La règle reste entière en série (le `replay`). — PR de #630
+- **Le délai de lecture d'une réponse du modèle passe de 90 à 200 s (`LLM_CALL_TIMEOUT_SECONDS`), l'échéance
+  d'une demande.** **Révise** « Appel du modèle : délai de lecture à 90 s » (2026-10-17). Ce qui a changé : le
+  modèle. Au débit mesuré sur gpt-6.1-sol le 2026-11-17 (environ 20 ms par jeton, contre 7,35 sur gpt-6-luna), une
+  sortie de 8 192 jetons prend environ 164 s, 229 s avec la marge de 40 % de #158. Valeur choisie par Sabine ; le
+  pourquoi de 200 plutôt que 229 n'a pas été dit, déduction de la session à confirmer par Sabine : l'échéance ramène
+  déjà chaque délai au temps restant (`Deadline.cap`), si bien qu'un délai au-delà de 200 s ne change rien. Ce que
+  cela change : l'échéance est la seule borne d'un appel, et un appel bloqué n'est plus relancé, un classement
+  compris, qui part en premier et emporte alors la demande (504 `llm_timeout`). Options écartées par la session :
+  170 s (4 % de marge) ; un délai par étape (aucun besoin écrit). Un test garde le calcul (la plus longue sortie au
+  débit mesuré tient dans le délai) et l'égalité avec l'échéance. — PR de #640
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

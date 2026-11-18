@@ -78,7 +78,7 @@ MARKUP = re.compile(
 # The longest output the bounds allow, an estimate: 12 claims of a text of 400 characters, 5
 # items and 10 facts of 120 characters, about 24,500 characters in compact JSON, so 8,192 tokens
 # at 3 characters per token (assumed; the note of #158 estimates 6,000 to 7,000). Read within
-# LLM_CALL_TIMEOUT_SECONDS at the rate measured by #158, with 40 % of margin
+# LLM_CALL_TIMEOUT_SECONDS at the rate measured on gpt-6.1-sol on 2026-11-17, about 164 s
 # (tests/ai_api/test_llm_client.py). Beyond, llm_truncated: the subject fails closed.
 WRITING_MAX_COMPLETION_TOKENS = 8192
 

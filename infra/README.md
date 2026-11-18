@@ -1212,7 +1212,7 @@ premier compte rendu d'un sujet sans fiche lit 3 jours (`KB_DIGEST_WINDOW_DAYS`,
   du jeudi (qui part du lundi 10:00) ; celle du jeudi, collectée le vendredi, avant celle du lundi.
 
 Pour réduire le risque :
-- La lecture par date d'arrivée dans K-B, prévue après l'oral blanc (décision de Sabine du 11/11). #565 a couvert le
+- La lecture par date d'arrivée dans K-B, prévue plus tard (décision de Sabine du 11/11). #565 a couvert le
   passage d'un compte rendu au suivant, le trou du jeudi 10:00 au vendredi 10:00 UTC.
 - Les items absents d'un compte rendu ne sont pas perdus pour K-B : ils restent 3 ans dans la base
   ([registre](../docs/registre-traitements.md), fiche 1, « Durée de conservation ») et se lisent par l'API de données
@@ -1588,7 +1588,7 @@ Puis, dans l'ordre :
   2026-11-11.**
   Pour réduire le risque : une lecture du site à chaque Deploy, avec le `curl` à l'en-tête forgé, est une issue à
   ouvrir après #571 (faisable, du workflow seulement) ; vérifier dans le site le jeton signé par Entra au lieu de
-  l'en-tête d'identité, ce qui ne se forge pas sans la clé d'Entra (issue à ouvrir après l'oral blanc, demandée par
+  l'en-tête d'identité, ce qui ne se forge pas sans la clé d'Entra (issue à ouvrir plus tard, demandée par
   Sabine ; une dépendance de plus, sur son accord) ; un environnement à part pour le site couperait le réseau commun
   (faisable avec nos droits, non retenu pour le 13/11).
 - **Des droits posés avant leur code** (consigne de time-knight du 2026-11-11, pour éviter une seconde passe). Depuis

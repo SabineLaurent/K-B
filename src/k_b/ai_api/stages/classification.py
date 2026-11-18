@@ -64,7 +64,7 @@ CLASSIFICATION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "only.",
 }
 # 50 answers of about 10 tokens each, with a wide margin; under the read timeout at the rate
-# measured by #158 (tests/ai_api/test_llm_client.py).
+# measured on gpt-6.1-sol (tests/ai_api/test_llm_client.py).
 CLASSIFICATION_MAX_COMPLETION_TOKENS = 2048
 # The long text of an item, the one cut for the classification; an advisory has none, and is
 # sorted by its title.
