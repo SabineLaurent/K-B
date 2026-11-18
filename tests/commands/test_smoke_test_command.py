@@ -29,6 +29,7 @@ from k_b.exchange.storage import (
     open_container_client,
 )
 from k_b.jobs.api_health import build_health_client
+from k_b.jobs.api_probes import build_probe_client
 
 TEST_DATA_API_HOST = "ca-kb-data-api.internal.test.example"
 TEST_AI_API_HOST = "ca-kb-ai-api.internal.test.example"
@@ -99,12 +100,25 @@ def simulate(monkeypatch, handle_api=None, handle_storage=None):
         api_requests.append(request)
         return (handle_api or answer_as_the_apis())(request)
 
+    def handle_health(request):
+        assert (request.method, request.url.path) == ("GET", "/health")
+        return keep_and_handle(request)
+
+    def handle_probe(request):
+        assert (request.method, request.url.path) != ("GET", "/health")
+        return keep_and_handle(request)
+
     identity = FakeTransport(answer_token)
     storage = FakeTransport(handle_storage or answer_listing(SPOTTED_BLOB_NAME))
     monkeypatch.setattr(
         smoke_test_command,
         "build_health_client",
-        partial(build_health_client, transport=httpx2.MockTransport(keep_and_handle)),
+        partial(build_health_client, transport=httpx2.MockTransport(handle_health)),
+    )
+    monkeypatch.setattr(
+        smoke_test_command,
+        "build_probe_client",
+        partial(build_probe_client, transport=httpx2.MockTransport(handle_probe)),
     )
     monkeypatch.setattr(
         smoke_test_command,

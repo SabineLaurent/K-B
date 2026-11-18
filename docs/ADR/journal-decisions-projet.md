@@ -7418,7 +7418,16 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
 - **Le corps d'une réponse à une sonde n'est jamais lu, et l'échec d'une sonde est un état nommé :
   `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`, jamais l'URL.** Pourquoi :
   seul le statut prouve le refus ; un corps non lu n'a rien à valider ni à citer au journal (règle 3 de
-  `conventions.md`). Le client et ses délais sont ceux du `/health` (`build_health_client`). — PR de #499
+  `conventions.md`). — PR de #499
+- **Les sondes ont leur client, aux délais d'une API éveillée : connexion 5 s, lecture 10 s, et non les 60 s de
+  lecture du `/health`, qui couvrent le réveil d'une API à 0 réplique (`PROBE_*`, `core/config.py`).** Pourquoi
+  (revue de code, tranché par time-knight) : avec les délais du `/health`, six sondes de 65 s portaient le pire cas
+  du job à environ 966 s, au-delà de son `replicaTimeout` de 900 s, et la réplique aurait été coupée avant son
+  résumé ; avec 15 s par sonde, environ 666 s (`infra/modules/smoke-test-job.bicep`). Une sonde suit le `/health`
+  de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra, aucune avant #630) ; sauter
+  les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et une sonde dit autre chose
+  que `/health`). Limite assumée : comme pour `/health` (#436), une réponse dont les en-têtes arrivent octet par
+  octet, chacun sous le délai de lecture, n'est pas coupée. — PR de #499
 - **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
   (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
   `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :

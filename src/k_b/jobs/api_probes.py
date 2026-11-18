@@ -6,6 +6,13 @@ from typing import Literal, NamedTuple
 import httpx2
 
 from k_b.core.api_health import HEALTH_PATH
+from k_b.core.config import (
+    PROBE_CONNECT_TIMEOUT_SECONDS,
+    PROBE_POOL_TIMEOUT_SECONDS,
+    PROBE_READ_TIMEOUT_SECONDS,
+    PROBE_WRITE_TIMEOUT_SECONDS,
+)
+from k_b.core.outbound import open_http_client
 
 # FastAPI's path of Swagger UI, served by both APIs in the sandbox only (read_openapi_url).
 DOCS_PATH = "/docs"
@@ -47,6 +54,23 @@ class ProbeError(Exception):
         super().__init__(", ".join((state, *status)))
         self.state: ProbeState = state
         self.http_status = http_status
+
+
+def build_probe_client(
+    base_url: str, transport: httpx2.BaseTransport | None = None
+) -> httpx2.Client:
+    """A client of the API at base_url, without a key, whose waits are those of an API awake."""
+    return open_http_client(
+        base_url,
+        {},
+        httpx2.Timeout(
+            connect=PROBE_CONNECT_TIMEOUT_SECONDS,
+            read=PROBE_READ_TIMEOUT_SECONDS,
+            write=PROBE_WRITE_TIMEOUT_SECONDS,
+            pool=PROBE_POOL_TIMEOUT_SECONDS,
+        ),
+        transport,
+    )
 
 
 def list_probes(route_with_key: Route, is_sandbox: bool) -> tuple[Probe, ...]:

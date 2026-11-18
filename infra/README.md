@@ -342,9 +342,10 @@ az monitor log-analytics query -w "$WS" -o tsv \
   --query "[].[TimeGenerated, Log]"
 ```
 
-Attendu : `smoke test finished in … s: 9 of 9 checks passed`. Les API n'écrivent pas un `/health` réussi, seulement
-un échec : avec `ContainerAppName` à la place de `JobName`, aucune ligne `status=400 route=/health` ne doit
-apparaître. Les sondes sans clé (#499) y laissent chacune sa ligne : `method='GET' route=/items status=401` pour
+Attendu : `smoke test finished in … s: 9 of 9 checks passed`. Les API n'écrivent pas un `GET /health` réussi,
+seulement un échec : avec `ContainerAppName` à la place de `JobName`, aucune ligne `method='GET' route=/health` ne
+doit apparaître (un `status=400`, par exemple, est un hôte refusé). Les sondes sans clé (#499) y laissent chacune sa
+ligne, attendue : `method='GET' route=/items status=401` pour
 l'API de données, `method='POST' route=/digests status=401` pour l'API IA, et pour les deux
 `method='GET' route=/docs status=404` et `method='HEAD' route=/health status=405`, toutes avec `client=-` (lignes
 relevées le 2026-11-18 sur l'API de données construite hors `sandbox`). Le démarrage, le tirage de l'image et le réveil d'une app à 0 réplique sont dans

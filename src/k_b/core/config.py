@@ -678,6 +678,13 @@ HEALTH_REQUEST_DEADLINE_SECONDS = (
 )
 # The body of GET /health is {"status":"ok"}, 15 bytes: beyond 1 KiB, it is not the answer of K-B.
 MAX_HEALTH_ANSWER_BYTES = 1024
+# A probe without key from a job (jobs/api_probes.py), after the /health of its API: the API is awake,
+# and refuses before any work (401, 404, 405), so the read waits 10 s, not the 60 s of a wake. Six
+# probes at most 15 s each keep the job within its replicaTimeout (infra/modules/smoke-test-job.bicep).
+PROBE_CONNECT_TIMEOUT_SECONDS = 5
+PROBE_POOL_TIMEOUT_SECONDS = 5
+PROBE_WRITE_TIMEOUT_SECONDS = 10
+PROBE_READ_TIMEOUT_SECONDS = 10
 # The waits of a request to the exchange storage or to the identity endpoint: those the SDK of the
 # storage sets only when it builds its transport (CONNECTION_TIMEOUT and READ_TIMEOUT,
 # azure/storage/blob/_shared/constants.py, azure-storage-blob 12.31.1); the transport of K-B would

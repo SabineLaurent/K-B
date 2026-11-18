@@ -39,6 +39,7 @@ from k_b.jobs.api_probes import (
     DATA_API_ROUTE_WITH_KEY,
     Probe,
     ProbeError,
+    build_probe_client,
     list_probes,
     send_probe,
 )
@@ -155,7 +156,7 @@ def check_api(name: str, base_url: str) -> CheckResult:
 
 def probe_api(name: str, base_url: str, probes: Sequence[Probe]) -> list[CheckResult]:
     """Each probe without key of the API at base_url, a failed one not stopping the others."""
-    with build_health_client(base_url) as http_client:
+    with build_probe_client(base_url) as http_client:
         return [check_probe(name, http_client, probe) for probe in probes]
 
 

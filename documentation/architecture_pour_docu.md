@@ -438,8 +438,8 @@ flowchart TB
     githubApi -->|"fiches et README"| aiApi
     aiApi <-->|"chat/completions"| model
     smokeContainer -->|"liste, Blob Data Reader"| smokeJob
-    smokeJob -->|"GET /health"| dataApi
-    smokeJob -->|"GET /health"| aiApi
+    smokeJob -->|"GET /health<br>sondes sans clé"| dataApi
+    smokeJob -->|"GET /health<br>sondes sans clé"| aiApi
     mac -.->|"make upload-library<br>prévu #542"| choice
     sources -->|"collecte"| dailyJob
     choice -->|"clips, Blob Data Reader<br>copie de Zotero: #425"| dailyJob
