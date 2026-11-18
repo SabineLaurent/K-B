@@ -1202,8 +1202,26 @@ def test_the_choice_writes_one_metric_line_without_a_repository(
         for scope in resource.scope_metrics
         for metric in scope.metrics
         for point in metric.data.data_points
+        if metric.name != "k_b.request.duration"
     }
     assert stages == {"select"}
+
+
+def test_a_request_measures_its_whole_duration_by_its_route(make_ai_api, metric_reader):
+    client = make_ai_api(simulate([day(offset) for offset in range(6)]))
+
+    post_trend_reports(client)
+
+    [request_duration] = [
+        metric
+        for resource in metric_reader.get_metrics_data().resource_metrics
+        for scope in resource.scope_metrics
+        for metric in scope.metrics
+        if metric.name == "k_b.request.duration"
+    ]
+    [point] = request_duration.data.data_points
+    assert dict(point.attributes) == {"http.route": "/trend-reports"}
+    assert point.count == 1
 
 
 def test_the_choice_is_a_span_of_counts_and_refs(make_ai_api, recorded_traces):
@@ -1615,6 +1633,7 @@ def test_each_writing_writes_one_metric_line_without_a_repository(
         for scope in resource.scope_metrics
         for metric in scope.metrics
         for point in metric.data.data_points
+        if metric.name != "k_b.request.duration"
     }
     assert stages == {"select", "write_trends"}
 

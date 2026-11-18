@@ -7325,6 +7325,47 @@ testé sur la branche du banc du 16/11.
   et l'admet donc lui aussi avec une barre oblique. Options écartées : non consignées par la session du banc.
   — PR de #627
 
+## 2026-11-18
+
+### Monitorage et production : K-B passe à gpt-6.1-sol (#631 à #635)
+
+Seuils décidés par Sabine dans la nuit du 18/11, recopiés par la mission de time-knight ; plan de la session validé
+par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrateur »).
+
+- **Le budget Azure `budget-kb` passe de 30 à 40 € par mois, pour tout K-B : hébergement et inférence.** Revient
+  sur les 30 € de #437, qui ne voyaient pas le modèle : sa ressource n'avait pas l'étiquette `project=k-b`. Pourquoi
+  (Sabine) : 40 € est le budget visé du benchmark de C7. Le filtre `project=k-b` et les trois seuils (50 % et
+  100 % du réel, 100 % de la prévision) restent. Limite assumée : `sabl-certif-resource`, dans le même groupe de
+  ressources, n'entre dans le budget qu'une fois étiquetée, un geste de Sabine après la fusion. — PR de #632
+- **L'alerte `KbModelCostOverBudget` passe de plus de 1 USD à plus de 2 USD sur 7 jours.** Revient sur le budget du
+  2026-11-08 (1 USD, `documentation/monitoring_pour_docu.md`), fixé pour gpt-6-luna. Pourquoi (Sabine) : 2 USD est
+  au-dessus du maximum normal de gpt-6.1-sol, 1,55 USD par semaine : l'alerte signale une dépense anormale.
+  — PR de #632
+- **Le coût estimé est compté aux prix de gpt-6.1-sol : 2,40 USD en entrée et 12,00 USD en sortie par million de
+  jetons (Data Zone Standard, France Central, contexte court).** Relus le 2026-11-18 dans l'API Azure Retail Prices
+  (`core/config.py`, `docs/fiches-veille.md`, « Sources »). Revient sur les prix de gpt-6-luna du 2026-10-21. Limite
+  assumée, inchangée : tout appel est compté à ces prix, quel que soit `KB_LLM_MODEL`, et le contexte long
+  (4,80 et 18,00 USD) n'est pas distingué. — PR de #631
+- **Une alerte `KbModelCallFailures` : la part des appels en échec après leur nouvelle tentative, sur 24 h, au-dessus
+  de 0 %.** Un échec est un délai dépassé, un service indisponible, un 429 ou le filtre de contenu (`k_b_outcome`,
+  aux mêmes valeurs que `error.type`). Seuil : recommandation de la session et de time-knight, choisie par Sabine
+  le 2026-11-18. Pourquoi : un appel en échec est un sujet ou un compte rendu qui manque. Limite assumée : jusqu'à
+  #630, l'alerte se déclenchera à chaque fiche de veille (le 2026-11-17, 5 sujets sur 9 étaient en
+  `llm_timeout`), et c'est un vrai signal. — PR de #633
+- **Une mesure nouvelle, `k_b.request.duration`, de chaque demande de compte rendu entière (`POST /digests` et
+  `POST /trend-reports`), et une alerte `KbRequestOverDuration` : la part des demandes de plus de 180 s, sur 24 h,
+  au-dessus de 0 %.** Pourquoi (Sabine) : 180 s, c'est sous l'échéance de 200 s d'une demande, que `POST /digests`
+  a atteinte le 2026-11-17 avec gpt-6.1-sol. « Compte rendu » couvre les deux routes, le vocabulaire de Sabine
+  (interprétation de la session, acceptée par time-knight). L'attribut de la route est `http.route`, comme sur les
+  spans racines. La part se lit par le nombre de demandes moins celles du palier de 180 s. Option écartée par la
+  session : `histogram_quantile(1, …) > 180`, qui groupe par `le` et lit une borne de palier, pas une durée. Limite
+  assumée : la forme de `le` dans Grafana Cloud (`180` ou `180.0`) n'est pas encore relevée, et l'expression lit les
+  deux ; aucun scénario du bac à sable ne déclenche ces deux alertes. — PR de #634
+- **En production, l'effort de raisonnement passe de `none` à `low` (`infra/main.bicep`), dans la même passe que
+  le modèle gpt-6.1-sol, jamais l'un sans l'autre.** Pourquoi : gpt-6.1-sol refuse `none` (« Appel du modèle : les
+  réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
+  restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

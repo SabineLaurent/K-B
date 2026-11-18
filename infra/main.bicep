@@ -298,8 +298,10 @@ module aiApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
       KB_LLM_PROVIDER: 'openai_compatible'
       KB_LLM_BASE_URL: llmBaseUrl
       KB_LLM_MODEL: llmModel
-      // Required by gpt-6-luna: without it, each call answers 400 (docs/fiches-veille.md).
-      KB_LLM_REASONING_EFFORT: 'none'
+      // The lowest effort of gpt-6.1-sol, the model of production since the bench of C7: it refuses
+      // none (src/k_b/core/config.py). Deployed with llmModel naming gpt-6.1-sol, never one without
+      // the other: gpt-6-luna was set with none (docs/fiches-veille.md, "Réglages d'appel").
+      KB_LLM_REASONING_EFFORT: 'low'
       KB_DATA_API_URL: 'https://${dataApiHost}'
       KB_OTLP_ENDPOINT: otlpEndpoint
     }

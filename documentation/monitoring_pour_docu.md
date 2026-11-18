@@ -7,7 +7,7 @@
 « La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du monitorage de l'application. » — C20
 
 Écrit le 2026-11-08 pour #164. Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
-tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les trois règles d'alerte,
+tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq règles d'alerte,
 `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry depuis
 #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
 `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section « Journaux de
@@ -15,19 +15,23 @@ l'application » (#165).
 
 ## Ce que le monitorage suit
 
-L'API IA mesure chaque appel au modèle: 14 instruments OpenTelemetry, dans
+L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 15 instruments OpenTelemetry, dans
 `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 20 noms de séries, relevés dans
 Explore le 2026-11-08, par exemple `k_b_llm_calls_total` (les appels), `k_b_llm_cost_total` (le coût estimé),
 `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total` (la fidélité). Chaque série porte son
-environnement, `deployment_environment_name`: `production` pour l'API en ligne, `sandbox` pour le bac à sable.
+environnement, `deployment_environment_name`: `production` pour l'API en ligne, `sandbox` pour le bac à sable. Les trois
+noms de la durée d'une demande, `k_b_request_duration_seconds_*` (#634, 2026-11-18), ne sont pas encore relevés dans
+Grafana.
 
-Trois mesures ont une alerte:
+Cinq alertes:
 
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source du seuil |
 |---|---|---|---|---|
 | `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | grille de Sabine du 2026-10-15: « 100 % de schémas valides après une nouvelle tentative » (`docs/ADR/journal-decisions-projet.md`) |
 | `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | même grille: « au moins 95 % de fidélité »; provisoire jusqu'au benchmark des modèles et à l'optimisation de la consigne (Sabine, 2026-11-08) |
-| `KbModelCostOverBudget` | le coût estimé des appels, aux prix de `src/k_b/core/config.py` | 7 jours | au-dessus de 1 USD | budget choisi par Sabine le 2026-11-08, à revoir avec le relevé des coûts de #411 |
+| `KbModelCostOverBudget` | le coût estimé des appels, aux prix de gpt-6.1-sol de `src/k_b/core/config.py` | 7 jours | au-dessus de 2 USD | seuil de Sabine du 2026-11-18 pour gpt-6.1-sol: au-dessus de son maximum normal, 1,55 USD par semaine, l'alerte signale une dépense anormale (`docs/ADR/journal-decisions-projet.md`) |
+| `KbModelCallFailures` | la part des appels en échec après leur nouvelle tentative: délai dépassé (`llm_timeout`), service indisponible (`llm_unavailable`), trop de requêtes (`llm_rate_limited`), filtre de contenu (`llm_content_filtered`) | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: un appel en échec est un sujet ou un compte rendu qui manque |
+| `KbRequestOverDuration` | la part des demandes de compte rendu (`POST /digests`, `POST /trend-reports`) de plus de 180 s, de leur arrivée à leur réponse | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: 180 s, sous l'échéance de 200 s d'une demande (le 2026-11-17, `POST /digests` sur gpt-6.1-sol l'a atteinte) |
 
 Les fenêtres sont longues: les fiches ne sortent que deux fois par semaine. Sans appel au modèle sur la fenêtre, il
 n'y a pas de série, et l'alerte reste normale. De même pour la fidélité sans fait vérifié: elle n'est pas calculée
@@ -58,7 +62,7 @@ Le tableau s'appelle « K-B, modèle: qualité, coût, alertes », dans le dossi
 Aucune information n'y passe par la seule couleur: les valeurs sont écrites sans couleur, un état est un texte, un
 seuil est une ligne nommée (tenu par `tests/test_grafana_files.py`). Les valeurs de chaque panneau se lisent aussi
 en tableau: menu du panneau, **Inspect**, **Data**. Un panneau sans appel sur sa fenêtre affiche « Aucun appel sur
-la période ».
+la période », et celui des demandes de plus de 180 s, « Aucune demande sur la période ».
 
 Une alerte déclenchée arrive par e-mail. L'état y est écrit (« Firing »), avec le nom de l'alerte, son environnement,
 sa valeur et son seuil.
@@ -81,7 +85,7 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
      d'enregistrement).
    - **Import**, puis confirmer. Les règles arrivent dans le groupe `k-b-model`, évalué toutes les 5 minutes.
 3. **L'état en cas d'erreur**: l'import règle « Alert state if execution error or timeout » sur « OK », et une
-   requête en échec laisserait l'alerte au repos. Pour chacune des trois règles: **Edit**, section **Configure no
+   requête en échec laisserait l'alerte au repos. Pour chacune des cinq règles: **Edit**, section **Configure no
    data and error handling**, **Alert state if execution error or timeout** sur **Error**, puis **Save rule**. Une
    requête en échec déclenche alors une alerte à part, `DatasourceError`. Le fichier des règles ne porte pas ce
    réglage: il est à refaire après chaque import des règles. Une règle enregistrée repart sans instance jusqu'à son
@@ -124,9 +128,11 @@ Environ 2 min 15. Quatre scénarios, un processus de l'API IA chacun, comme apr�
 | fiches valides | 3 demandes à 65 s d'écart, 12 appels |
 | sortie invalide | 1 classement refusé deux fois: `llm_invalid_output` |
 | fidélité basse | 3 faits trouvés sur 7 |
-| coût au-dessus du budget | au classement, les jetons d'entrée qui coûtent 1,1 fois le budget de l'alerte, sous le plafond de 10 millions qu'une réponse peut déclarer: 9 166 667 jetons, 1,10084 USD |
+| coût au-dessus du budget | au classement, les jetons d'entrée qui coûtent 1,1 fois le budget de l'alerte, sous le plafond de 10 millions qu'une réponse peut déclarer: 916 667 jetons aux prix de gpt-6.1-sol, 2,20 USD pour le classement seul (calculé, pas relevé) |
 
-Chaque test échoue si un envoi échoue. Sans adresse ni en-tête, il est sauté.
+Chaque test échoue si un envoi échoue. Sans adresse ni en-tête, il est sauté. Les deux alertes du 2026-11-18,
+`KbModelCallFailures` et `KbRequestOverDuration`, n'ont pas de scénario: la seconde demanderait une demande de plus
+de 180 s.
 
 ## Relevé des alertes du bac à sable
 
@@ -137,7 +143,7 @@ de coût envoyait alors 10 millions de jetons, soit 1,20084 USD.
 |---|---|---|---|---|
 | `KbModelInvalidOutputs` | > 0 % | 4,8 % (1 appel sur 21) | oui, 19:15:20 UTC | oui, 19:27 UTC |
 | `KbModelLowFidelity` | < 95 % | 73,3 % (11 faits sur 15) | oui, 19:15:20 UTC | oui, 19:27 UTC |
-| `KbModelCostOverBudget` | > 1 USD | 1,2641 USD | oui, 19:15:20 UTC | oui, 19:27 UTC |
+| `KbModelCostOverBudget` | > 1 USD (seuil d'alors) | 1,2641 USD | oui, 19:15:20 UTC | oui, 19:27 UTC |
 
 Le coût observé dépasse les 1,20516 USD du bac à sable: le reste vient de mesures `sandbox` plus anciennes de la
 fenêtre de 7 jours (essais locaux du 2 au 6 novembre). L'e-mail de test du point de contact est arrivé à 19:25:12 UTC.
@@ -196,7 +202,7 @@ Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.
 |---|---|---|---|---|
 | journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
 | journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
-| journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-87`, `src/k_b/ai_api/app.py:96` |
+| journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-93`, `src/k_b/ai_api/app.py:96` |
 | ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
 | résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
 
@@ -213,7 +219,7 @@ partir d'un niveau plus haut, car en dessous elles citent ce que `kb` ne journal
 du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un clip); `psycopg`
 et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:31-55`, `:96-97`). uvicorn écrit par les mêmes
 sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
-`src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:107-108`).
+`src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:113-114`).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
 statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans

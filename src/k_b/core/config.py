@@ -290,17 +290,17 @@ MAX_TOKENS_READ_PER_ANSWER = 10_000_000
 # bytes per token doubled by the escaping of a JSON output inside the JSON of the completion,
 # assumed, not measured; the margin covers the annotations of the content filter of Azure.
 MAX_LLM_ANSWER_BYTES = 1_000_000
-# The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
-# de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
-# line: Data Zone Standard, France Central, short context, effective from 2026-09-01. Read on
-# 2026-10-21 in the Azure Retail Prices API (https://prices.azure.com/api/retail/prices,
-# armRegionName francecentral, meters "6-luna ShortCo Inp Std DZ 1M Tokens" and "6-luna ShortCo
-# Opt Std DZ 1M Tokens"), described by the page "Azure Retail Prices overview" of Microsoft Learn
-# (https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices,
-# the address a web search of the same day gave).
+# The prices of gpt-6.1-sol, the model of production since the bench of C7 (thresholds of Sabine of
+# 2026-11-18, docs/ADR/journal-decisions-projet.md), in USD per million tokens, for cost_estimated
+# of each metric line: Data Zone Standard, France Central, short context, effective from
+# 2026-10-01. Read on 2026-11-18 in the Azure Retail Prices API
+# (https://prices.azure.com/api/retail/prices, api-version 2023-01-01-preview, armRegionName
+# francecentral, meters "6.1-sol ShortCo Inp Std DZ 1M Tokens" and "6.1-sol ShortCo Opt Std DZ 1M
+# Tokens"), described by the page "Azure Retail Prices overview" of Microsoft Learn
+# (https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices).
 # Every call is counted at these prices, the replay and another KB_LLM_MODEL included.
-LLM_INPUT_USD_PER_MILLION_TOKENS = 0.12
-LLM_OUTPUT_USD_PER_MILLION_TOKENS = 0.60
+LLM_INPUT_USD_PER_MILLION_TOKENS = 2.40
+LLM_OUTPUT_USD_PER_MILLION_TOKENS = 12.00
 
 # The local defaults of kb serve-ai, each changed by its variable (ai_api/settings.py;
 # .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve-data.

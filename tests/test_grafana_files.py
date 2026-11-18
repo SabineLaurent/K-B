@@ -49,6 +49,13 @@ NAMES_SEEN_IN_GRAFANA = {
     "k_b_llm_check_duration_seconds_sum",
     "k_b_llm_cost_total",
 }
+# The names of the measures added since, as the rules of Grafana Cloud above give them: not seen in
+# Grafana yet (#634, 2026-11-18).
+NAMES_NOT_SEEN_IN_GRAFANA_YET = {
+    "k_b_request_duration_seconds_bucket",
+    "k_b_request_duration_seconds_count",
+    "k_b_request_duration_seconds_sum",
+}
 STRING_LITERAL = re.compile(r'"(?:[^"\\]|\\.)*"')
 RANGE = re.compile(r"\[[^\]]*\]")
 MATCHER_LABEL = re.compile(r"([A-Za-z_]\w*)\s*(?:=~|!~|!=|=)")
@@ -195,7 +202,7 @@ def read_measure_names(expression):
 
 
 def test_the_names_k_b_gives_its_measures_are_those_grafana_cloud_showed():
-    assert read_emitted_names() == NAMES_SEEN_IN_GRAFANA
+    assert read_emitted_names() == NAMES_SEEN_IN_GRAFANA | NAMES_NOT_SEEN_IN_GRAFANA_YET
 
 
 def test_each_expression_reads_only_measures_k_b_emits():
@@ -413,9 +420,11 @@ def test_no_text_has_a_space_before_a_colon_or_a_semicolon():
     assert [text for text in texts if SPACE_BEFORE_PUNCTUATION.search(text)] == []
 
 
-def test_the_three_alerts_of_the_criterion_are_there():
+def test_the_alerts_of_the_criterion_and_of_gpt_6_1_sol_are_there():
     assert set(read_alert_thresholds()) == {
         "KbModelInvalidOutputs",
         "KbModelLowFidelity",
         "KbModelCostOverBudget",
+        "KbModelCallFailures",
+        "KbRequestOverDuration",
     }

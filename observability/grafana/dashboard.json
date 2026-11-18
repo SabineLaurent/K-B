@@ -330,7 +330,7 @@
       "id": 5,
       "type": "stat",
       "title": "Coût estimé sur 7 jours",
-      "description": "Coût estimé des appels au modèle, aux prix de core/config.py. Budget: 1 USD, au-dessus l'alerte KbModelCostOverBudget se déclenche.",
+      "description": "Coût estimé des appels au modèle, aux prix de core/config.py. Budget: 2 USD, au-dessus l'alerte KbModelCostOverBudget se déclenche.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -360,7 +360,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(max_over_time(k_b_llm_cost_total{deployment_environment_name=\"$env\"}[7d]))) > bool 1",
+          "expr": "(sum(max_over_time(k_b_llm_cost_total{deployment_environment_name=\"$env\"}[7d]))) > bool 2",
           "legendFormat": "État",
           "instant": true,
           "range": false,
@@ -683,8 +683,8 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "vector(1)",
-          "legendFormat": "Budget: 1 USD",
+          "expr": "vector(2)",
+          "legendFormat": "Budget: 2 USD",
           "instant": false,
           "range": true,
           "format": "time_series"
@@ -754,6 +754,444 @@
       }
     },
     {
+      "id": 17,
+      "type": "stat",
+      "title": "Appels en échec sur 24 h",
+      "description": "Part des appels au modèle en échec après leur nouvelle tentative: délai dépassé, service indisponible, trop de requêtes ou filtre de contenu. Seuil: 0 %, tout appel en échec déclenche l'alerte KbModelCallFailures.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 0,
+        "y": 18
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Valeur",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "((sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))) > bool 0",
+          "legendFormat": "État",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "NORMAL",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ALERTE: seuil dépassé",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 18,
+      "type": "stat",
+      "title": "Demandes de plus de 180 s sur 24 h",
+      "description": "Part des demandes de compte rendu (fiches de veille, compte rendu des tendances) de plus de 180 s, sous l'échéance de 200 s. Seuil: 0 %, toute demande de plus de 180 s déclenche l'alerte KbRequestOverDuration.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 5,
+        "w": 12,
+        "x": 12,
+        "y": 18
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h])) - sum(max_over_time(k_b_request_duration_seconds_bucket{deployment_environment_name=\"$env\",le=~\"180|180.0\"}[24h]))) / sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Valeur",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "((sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h])) - sum(max_over_time(k_b_request_duration_seconds_bucket{deployment_environment_name=\"$env\",le=~\"180|180.0\"}[24h]))) / sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h]))) > bool 0",
+          "legendFormat": "État",
+          "instant": true,
+          "range": false,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucune demande sur la période",
+          "color": {
+            "mode": "fixed",
+            "fixedColor": "text"
+          },
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "text",
+                "value": null
+              }
+            ]
+          },
+          "mappings": []
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "unit",
+                "value": "none"
+              },
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "0": {
+                        "text": "NORMAL",
+                        "index": 0
+                      },
+                      "1": {
+                        "text": "ALERTE: seuil dépassé",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        },
+        "orientation": "horizontal",
+        "textMode": "value_and_name",
+        "colorMode": "none",
+        "graphMode": "none",
+        "justifyMode": "auto",
+        "wideLayout": true,
+        "showPercentChange": false
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "Appels en échec sur 24 h glissantes",
+      "description": "La part des appels en échec dans le temps, et son seuil en tirets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Appels en échec",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(0)",
+          "legendFormat": "Seuil: 0 %",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucun appel sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "Demandes de plus de 180 s sur 24 h glissantes",
+      "description": "La part des demandes de plus de 180 s dans le temps, et son seuil en tirets.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 23
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "(sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h])) - sum(max_over_time(k_b_request_duration_seconds_bucket{deployment_environment_name=\"$env\",le=~\"180|180.0\"}[24h]))) / sum(max_over_time(k_b_request_duration_seconds_count{deployment_environment_name=\"$env\"}[24h]))",
+          "legendFormat": "Demandes de plus de 180 s",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        },
+        {
+          "refId": "B",
+          "datasource": {
+            "type": "prometheus",
+            "uid": "${datasource}"
+          },
+          "expr": "vector(0)",
+          "legendFormat": "Seuil: 0 %",
+          "instant": false,
+          "range": true,
+          "format": "time_series"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "decimals": 1,
+          "noValue": "Aucune demande sur la période",
+          "color": {
+            "mode": "palette-classic"
+          },
+          "custom": {
+            "drawStyle": "line",
+            "lineWidth": 2,
+            "lineInterpolation": "linear",
+            "showPoints": "always",
+            "pointSize": 6,
+            "spanNulls": false,
+            "fillOpacity": 0,
+            "lineStyle": {
+              "fill": "solid"
+            },
+            "thresholdsStyle": {
+              "mode": "off"
+            },
+            "axisPlacement": "auto",
+            "axisSoftMin": 0
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byFrameRefID",
+              "options": "B"
+            },
+            "properties": [
+              {
+                "id": "custom.lineStyle",
+                "value": {
+                  "fill": "dash",
+                  "dash": [
+                    10,
+                    10
+                  ]
+                }
+              },
+              {
+                "id": "custom.showPoints",
+                "value": "never"
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "legend": {
+          "displayMode": "list",
+          "placement": "bottom",
+          "showLegend": true
+        },
+        "tooltip": {
+          "mode": "multi",
+          "sort": "none"
+        }
+      }
+    },
+    {
       "id": 9,
       "type": "row",
       "title": "Appels et contenu des fiches",
@@ -763,7 +1201,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 18
+        "y": 31
       }
     },
     {
@@ -779,7 +1217,7 @@
         "h": 8,
         "w": 8,
         "x": 0,
-        "y": 19
+        "y": 32
       },
       "targets": [
         {
@@ -843,7 +1281,7 @@
         "h": 8,
         "w": 8,
         "x": 8,
-        "y": 19
+        "y": 32
       },
       "targets": [
         {
@@ -923,7 +1361,7 @@
         "h": 8,
         "w": 8,
         "x": 16,
-        "y": 19
+        "y": 32
       },
       "targets": [
         {
@@ -1015,7 +1453,7 @@
         "h": 5,
         "w": 8,
         "x": 0,
-        "y": 27
+        "y": 40
       },
       "targets": [
         {
@@ -1092,7 +1530,7 @@
         "h": 1,
         "w": 24,
         "x": 0,
-        "y": 32
+        "y": 45
       }
     },
     {
@@ -1108,7 +1546,7 @@
         "h": 8,
         "w": 12,
         "x": 0,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
@@ -1212,7 +1650,7 @@
         "h": 8,
         "w": 12,
         "x": 12,
-        "y": 33
+        "y": 46
       },
       "targets": [
         {
