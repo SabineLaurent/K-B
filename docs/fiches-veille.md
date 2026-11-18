@@ -208,19 +208,30 @@ d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes q
   tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
   plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
 - **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS` = 200 s (#205, `core/config.py`), comptée
-  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle. Les
-  appels se font **en série**, un sujet après l'autre (décision de Sabine du 2026-10-17, plan de
-  #205) : la chaîne mesurée par #158 dure environ 98 s (113 s avec les appels les plus lents),
-  sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une requête
+  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle, sous les 240 s
+  que l'ingress HTTP d'Azure Container Apps laisse à une requête
   ([Ingress in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
-  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Cette
-  mesure comptait un appel de plus par sujet, la vérification du sens, sortie du contrat le
-  2026-10-20 (section « Ce que la spec ne couvre pas » ; `core/config.py`). Options
-  écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
-  possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
-  entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
-  Le pire cas, 16 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
-  borne la demande.
+  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Les lots
+  du classement partent **en série** ; puis les sujets sont **rédigés en parallèle**, un fil par
+  sujet, tous à la fois (décision de Sabine du 2026-11-17, #630 ; `write_subjects`,
+  `ai_api/digests.py`). Pourquoi : le 2026-11-17, sur 300 items et gpt-6.1-sol, la chaîne en série
+  a atteint l'échéance avec 4 fiches sur 9 (7 classements de 6,2 à 14,3 s, rédactions de 23,4 à
+  30,7 s) ; en parallèle, la rédaction dure à peu près la plus lente des rédactions, non leur
+  somme. Les fiches, les échecs et les lignes de métriques restent dans l'ordre de la liste des
+  sujets, quel que soit l'ordre où les rédactions finissent. Le client d'httpx2 est partagé entre
+  les fils : son pool est sûr entre fils (doc d'httpx2,
+  [Connection pools](https://github.com/pydantic/httpx2/blob/main/src/httpcore2/docs/connection-pools.md),
+  « Thread and task safety », lue par Context7 le 2026-11-18 ; 100 connexions par défaut).
+  Chaque fil s'exécute dans une copie du contexte de la demande, sans quoi le span
+  `write_subject` perdrait son parent : OpenTelemetry tient le span courant dans `contextvars`
+  (`ContextVarsRuntimeContext`, lu dans l'environnement le 2026-11-18), qu'un `ThreadPoolExecutor`
+  ne copie pas dans ses fils. Le `replay` rédige en série : ses réponses suivent l'ordre des
+  requêtes (`connectors/llm_replay.py`). Options écartées : borner le nombre de fils (environ
+  60 s de plus en trois vagues, pour peu de protection contre un 429) ; rendre la demande
+  asynchrone, par une tâche de fond (un état gardé entre deux requêtes, contraire à la règle 7 de
+  `poc.md` ; à reprendre seulement si la rédaction en parallèle ne suffit pas). Avant #630, les
+  sujets étaient rédigés en série (décision de Sabine du 2026-10-17, plan de #205), et le
+  parallèle écarté faute de besoin mesuré.
   - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
     `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
     (9,3 s), pour que les items ne partent pas pour une réponse que l'échéance jetterait ; une
@@ -252,8 +263,10 @@ d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes q
   constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
-quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
-`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Selon le calcul de la doc « Manage quota »
+quota du déploiement Foundry de gpt-6-luna est de 140 000 jetons et 140 requêtes par minute (en-têtes
+`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17) ; celui de gpt-6.1-sol, de 250 000 jetons
+par minute (déploiement relevé par Sabine le 2026-11-17, #630) : les 9 rédactions envoyées à la
+fois demandent au plus environ 150 000 jetons estimés (entrée plus `max_completion_tokens`). Selon le calcul de la doc « Manage quota »
 (entrée estimée plus `max_completion_tokens`), une demande approche 110 000 jetons estimés par
 minute, même en série : une seconde demande dans la même minute peut rendre un 429 (non observé :
 sur l'essai de #158, l'en-tête ne baissait que des jetons d'entrée). Les sortes rares tiennent bien sous
@@ -572,8 +585,8 @@ moins la plus longue sortie que ces bornes permettent (12 affirmations, 5 items 
 120 caractères chacune) : une troncature ne vient alors que d'une sortie hors bornes. #205 le
 fixe à 8 192 jetons pour la rédaction (`WRITING_MAX_COMPLETION_TOKENS`) : une **estimation**,
 environ 24 500 caractères en JSON compact à 3 caractères par jeton (hypothèse ; la note de #158
-l'estime à 6 000-7 000 jetons). C'est aussi le plus haut que permet le délai de lecture de 90 s
-au débit mesuré par #158, avec 40 % de marge (environ 8 746 jetons ; un test le garde). Au
+l'estime à 6 000-7 000 jetons). Au débit mesuré sur gpt-6.1-sol le 2026-11-17 (environ 20 ms par
+jeton), il se lit en environ 164 s, sous le délai de lecture de 200 s (un test le garde). Au
 classement, 2 048 (50 affectations d'environ 25 jetons). Chez un modèle à raisonnement, ce plafond compte aussi les jetons
 de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_tokens`, section
 « Métriques »).
@@ -1974,7 +1987,7 @@ Sources, lues le 2026-10-27 :
 | `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet pas encore envoyé, sans envoi (#205) ; en parallèle, les sujets partent à la fois, avant qu'un 429 soit connu (#630) |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, réponse au-delà de `MAX_LLM_ANSWER_BYTES` (1 000 000 d'octets, annoncés ou comptés, OWASP API10:2023), ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé, ou pendant la lecture d'une réponse | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
@@ -1997,11 +2010,17 @@ Sources, lues le 2026-10-27 :
   ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
   en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de
   `LLM_RETRY_AFTER_MAX_SECONDS` met fin à l'appel, car une attente plus courte rendrait la même
-  réponse. Un appel dure ainsi 210 s quand les réponses arrivent d'un bloc (deux tentatives de
-  5 s de connexion et 90 s de réponse, et 20 s d'attente) ; 90 s couvrent une sortie de 8 192
-  jetons au débit mesuré par #158 sur gpt-6-luna (environ 7,35 ms par jeton, soit ~60 s) ; une réponse envoyée par morceaux peut
-  durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
-  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture plafonnée »).
+  réponse. **Délai de lecture** (`LLM_CALL_TIMEOUT_SECONDS`) : 200 s, l'échéance de la demande
+  (décision de Sabine du 2026-11-18, #640). Le calcul : au débit mesuré sur gpt-6.1-sol le
+  2026-11-17 (rédactions de 1 220 à 1 765 jetons en 23,4 à 30,7 s, environ 20 ms par jeton), une
+  sortie de 8 192 jetons prend environ 164 s, 229 s avec la marge de 40 % de #158 (7,35 ms par
+  jeton sur gpt-6-luna, 90 s). **Ce que cela change** : le délai d'un appel ne coupe plus avant
+  l'échéance de 200 s, qui devient la seule borne d'un appel (chaque délai est ramené au temps
+  restant, `ai_api/deadline.py`) ; un appel bloqué n'est plus relancé, un classement compris, qui
+  part en premier et emporte alors la demande (`llm_timeout`, 504). Une réponse envoyée par
+  morceaux peut durer plus, car chaque lecture a son propre délai : la borne totale est celle de
+  la demande, `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture
+  plafonnée »).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
@@ -2026,6 +2045,13 @@ Sources, lues le 2026-10-27 :
   `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus
   propres à une requête (un autre 4xx, une réponse illisible) : après une panne, les sujets
   suivants partent encore.
+  **Depuis la rédaction en parallèle** (#630, décision de Sabine du 2026-11-18) : les sujets
+  partent tous à la fois, avant qu'un 429 puisse être connu ; la règle ne vaut plus que pour un
+  sujet pas encore envoyé quand le 429 arrive, en pratique aucun, sauf en série (le `replay`).
+  Les items de tous les sujets partent donc même quand l'un d'eux recevra un 429. Accepté : les
+  9 rédactions tiennent sous le quota (environ 150 000 jetons estimés sur 250 000 par minute,
+  section « Lecture plafonnée ») ; borner le nombre de fils coûterait environ 60 s pour peu de
+  protection.
 - **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
   dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
   d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502
