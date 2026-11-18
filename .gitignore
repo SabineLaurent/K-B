@@ -26,3 +26,7 @@ temp/
 
 # Rapport HTML des tests de bout en bout (pytest-html), jamais suivi : il garde leur sortie
 /reports/
+
+# Site MkDocs construit (mkdocs build), et le cache de son plugin privacy
+/site/
+/.cache/

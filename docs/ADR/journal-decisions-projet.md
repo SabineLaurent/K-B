@@ -7322,6 +7322,121 @@ Sabine du 15/10.
   non tenue l'est par décision écrite). Écarté : `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image
   du jour de sa construction. — PR de #498
 
+### Documentation publiée par un site MkDocs sur GitHub Pages (#167)
+
+- **Les fiches de `documentation/` deviennent un site statique, construit par MkDocs 1.6.1 avec le thème Material for
+  MkDocs 9.8.1, en mode strict sur chaque PR (`docs.yml`), et publié sur GitHub Pages à la main.** Le format, un site
+  publié par MkDocs ou un équivalent sur GitHub Pages, est la décision de Sabine du 2026-11-11 pour le critère du
+  « format qui respecte les recommandations d'accessibilité » (tri des relectures « jury » des fiches) ; l'outil, son
+  « go » du 2026-11-12, sur la recommandation de time-knight. Pourquoi MkDocs avec Material : c'est l'outil demandé pour le format
+  (rapporté par time-knight) ; Material reçoit ses corrections de sécurité jusqu'au
+  2027-05-05, après le rendu et la soutenance ; il borne MkDocs sous la version 2. Options écartées : Zensical 0.1.1,
+  successeur de Material par la même équipe, en Beta depuis le 2026-11-10 (il lit `mkdocs.yml` : migration possible
+  plus tard) ; Sphinx avec MyST (les schémas Mermaid à reprendre) ; Jekyll (Ruby, une seconde pile). La dépendance
+  vit dans un groupe à part, `docs`, que ni les tests ni l'image n'installent (choix 2 du même « go »). Les règles
+  suivies (AVH, Microsoft, RGAA 4.1.2) et leur contrôle : `documentation/accessibilite_pour_docu.md`.
+- **Écarts du 2026-11-14 au plan, acceptés par time-knight sous la délégation de Sabine du 15/10.** L'audit de la CI
+  exporte tous les groupes (`--all-groups`) : `uv export` laisse le groupe `docs` de côté par défaut, et une faille de
+  MkDocs ou de Material fait donc échouer `audit` sur toute PR. `actions/configure-pages` retiré : ses sorties ne
+  servent qu'à l'adresse du site, déjà fixée par `site_url`. La publication est bornée à `main`, car un
+  `workflow_dispatch` peut nommer toute branche. L'accent du thème passe de `#526cfe` (4,26:1 sur blanc, sous le seuil
+  du RGAA 3.2) à `#303f9f` (8,98:1). Mermaid, que le plugin `privacy` télécharge d'unpkg dans sa version flottante
+  `mermaid@11`, est vérifié par son empreinte, celle de Mermaid 11.17.2 recoupée avec l'intégrité publiée par npm ;
+  option écartée : une version exacte chargée par `extra_javascript`, qui fixe aussi le fichier mais charge 3,5 Mo
+  sur chaque page, au lieu des seules pages à schéma. `deploy.yml` ne change pas : une exécution manuelle de `Docs`
+  en échec fait refuser le tag de son commit, parade écrite dans la fiche de l'intégration continue (relancer `Docs`,
+  ou livrer un commit suivant) ; exclure `docs.yml` de son contrôle est écarté, car c'est un contrôle de sécurité de la
+  livraison.
+- Limites assumées : le rendu au lecteur d'écran n'est pas vérifié (parade : un essai VoiceOver par Sabine sur une
+  fiche par lot) ; la publication attend que le dépôt soit public, puisqu'un site publié depuis un dépôt privé est
+  public ; Material est en fin de vie le 2027-05-05, sans migration faite ; une nouvelle version 11 de Mermaid demande
+  de revérifier et de changer l'empreinte. — PR A de la tâche 2 (Refs #167, #623)
+
+## 2026-11-17
+
+### Appel du modèle : les réglages des modèles du banc de C7 (#627)
+
+Mission de time-knight du 2026-11-17, avec l'accord de Sabine (« OK PR de la branche du banc ») ; le code, écrit et
+testé sur la branche du banc du 16/11.
+
+- **`KB_LLM_REASONING_EFFORT` accepte `none`, `minimal` et `low` ; toute autre valeur arrête le démarrage.**
+  Pourquoi : gpt-6.1-sol, le service que préconise le banc de C7 pour C8, refuse `none` et `minimal` et demande
+  `low` ; gpt-5-nano et gpt-5-mini ne descendent pas sous `minimal`. Sur `main`, seul `none` passait : C8 aurait
+  décrit un réglage que le code refuse. La liste reste fermée (`ReasoningEffort`, `core/config.py`), comme avant :
+  une valeur au-delà de `low` n'a pas d'usage. Limite assumée : à `minimal` ou `low`, le raisonnement compte dans
+  `max_completion_tokens`, que K-B ne relève pas (1 024 pour la sélection des tendances) ; tri de la revue de code
+  par time-knight le 2026-11-17 : pas de code, la mesure du banc à l'appui (gpt-6.1-sol à `low`, aucun appel coupé
+  sur 5 passages ; gemini-4-hydrogen, choix coupé 2 fois sur 5 ; `docs/fiches-veille.md`, « Réglages d'appel »),
+  remesurée par l'essai de bout en bout de C8. — PR de #627
+- **`KB_LLM_SEND_PROMPT_CACHE_OPTIONS` (`true` par défaut) : à `false`, `prompt_cache_options` ne part plus, pour
+  un modèle d'avant GPT-5.6 ou un autre fournisseur, qui le refusent par un 400.** Revient en partie sur l'entrée du
+  2026-10-17 (« Appel du modèle : cache de prompt coupé »), qui écartait une variable « sans second usage
+  aujourd'hui » et annonçait un réglage « avec le second modèle, si besoin » : le banc de C7 en est le second usage.
+  Le défaut garde la décision de 2026-10-17 en production : sans la variable, rien ne change pour gpt-6-luna.
+  Limite assumée : à `false`, le fournisseur peut garder les items dans son cache de prompt, d'où l'entrée
+  suivante. — PR de #627
+- **`kb serve-ai` refuse de démarrer avec `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false` et
+  `KB_DEPLOYMENT_ENVIRONMENT=production` ; `false` reste accepté en local et en bac à sable.** Tranché par
+  time-knight le 2026-11-17 après un relecteur neuf (délégation de Sabine du 15/10), sur le constat C2 de la revue
+  de code. Pourquoi : à `false`, le cache de prompt du fournisseur garde le texte des items (données personnelles
+  possibles) au moins 30 minutes, alors que le registre dit le cache coupé ; le même refus que `KB_TRACE_CONTENT=all`
+  en production (`metrics_export.py`) ; aucun usage bloqué, gpt-6-luna et gpt-6.1-sol acceptant le champ (banc du
+  16/11). Option écartée : une garde par l'écrit seul (registre, `MEMORY.md`), la recommandation de la session, que
+  rien ne fait respecter. Une valeur de `KB_DEPLOYMENT_ENVIRONMENT` posée hors de `sandbox` et `production` est
+  refusée elle aussi avec `false` (constat R1 de la seconde revue, tranché par time-knight après un relecteur neuf) :
+  une faute de frappe échoue fermé au lieu de faire sauter le refus ; non posée, c'est un poste local. Limite
+  assumée : un Gemini en production demanderait sa ligne au registre et la levée de ce refus. — PR de #627
+- **`KB_LLM_MODEL` accepte un modèle derrière son éditeur, `<éditeur>/<modèle>`, une barre oblique au plus, chaque
+  côté au motif d'un nom de modèle (`MODEL_NAME`).** Pourquoi : Google Cloud nomme ses modèles `google/<modèle>`
+  sur son point compatible Chat Completions. Le nom ne part que dans le corps JSON, jamais dans l'URL ni un
+  en-tête (un test) ; `MODEL_NAME` contrôle aussi le nom que `kb digest` et `kb trend-report` lisent dans la
+  réponse de l'API IA (qui le tient de `KB_LLM_MODEL`, jamais du fournisseur) avant qu'il n'entre dans une fiche,
+  et l'admet donc lui aussi avec une barre oblique. Options écartées : non consignées par la session du banc.
+  — PR de #627
+
+## 2026-11-18
+
+### Monitorage et production : K-B passe à gpt-6.1-sol (#631 à #635)
+
+Seuils décidés par Sabine dans la nuit du 18/11, recopiés par la mission de time-knight ; plan de la session validé
+par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrateur »).
+
+- **Le budget Azure `budget-kb` passe de 30 à 40 € par mois, pour tout K-B : hébergement et inférence.** Revient
+  sur les 30 € de #437, qui ne voyaient pas le modèle : sa ressource n'avait pas l'étiquette `project=k-b`. Pourquoi
+  (Sabine) : 40 € est le budget visé du benchmark de C7. Le filtre `project=k-b` et les trois seuils (50 % et
+  100 % du réel, 100 % de la prévision) restent. Limite assumée : `sabl-certif-resource`, dans le même groupe de
+  ressources, n'entre dans le budget qu'une fois étiquetée, un geste de Sabine après la fusion. — PR de #632
+- **L'alerte `KbModelCostOverBudget` passe de plus de 1 USD à plus de 2 USD sur 7 jours.** Revient sur le budget du
+  2026-11-08 (1 USD, `documentation/monitoring_pour_docu.md`), fixé pour gpt-6-luna. Pourquoi (Sabine) : 2 USD est
+  au-dessus du maximum normal de gpt-6.1-sol, 1,55 USD par semaine : l'alerte signale une dépense anormale.
+  — PR de #632
+- **Le coût estimé est compté aux prix de gpt-6.1-sol : 2,40 USD en entrée et 12,00 USD en sortie par million de
+  jetons (Data Zone Standard, France Central, contexte court).** Relus le 2026-11-18 dans l'API Azure Retail Prices
+  (`core/config.py`, `docs/fiches-veille.md`, « Sources »). Revient sur les prix de gpt-6-luna du 2026-10-21. Limite
+  assumée, inchangée : tout appel est compté à ces prix, quel que soit `KB_LLM_MODEL`, et le contexte long
+  (4,80 et 18,00 USD) n'est pas distingué. — PR de #631
+- **Une alerte `KbModelCallFailures` : la part des appels en échec après leur nouvelle tentative, sur 24 h, au-dessus
+  de 0 %.** Un échec est un délai dépassé, un service indisponible, un 429, le filtre de contenu (`k_b_outcome`,
+  aux mêmes valeurs que `error.type`) ou une sortie coupée au plafond de jetons (`llm_truncated`, ajoutée par
+  Sabine sur le constat C1 de la revue de code : aucune alerte ne la voyait, et le raisonnement de l'effort
+  `low` compte dans ce plafond). Seuil : recommandation de la session et de time-knight, choisie par Sabine
+  le 2026-11-18. Pourquoi : un appel en échec est un sujet ou un compte rendu qui manque. Limite assumée : jusqu'à
+  #630, l'alerte se déclenchera à chaque fiche de veille (le 2026-11-17, 5 sujets sur 9 étaient en
+  `llm_timeout`), et c'est un vrai signal. — PR de #633
+- **Une mesure nouvelle, `k_b.request.duration`, de chaque demande de compte rendu entière (`POST /digests` et
+  `POST /trend-reports`), et une alerte `KbRequestOverDuration` : la part des demandes de plus de 180 s, sur 24 h,
+  au-dessus de 0 %.** Pourquoi (Sabine) : 180 s, c'est sous l'échéance de 200 s d'une demande, que `POST /digests`
+  a atteinte le 2026-11-17 avec gpt-6.1-sol. « Compte rendu » couvre les deux routes, le vocabulaire de Sabine
+  (interprétation de la session, acceptée par time-knight). L'attribut de la route est `http.route`, comme sur les
+  spans racines. La part se lit par le nombre de demandes moins celles du palier de 180 s. Option écartée par la
+  session : `histogram_quantile(1, …) > 180`, qui groupe par `le` et lit une borne de palier, pas une durée. Limite
+  assumée : la forme de `le` dans Grafana Cloud (`180` ou `180.0`) n'est pas encore relevée, et l'expression lit les
+  deux ; aucun scénario du bac à sable ne déclenche ces deux alertes. — PR de #634
+- **En production, l'effort de raisonnement passe de `none` à `low` (`infra/main.bicep`), dans la même passe que
+  le modèle gpt-6.1-sol, jamais l'un sans l'autre.** Pourquoi : gpt-6.1-sol refuse `none` (« Appel du modèle : les
+  réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
+  restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

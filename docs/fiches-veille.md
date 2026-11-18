@@ -318,11 +318,37 @@ faudrait alors des lots plus petits.
 la sortie ; `reasoning_tokens` vaut 0. Le client envoie donc `reasoning_effort: "none"` seul ;
 option écartée : envoyer les deux (effet non prouvé). Pour gpt-6-luna,
 `KB_LLM_REASONING_EFFORT=none` est donc **obligatoire** : sans lui, chaque appel rend un 400, lu
-`llm_unavailable`, alors que l'API IA démarre. Chaque requête coupe aussi le cache de prompt
-(`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
-modèle : cache de prompt coupé ») : le client exige donc un modèle qui accepte ce champ (selon
-la doc, un modèle d'avant GPT-5.6 le refuse par un 400) ; un réglage viendra avec un modèle qui
-le refuse. Sur Azure AI Foundry, l'URL de base est
+`llm_unavailable`, alors que l'API IA démarre. Depuis #627, `KB_LLM_REASONING_EFFORT` accepte
+aussi `minimal` et `low`, pour les modèles du banc de C7 dont l'effort ne descend pas plus bas :
+`minimal` pour gpt-5-nano et gpt-5-mini, `low` pour gpt-6.1-sol, Gemini 3.8 Flash et Gemini 4
+Hydrogen ; toute autre valeur arrête le démarrage. À `minimal` ou `low`, le modèle raisonne, et ses
+jetons de raisonnement comptent dans `max_completion_tokens` (référence de l'API OpenAI,
+`chat/completions`, lue le 2026-11-17) : la sélection des tendances (1 024), la classification et
+la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_invalid_output`.
+Mesure du banc de C7 (16/11, `wip/banc-c7/results/passages.jsonl` de time-knight) : gpt-6.1-sol à
+`low`, lancement `20261116T142308Z`, 5 passages complets, choix des dépôts valide 5 fois sur 5, 274
+à 588 jetons de raisonnement par passage, toutes étapes comprises (textes : 91 à 207, lancement
+`20261116T143412Z`), aucun appel coupé ; gemini-4-hydrogen à `low` a vu son choix coupé 2 fois sur
+5 au plafond de 1 024. L'essai de bout en bout de C8 le remesure. En production, `infra/main.bicep` pose
+`low` depuis #635, avec le déploiement de gpt-6.1-sol pour `KB_LLM_MODEL`, jamais l'un sans l'autre. Chaque requête coupe aussi le cache de
+prompt (`prompt_cache_options: {"mode": "explicit"}` sans point d'arrêt ; journal ADR, « Appel du
+modèle : cache de prompt coupé »). Selon la doc, un modèle d'avant GPT-5.6 refuse ce champ par
+un 400, comme un autre fournisseur qui ne le connaît pas : `KB_LLM_SEND_PROMPT_CACHE_OPTIONS=false`
+le retire de chaque requête (#627 ; `true`, ou rien, l'envoie). Le fournisseur peut alors garder
+les items dans son cache de prompt : `false` est refusé au démarrage avec
+`KB_DEPLOYMENT_ENVIRONMENT=production`, comme `KB_TRACE_CONTENT=all`, ou avec une valeur hors de
+`sandbox` et `production` (une faute de frappe échoue fermé), et accepté en local et en bac à
+sable. Accepté ne veut pas dire sans condition : avant le premier envoi de données réelles à un
+fournisseur, son contrat est lu et le registre à jour (`docs/registre-traitements.md`,
+« Destinataire » ; `.claude/rules/conformite.md`, « RGPD : sous-traitance et transferts »).
+gpt-6-luna et gpt-6.1-sol acceptent le champ (banc de C7) ; un modèle qui en aurait
+besoin en production a d'abord sa ligne au registre des traitements (« Usage par le fournisseur »),
+puis la levée de ce refus. Le démarrage de `kb serve-ai` journalise l'effort et l'envoi du champ
+(`LLM reasoning effort low, prompt_cache_options sent`). `KB_LLM_MODEL`
+accepte un modèle derrière son éditeur, `<éditeur>/<modèle>` (`google/<modèle>` sur Google Cloud),
+une barre oblique au plus, chaque côté au motif d'un nom de modèle (`MODEL_NAME`, `core/config.py`) ;
+le nom ne part que dans le corps JSON, jamais dans l'URL ni un en-tête. Sur Azure AI Foundry,
+l'URL de base est
 `https://<ressource>.openai.azure.com/openai/v1`, sans `api-version`, et la clé part en
 `Authorization: Bearer` (mesure de #158). Le déploiement est figé sur une version du modèle. Le
 fournisseur, son URL et le nom du modèle n'ont pas de valeur par défaut : sans eux, l'API IA ne
@@ -1192,18 +1218,19 @@ API8 (revue et évaluation, #497 et #499) et API10 (portée du jeton de Grafana 
   (#501 ; décision de Sabine du 2026-11-08 : la tenir). « Configure spending limits for all service
   providers/API integrations. When setting spending limits is not possible, billing alerts should be
   configured instead. » (API4:2023, lue le 2026-11-10). Le budget `budget-kb` existe, au niveau du
-  groupe de ressources (`infra/modules/budget.bicep:5-25`, `infra/main.bicep:136-141`) : 30 € par
-  mois,
+  groupe de ressources (`infra/modules/budget.bicep:5-25`, `infra/main.bicep:136-141`) : 40 € par
+  mois pour tout K-B, hébergement et inférence (seuil de Sabine du 2026-11-18, #632),
   une alerte par e-mail à 50 et 100 % du réel et à 100 % de la prévision, sans rien arrêter. Il ne
   compte que les coûts étiquetés `project=k-b` (`budget.bicep:16-25`), et la ressource du modèle,
   dans le groupe, n'a pas d'étiquette (relevé de Sabine du 2026-11-08, #501) : la dépense du modèle
-  n'y entre pas. Ce que bornent les limites, par demande : les jetons de sortie de chaque appel, une
+  n'y entre pas, tant que `sabl-certif-resource`, la ressource de gpt-6.1-sol, ne porte pas `project=k-b` (geste
+  de Sabine, #632). Ce que bornent les limites, par demande : les jetons de sortie de chaque appel, une
   relance au plus, une échéance de 200 s, que le dernier appel en cours peut dépasser (« Lecture
   plafonnée », « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Dans la vie
   d'une réplique, l'ordre de grandeur que permettent les limites de débit, au prix de sortie
-  (0,60 $ par million de jetons, le plus cher) et sur les estimations de pire cas de la doc :
-  20 demandes de fiches × 420 000 jetons (`README.md`), environ 5 $, et 20 comptes rendus × 80 000
-  jetons ([tendances.md](tendances.md)), environ 1 $. En ligne, ce n'est pas un plafond par jour :
+  (12 $ par million de jetons pour gpt-6.1-sol, le plus cher) et sur les estimations de pire cas de la doc :
+  20 demandes de fiches × 420 000 jetons (`README.md`), environ 100 $, et 20 comptes rendus × 80 000
+  jetons ([tendances.md](tendances.md)), environ 19 $. En ligne, ce n'est pas un plafond par jour :
   avec `minReplicas: 0`, une réplique s'arrête 300 s après la dernière requête (« Cool down period
   is how long after the last event KEDA waits before the application scales down to its minimum
   replica count. », 300 secondes par défaut, page de la mise à l'échelle d'ACA, lue le 2026-11-10 ;
@@ -1711,7 +1738,7 @@ ne sont écrites qu'au retour du parcours.
 | `fidelity_rate` | `facts_found` / `facts_checked`, arrondi à 4 décimales ; nul au classement, pour une rédaction en échec, et quand `facts_checked` vaut 0 |
 | `claims_removed`, `items_removed_by_checks` | compteurs des contrôles, bornes ou fidélité (rédaction) ; nuls au classement |
 | `items_with_subject`, `items_no_suitable_subject`, `items_unanswered` | compteurs du classement (section « Sortie du classement », « Trois cas ») : les items du lot qui ont reçu un sujet, ceux auxquels aucun sujet ne convient, et ceux que le modèle a laissés sans réponse, `items_in` à eux trois ; nuls à la rédaction, et pour un classement en échec |
-| `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6-luna, Data Zone Standard, France Central, contexte court : 0,12 et 0,60) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
+| `cost_estimated` | en USD, arrondi à 6 décimales : `tokens_in` et `tokens_out` × prix au million de `core/config.py` (gpt-6.1-sol, Data Zone Standard, France Central, contexte court : 2,40 et 12,00, depuis #631) ; 0 en offre gratuite. **Limite** : tout appel est compté à ces prix, le replay compris (ses jetons sont ceux de ses pas, `provider` le dit) et un autre `KB_LLM_MODEL` aussi |
 
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
@@ -1747,6 +1774,7 @@ n'est importé nulle part ailleurs (`tests/architecture/test_opentelemetry.py`).
 | `k_b.digest.facts_checked`, `k_b.digest.facts_found` | Counter, `{fact}` | les compteurs de la fidélité (#207) ; le taux se calcule dans Grafana par leur rapport, un taux ne s'additionnant pas | — |
 | `k_b.digest.facts_found_in_item`, `k_b.digest.facts_found_in_text` | Counter, `{fact}` | les faits trouvés dans leur item, et dans leur `text` (#518) ; rien pour un compte rendu des tendances | — |
 | `k_b.digest.data_fetch.duration` | Histogram, `s` | `data_fetch_ms` / 1000 | aucun |
+| `k_b.request.duration` | Histogram, `s`, paliers de 1 à 240 s dont 180 | la durée d'une demande de compte rendu, de l'entrée dans sa route à sa réponse, échec compris (#634) ; pas de mesure d'un appel | `http.route` = `/digests` ou `/trend-reports` |
 
 - **Attributs communs** aux mesures d'un appel : `gen_ai.operation.name = chat`,
   `gen_ai.provider.name` (`openai_compatible` ou `replay`, ce que K-B sait),
@@ -2417,7 +2445,10 @@ Consultées le 2026-10-15, sauf mention.
   contains(meterName, 'luna')` : compteurs `6-luna ShortCo Inp Std DZ 1M Tokens` (0,12 USD) et
   `6-luna ShortCo Opt Std DZ 1M Tokens` (0,60 USD), `effectiveStartDate` 2026-09-01
   (`cost_estimated`). Recoupé par une recherche du même jour : [GPT-6 Luna Azure Pricing](https://www.azurespeed.com/AzureAiModelPricing/Models/openai-gpt-6-luna),
-  agrégateur tiers, 0,11 à 0,12 et 0,55 à 0,60 USD en Data Zone Standard.
+  agrégateur tiers, 0,11 à 0,12 et 0,55 à 0,60 USD en Data Zone Standard. Remplacés le 2026-11-18 par les prix de
+  gpt-6.1-sol (#631) : même API, même `api-version`, filtre `armRegionName eq 'francecentral' and
+  contains(meterName, 'sol')`, requête du 2026-11-18 à 02:22 UTC, compteurs `6.1-sol ShortCo Inp Std DZ 1M Tokens`
+  (2,40 USD) et `6.1-sol ShortCo Opt Std DZ 1M Tokens` (12,00 USD), `effectiveStartDate` 2026-10-01.
 
 - [Data, privacy, and security for Foundry Models sold by Azure](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
   — Microsoft, relevé par recherche web : les demandes et réponses ne servent pas à entraîner les

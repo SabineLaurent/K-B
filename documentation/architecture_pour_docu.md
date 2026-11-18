@@ -296,7 +296,7 @@ Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
 - **Zotero n'est jamais ouvert en place**: `zotero.sqlite` est copié, avec son journal d'écriture, dans un dossier
   temporaire, puis lu (`etl/sources/zotero.py:1-6`).
 
-Les sources, leur accès et leurs limites sont dans [`docs/specs-collecte.md`](../docs/specs-collecte.md).
+Les sources, leur accès et leurs limites sont dans [`docs/specs-collecte.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md).
 
 ## L'import et la base
 
@@ -309,14 +309,14 @@ Les sources, leur accès et leurs limites sont dans [`docs/specs-collecte.md`](.
 - **Les purges sont une commande à part, `kb purge`**, que la routine quotidienne lance après `kb import`: les
   catalogues remplacés, la base, le brut, le registre, puis les journaux (`purge/all_purges.py:1-3`, `:52-63`). Leurs
   durées sont dans le
-  [registre des traitements](../docs/registre-traitements.md).
+  [registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md).
 - **La base a deux moteurs.** Sans `KB_DATABASE_URL`, c'est le fichier SQLite `k-b.sqlite` du dossier de données;
   avec, la base PostgreSQL qu'elle nomme (`database/location.py:1-3`, `core/config.py:182`). Les deux schémas ont
   les mêmes 15 tables (`database/schema.sql`, `database/schema_postgresql.sql`); un test compare leurs structures
   (`tests/test_schema_structures.py`). `kb create-db` crée la base; en ligne, `kb migrate-database` la crée si elle
   n'a pas encore ses tables (`commands/migrate_database_command.py:1-2`).
 
-Le modèle de la base est dans [`docs/stockage.md`](../docs/stockage.md).
+Le modèle de la base est dans [`docs/stockage.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md).
 
 ## Les deux API
 
@@ -328,7 +328,7 @@ Le modèle de la base est dans [`docs/stockage.md`](../docs/stockage.md).
 | Sans clé | `GET /health` (`data_api/app.py:75`) | `GET /health` (`ai_api/app.py:100`) |
 | Clients | chacun sa clé, `KB_DATA_API_KEY_<CLIENT>` (`core/api_keys.py:12`); l'API IA est le client `AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`) | `kb digest`, client `KB_DIGEST`, pour `POST /digests`; `kb trend-report`, client `KB_TREND_REPORT`, pour `POST /trend-reports` (`core/config.py:300-305`) |
 | Lit | la base, en lecture seule (`database/engine.py:58-87`) | l'API de données, le modèle, l'API GitHub |
-| Contrat | [`docs/api/openapi-donnees.json`](../docs/api/openapi-donnees.json) | [`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json) |
+| Contrat | [`docs/api/openapi-donnees.json`](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json) | [`docs/api/openapi-ia.json`](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-ia.json) |
 
 Les deux API n'écrivent rien de durable, hors du journal de fonctionnement que tient leur commande
 (`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:27`, `:29`): l'API de données ne peut pas
@@ -370,7 +370,7 @@ K-B tourne de deux façons, par le même code.
 sur le port 8002 (`core/config.py:304-305`).
 
 **En ligne, sur Azure**, depuis l'image de K-B, dans l'environnement Azure Container Apps `cae-kb`. Le Bicep
-d'`infra/` décrit chaque ressource ([`infra/README.md`](../infra/README.md), tableau des modules); voici les
+d'`infra/` décrit chaque ressource ([`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), tableau des modules); voici les
 principales:
 
 | Ressource | Ce qu'elle fait | Où |
@@ -386,7 +386,7 @@ principales:
 
 Les deux API n'ont qu'une entrée interne, en HTTPS: elles n'ont pas d'adresse publique
 (`infra/modules/api-container-app.bicep:74-81`). Le site n'a une adresse publique qu'une fois sa connexion en place,
-quand `exposeWeb` l'ouvre (`infra/main.bicep:345`; [`infra/README.md`](../infra/README.md), « Le site privé
+quand `exposeWeb` l'ouvre (`infra/main.bicep:345`; [`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « Le site privé
 (#571) »). Les apps et les jobs déclarés en ligne sont ceux d'`infra/deployment.json`: `ca-kb-data-api`,
 `ca-kb-ai-api`, `ca-kb-web`, `caj-kb-smoke-test`, `caj-kb-migrate-database`,
 `caj-kb-daily-routine` et `caj-kb-digest-watch`. Un
@@ -489,7 +489,7 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   risque accepté: ces rôles Contributor permettent de lire en clair les secrets des apps et des jobs
   (`docs/registre-traitements.md:196`).
 - **L'opératrice**, par son compte Entra, applique le Bicep à la main (`infra/main.bicep:1-3`,
-  [`infra/README.md`](../infra/README.md)); elle a le rôle Key Vault Secrets Officer, pour poser les secrets
+  [`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md)); elle a le rôle Key Vault Secrets Officer, pour poser les secrets
   (`infra/modules/key-vault.bicep:33-41`, `infra/main.bicep:102`), et elle est l'administratrice Entra du serveur
   PostgreSQL (`infra/modules/postgresql-server.bicep:53-61`, `infra/main.bicep:270-271`). Le budget `budget-kb` envoie
   ses alertes par e-mail (`infra/modules/budget.bicep:1`, `:26-57`).
@@ -506,10 +506,10 @@ nœud porte son identité managée; sur une flèche, le rôle qui la permet.
   précédente de son sujet, par la date de la source: plus rien ne manque d'un compte rendu au suivant. Un item daté
   avant le `until` d'un compte rendu mais collecté après lui n'entre dans aucun, comme les éditions TLDR et les
   entrées KEV du lundi et du jeudi, datées de minuit et collectées le lendemain. Il attend la lecture par date
-  d'arrivée dans K-B, prévue après l'oral blanc ([`infra/README.md`](../infra/README.md), « Les comptes rendus en
+  d'arrivée dans K-B, prévue après l'oral blanc ([`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « Les comptes rendus en
   ligne »).
 - **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main de
-  [`infra/README.md`](../infra/README.md), « La règle des heures ». Le verrou de #426 tiendra deux exécutions de la
+  [`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « La règle des heures ». Le verrou de #426 tiendra deux exécutions de la
   routine à l'écart, pas le job des comptes rendus, qui ne touche pas la base.
 - **Zotero n'est pas collecté en ligne**: la copie de la bibliothèque dans un job est à venir, entre le miroir des
   clips et `kb collect` (#425, `commands/daily_routine_command.py:50`).

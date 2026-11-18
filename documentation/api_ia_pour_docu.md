@@ -6,7 +6,7 @@
 
 Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait chacun de ses points de terminaison,
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est l'OpenAPI versionnée,
-[`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json): la fiche y renvoie et ne la remplace pas. Elle est écrite
+[`docs/api/openapi-ia.json`](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-ia.json): la fiche y renvoie et ne la remplace pas. Elle est écrite
 d'après le code de `main` au commit `875c638` (2026-11-08), et ses appelants en ligne d'après le code de la PR de #423,
 et la fenêtre par sujet, par #565, d'après le code de sa PR. Les chemins du code de K-B (`ai_api/…`, `core/…`,
 `post/…`, `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
@@ -120,7 +120,7 @@ du code pur en bas, puis les clients sortants (`connectors/`), les étapes du mo
 chaque route (`digests.py`, `trend_reports.py`), les contrats (`schemas/`), les routeurs (`routers/`) et l'app
 (`app.py`). Deux tests tiennent la table: chaque module est dans une seule couche (`:212`), et aucun n'importe sa
 couche ni celles du dessus (`:223`). La table complète, couche par couche, est dans
-[`docs/architecture-api-ia.md`](../docs/architecture-api-ia.md), « Les couches de `src/k_b/ai_api/` ».
+[`docs/architecture-api-ia.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « Les couches de `src/k_b/ai_api/` ».
 
 ## Les points de terminaison
 
@@ -259,13 +259,13 @@ redémarrer les deux. Tant que l'un garde l'ancienne, chaque demande reçoit 502
 par son identité, sans numéro de version (`infra/modules/api-container-app.bicep:88-94`). Une nouvelle version du
 secret remplace l'ancienne; Container Apps la lit dans les 30 minutes, mais un conteneur qui tourne garde ses
 variables. La procédure pose la nouvelle version, puis redémarre la révision active de chaque app qui lit ce
-secret ([`infra/README.md`](../infra/README.md), « 4. Poser les secrets »).
+secret ([`infra/README.md`](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « 4. Poser les secrets »).
 
 **Les autres secrets de l'API IA**, qu'elle envoie à son tour:
 
 - le jeton GitHub, `KB_AI_GITHUB_TOKEN`, doit être un jeton *fine-grained* (préfixe `github_pat_`), sinon
   `kb serve-ai` ne démarre pas (`ai_api/connectors/github_settings.py:22-34`). Son expiration est fixée à sa
-  création sur GitHub ([`docs/jeton-github.md`](../docs/jeton-github.md)); le code ne la lit pas. Un jeton expiré
+  création sur GitHub ([`docs/jeton-github.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/jeton-github.md)); le code ne la lit pas. Un jeton expiré
   ou révoqué se voit au premier compte rendu qui a un candidat, car sans candidat GitHub n'est pas appelé
   (`ai_api/trend_reports.py:179-181`): 502 `github_unauthorized` (`ai_api/connectors/github_client.py:335-336`);
 - la clé du modèle, `KB_LLM_API_KEY`: une clé refusée par le fournisseur donne l'état `llm_unavailable`
@@ -298,7 +298,7 @@ GitHub (`ai_api/connectors/github_client.py:158`) et du modèle (`ai_api/connect
 
 ## Le contrat OpenAPI
 
-[`docs/api/openapi-ia.json`](../docs/api/openapi-ia.json) est la référence de l'API au standard OpenAPI (3.1.0).
+[`docs/api/openapi-ia.json`](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-ia.json) est la référence de l'API au standard OpenAPI (3.1.0).
 Sa version, `0.13.0`, est celle de l'app (`ai_api/app.py:38`); un changement visible par un client change les
 deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
 `HTTPBearer`.
@@ -311,8 +311,8 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
   vérifie que le document est un OpenAPI 3.1 valide (`:62`).
 - **Le lire**: ouvrir le fichier, ou lancer `kb serve-ai` avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` et ouvrir
   `http://127.0.0.1:8001/docs`. Le sens de chaque champ et de chaque état est écrit dans
-  [`docs/fiches-veille.md`](../docs/fiches-veille.md) (« Schémas », « États nommés ») et
-  [`docs/tendances.md`](../docs/tendances.md).
+  [`docs/fiches-veille.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md) (« Schémas », « États nommés ») et
+  [`docs/tendances.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md).
 
 ## En ligne
 
@@ -333,7 +333,7 @@ deux. Il décrit les deux routes, leurs corps, leurs réponses, chaque état d'e
   (`infra/modules/api-container-app.bicep:147-148`).
 - **Les essais de clé ne sont pas limités.** Le débit ne compte que les clients à clé valide; un 401 ne compte
   pas. Écart voulu, décidé par Sabine le 2026-11-05: une clé de 32 caractères au moins ne se trouve pas par essais
-  ([`docs/fiches-veille.md`](../docs/fiches-veille.md), « API2:2023 Broken Authentication »).
+  ([`docs/fiches-veille.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « API2:2023 Broken Authentication »).
 - **Un retrait ne prend effet qu'au redémarrage** de `kb serve-ai`. Une variable `KB_AI_API_KEY_*` exportée dans le
   profil du shell reste valide même retirée du `.env`.
 - **`uv run --env-file .env kb serve-ai` charge tout le `.env`**, donc aussi des secrets dont l'API IA n'a pas
