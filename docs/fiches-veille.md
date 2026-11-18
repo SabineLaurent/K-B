@@ -1382,7 +1382,9 @@ dépend que du code garde son état et sa preuve.
   l'image : Grype v0.121.3, vérifié par son SHA256, cherche dans l'image construite les
   vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
   de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
-  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Un scan rouge sur `main`
+  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Constaté le 2026-11-18 :
+  rouge sur une image de base de décembre 2024 (essai #644, exécution 44275262249), vert sur l'image de #643
+  (exécution 44347407723). Un scan rouge sur `main`
   bloque aussi la mise en ligne : `deploy.yml` ne déploie qu'un commit dont toutes les exécutions
   sont vertes (l. 51-67). Après chaque déploiement, `deploy.yml` lance `caj-kb-smoke-test`
   (l. 204-209), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le

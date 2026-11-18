@@ -7480,8 +7480,8 @@ d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le 
 - **L'étape finale du `Dockerfile` installe zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1`, la version écrite en entier,
   et #647 retire ce bloc dès qu'un digest de l'image de base porte le correctif.** Révise en partie la décision du
   2026-11-14 (« Écarté : `apt-get upgrade` dans le `Dockerfile` »). Ce qui a changé entre-temps : le premier scan de
-  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1` y porte CVE-2026-85091 (haute), et le
-  digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
+  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1+b1` y porte CVE-2026-85091 (haute), et
+  le digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
   DSA-6613-1, du 2026-11-07 (liste des DSA du suivi de sécurité de Debian), mais seulement dans `trixie-security`
   (index lu le 2026-11-18). Décision de Sabine du 2026-11-18, sur la recommandation de time-knight : « Le correctif
   existe et la production porte la faille ; A accepte un risque qu'on peut corriger ». Options écartées : une entrée de
