@@ -11,6 +11,14 @@ les mesures sont ceux des maquettes. La fiche donne ensuite le parcours de l'op�
 fonctionnel, d'après le code de `main` au commit `ffc0942` (2026-11-14). Les chemins du code de K-B (`web/…`) partent
 de `src/k_b/`, les autres de la racine du dépôt.
 
+Les sigles de la fiche: CISA KEV, le catalogue des failles exploitées (<span lang="en">Known Exploited Vulnerabilities</span>)
+de l'agence américaine de cybersécurité (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>); CVE, le
+catalogue public des failles et de leurs identifiants (<span lang="en">Common Vulnerabilities and Exposures</span>); GHSA, une
+alerte de sécurité de GitHub (<span lang="en">GitHub Security Advisory</span>); NVD, la base nationale des failles des
+États-Unis (<span lang="en">National Vulnerability Database</span>); WCAG, les règles pour l'accessibilité des contenus web
+(<span lang="en">Web Content Accessibility Guidelines</span>); RGAA, le référentiel général d'amélioration de l'accessibilité,
+le référentiel français.
+
 Les maquettes ont été réalisées dans l'outil Design de claude.ai, à partir des wireframes et de la charte. Le site
 intégré s'en écarte sur des points décidés, que `docs/site-web.md` et le journal des décisions
 (`docs/ADR/journal-decisions-projet.md`, entrées « Site » du 11/11 au 14/11) écrivent avec leur raison. Par exemple,
@@ -76,6 +84,8 @@ Deux polices, chacune montrée par ses exemples, puis nommée en 14 px et en gri
 - « CVE-2026-45134 » en 20 px et « GHSA-3644-q5cj-c5c7 » en 16 px, en chasse fixe: ui-monospace, Menlo, Consolas,
   monospace, « les identifiants seulement (CVE, GHSA, arXiv) ».
 
+Le tableau suivant donne les cinq niveaux de texte, du titre de page aux métadonnées.
+
 | Niveau | Taille | Graisse | Exemple |
 |---|---|---|---|
 | Titre de page (h1) | 1,875 rem (30 px) | 700 | Quoi de neuf |
@@ -107,7 +117,8 @@ décorative. »
 « Calculés par un script (luminance relative de WCAG 2.2). Seuils: AA 4,5:1 pour le texte courant, 3:1 pour un
 composant d'interface ou un texte de 24 px; AAA 7:1. » Puis, en 14 px: « Note: critères de contraste (1.4.3, 1.4.6,
 1.4.11) et formule de la luminance relative identiques à WCAG 2.1, base du RGAA 4.1.2 en vigueur. » Sur la planche,
-chaque ligne montre aussi un aperçu, « Aa texte » écrit dans le couple de couleurs.
+chaque ligne montre aussi un aperçu, « Aa texte » écrit dans le couple de couleurs. Le tableau suivant donne les 23
+couples.
 
 | Texte / fond | Usage | Ratio | Niveau |
 |---|---|---|---|
@@ -211,10 +222,12 @@ Microsoft Entra, puis le site vérifie, à chaque requête, que la personne conn
 `web/pages.py` et les gabarits de `web/templates/`. Un rectangle est un écran du site; un rectangle arrondi, le point
 de départ, la plateforme ou un écran hors du site; un losange, une vérification. Chaque flèche porte, entre guillemets,
 le libellé exact du lien ou du bouton (« Retour au fil »), ou, sans guillemets, l'action ou l'événement qui mène d'un
-écran à l'autre (titre d'une carte).
+écran à l'autre (titre d'une carte). Le texte qui suit le schéma, « Description du schéma », le décrit en entier.
 
 ```mermaid
 flowchart TD
+    accTitle: Le parcours de l'opératrice sur le site de K-B
+    accDescr: Après la connexion Microsoft Entra, la plateforme puis le site vérifient que la personne connectée est l'opératrice, sinon ils la refusent. Depuis le fil de veille, elle va au détail d'un item, aux tendances, aux pages des sources et de l'accessibilité, à la source d'un item ou à la page GitHub d'un dépôt dans un nouvel onglet, et à la déconnexion. Une adresse inconnue donne la page 404, une erreur la page 500.
     open("L'opératrice ouvre l'adresse du site")
     entra("Connexion Microsoft Entra<br>(plateforme Container Apps)")
     platform{"La plateforme admet-elle ce compte ?<br>(tenant du déploiement,<br>puis compte de Sabine seul)"}
