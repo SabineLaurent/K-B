@@ -7307,11 +7307,13 @@ Sabine du 15/10.
   `deploy.yml` reconstruit l'image au tag sans la scanner. Pour réduire le risque : la PR hebdomadaire de Dependabot
   sur le digest de l'image de base, scannée ; le même scan dans `deploy.yml` (#626) ; un déclenchement planifié
   d'`image.yml`, faisable avec nos droits, non retenu ici.
-- **Grype v0.121.2, la dernière version publiée depuis 7 jours au moins, la même attente que Dependabot.** Écartée :
-  v0.121.3 (2026-11-09), à 5 jours. Elle corrige 8 avis de ses dépendances (dont GO-2026-6888, critique), lus le
-  2026-11-14 : ils visent le démon Docker, dont Grype n'est que client, ou sont des dénis de service à la
-  décompression et à l'analyse HTML ; au pire le job échoue, sans laisser passer l'image. Pour réduire le risque :
-  monter à v0.121.3 après le 2026-11-16 à 15:17 UTC, dans cette PR si elle n'est pas fusionnée, sinon par une issue.
+- **Grype v0.121.3, la dernière version publiée depuis 7 jours au moins, la même attente que Dependabot.** Le code
+  du 2026-11-14 a pris v0.121.2 : v0.121.3 (2026-11-09) n'avait que 5 jours ; elle corrige 8 avis de ses dépendances
+  (dont GO-2026-6888, critique), qui visent le démon Docker, dont Grype n'est que client, ou sont des dénis de service
+  à la décompression et à l'analyse HTML. Montée le 2026-11-18, la PR n'étant pas fusionnée (tranché par time-knight
+  le 2026-11-14). Écartée : v0.122.0 (2026-11-16), à 2 jours ; elle corrige GHSA-q7gw-24fr-5p69 (moyen, SDK
+  OpenTelemetry pour Go : une borne de longueur d'attribut contournée), lu le 2026-11-18 ; le job ne règle aucune
+  variable `OTEL_*`, et son effet sur le scan est supposé nul, non vérifié dans le code de Grype. Pour réduire le risque : monter à v0.122.0 après le 2026-11-23 à 20:41 UTC, par une PR.
 - **`image-build` devient un contrôle exigé du ruleset de `main`, posé par Sabine juste avant la fusion, comme
   `bicep-build` (#496).** Pourquoi : la limite « Deux contrôles ne bloquent pas la fusion » de la doc de la CI (lue
   le 2026-11-10) : non exigé, un scan rouge laisse fusionner, et ne bloque qu'au déploiement (`deploy.yml` exige

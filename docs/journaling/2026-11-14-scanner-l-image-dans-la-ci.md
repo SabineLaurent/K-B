@@ -32,19 +32,19 @@ d'API8 à « tenue », grâce au constat que #496 attendait.
 ### 1. Un binaire téléchargé, vérifié avant d'être exécuté
 
 ```yaml
-      - name: Installs Grype v0.121.2
+      - name: Installs Grype v0.121.3
         run: |
           curl -fsSL -o "$RUNNER_TEMP/grype.tar.gz" \
-            https://github.com/anchore/grype/releases/download/v0.121.2/grype_0.121.2_linux_amd64.tar.gz
-          echo "9c8965ced9df657e5e851c14021bae838802f711edd7a48f9bc3c923a8d28f12  $RUNNER_TEMP/grype.tar.gz" | sha256sum -c
+            https://github.com/anchore/grype/releases/download/v0.121.3/grype_0.121.3_linux_amd64.tar.gz
+          echo "e9da18cc1429e786722e32161288103600efffd8e483c90761f90485bd1bec85  $RUNNER_TEMP/grype.tar.gz" | sha256sum -c
           tar -xzf "$RUNNER_TEMP/grype.tar.gz" -C "$RUNNER_TEMP" grype
 ```
 
 `.github/workflows/image.yml:67-72`. Le job télécharge l'archive de la release de Grype, puis `sha256sum -c` compare
 son empreinte à celle écrite dans le workflow. Si elles diffèrent, la commande rend un code non nul, et le shell du
 runner (`bash -e`) arrête l'étape : l'archive n'est jamais décompressée, Grype jamais lancé. L'empreinte a été lue le
-14/11 à deux endroits : le `digest` de l'asset dans l'API des releases de GitHub, et le fichier
-`grype_0.121.2_checksums.txt` de la même release. Elles concordent.
+18/11 à deux endroits : le `digest` de l'asset dans l'API des releases de GitHub, et le fichier
+`grype_0.121.3_checksums.txt` de la même release. Elles concordent.
 
 C'est le même principe qu'`infra.yml` pour Bicep : on ne fait pas confiance à « la dernière version », ni à une URL
 seule. Une release réécrite après coup (ce qui est arrivé à Trivy le 19/03/2026) changerait l'empreinte, et le job
@@ -128,7 +128,7 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
 |---|---|---|
 | L'outil | Grype (Anchore, Apache 2.0) : un binaire, sans compte, qui voit CPython | Trivy : vecteur de l'attaque du 19/03/2026 (76 tags de `trivy-action` sur 77 réécrits, un binaire v0.69.4 piégé), et il ne voit pas le CPython de l'image ; Docker Scout : un compte Docker |
 | La forme | le binaire de la release, vérifié par son SHA256, comme Bicep | `anchore/scan-action` : une action de plus, du code de plus à croire |
-| La version | v0.121.2 (05/11), la dernière publiée depuis 7 jours au moins, l'attente que se donne Dependabot | v0.121.3 (09/11), 5 jours au moment du code ; elle corrige 8 avis de ses dépendances, lus : démon Docker (Grype n'en est que client) ou dénis de service ; au pire le job échoue (tranché par time-knight) |
+| La version | v0.121.3 (09/11), la dernière publiée depuis 7 jours au moins, l'attente que se donne Dependabot ; v0.121.2 au code du 14/11, montée le 18/11 (tranché par time-knight) | v0.122.0 (16/11), 2 jours le 18/11 ; elle corrige un avis moyen du SDK OpenTelemetry pour Go que Grype embarque ; le job ne règle aucune variable `OTEL_*`, son effet sur le scan est supposé nul, non vérifié |
 | Ce qui est scanné | tout ce que Grype voit : l'image est ce qui part en ligne (plan, point 4) | les seuls paquets Debian : `pip` et CPython échapperaient au scan |
 | Le seuil | haute ou critique, avec correctif (l'issue, validé avec le plan) | sans `--only-fixed` : une vulnérabilité que personne ne peut corriger bloquerait toutes les PR |
 | La place | en dernière étape (revue de code, tranché par time-knight) | juste après la construction (le plan) : un scan rouge cachait les autres contrôles |
@@ -141,7 +141,7 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `grep -n "grype" .github/workflows/image.yml` → rien, exit 1, le 14/11 avant le code | le critère rouge : aucun scan avant #498 |
-| `gh api repos/anchore/grype/releases/tags/v0.121.2` → digest `sha256:9c8965ce…8f12`, égal à la ligne de `grype_0.121.2_checksums.txt` | l'empreinte écrite dans `image.yml:71` est celle de la release |
+| `gh api repos/anchore/grype/releases/tags/v0.121.3` → digest `sha256:e9da18cc…ec85`, égal à la ligne de `grype_0.121.3_checksums.txt`, le 18/11 | l'empreinte écrite dans `image.yml:71` est celle de la release |
 | `gh pr checks 625` → `bicep-build pass 20s`, exécution 43618055085, le 14/11 à 16:53 UTC | le « durcissement répétable » est tenu (#496) |
 | `uv run pytest` → 5582 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts ; `yamllint` sur `image.yml` sans erreur | la branche ne casse rien ; le workflow est un YAML valide |
 | `/security-review` (sous-agent neuf, lecture seule) → aucun constat ≥ 8/10 | pas d'injection (aucun `${{ github.event.* }}` dans un `run:`), `pull_request` et non `pull_request_target`, `contents: read`, échec fermé |
@@ -182,8 +182,7 @@ Les deux dernières lignes n'existent pas encore au moment de cette note : elles
 
 - **Dans cette PR, après le push** : les exécutions verte et rouge, citées dans l'auto-évaluation par un commit de
   plus ; le geste de Sabine (`image-build` au ruleset) juste avant la fusion, et sa lecture citée.
-- **La montée à Grype v0.121.3** après le 16/11 à 15:17 UTC : dans cette PR si elle n'est pas fusionnée, sinon par une
-  issue.
+- **La montée à Grype v0.122.0** après le 23/11 à 20:41 UTC, par une PR.
 - **#626** : le même scan dans `deploy.yml`, avant la mise en ligne.
 - **#499** : les sondes sans clé après déploiement, qui tiendront le reste de l'« évaluation automatisée ».
 - **#497** : la revue périodique de la configuration en ligne, le dernier morceau d'API8.

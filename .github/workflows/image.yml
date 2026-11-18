@@ -64,11 +64,11 @@ jobs:
       # Grype (Anchore), the binary of its release, checked by its SHA256 (GitHub release asset digest), like
       # Bicep in infra.yml: update both with the version. The last version published 7 days before or more
       # (issue #498).
-      - name: Installs Grype v0.121.2
+      - name: Installs Grype v0.121.3
         run: |
           curl -fsSL -o "$RUNNER_TEMP/grype.tar.gz" \
-            https://github.com/anchore/grype/releases/download/v0.121.2/grype_0.121.2_linux_amd64.tar.gz
-          echo "9c8965ced9df657e5e851c14021bae838802f711edd7a48f9bc3c923a8d28f12  $RUNNER_TEMP/grype.tar.gz" | sha256sum -c
+            https://github.com/anchore/grype/releases/download/v0.121.3/grype_0.121.3_linux_amd64.tar.gz
+          echo "e9da18cc1429e786722e32161288103600efffd8e483c90761f90485bd1bec85  $RUNNER_TEMP/grype.tar.gz" | sha256sum -c
           tar -xzf "$RUNNER_TEMP/grype.tar.gz" -C "$RUNNER_TEMP" grype
       # Debian packages, Python packages (the virtual environment, and pip of the base image) and CPython:
       # what Grype finds in the final filesystem of the image. --fail-on counts what --only-fixed keeps: a

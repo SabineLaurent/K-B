@@ -1365,7 +1365,7 @@ dépend que du code garde son état et sa preuve.
   mesure nécessaire non intégrée (#499). La CI
   lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
   (`.github/workflows/ci.yml`), la construction du Bicep (`infra.yml`) et, depuis #498, le scan de
-  l'image : Grype v0.121.2, vérifié par son SHA256, cherche dans l'image construite les
+  l'image : Grype v0.121.3, vérifié par son SHA256, cherche dans l'image construite les
   vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
   de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
   un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Un scan rouge sur `main`

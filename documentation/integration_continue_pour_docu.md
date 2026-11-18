@@ -17,7 +17,7 @@ d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livr
 Chaque demande de fusion (PR, <span lang="en">pull request</span>) vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
 couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Sur
 chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le workflow `Docs`](#le-workflow-docs)). Une
-PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
+PR ne fusionne que si ses sept contrôles requis sont verts sur une branche à jour avec `main`
 ([Le ruleset de `main`](#le-ruleset-de-main)). La CI ne pousse rien et ne déploie rien sur Azure, où elle n'a aucun
 droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le site des fiches, sur GitHub Pages.
 
@@ -33,7 +33,7 @@ droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le si
 | pip-audit 2.10.1 | cherche les vulnérabilités connues des versions de `uv.lock`, de tous les groupes de dépendances, avec leurs empreintes | `ci.yml:25-26` |
 | PostgreSQL 18.6 | un service du job `tests-postgresql`, épinglé par son digest | `ci.yml:69-83` |
 | Docker Buildx | construit l'image `linux/amd64` de K-B et la contrôle | `image.yml` |
-| Grype v0.121.2 (Anchore) | cherche dans l'image les vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip` de l'image de base) et de CPython; refuse une haute ou critique qui a un correctif | `image.yml:64-82` |
+| Grype v0.121.3 (Anchore) | cherche dans l'image les vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip` de l'image de base) et de CPython; refuse une haute ou critique qui a un correctif | `image.yml:64-82` |
 | Azure CLI et Bicep v0.48.1 | compile `infra/main.bicep`, sans connexion à Azure | `infra.yml` |
 | MkDocs 1.6.1, avec Material for MkDocs 9.8.1 | construit le site des fiches de `documentation/`, en mode strict | `mkdocs.yml`; versions dans `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) |
 | Dependabot | ouvre chaque semaine les PR de mise à jour des actions et des images de base du `Dockerfile` | `.github/dependabot.yml` |
@@ -114,7 +114,7 @@ liste ni `mkdocs` ni `mkdocs-material`, mais liste `pytest` et `mypy`, du groupe
 | 6 | `Holds none of the planted files` (l. 45-48) | vérifie qu'aucun chemin de l'image ne s'appelle `.env*`, `*.sqlite*`, `decoy`, `.DS_Store` ni `.git` (l. 47); `__pycache__` n'est cherché que dans le contexte (étape 3) |
 | 7 | `Refuses to start without KB_DATA_DIR` (l. 51-57) | vérifie que `kb create-db` sans `KB_DATA_DIR` sort en code 2 avec `KB_DATA_DIR must point to the data directory` |
 | 8 | `Starts kb and creates the database` (l. 60-63) | lance `kb --help`, puis `kb create-db` dans le dossier de données de l'image |
-| 9 | `Installs Grype v0.121.2` (l. 67-72) | télécharge l'archive de Grype de sa release et vérifie son SHA256 (l. 71), comme Bicep dans `Infra` |
+| 9 | `Installs Grype v0.121.3` (l. 67-72) | télécharge l'archive de Grype de sa release et vérifie son SHA256 (l. 71), comme Bicep dans `Infra` |
 | 10 | `Has no high or critical vulnerability that has a fix` (l. 78-82) | lance `grype docker:k-b:ci --only-fixed --fail-on high`: Grype lit le système de fichiers final de l'image, tire sa base de vulnérabilités à chaque exécution (refusée si elle a plus de 5 jours, son défaut), garde les vulnérabilités qui ont un correctif (`--only-fixed`), puis échoue s'il en reste une haute ou critique (`--fail-on high`); le tableau des vulnérabilités gardées se lit dans le journal de l'étape. En dernier, pour qu'un scan rouge ne cache pas le résultat des étapes 5 à 8 |
 
 Les fichiers plantés à l'étape 2 sont, à la racine, `.env`, `.env.decoy`, `temp/decoy`, `reports/decoy` et
@@ -493,12 +493,13 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     la montée du digest ou une entrée de `.grype.yaml`.
     Pour réduire le risque: la marche à suivre est écrite ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage));
     faisable avec nos droits, une PR suffit.
-- **Grype v0.121.2 porte des vulnérabilités que v0.121.3 corrige** (lu le 2026-11-14): 8 avis de ses dépendances,
-    dont GO-2026-6888 (critique, `andybalholm/brotli`) et quatre hauts. Ils visent le démon Docker, dont Grype n'est que
-    client, ou sont des dénis de service à la décompression et à l'analyse HTML: au pire, le job échoue, sans laisser
-    passer l'image. v0.121.3, publiée le 2026-11-09 à 15:17 UTC, n'a pas encore les 7 jours d'attente que se donne la
-    CI.
-    Pour réduire le risque: monter Grype à v0.121.3 après le 2026-11-16 à 15:17 UTC
+- **Grype v0.121.3 porte un avis que v0.122.0 corrige** (lu le 2026-11-18): GHSA-q7gw-24fr-5p69 (moyen), dans le
+    SDK OpenTelemetry pour Go que Grype embarque: la borne de longueur d'un attribut de trace ou de journal ne coupe
+    pas une valeur faite du caractère U+FFFD. Le job ne règle aucune variable `OTEL_*` (`image.yml`); que Grype
+    n'exporte alors aucune trace, et que l'avis ne change pas le résultat du scan, est une hypothèse, non vérifiée
+    dans son code. v0.122.0, publiée le 2026-11-16 à 20:41 UTC, n'a pas encore les 7 jours
+    d'attente que se donne la CI.
+    Pour réduire le risque: monter Grype à v0.122.0 après le 2026-11-23 à 20:41 UTC
     ([Le détail des réglages](#le-detail-des-reglages), version de Grype); faisable avec nos droits, par une PR.
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml`, `infra.yml` ni `docs.yml`; le
     délai par défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
@@ -507,7 +508,7 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     la PR n° 533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
     Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-    lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+    lance la CI et attend ses sept contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
     lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,
@@ -526,10 +527,10 @@ Sources, lues le 2026-11-10: GitHub Docs,
 `action.yml` et sa dernière release, v7.4.2 (2026-08-28).
 
 Sources de #498, lues le 2026-11-14: les releases de Grype,
-[v0.121.2](https://github.com/anchore/grype/releases/tag/v0.121.2) (le digest de
-`grype_0.121.2_linux_amd64.tar.gz`, recoupé avec `grype_0.121.2_checksums.txt`) et
 [v0.121.3](https://github.com/anchore/grype/releases/tag/v0.121.3) (les avis qu'elle corrige, lus sur GitHub et
-[OSV](https://osv.dev/)); la [référence des réglages de Grype](https://oss.anchore.com/docs/reference/grype/configuration/)
+[OSV](https://osv.dev/); le 2026-11-18, le digest de `grype_0.121.3_linux_amd64.tar.gz`, recoupé avec
+`grype_0.121.3_checksums.txt`) et [v0.122.0](https://github.com/anchore/grype/releases/tag/v0.122.0) (l'avis
+qu'elle corrige, [GHSA-q7gw-24fr-5p69](https://github.com/advisories/GHSA-q7gw-24fr-5p69), lu le 2026-11-18); la [référence des réglages de Grype](https://oss.anchore.com/docs/reference/grype/configuration/)
 (ordre de recherche de `.grype.yaml`, `db.max-allowed-built-age` à 120 h, `check-for-app-update`, règles `ignore` et
 `reason`); Context7 `/anchore/grype` (`--only-fixed`, `--fail-on`); GitHub Docs,
 [« Events that trigger workflows »](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
