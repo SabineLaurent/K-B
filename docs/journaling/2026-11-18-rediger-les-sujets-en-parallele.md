@@ -169,7 +169,7 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 | Les tests existants de `test_digests.py` et `test_digest_router.py`, inchangés | Le replay en série garde l'ordre, le 429 et l'échéance comme avant |
 | `test_the_read_timeout_covers_the_longest_output_at_the_measured_rate` et `test_the_read_timeout_is_the_deadline_of_a_request` (`tests/ai_api/test_llm_client.py:686`, `:695`) | 8 192 jetons à 20 ms (163,84 s) tiennent dans le délai, et le délai égale les deux échéances ; échecs observés avant le code (`163.84 <= 90`, `90 == 200`) |
 | `uv run pytest` : 5 626 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Aucun recul ailleurs |
-| Essai de bout en bout sur gpt-6.1-sol | **À faire**, lancé par Sabine : critère 9 sujets sur 9 avant 200 s ; relevé dans `essai-c8/` |
+| Essai de bout en bout sur gpt-6.1-sol, le 2026-11-18 à 09:24Z (demande `65b59c73`, 300 items, 14 jours) | HTTP 200 en **109,3 s**, **9 fiches sur 9**, 16 requêtes sans relance : 7 classements en 76,9 s, puis 9 rédactions à la fois, de 21,2 à 32,0 s chacune. Le 17/11, en série : 4 fiches sur 9 à l'échéance de 200 s. Coût estimé 0,43 USD |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -194,8 +194,8 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 - **L'enregistrement du jeu de référence** : le tri est testé, mais aucun enregistrement réel n'a été lancé (un appel
   payant, réservé à Sabine).
 
-- **L'essai réel n'est pas encore fait** : les gains (environ 105 s au lieu de 200 s) sont une estimation tirée des
-  durées du 17/11. Rien ne dit encore que gpt-6.1-sol répond aussi vite à 9 requêtes simultanées qu'à une seule.
+- **Un seul essai réel** : 109,3 s pour une estimation d'environ 105 s ; les 9 rédactions simultanées ont pris 21,2 à
+  32,0 s, à peine plus que les 30,7 s mesurées une à une le 17/11. Un seul passage ne dit pas la variance.
 - **Le quota en parallèle** : environ 150 000 jetons estimés pour les 9 rédactions, d'après les plafonds de sortie et
   une entrée estimée, pas mesurée. Le comptage de Foundry par minute glissante n'a pas été lu.
 - **Le pourquoi de 200 plutôt que 229 s** n'a pas été donné par Sabine. L'ADR l'écrit comme une déduction, à
@@ -207,7 +207,7 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 
 ## Ce qui reste
 
-- L'essai de bout en bout sur gpt-6.1-sol (lancé par Sabine), puis la revue, la PR et la fusion.
+- La PR et la fusion.
 - Si l'essai ne tient pas l'échéance : classer en parallèle, ou passer en asynchrone. C'est hors de cette mission, à
   proposer à time-knight d'abord.
 - Les limites écrites après la revue (C2, C4, C5) : un appel en cours relance encore après le 429 d'un autre sujet ;
