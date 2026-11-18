@@ -685,15 +685,14 @@ MEASURED_MS_PER_OUTPUT_TOKEN = 20
 )
 def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate(output_cap):
     """An answer not streamed comes in one block: the read timeout of a call does not cut a valid
-    output near the cap. The deadline of the request can: a writing starts once the reading and
-    the classification are done, about 130 s before it on 2026-11-17."""
+    output near the cap; the deadline of the request still can."""
     seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * output_cap / 1000
 
     assert seconds_at_cap <= LLM_CALL_TIMEOUT_SECONDS
 
 
 def test_the_read_timeout_is_the_deadline_of_a_request():
-    """Decision of Sabine of 2026-11-18 (#640): the deadline of the request bounds a call."""
+    """The deadline of the request bounds a call."""
     assert LLM_CALL_TIMEOUT_SECONDS == DIGEST_REQUEST_TIMEOUT_SECONDS
     assert LLM_CALL_TIMEOUT_SECONDS == TREND_REPORT_REQUEST_TIMEOUT_SECONDS
 

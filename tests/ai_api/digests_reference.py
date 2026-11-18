@@ -12,6 +12,7 @@ import secrets
 import shutil
 import sys
 import tempfile
+import threading
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -284,8 +285,8 @@ def order_as_replayed[CallT](
     recorded: Sequence[tuple[str | None, CallT]], subject_names: Sequence[str]
 ) -> list[CallT]:
     """The calls in the order the replay sends them: the classification, then the writings in
-    the order of the list. A provider writes the subjects at once (#630), so they end in any
-    order; the attempts of a subject, made one after the other in its thread, keep theirs."""
+    the order of the list, the attempts of a subject in theirs; a provider writes the subjects at
+    once, so they end in any order."""
     position = {name: index for index, name in enumerate(subject_names)}
     in_order = sorted(
         recorded, key=lambda pair: -1 if pair[0] is None else position[pair[0]]
@@ -316,6 +317,8 @@ class RecordingTransport(httpx2.BaseTransport):
         # appends to it, a list.append being atomic.
         self.recorded: list[tuple[str | None, RecordedCall]] = []
         self.transport_errors = 0
+        # The count is read then written by the threads of the writings.
+        self.transport_errors_lock = threading.Lock()
 
     @property
     def calls(self) -> list[RecordedCall]:
@@ -329,7 +332,8 @@ class RecordingTransport(httpx2.BaseTransport):
             finally:
                 response.close()
         except BaseException:
-            self.transport_errors += 1
+            with self.transport_errors_lock:
+                self.transport_errors += 1
             raise
         stage = read_stage(request)
         retry_after = response.headers.get("Retry-After")

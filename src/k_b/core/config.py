@@ -621,8 +621,8 @@ WAIT_LOG_INTERVAL_SECONDS = 10
 # The time a request to the model needs at least: none is sent with less left, so that the items
 # are not sent for an answer the deadline would throw away. Above the slowest writing measured by
 # #158 on gpt-6-luna (9.3 s), not above the longest one the output cap allows (about 164 s on
-# gpt-6.1-sol, LLM_CALL_TIMEOUT_SECONDS): a longer writing started with less time left can still
-# end in llm_timeout.
+# gpt-6.1-sol, see the comment of LLM_CALL_TIMEOUT_SECONDS): a longer writing started with less
+# time left can still end in llm_timeout.
 MIN_SECONDS_FOR_LLM_REQUEST = 10
 
 # The export of the metrics of the AI API in OpenTelemetry (ai_api/connectors/metrics_export.py,

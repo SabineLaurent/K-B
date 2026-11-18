@@ -1419,7 +1419,9 @@ def test_the_subjects_of_a_provider_are_written_all_at_once(reading):
     assert result.failed_subjects == ()
 
 
-def test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in(reading):
+def test_the_digests_keep_the_order_of_the_list_when_the_first_is_answered_last(
+    reading,
+):
     others_answered = threading.Event()
     others = {"agent_tools", "research"}
     answered = set()
@@ -1434,7 +1436,7 @@ def test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in(readi
             if answered == others:
                 others_answered.set()
 
-    # The first subject is answered once the two others are: its wait returns True only then.
+    # The first subject is answered after the two others are: its wait returns True only then.
     result = digest_in_parallel(
         reading, ProviderInParallel(answer_the_first_subject_last)
     )

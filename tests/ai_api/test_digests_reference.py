@@ -94,8 +94,8 @@ def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
 
 
 def test_the_calls_recorded_in_parallel_are_kept_in_the_order_the_replay_sends_them():
-    """The writings of a provider end in any order (#630); the replay sends the classification,
-    then each subject in the order of the list, its attempts one after the other."""
+    """The writings of a provider end in any order; the replay sends the classification, then
+    each subject in the order of the list, its attempts one after the other."""
     recorded = [
         (None, "classify 1"),
         (None, "classify 2"),

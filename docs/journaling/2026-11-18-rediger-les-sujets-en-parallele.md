@@ -162,7 +162,7 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `test_the_subjects_of_a_provider_are_written_all_at_once` (`tests/ai_api/test_digests.py:1405`) | Chaque rédaction attend à une `threading.Barrier` de 3 que les trois soient en vol. En série, la première attendrait seule : `BrokenBarrierError` au bout de 5 s (échec observé avant le code, le 18/11 à 03:10Z) |
-| `test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in` (`:1422`) | Le premier sujet répond le dernier ; les fiches et les appels (`stage_calls`) restent dans l'ordre de la liste |
+| `test_the_digests_keep_the_order_of_the_list_when_the_first_is_answered_last` (`:1422`) | Le premier sujet n'est servi qu'après les deux autres ; les fiches et les appels (`stage_calls`) restent dans l'ordre de la liste. Le test ne prouve pas qu'il finit le dernier : l'ordre de fin dépend de l'ordonnanceur |
 | `test_a_subject_written_in_its_thread_keeps_its_span_under_the_request` (`:1455`) | Chaque `write_subject` a pour parent le span de la demande, et chaque `chat` de rédaction a pour parent son `write_subject` : la copie du contexte fonctionne |
 | `test_a_fault_in_a_thread_is_raised` (`:1483`) | Une exception dans un fil remonte à l'appelant, elle n'est pas perdue |
 | `test_the_calls_recorded_in_parallel_are_kept_in_the_order_the_replay_sends_them` (`tests/ai_api/test_digests_reference.py:96`) | Des rédactions enregistrées dans le désordre sont rendues dans l'ordre du replay, les tentatives d'un sujet groupées |
@@ -213,6 +213,8 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 - Les limites écrites après la revue (C2, C4, C5) : un appel en cours relance encore après le 429 d'un autre sujet ;
   des fils refusés ensemble relancent ensemble ; une sortie proche du plafond peut être coupée par l'échéance, faute
   des 130 s nécessaires. Rien n'est changé dans `llm_client.py`.
-- `MIN_SECONDS_FOR_LLM_REQUEST` (10 s) a été calculé sur la rédaction la plus lente de gpt-6-luna (9,3 s). Avec
-  gpt-6.1-sol, une rédaction lancée avec 11 s restantes sera presque toujours coupée. Non traité ici.
+- `MIN_SECONDS_FOR_LLM_REQUEST` (10 s) a été calculé sur la rédaction la plus lente de gpt-6-luna (9,3 s). Une
+  rédaction de gpt-6.1-sol dure 23 à 31 s : une demande au modèle lancée avec 10 à 30 s restantes peut finir en
+  `llm_timeout`, ses items envoyés pour rien. La valeur reste à 10 s (constat D1 de la seconde revue, écarté par
+  time-knight) ; l'essai réel le montrera s'il arrive.
 - Après la fusion : le passage de la production à gpt-6.1-sol, par les gestes de Sabine.

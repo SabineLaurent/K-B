@@ -3,8 +3,7 @@ under the deadline; nothing is written nor logged here, each step is a span.
 
 After a writing failed with a 429, no subject not sent yet is sent: its items would leave for an
 answer refused (minimisation, GDPR art. 5.1.c). In parallel, the subjects leave at once, before
-any 429 is known, and a call under way still makes its own retry (decision of Sabine of
-2026-11-18, #630)."""
+any 429 is known."""
 
 import contextvars
 import threading
@@ -152,10 +151,9 @@ def write_subjects(
     *,
     tracing: Tracing,
 ) -> list[SubjectWriting]:
-    """Each subject written in its thread, all at once, the writings in the order of the list
-    whatever order they end in (decision of Sabine of 2026-11-17, #630). The client of httpx2 is
-    shared: its pool is thread-safe. Each thread runs in a copy of the context, where the span of
-    the request is current: OpenTelemetry keeps it in contextvars, which a thread does not get."""
+    """Each subject written in its thread, all at once, the writings in the order of the list;
+    each thread runs in a copy of the context, where the span of the request is current, since
+    OpenTelemetry keeps it in contextvars, which a thread does not get."""
     rate_limited = threading.Event()
     if settings.provider == "replay" or len(subjects_to_write) < 2:
         # In series, stopped by a fault: the answers of the replay follow the order of the
@@ -201,8 +199,7 @@ def write_one_subject(
     tracing: Tracing,
 ) -> SubjectWriting:
     """The writing of a subject and its checks, a span; nothing sent past the deadline or after a
-    429 of another subject. In parallel, the subjects leave at once, before any 429 is known: the
-    rule holds for those not sent yet (decision of Sabine of 2026-11-18, #630)."""
+    429 of another subject."""
     with tracing.step(
         "write_subject", attributes={"k_b.subject": subject.name}
     ) as step:
