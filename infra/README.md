@@ -352,7 +352,8 @@ false ; aucune route (`[]`).
 az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].{name:name, notScopes:notScopes}" -o json
 # L'évaluation à la demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h.
 az policy state trigger-scan -g "$RG"
-az policy state list -g "$RG" --filter "resourceType eq 'Microsoft.App/containerApps'" \
+# Par le nom des assignations seulement : les deux ne visent que les apps (Microsoft.App/containerApps).
+az policy state list -g "$RG" \
   --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, compliant:isCompliant}" -o table
 ```
 
@@ -1665,8 +1666,9 @@ lue le 2026-11-13).
 Après la fusion de #630 (décision de Sabine du 2026-11-18 : aucune passe avant). Le module ne dépend pas de l'image :
 la première passe l'applique, la seconde aussi.
 
-1. Le critère rouge, avant la passe : `az policy assignment list -g "$RG" --query "[].displayName" -o tsv` ne nomme
-   aucune des deux politiques.
+1. Le critère rouge, avant la passe, par le nom des assignations (le nom affiché est celui de la définition, qu'un
+   autre projet du groupe peut avoir assignée) :
+   `az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].name" -o tsv` ne rend rien.
 2. La première passe (étape 2). Aperçu attendu, déduit du Bicep : **à créer** `audit-kb-ca-external-ingress` et
    `audit-kb-ca-https-only` ; **à modifier** le bruit de l'étape 2.
 3. Les constats : « La relecture de la configuration » et « Les politiques d'audit » (étape 6).

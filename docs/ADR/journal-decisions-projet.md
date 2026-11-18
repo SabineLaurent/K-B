@@ -7413,8 +7413,9 @@ des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, 
   que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
   bloquée ; les apps des autres projets du groupe sont auditées aussi. — PR de #497
 - **`ca-kb-web` est hors de la politique « Container Apps should disable external network access », par
-  `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; son nom est une
-  seule variable de `main.bicep`, `webAppName`, lue par le site et par le module. Écartée : une exemption, visible
+  `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; dans
+  `main.bicep`, son nom est une variable, `webAppName`, lue par le site, par son hôte et par le module ;
+  `infra/deployment.json`, que lit `deploy.yml`, l'écrit aussi. Écartée : une exemption, visible
   comme « Exempt », mais en API de préversion et avec un droit de plus. — PR de #497
 - **Le module s'applique aux deux passes, hors de `deployWorkloads`.** Pourquoi : il ne dépend ni de l'image ni des
   apps ; `notScopes` vise le site par son identifiant, qu'il existe ou non. — PR de #497

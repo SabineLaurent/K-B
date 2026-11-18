@@ -173,8 +173,8 @@ var dataApiHost = 'ca-kb-data-api.${internalDomain}'
 var aiApiHost = 'ca-kb-ai-api.${internalDomain}'
 // The site (#571): its internal name until exposeWeb opens it, then its name on the internet.
 var webHost = exposeWeb
-  ? 'ca-kb-web.${containerAppsEnvironment.outputs.defaultDomain}'
-  : 'ca-kb-web.${internalDomain}'
+  ? '${webAppName}.${containerAppsEnvironment.outputs.defaultDomain}'
+  : '${webAppName}.${internalDomain}'
 var image = '${registry.outputs.loginServer}/k-b:${imageTag}'
 // Variable to Key Vault secret, for each app. KB_DATA_API_KEY_AI_DIGEST is the key of the AI API to
 // the data API, KB_DATA_API_KEY_WEB the key of the site: each read by both apps.
