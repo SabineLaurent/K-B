@@ -123,8 +123,8 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
   vert, le 14/11 à 16:53 UTC (exécution 43618055085). Le constat est posté sur #496. Le plan attendait la PR d'API10 ;
   celle de #625 est venue plus tôt, avec la même preuve (accord de time-knight).
 - **« Évaluation automatisée »** (l. 1337) reste « non tenue, en partie » : le scan y est décrit, mais les sondes après
-  déploiement viennent avec #499. Les exécutions du scan, vert sur l'image du jour et rouge sur l'essai, y seront
-  citées une fois qu'elles existeront : l'auto-évaluation ne s'écrit jamais d'avance.
+  déploiement viennent avec #499. Les exécutions du scan, rouge sur l'essai et vert sur l'image de #643, n'y ont été
+  citées qu'une fois qu'elles existaient (`1f2abbf`) : l'auto-évaluation ne s'écrit jamais d'avance.
 
 ### 6. Le premier scan rouge : zlib1g, installé à sa version corrigée
 
@@ -179,8 +179,6 @@ qu'un digest de l'image de base porte le correctif.
 | l'exécution 44279945350 sur b38fd169, le 18/11 : `zlib1g 1:1.3.dfsg+really1.3.1-1+b1`, corrigé en `1:1.3.dfsg+really1.3.1-1+deb13u1`, CVE-2026-85091 `High` ; `image-build` rouge | l'image du jour, au digest monté, porte la faille ; la version installée est `+b1`, une recompilation de Debian |
 | l'exécution 44347407723 sur ccb672fc, le 18/11 à 16:27 UTC : apt prend zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1` dans `trixie-security` (« 1 upgraded, 0 newly installed »), puis le scan est vert ; restent 7 vulnérabilités de CPython, moyennes ou moindres | les sources d'APT de l'image comptent `trixie-security`, le bloc n'installe que zlib1g, et l'image passe le seuil |
 
-Les deux dernières lignes n'existent pas encore au moment de cette note : elles viennent après le push.
-
 ## Ce que tu dois pouvoir défendre
 
 - **Pourquoi un scan de l'image, alors qu'`audit` existe ?** `audit` lit `uv.lock`. L'image contient aussi les paquets
@@ -210,7 +208,8 @@ Les deux dernières lignes n'existent pas encore au moment de cette note : elles
 
 ## Ce qui reste
 
-- **Dans cette PR, avant la fusion** : le geste de Sabine (`image-build` au ruleset), et sa lecture citée.
+- **Le geste de Sabine, après la fusion de #643** (le 18/11, sans lui) : `image-build` au ruleset de `main`, et sa
+  lecture citée. Lu le 18/11 après la fusion, le ruleset exige encore six contrôles, sans `image-build`.
 - **La montée à Grype v0.122.0** après le 23/11 à 20:41 UTC, par une PR.
 - **#647** : retirer l'installation de zlib1g quand l'image de base porte le correctif.
 - **#626** : le même scan dans `deploy.yml`, avant la mise en ligne.
