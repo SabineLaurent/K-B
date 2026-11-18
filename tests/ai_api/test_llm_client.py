@@ -36,6 +36,7 @@ from k_b.ai_api.stages.trend_writing import TREND_WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.stages.writing import WRITING_MAX_COMPLETION_TOKENS
 from k_b.ai_api.tracing import TRACING_OFF, SpanRef
 from k_b.core.config import (
+    DIGEST_REQUEST_TIMEOUT_SECONDS,
     LLM_CALL_TIMEOUT_SECONDS,
     LLM_CONNECT_TIMEOUT_SECONDS,
     LLM_POOL_TIMEOUT_SECONDS,
@@ -45,6 +46,7 @@ from k_b.core.config import (
     LLM_WRITE_TIMEOUT_SECONDS,
     MAX_TOKENS_READ_PER_ANSWER,
     MIN_SECONDS_FOR_LLM_REQUEST,
+    TREND_REPORT_REQUEST_TIMEOUT_SECONDS,
 )
 from k_b.core.retry_after import MAX_RETRY_AFTER_DIGITS
 
@@ -666,9 +668,10 @@ def test_the_client_of_the_provider_sends_the_key_and_follows_no_redirection():
     assert llm_call.outcome == "llm_unavailable"
 
 
-# Measured by #158 on gpt-6-luna (2026-10-17): about 7.35 ms per output token, a call not
-# streamed.
-MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
+# Measured on gpt-6.1-sol, the model of production, by the end-to-end run of 2026-11-17 (#630):
+# writings of 1,220 to 1,765 output tokens in 23.4 to 30.7 s, a call not streamed; the slowest,
+# 19.2 ms per token, rounded up.
+MEASURED_MS_PER_OUTPUT_TOKEN = 20
 
 
 @pytest.mark.parametrize(
@@ -680,14 +683,18 @@ MEASURED_MS_PER_OUTPUT_TOKEN = 7.35
         TREND_WRITING_MAX_COMPLETION_TOKENS,
     ],
 )
-def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate_with_a_margin(
-    output_cap,
-):
+def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate(output_cap):
     """An answer not streamed comes in one block: a valid output near the cap must not end in
     llm_timeout, which is not retried."""
     seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * output_cap / 1000
 
-    assert seconds_at_cap * 1.4 <= LLM_CALL_TIMEOUT_SECONDS
+    assert seconds_at_cap <= LLM_CALL_TIMEOUT_SECONDS
+
+
+def test_the_read_timeout_is_the_deadline_of_a_request():
+    """Decision of Sabine of 2026-11-18 (#640): the deadline of the request bounds a call."""
+    assert LLM_CALL_TIMEOUT_SECONDS == DIGEST_REQUEST_TIMEOUT_SECONDS
+    assert LLM_CALL_TIMEOUT_SECONDS == TREND_REPORT_REQUEST_TIMEOUT_SECONDS
 
 
 def test_the_client_of_the_provider_reads_no_proxy_of_the_environment(monkeypatch):

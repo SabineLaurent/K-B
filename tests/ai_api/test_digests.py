@@ -3,10 +3,12 @@ subject, then each subject written."""
 
 import json
 import secrets
+import threading
 from dataclasses import replace
 from datetime import UTC, datetime, time
 from pathlib import Path
 
+import httpx2
 import pytest
 from fastapi.testclient import TestClient
 from pydantic import SecretStr
@@ -14,7 +16,11 @@ from pydantic import SecretStr
 from k_b.ai_api import digests, watch_items
 from k_b.ai_api.connectors.data_api_client import read_watch
 from k_b.ai_api.connectors.llm_client import build_http_client
-from k_b.ai_api.connectors.llm_replay import ReplayTransport
+from k_b.ai_api.connectors.llm_replay import (
+    CompletionStep,
+    ReplayTransport,
+    build_completion,
+)
 from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.digests import DigestsResult, FailedSubject, build_digests
@@ -1340,3 +1346,147 @@ def test_with_content_all_a_fault_in_the_checks_keeps_the_content_sent(
 
     # The classification, then the writing whose checks failed.
     assert len(contents_sent(recorded_traces)) == 2
+
+
+# The writings of a provider in parallel, one thread per subject (#630).
+PROVIDER_SETTINGS = replace(
+    REPLAY_SETTINGS,
+    provider="openai_compatible",
+    base_url="https://models.example/openai/v1",
+    model="test-model",
+    api_key=SecretStr("test-key-0123456789"),
+)
+OUTPUT_BY_SUBJECT = {
+    "security_alerts": written(SECURITY_CLAIM),
+    "agent_tools": written(AGENT_CLAIM),
+    "research": written(),
+}
+# Long enough for three threads to meet, short enough for a test written in series to fail fast.
+THREAD_WAIT_SECONDS = 5
+
+
+class ProviderInParallel(httpx2.MockTransport):
+    """A provider that answers the classification at once, and each writing once wait_for_turn
+    lets it go."""
+
+    def __init__(self, wait_for_turn):
+        super().__init__(self.answer)
+        self.wait_for_turn = wait_for_turn
+        self.answered_subjects = []
+
+    def answer(self, request):
+        body = json.loads(request.content)
+        if messages_of(body, "system") == [CLASSIFICATION_SYSTEM_PROMPT]:
+            return to_response(classified())
+        subject = json.loads(messages_of(body, "user")[0])["subject"]["name"]
+        self.wait_for_turn(subject)
+        self.answered_subjects.append(subject)
+        return to_response(OUTPUT_BY_SUBJECT[subject])
+
+
+def to_response(step):
+    return httpx2.Response(
+        200, json=build_completion(CompletionStep.model_validate(step))
+    )
+
+
+def digest_in_parallel(reading, transport, tracing=TRACING_OFF):
+    with build_http_client(PROVIDER_SETTINGS, transport=transport) as http_client:
+        return build_digests(
+            http_client,
+            PROVIDER_SETTINGS,
+            reading,
+            TEST_SUBJECTS,
+            {subject.name: EARLIEST_START for subject in TEST_SUBJECTS},
+            LATEST_END,
+            Deadline.after(3600),
+            tracing=tracing,
+        )
+
+
+def test_the_subjects_of_a_provider_are_written_all_at_once(reading):
+    # Each writing waits until the three are under way: written one after the other, the first
+    # would wait alone.
+    all_under_way = threading.Barrier(len(TEST_SUBJECTS), timeout=THREAD_WAIT_SECONDS)
+
+    result = digest_in_parallel(
+        reading, ProviderInParallel(lambda subject: all_under_way.wait())
+    )
+
+    assert [digest.subject for digest in result.digests] == [
+        "security_alerts",
+        "agent_tools",
+        "research",
+    ]
+    assert result.failed_subjects == ()
+
+
+def test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in(reading):
+    others_answered = threading.Event()
+    others = {"agent_tools", "research"}
+    answered = set()
+    lock = threading.Lock()
+
+    def answer_the_first_subject_last(subject):
+        if subject == "security_alerts":
+            assert others_answered.wait(THREAD_WAIT_SECONDS)
+            return
+        with lock:
+            answered.add(subject)
+            if answered == others:
+                others_answered.set()
+
+    transport = ProviderInParallel(answer_the_first_subject_last)
+
+    result = digest_in_parallel(reading, transport)
+
+    assert transport.answered_subjects[-1] == "security_alerts"
+    assert [digest.subject for digest in result.digests] == [
+        "security_alerts",
+        "agent_tools",
+        "research",
+    ]
+    assert [call.subject for call in result.stage_calls] == [
+        None,
+        "security_alerts",
+        "agent_tools",
+        "research",
+    ]
+
+
+def test_a_subject_written_in_its_thread_keeps_its_span_under_the_request(
+    reading, recorded_traces
+):
+    tracing = recorded_traces.trace_export.build_tracing()
+    all_under_way = threading.Barrier(len(TEST_SUBJECTS), timeout=THREAD_WAIT_SECONDS)
+
+    with tracing.step("request") as request:
+        digest_in_parallel(
+            reading,
+            ProviderInParallel(lambda subject: all_under_way.wait()),
+            tracing=tracing,
+        )
+
+    request_id = request.ref.span_context.span_id
+    writings = recorded_traces.find_spans("write_subject")
+    assert len(writings) == len(TEST_SUBJECTS)
+    assert {span.parent.span_id for span in writings} == {request_id}
+    writing_ids = {span.context.span_id for span in writings}
+    chats = recorded_traces.find_spans("chat test-model")
+    # The classification under the request, each writing under its subject.
+    assert sorted(span.parent.span_id in writing_ids for span in chats) == [
+        False,
+        True,
+        True,
+        True,
+    ]
+
+
+def test_a_fault_in_a_thread_is_raised(reading, monkeypatch):
+    def fail(*arguments):
+        raise RuntimeError("a fault of the checks")
+
+    monkeypatch.setattr(digests, "to_digest", fail)
+
+    with pytest.raises(RuntimeError):
+        digest_in_parallel(reading, ProviderInParallel(lambda subject: None))

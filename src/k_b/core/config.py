@@ -238,18 +238,23 @@ LOG_TO_FILE = True
 # The call to the model by the AI API (ai_api/connectors/llm_client.py; docs/fiches-veille.md). Waiting for
 # a connection, for a connection of the pool, for each write of the request, and for each read of
 # the answer: a call that is not streamed sends nothing before its answer is whole, so the read
-# timeout bounds the wait for an answer that comes in one block. Measured by #158 on gpt-6-luna
-# (2026-10-17): about 7.35 ms per output token, so 8,192 tokens take about 60 seconds; 90 leaves
-# a margin. Connection, pool and write: no failure over 20 real calls, bodies of 27,000
-# characters.
+# timeout bounds the wait for an answer that comes in one block. Measured on gpt-6.1-sol by the
+# end-to-end run of 2026-11-17 (#630): writings of 1,220 to 1,765 output tokens in 23.4 to 30.7
+# s, at most 19.2 ms per token, so about 20 ms; the 8,192 tokens of WRITING_MAX_COMPLETION_TOKENS
+# take about 164 s, 229 s with the margin of 40 % kept since #158 (7.35 ms per token on
+# gpt-6-luna, 90 s). Set to the deadline of a request, 200 s (DIGEST_REQUEST_TIMEOUT_SECONDS,
+# TREND_REPORT_REQUEST_TIMEOUT_SECONDS; decision of Sabine of 2026-11-18, #640): the deadline,
+# which shortens each timeout to the time left (ai_api/deadline.py), is the only bound of a call,
+# and a call that hangs, a classification included, leaves no time for its retry. Connection,
+# pool and write: no failure over 20 real calls, bodies of 27,000 characters.
 LLM_CONNECT_TIMEOUT_SECONDS = 5
 LLM_POOL_TIMEOUT_SECONDS = 5
 LLM_WRITE_TIMEOUT_SECONDS = 10
-LLM_CALL_TIMEOUT_SECONDS = 90
+LLM_CALL_TIMEOUT_SECONDS = 200
 # The wait before the retry after a 429, a 5xx or a failed connection without Retry-After; a
-# Retry-After above the maximum is not waited: the call ends there. A call lasts 2 × (5 + 90) +
-# 20 = 210 seconds when its answers come in one block; an answer sent in pieces can last longer,
-# since each read has its own timeout: the bound of the whole is the one of the request (#205).
+# Retry-After above the maximum is not waited: the call ends there. The deadline of the request
+# bounds a call and its retry (#205): a retry is sent only if MIN_SECONDS_FOR_LLM_REQUEST are
+# left after its wait.
 LLM_RETRY_WAIT_SECONDS = 2
 LLM_RETRY_AFTER_MAX_SECONDS = 20
 # Not set: temperature=0. "none", "minimal" or "low" for a reasoning model, which takes no
