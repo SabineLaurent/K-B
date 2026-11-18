@@ -23,11 +23,12 @@ def api_keys():
 @pytest.fixture
 def make_client():
     """A client of a new app, on localhost, as TrustedHostMiddleware refuses the testserver host
-    of TestClient; the app reads the SQLite file, or the pool of a PostgreSQL base, it is given."""
+    of TestClient; the app reads the SQLite file, or the pool of a PostgreSQL base, it is given,
+    and serves its OpenAPI as in the sandbox unless openapi_url says otherwise."""
 
-    def make(readers, api_keys):
+    def make(readers, api_keys, openapi_url=OPENAPI_PATH):
         return TestClient(
-            create_app(readers, api_keys, openapi_url=OPENAPI_PATH),
+            create_app(readers, api_keys, openapi_url=openapi_url),
             base_url="http://localhost",
             raise_server_exceptions=False,
         )

@@ -1,5 +1,5 @@
-"""kb smoke-test: the health of both APIs, then the listing of the container of the test by the
-identity of the job; only counts are written."""
+"""kb smoke-test: the health and the probes without key of both APIs, then the listing of the
+container of the test by the identity of the job; only counts are written."""
 
 import re
 import signal
@@ -30,9 +30,29 @@ from k_b.exchange.storage import (
 )
 from k_b.jobs.api_health import build_health_client
 
-TEST_DATA_API_URL = "https://ca-kb-data-api.internal.test.example"
-TEST_AI_API_URL = "https://ca-kb-ai-api.internal.test.example"
+TEST_DATA_API_HOST = "ca-kb-data-api.internal.test.example"
+TEST_AI_API_HOST = "ca-kb-ai-api.internal.test.example"
+TEST_DATA_API_URL = f"https://{TEST_DATA_API_HOST}"
+TEST_AI_API_URL = f"https://{TEST_AI_API_HOST}"
 HEALTH_BODY = b'{"status":"ok"}'
+# What both APIs answer without a key, out of the sandbox; tests/ai_api and tests/data_api send
+# each probe to the apps themselves.
+STATUS_WITHOUT_KEY = {
+    ("GET", "/health"): 200,
+    ("GET", "/items"): 401,
+    ("POST", "/digests"): 401,
+    ("GET", "/docs"): 404,
+    ("HEAD", "/health"): 405,
+}
+# Each probe: the API, its host, the request, and the row of the summary.
+PROBES = [
+    ("data API", TEST_DATA_API_HOST, "GET", "/items"),
+    ("data API", TEST_DATA_API_HOST, "GET", "/docs"),
+    ("data API", TEST_DATA_API_HOST, "HEAD", "/health"),
+    ("AI API", TEST_AI_API_HOST, "POST", "/digests"),
+    ("AI API", TEST_AI_API_HOST, "GET", "/docs"),
+    ("AI API", TEST_AI_API_HOST, "HEAD", "/health"),
+]
 
 
 @pytest.fixture(autouse=True)
@@ -55,14 +75,17 @@ def smoke_test_environment(monkeypatch, tmp_path):
     return tmp_path
 
 
-def answer_health(status_by_host=None):
-    """Both APIs; an API answers its status of status_by_host, 200 by default."""
-    status_by_host = status_by_host or {}
+def answer_as_the_apis(changed_statuses=None):
+    """Both APIs as they answer without a key out of the sandbox; changed_statuses gives another
+    status to a request, by its host, method and path."""
+    changed_statuses = changed_statuses or {}
 
     def handle(request):
-        return httpx2.Response(
-            status_by_host.get(request.url.host, 200), content=HEALTH_BODY
+        status = changed_statuses.get(
+            (request.url.host, request.method, request.url.path),
+            STATUS_WITHOUT_KEY[(request.method, request.url.path)],
         )
+        return httpx2.Response(status, content=HEALTH_BODY)
 
     return handle
 
@@ -74,7 +97,7 @@ def simulate(monkeypatch, handle_api=None, handle_storage=None):
 
     def keep_and_handle(request):
         api_requests.append(request)
-        return (handle_api or answer_health())(request)
+        return (handle_api or answer_as_the_apis())(request)
 
     identity = FakeTransport(answer_token)
     storage = FakeTransport(handle_storage or answer_listing(SPOTTED_BLOB_NAME))
@@ -100,6 +123,11 @@ def read_kb_log(data_dir):
     return (data_dir / "logs" / "kb.log").read_text("utf-8")
 
 
+def read_summary(output):
+    """The rows of the summary kb smoke-test prints, its header included: check -> result."""
+    return dict(re.findall(r"^(\S.*?)  +(\S.*)$", output, re.MULTILINE))
+
+
 def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
     monkeypatch, smoke_test_environment, capsys
 ):
@@ -108,20 +136,109 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.SUCCEEDED
-    assert [str(request.url) for request in api_requests] == [
-        f"{TEST_DATA_API_URL}/health",
-        f"{TEST_AI_API_URL}/health",
+    assert [(request.method, str(request.url)) for request in api_requests] == [
+        ("GET", f"{TEST_DATA_API_URL}/health"),
+        ("GET", f"{TEST_DATA_API_URL}/items"),
+        ("GET", f"{TEST_DATA_API_URL}/docs"),
+        ("HEAD", f"{TEST_DATA_API_URL}/health"),
+        ("GET", f"{TEST_AI_API_URL}/health"),
+        ("POST", f"{TEST_AI_API_URL}/digests"),
+        ("GET", f"{TEST_AI_API_URL}/docs"),
+        ("HEAD", f"{TEST_AI_API_URL}/health"),
     ]
+    assert not any("authorization" in request.headers for request in api_requests)
     assert len(storage_requests) == 1
-    output = capsys.readouterr().out
-    assert "data API          ok" in output
-    assert "AI API            ok" in output
-    assert "exchange storage  1 blob listed in smoke-test" in output
+    assert read_summary(capsys.readouterr().out) == {
+        "check": "result",
+        "data API": "ok",
+        "data API GET /items": "401 as expected",
+        "data API GET /docs": "404 as expected",
+        "data API HEAD /health": "405 as expected",
+        "AI API": "ok",
+        "AI API POST /digests": "401 as expected",
+        "AI API GET /docs": "404 as expected",
+        "AI API HEAD /health": "405 as expected",
+        "exchange storage": "1 blob listed in smoke-test",
+    }
     log = read_kb_log(smoke_test_environment)
+    assert "AI API: POST /digests without key answered 401" in log
     assert "exchange storage: 1 blob listed in smoke-test" in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 3 of 3 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 9 checks passed\n", log
     )
+
+
+@pytest.mark.parametrize(("name", "host", "method", "path"), PROBES)
+def test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run(
+    monkeypatch, smoke_test_environment, capsys, name, host, method, path
+):
+    api_requests, storage_requests = simulate(
+        monkeypatch, handle_api=answer_as_the_apis({(host, method, path): 200})
+    )
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.FAILED
+    assert len(api_requests) == 8
+    assert len(storage_requests) == 1
+    summary = read_summary(capsys.readouterr().out)
+    assert summary[f"{name} {method} {path}"] == "failed"
+    assert sum(result == "failed" for result in summary.values()) == 1
+    log = read_kb_log(smoke_test_environment)
+    assert (
+        f"ERROR k_b.cli: {name}: {method} {path} without key failed: "
+        "probe_unexpected_status, HTTP 200\n"
+    ) in log
+    assert re.search(
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
+    )
+
+
+@pytest.mark.parametrize(
+    ("error_type", "state"),
+    [(httpx2.ReadTimeout, "probe_timeout"), (httpx2.ConnectError, "probe_unavailable")],
+)
+def test_a_probe_without_answer_fails_by_its_state_without_the_url(
+    monkeypatch, smoke_test_environment, error_type, state
+):
+    def fail_the_digests(request):
+        if request.method == "POST":
+            raise error_type("refused by the test", request=request)
+        return answer_as_the_apis()(request)
+
+    simulate(monkeypatch, handle_api=fail_the_digests)
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.FAILED
+    log = read_kb_log(smoke_test_environment)
+    assert f"ERROR k_b.cli: AI API: POST /digests without key failed: {state}\n" in log
+    assert TEST_AI_API_HOST not in log
+    assert "refused by the test" not in log
+    assert re.search(
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
+    )
+
+
+class UnreadStream(httpx2.SyncByteStream):
+    """A body that fails the test if it is read."""
+
+    def __iter__(self):
+        raise AssertionError("the body was read")
+
+
+def test_the_body_of_an_answer_to_a_probe_is_never_read(
+    monkeypatch, smoke_test_environment
+):
+    def answer_probes_with_an_unread_body(request):
+        answer = answer_as_the_apis()(request)
+        if (request.method, request.url.path) == ("GET", "/health"):
+            return answer
+        return httpx2.Response(answer.status_code, stream=UnreadStream())
+
+    simulate(monkeypatch, handle_api=answer_probes_with_an_unread_body)
+
+    assert cli.main(["smoke-test"]) == cli.ExitCode.SUCCEEDED
 
 
 def test_the_name_of_a_blob_listed_is_written_nowhere(
@@ -151,7 +268,7 @@ def test_a_403_of_the_storage_fails_the_smoke_test_without_the_name_its_body_giv
         "exchange storage: not listed: exchange_storage_forbidden, HTTP 403,"
         " AuthenticationFailed"
     ) in log
-    assert "exchange storage  failed" in captured.out
+    assert read_summary(captured.out)["exchange storage"] == "failed"
     assert not names_the_spotted_blob(captured.out)
     assert not names_the_spotted_blob(captured.err)
     assert not names_the_spotted_blob(log)
@@ -183,21 +300,22 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
 ):
     api_requests, storage_requests = simulate(
         monkeypatch,
-        handle_api=answer_health({"ca-kb-data-api.internal.test.example": 503}),
+        handle_api=answer_as_the_apis({(TEST_DATA_API_HOST, "GET", "/health"): 503}),
     )
 
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.FAILED
-    assert len(api_requests) == 2
+    assert len(api_requests) == 8
     assert len(storage_requests) == 1
-    output = capsys.readouterr().out
-    assert "data API          failed" in output
-    assert "AI API            ok" in output
+    summary = read_summary(capsys.readouterr().out)
+    assert summary["data API"] == "failed"
+    assert summary["data API GET /items"] == "401 as expected"
+    assert summary["AI API"] == "ok"
     log = read_kb_log(smoke_test_environment)
     assert "data API: /health failed: health_failed, HTTP 503" in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 2 of 3 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
     )
 
 
@@ -207,15 +325,45 @@ def test_smoke_test_reaches_the_compose_services_in_http_in_the_sandbox(
     monkeypatch.setenv("KB_DEPLOYMENT_ENVIRONMENT", "sandbox")
     monkeypatch.setenv("KB_DATA_API_URL", "http://api-donnees:8000")
     monkeypatch.setenv("KB_AI_API_URL", "http://api-ia:8001")
-    api_requests, _ = simulate(monkeypatch)
+    api_requests, _ = simulate(
+        monkeypatch,
+        handle_api=answer_as_the_apis(
+            {("api-donnees", "GET", "/docs"): 200, ("api-ia", "GET", "/docs"): 200}
+        ),
+    )
 
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.SUCCEEDED
     assert [str(request.url) for request in api_requests] == [
         "http://api-donnees:8000/health",
+        "http://api-donnees:8000/items",
+        "http://api-donnees:8000/docs",
+        "http://api-donnees:8000/health",
+        "http://api-ia:8001/health",
+        "http://api-ia:8001/digests",
+        "http://api-ia:8001/docs",
         "http://api-ia:8001/health",
     ]
+
+
+def test_in_the_sandbox_a_docs_not_served_fails_its_probe(
+    monkeypatch, smoke_test_environment, capsys
+):
+    """In the sandbox both APIs serve /docs (read_openapi_url), out of it neither does."""
+    monkeypatch.setenv("KB_DEPLOYMENT_ENVIRONMENT", "sandbox")
+    simulate(monkeypatch)
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.FAILED
+    summary = read_summary(capsys.readouterr().out)
+    assert summary["data API GET /docs"] == "failed"
+    assert summary["AI API GET /docs"] == "failed"
+    log = read_kb_log(smoke_test_environment)
+    assert (
+        "AI API: GET /docs without key failed: probe_unexpected_status, HTTP 404\n"
+    ) in log
 
 
 @pytest.mark.parametrize(
