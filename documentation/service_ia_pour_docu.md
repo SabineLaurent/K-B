@@ -5,25 +5,25 @@
 — C8
 
 Cette fiche documente le service d'intelligence artificielle (IA) de K-B. Ce service est le déploiement d'un modèle
-de langage, `gpt-6.1-sol`, dans Microsoft Foundry. Microsoft Foundry, anciennement Azure AI Foundry, est la
-plateforme de Microsoft qui héberge des modèles d'IA et les rend appelables par Internet. Mettre un modèle à
-disposition dans Foundry s'appelle un déploiement. Le déploiement de `gpt-6.1-sol` a été fait à la main, dans le
+de langage, `gpt-6.1-sol`, dans Microsoft Foundry. Un déploiement est la mise à disposition d'un modèle par une
+plateforme. Microsoft Foundry, anciennement Azure AI Foundry, est la plateforme de Microsoft qui héberge des modèles
+d'IA et les rend appelables par Internet. Le déploiement de `gpt-6.1-sol` a été fait à la main, dans le
 portail web de Foundry. Le code de K-B ne le décrit donc pas.
 
 La fiche dit qui accède au service, comment l'installer et le tester, de quoi il dépend, et quelles données il
 reçoit. Le programme de K-B qui appelle ce service est l'API IA. Cette API a sa propre fiche,
 [la fiche de l'API IA](api_ia_pour_docu.md).
 
-Les faits propres à K-B et à son service viennent de cinq sources. Les pages de Microsoft et les documents du
-dépôt de code sont listés à la fin, dans « Sources ».
+Le code cité est celui de K-B dans sa version du 2026-11-18. Ce qui est hors du code vient de trois relevés.
 
-- Le code de K-B, dans sa version du 2026-11-18.
 - Trois lectures de l'état d'Azure, faites le 2026-11-18 avec `az`, l'outil d'Azure en ligne de commande, en lecture
     seule. Elles portent sur la ressource, ses déploiements et les rôles de l'opératrice (« Relire l'état »).
 - Des captures d'écran du portail Foundry, du 2026-11-17. Elles montrent le catalogue des modèles et le formulaire
     de déploiement de `gpt-6.1-sol`, avec son type, sa limite de jetons par minute et sa zone de données.
 - L'essai de bout en bout du 2026-11-17 (« Le test »).
-- Une lecture plus ancienne, du 2026-11-09, citée seulement pour le modèle `DeepSeek-V4-Flash`.
+
+Une lecture plus ancienne, du 2026-11-09, n'est citée que pour le modèle `DeepSeek-V4-Flash`. Les pages de Microsoft
+et les documents du dépôt de code sont listés à la fin, dans « Sources ».
 
 Les sources de chaque fait tiré du dépôt, avec leurs fichiers et leurs lignes, sont regroupées à la fin, dans
 « Vérifier cette fiche ».
@@ -53,8 +53,9 @@ tableau.
 
 - **La capacité** se compte en milliers de jetons par minute. Un jeton est un morceau de mot. Le modèle lit et
     écrit des jetons, et Microsoft les facture. Le portail a fixé 250 000 jetons par minute pour `gpt-6.1-sol`
-    (capture du 2026-11-17). Son nombre de requêtes par minute n'a pas été lu. Pour `gpt-6-luna`, les en-têtes des
-    réponses donnaient 140 000 jetons et 140 requêtes par minute, lors de l'essai du 2026-10-17. Ces en-têtes sont
+    (capture du 2026-11-17). Son nombre de requêtes par minute n'a pas été lu. Un en-tête HTTP est une ligne
+    d'information jointe à une requête ou à une réponse. Pour `gpt-6-luna`, les en-têtes des réponses donnaient
+    140 000 jetons et 140 requêtes par minute, lors de l'essai du 2026-10-17. Ces en-têtes sont
     `x-ratelimit-limit-tokens` et `x-ratelimit-limit-requests`.
 - **Le choix de `gpt-6.1-sol`** vient du banc d'essai des modèles du 2026-11-16. Ce banc préconise `gpt-6.1-sol`,
     réglé à l'effort de raisonnement `low`. L'effort de raisonnement dit combien le modèle réfléchit avant de
@@ -102,14 +103,14 @@ Une version de modèle finit par être retirée par Microsoft. La page « <span 
 support policy</span> » dit de deux façons ce qui se passe alors (« Limites »).
 
 - Sa foire aux questions dit qu'avec `NoAutoUpgrade`, le déploiement <q lang="en">stops working at retirement</q>,
-    c'est-à-dire qu'il cesse de fonctionner au retrait. Son tableau « <span lang="en">Lifecycle stages</span> » le
-    confirme: une version retirée rend l'erreur `410 Gone` à toute requête.
+    c'est-à-dire qu'il cesse de fonctionner au retrait. Son tableau « <span lang="en">Lifecycle stages</span> »
+    ajoute qu'une version retirée rend l'erreur `410 Gone` à toute requête.
 - Sa section « <span lang="en">Automatic upgrades</span> » s'ouvre au contraire sur <q lang="en">For Global Standard,
     Data Zone Standard, and Standard deployment types, Microsoft manages automatic upgrades when a model version is
     retired</q>. Elle ne fait pas d'exception pour `NoAutoUpgrade`.
 
-La date de retrait de `gpt-6.1-sol` n'a pas été lue (« Limites »). L'abonnement Azure est le compte qui paie les
-ressources. D'après la même page, Microsoft prévient par courriel au moins 60 jours avant un retrait. Ce courriel va
+La date de retrait de `gpt-6.1-sol` n'a pas été lue (« Limites »). L'abonnement Azure est le contrat de facturation
+auquel les ressources sont rattachées. D'après la même page, Microsoft prévient par courriel au moins 60 jours avant un retrait. Ce courriel va
 aux propriétaires de l'abonnement qui ont un déploiement actif: <q lang="en">Sent to subscription owners with active
 deployments</q>. L'avis paraît aussi dans Azure Service Health, le service d'Azure qui publie ses avis.
 
@@ -136,7 +137,8 @@ Deux portes donnent accès au service.
 
 - **Le plan de gestion d'Azure** permet de voir, de modifier ou de supprimer la ressource et ses déploiements, et
     de lire ses clés. Les rôles Azure tiennent cette porte. Un rôle Azure est un ensemble de droits, donné à un
-    compte, d'une personne ou d'un programme, sur un abonnement, un groupe ou une ressource.
+    compte, d'une personne ou d'un programme, ou à un groupe Microsoft Entra, sur un abonnement, un groupe de
+    ressources ou une ressource.
 - **L'appel du modèle** se fait avec une clé de la ressource, ou avec un jeton d'accès de Microsoft Entra ID. Une
     clé est une longue chaîne secrète qui sert de mot de passe. Microsoft Entra ID est le service d'identité de
     Microsoft, qui tient les comptes d'une organisation. Un jeton d'accès est une preuve d'identité temporaire que ce
@@ -166,14 +168,14 @@ D'autres personnes que l'opératrice peuvent avoir ces accès.
 - Tout titulaire d'Owner ou de Contributor, sur l'abonnement ou sur le groupe, peut lire les clés et modifier les
     déploiements.
 - Un titulaire de Foundry User peut lire les clés.
-- Un administrateur général de l'annuaire Microsoft Entra ID peut se donner ces accès.
+- Un administrateur général de Microsoft Entra ID peut se donner ces accès.
 
 Seuls les rôles de l'opératrice sont listés ici.
 
 ### La clé de K-B
 
 L'API IA appelle le modèle avec la clé de la ressource. Elle envoie cette clé dans l'en-tête HTTP
-`Authorization: Bearer`, une ligne d'information qui accompagne la requête. Elle la lit dans la variable d'environnement `KB_LLM_API_KEY`. Une variable d'environnement
+`Authorization: Bearer`. Elle la lit dans la variable d'environnement `KB_LLM_API_KEY`. Une variable d'environnement
 est un réglage que le système passe à un programme à son démarrage.
 
 L'authentification par clé est active sur la ressource. Le réglage `disableLocalAuth` vaut en effet `False`, d'après
@@ -185,14 +187,14 @@ Qui a la clé peut donc appeler les deux déploiements, quels que soient ses rô
 La clé est gardée à deux endroits.
 
 - **Sur le Mac**, la clé est dans le fichier `.env` de l'opératrice. Ce fichier de réglages est exclu du dépôt de
-    code. La commande `uv run --env-file .env` le passe au processus. Aucune commande `kb` ne lit ce fichier
+    code. La commande `uv run --env-file .env` le passe au processus, c'est-à-dire au programme en cours. Aucune commande `kb` ne lit ce fichier
     elle-même.
 - **En ligne**, la clé est le secret `kb-llm-api-key` du coffre de secrets de K-B. Ce secret a été posé à la main,
-    collé sans s'afficher à l'écran, selon l'étape « 4. Poser les secrets » du README de l'infrastructure. Parmi les
-    identités managées de K-B, seule celle de l'app `ca-kb-ai-api` lit ce secret. Une identité managée est un compte
-    qu'Azure donne à un programme, pour qu'il accède à d'autres ressources sans mot de passe. L'app `ca-kb-ai-api`
-    est l'API IA en ligne, qu'Azure Container Apps fait tourner dans un conteneur. Un conteneur est un programme emballé avec
-    tout ce dont il a besoin, et il démarre d'une image. L'identité de l'app a le rôle Key Vault Secrets User sur ce
+    collé sans s'afficher à l'écran, selon l'étape « 4. Poser les secrets » du README de l'infrastructure. Une
+    identité managée est un compte qu'Azure donne à un programme, pour qu'il accède à d'autres ressources sans mot
+    de passe. Parmi les identités managées de K-B, seule celle de l'app `ca-kb-ai-api` lit ce secret. L'app
+    `ca-kb-ai-api` est l'API IA en ligne, qu'Azure Container Apps fait tourner dans un conteneur. Un conteneur est un
+    programme emballé avec tout ce dont il a besoin, et il démarre d'une image. L'identité de l'app a le rôle Key Vault Secrets User sur ce
     seul secret. Container Apps donne la clé au conteneur comme variable d'environnement, par une référence au
     coffre. La clé n'est donc ni dans l'image ni dans le code.
 
@@ -228,7 +230,7 @@ suivantes.
 6. **Garde-fous**: `DefaultV2`, le jeu par défaut. Puis **Déployer**.
 
 Le 2026-11-17, le catalogue montre `gpt-6.1-sol` en « Disponibilité générale ». Un nouveau déploiement est alors
-permis. Cette version passera au stade « <span lang="en">Deprecated</span> » 12 mois après sa sortie. Dès ce stade,
+permis. La version 2026-09-29 passera au stade « <span lang="en">Deprecated</span> » 12 mois après sa sortie. Dès ce stade,
 ce déploiement ne pourra se refaire que sur un abonnement qui a déjà déployé cette version. La page
 « <span lang="en">Foundry Models lifecycle and support policy</span> » le dit ainsi: <q lang="en">"Existing customer"
 is determined at the subscription level […] A new subscription under the same tenant doesn't inherit access.</q>
@@ -299,11 +301,11 @@ az role assignment list --assignee "$(az ad signed-in-user show --query id -o ts
 Le service a été essayé sur deux modèles, `gpt-6.1-sol` puis, avant lui, `gpt-6-luna`. Quelques termes servent
 dans cette section.
 
-- Une fiche se fait en plusieurs appels au modèle. Le classement range chaque publication dans un sujet, ou dans
-    aucun. La rédaction écrit la fiche d'un sujet. Le jugement vérifie les affirmations d'une fiche.
+- Le classement est l'étape qui range chaque publication dans un sujet, ou dans aucun.
+- La rédaction est l'étape qui écrit la fiche de veille d'un sujet.
 - Grafana Cloud est le service en ligne qui reçoit et affiche les mesures de K-B.
 - Le bac à sable est un environnement d'essai, séparé de la production.
-- Le coffre de notes est le dossier d'Obsidian, une application de notes, où `kb` écrit les fiches.
+- Le coffre de notes est le dossier d'Obsidian, une application de notes, où `kb` écrit les fiches de veille.
 
 **Le 2026-11-17, sur `gpt-6.1-sol`**, `kb serve-ai` a tourné sur le Mac, avec la version `f1eac19c` du code. L'effort
 de raisonnement était `low` (`KB_LLM_REASONING_EFFORT=low`). Les mesures partaient vers Grafana Cloud, dans le bac à
@@ -331,8 +333,9 @@ ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, mod
 **Sur `gpt-6-luna`**, le modèle de K-B avant `gpt-6.1-sol`, trois essais ont eu lieu.
 
 - **Le 2026-10-17**, un appel avec la clé a rendu le code 200 et le `model` `gpt-6-luna-2026-09-22`. Sur une veille
-    réelle, 6 appels de classement, 5 de rédaction et 3 de jugement ont passé, avec le schéma strict de K-B. Ce schéma est le format
-    de réponse que l'API IA impose au modèle. Aucun cache n'a été écrit: `cache_write_tokens` valait 0 sur 20
+    réelle, 6 appels de classement, 5 de rédaction et 3 de jugement ont passé, avec le schéma strict de K-B. Un
+    jugement est l'appel d'un second modèle, le juge, qui vérifie les affirmations d'une fiche. Le schéma strict est
+    le format de réponse que l'API IA impose au modèle. Aucun cache n'a été écrit: `cache_write_tokens` valait 0 sur 20
     réponses.
 - **Le 2026-10-28**, `kb serve-ai` a tourné dans le bac à sable. Une demande de fiches sur 3 jours a fait 10 requêtes
     au modèle. La réponse est arrivée avec le code 200, en 56,8 s.
@@ -345,10 +348,10 @@ ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, mod
 
 Chaque commande se lance depuis la racine du dépôt de code, dans un terminal où le `.env` n'est pas exporté. La
 commande `uv run --env-file .env` passe tout le `.env` à `sh` et à `curl`, et non la seule clé. La clé n'est lue que
-dans la variable `KB_LLM_API_KEY`. Elle n'est donc ni tapée, ni affichée, ni écrite dans l'historique du shell,
-l'interpréteur de commandes du terminal. `printf`, une commande interne du shell, passe la clé à `curl` par l'entrée
-standard (`-H @-`), le canal par lequel un programme reçoit des données d'un autre. La clé ne passe donc pas sur la
-ligne de commande, que les autres processus, c'est-à-dire les programmes en cours sur la machine, peuvent voir.
+dans la variable `KB_LLM_API_KEY`. Elle n'est donc ni tapée, ni affichée, ni écrite dans l'historique du shell. Le
+shell est l'interpréteur de commandes du terminal. `printf`, une commande interne du shell, passe la clé à `curl` par
+l'entrée standard (`-H @-`). L'entrée standard est le canal par lequel un programme reçoit ses données, ici celles de
+`printf`. La clé ne passe donc pas sur la ligne de commande, que les autres processus de la machine peuvent voir.
 
 1. **L'appel sans clé est refusé**:
 
@@ -379,10 +382,11 @@ ligne de commande, que les autres processus, c'est-à-dire les programmes en cou
     la section « Écrire les comptes rendus de veille dans le coffre » du même README. Ce coffre est le coffre de notes
     Obsidian. La chaîne envoie une veille réelle au modèle, et coûte donc ses jetons.
 
-Les tests automatiques du dépôt n'appellent jamais le service. Ils se lancent par `uv run pytest`, et l'intégration
-continue (CI) les relance sur GitHub. Dans ces tests, le client du modèle reçoit ses réponses d'un rejeu, c'est-à-dire
-de réponses enregistrées, ou d'un transport simulé, une fausse connexion réseau écrite pour les tests. Ces tests vérifient le corps de la requête que
-l'API IA envoie: le cache coupé, l'effort de raisonnement, et le refus en production du cache non coupé.
+Les tests automatiques du dépôt n'appellent jamais le service. Ils se lancent par `uv run pytest`. L'intégration
+continue (CI) les relance aussi, sur GitHub, à chaque proposition de modification du code. Dans ces tests, le client
+du modèle reçoit ses réponses d'un rejeu ou d'un transport simulé. Un rejeu rend des réponses enregistrées. Un
+transport simulé est une fausse connexion réseau, écrite pour les tests. Ces tests vérifient le corps de la requête
+que l'API IA envoie: le cache coupé, l'effort de raisonnement, et le refus en production du cache non coupé.
 
 ## Les dépendances et les interconnexions
 
@@ -401,7 +405,7 @@ flowchart LR
 
 - **Un seul appelant.** Seule l'API IA appelle le service. Elle utilise le format d'appel
     <span lang="en">Chat Completions</span> d'OpenAI, sur le chemin `chat/completions`. Elle n'appelle que ce chemin,
-    sans le champ `store`. Elle n'utilise ainsi aucune des fonctions qui gardent des échanges chez Microsoft (<span lang="en">Responses API, Assistants, Stored
+    sans le champ `store`, qui demande au fournisseur de garder l'échange. Elle n'utilise ainsi aucune des fonctions qui gardent des échanges chez Microsoft (<span lang="en">Responses API, Assistants, Stored
     completions</span>). Les clients de l'API IA sont `kb digest` et `kb trend-report`, décrits dans la fiche de
     l'API IA. Le jeu de référence est un ensemble de sorties du modèle, enregistrées pour être rejouées par les tests.
     Le script qui l'enregistre, lancé à la main, passe lui aussi par l'API IA, dans le même processus.
@@ -448,7 +452,7 @@ modèle des fiches » et « Envoi des dépôts au modèle du compte rendu des te
     chaque texte est coupé à 2 000 caractères.
 
 - **Pour le compte rendu des tendances**, l'API IA envoie d'abord quelques champs de chaque dépôt candidat: son nom,
-    sa description, ses sujets (<span lang="en">topics</span>) et son langage. Elle envoie ensuite le README nettoyé des dépôts choisis, coupé à
+    sa description, ses mots-clés (<span lang="en">topics</span>) et son langage. Elle envoie ensuite le README nettoyé des dépôts choisis, coupé à
     4 000 caractères (registre).
 
 - **Rien de la bibliothèque de lecture ne part**, ni entrée Zotero ni clip. Zotero est le gestionnaire de références
@@ -467,8 +471,8 @@ Des données personnelles partent pourtant, d'après le registre.
     completions are stored in the model. Additionally, prompts and completions are not used to train, retrain, or
     improve the base models.</q>
 - **Le cache de la consigne est coupé.** À chaque requête, l'API IA envoie
-    `prompt_cache_options: {"mode": "explicit"}`, sans point d'arrêt. Un point d'arrêt marque la fin de la partie de
-    la demande à garder en cache. Sans point d'arrêt, ce réglage n'écrit donc aucun cache. La coupure a été vérifiée une fois, sur
+    `prompt_cache_options: {"mode": "explicit"}`, sans point d'arrêt. Un point d'arrêt est une marque, dans la
+    demande, qui désigne ce que ce mode met en cache. L'API IA n'en pose aucun, donc ce réglage n'écrit aucun cache. La coupure a été vérifiée une fois, sur
     `gpt-6-luna`, le 2026-10-17: `cache_write_tokens` valait 0 sur 20 réponses. Sur `gpt-6.1-sol`, elle n'a pas été
     relevée, parce que le client du modèle ne suit pas ce champ.
 - **La surveillance des abus garde les demandes signalées.** Microsoft surveille les abus, c'est-à-dire les usages
@@ -541,7 +545,7 @@ la section « Envoi des mesures à Grafana Cloud ».
     donné 4 fiches sur 9 en 200 s, les appels étant faits un par un. L'essai de `gpt-6-luna` du 2026-10-28 portait sur
     3 jours. Les deux essais ne se comparent donc pas directement.
 - **Le coût que l'API IA estime est compté aux prix de `gpt-6.1-sol`**, en contexte court. Le contexte est le texte
-    que le modèle reçoit en une demande, et un contexte long peut avoir son propre prix. Tout appel est compté aux
+    que le modèle reçoit en une demande. Un contexte long peut avoir son propre prix. Tout appel est compté aux
     prix de `gpt-6.1-sol`, quel que soit `KB_LLM_MODEL`. Le prix du contexte long n'est pas distingué.
 - **`gpt-6-luna` reste déployé.** La production l'appelle jusqu'à son passage à `gpt-6.1-sol`. Ensuite, l'API IA ne
     l'appellera plus, mais la clé le permettra encore.
@@ -587,14 +591,14 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Le branchement de K-B | `KB_LLM_BASE_URL`, paramètre `llmBaseUrl` | `infra/main.bicep:22-23`, `:299` |
 | Le branchement de K-B | `KB_LLM_MODEL`, paramètre `llmModel` | `infra/main.bicep:25-26`, `:300` |
 | Le branchement de K-B | `KB_LLM_API_KEY`, le secret `kb-llm-api-key` | `infra/main.bicep:181` |
-| Le branchement de K-B | `KB_LLM_REASONING_EFFORT`: `none` dans le modèle du `.env`, `low` fixé en ligne | `.env.example:128`; `infra/main.bicep:304` |
-| Le branchement de K-B | `KB_LLM_SEND_PROMPT_CACHE_OPTIONS` vaut `true` par défaut, en commentaire dans le modèle du `.env` | `core/config.py:266`; `.env.example:133` |
+| Le branchement de K-B | `KB_LLM_REASONING_EFFORT`: `none` dans le fichier d'exemple du `.env`, `low` fixé en ligne | `.env.example:128`; `infra/main.bicep:304` |
+| Le branchement de K-B | `KB_LLM_SEND_PROMPT_CACHE_OPTIONS` vaut `true` par défaut, en commentaire dans le fichier d'exemple du `.env` | `core/config.py:266`; `.env.example:133` |
 | Le branchement de K-B | `reasoning_effort` envoyé au lieu de `temperature: 0` | `ai_api/connectors/llm_client.py:419-422` |
 | Le branchement de K-B | `gpt-6.1-sol` refuse `none` et `minimal`, et demande `low` | journal ADR, 2026-11-17 |
 | Le branchement de K-B | `kb serve-ai` n'accepte que `none`, `minimal` et `low` | `core/config.py:260`; journal ADR, 2026-11-17 |
 | Le branchement de K-B | `false` refusé au démarrage en production | `ai_api/connectors/llm_settings.py:106-123` |
 | Le branchement de K-B | la passe 2, ses paramètres et le secret | `infra/README.md`, « 4. Poser les secrets » et « 5. Seconde passe » |
-| Le branchement de K-B | l'effort `low` en ligne, demandé par le passage de la production | `infra/main.bicep:304` |
+| Le branchement de K-B | l'effort `low` en ligne, demandé par le passage de la production | `infra/main.bicep:301-304`; journal ADR, 2026-11-17 |
 | Ce qui a été essayé | le contournement de TLS de l'essai du 2026-11-17 | #629 |
 | Ce qui a été essayé | l'essai du 2026-10-17 sur `gpt-6-luna` | note du branchement de gpt-6-luna, « Preuve » |
 | Ce qui a été essayé | l'essai du 2026-10-28 dans le bac à sable | [note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel » |
@@ -619,7 +623,7 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Ce qui part | le texte long du classement, coupé à 500 caractères | `ai_api/stages/classification.py:71-77`, `:289-304`; `core/config.py:464` |
 | Ce qui part | les textes de la rédaction, coupés à 2 000 caractères | `core/config.py:446` |
 | Ce qui part | ni entrée Zotero ni clip | registre, « Envoi des items au modèle des fiches » |
-| Ce que Microsoft en garde | `prompt_cache_options` sans point d'arrêt | `ai_api/connectors/llm_client.py:41`, `:416-417` |
+| Ce que Microsoft en garde | `prompt_cache_options` sans point d'arrêt | `ai_api/connectors/llm_client.py:41`, `:412-417` |
 | Une copie possible vers Grafana Cloud | `none` par défaut | `ai_api/connectors/metrics_export.py:158` |
 | Une copie possible vers Grafana Cloud | `none` fixé en production, `all` refusé au démarrage | `infra/main.bicep:297`; `ai_api/connectors/metrics_export.py:186-187` |
 | Une copie possible vers Grafana Cloud | aucun fichier ne pose le réglage pour le bac à sable | `.env.example:173-178`, `.env.e2e_test.example` |
