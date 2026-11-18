@@ -64,7 +64,7 @@ theme:
 extra_css:
   - stylesheets/extra.css
 
-# The list of the search results out of the Tab key while it is empty (issue 654).
+# The list of the search results out of the Tab key, where it would get the focus folded (issue 654).
 extra_javascript:
   - javascripts/search-list.js
 

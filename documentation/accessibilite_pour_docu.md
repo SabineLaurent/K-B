@@ -20,7 +20,7 @@ champ de recherche (`mkdocs.yml:3-29`, `:71-72`). Sur un écran large, de 76,25e
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
 seul menu, à gauche, donne la page d'accueil, puis les quatre parties numérotées de la documentation et leurs fiches.
 La table des matières de la page ouverte est sous son lien (`mkdocs.yml:38-44`). Sur un écran plus étroit, le bouton
-de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil.
+de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
 n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:26-27`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
@@ -201,12 +201,14 @@ peut y paraître avant le texte qui le développe.
 
 4. Passer WAVE, l'outil de contrôle de WebAIM, sur trois pages du site servi en local, et les parcourir à la touche Tab,
     sur un écran large et sur un écran étroit. Le 2026-11-18, sur le thème de #652, WAVE relevait 15 erreurs de
-    libellé, sur les cases cachées du thème (« Limites »), et un contraste très faible, sur l'en-tête caché des
-    résultats de recherche: un fond transparent, que WAVE ne compose pas avec la page. Cet en-tête a depuis un fond
-    opaque, de la même couleur (`documentation/stylesheets/extra.css:199-203`). La liste vide des résultats de
-    recherche recevait le focus sans rien montrer: elle n'est plus un arrêt de la touche Tab tant qu'elle est vide
-    (`documentation/javascripts/search-list.js`). Sur un écran large, le parcours à la touche Tab suit l'ordre de la
-    page, le bouton du mode compris.
+    libellé, sur les cases cachées du thème et sur les `label` des deux radios du mode (« Limites »), et un contraste
+    très faible, sur l'en-tête caché des résultats de recherche: un fond transparent, que WAVE ne compose pas avec la
+    page. Cet en-tête a depuis un fond opaque, le même à l'œil (`documentation/stylesheets/extra.css:199-203`). La
+    liste des résultats de recherche recevait le focus sans rien montrer: la recherche de Material se ferme sur la
+    touche Tab avant que le focus ne bouge, et la liste repliée n'a plus de hauteur. Elle n'est plus un arrêt de la
+    touche Tab (`documentation/javascripts/search-list.js`); les résultats s'atteignent par les flèches, depuis le
+    champ de recherche. Sur un écran large, le parcours à la touche Tab suit l'ordre de la page, le bouton du mode
+    compris.
 
 ## Publier
 
@@ -245,7 +247,7 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     thème, sans `tabindex`: la touche Tab ne s'y arrête pas (relevé le 2026-11-18 dans Chrome sans interface, à
     390 pixels; #651). Parade: le champ de recherche, atteint au clavier, mène à chaque fiche. Une fenêtre élargie, ou
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
-- **WAVE relève des libellés vides ou multiples sur les cases cachées du thème.** Material ouvre son menu, sa
+- **WAVE relève des libellés vides ou multiples sur les cases cachées du thème et sur les radios du mode.** Material ouvre son menu, sa
     recherche et la table des matières d'une page par des cases à cocher cachées, liées à des `label` sans texte ou à
     plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, et 7 et 8
     depuis: le menu numéroté ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les

@@ -196,10 +196,10 @@
   outline-color: var(--md-accent-fg-color);
 }
 
-/* The header of the search results, hidden until a search opens, on an opaque background: the same colour as the
-   veil of Material over the page, whose transparency a contrast checker such as WAVE does not compose. */
+/* The header of the search results, hidden until a search opens: its veil painted on the colour of the page, so
+   the background is opaque, the same to the eye, and a contrast checker such as WAVE reads the page under it. */
 .md-search-result__meta {
-  background-color: light-dark(#E3E4E1, #2D2F31);
+  background: linear-gradient(var(--md-default-fg-color--lightest) 0 0), var(--md-default-bg-color);
 }
 
 /* An inline citation is a q element (AcceDe Web, rule 6.1; RGAA 9.4): the browser draws its marks, here the French
