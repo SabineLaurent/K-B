@@ -3,160 +3,145 @@
 - **Date** : 2026-11-18
 - **Branche** : `docs/doc-site-theme`
 - **Issue** : #649
-- **Fichiers** : `mkdocs.yml`, `documentation/stylesheets/extra.css`, `documentation/accessibilite_pour_docu.md`,
-  `documentation/integration_continue_pour_docu.md` (un renvoi de ligne décalé)
+- **Fichiers** : `mkdocs.yml`, `documentation/stylesheets/extra.css`, `overrides/partials/copyright.html`,
+  `documentation/accessibilite_pour_docu.md`, l'en-tête de neuf fiches, un renvoi de
+  `documentation/integration_continue_pour_docu.md`
 - **Série** : suit [la publication des fiches en site accessible](2026-11-18-publier-les-fiches-en-site-accessible.md),
   qui a choisi MkDocs avec Material et écrit la déclaration d'accessibilité.
 
 ## Le pourquoi
 
-En lisant le site de la doc en local, Sabine a relevé trois points. Sur ordinateur, deux menus l'entourent : la
-navigation à gauche, la table des matières de la page à droite, et elle s'y perd. Il n'y a pas de barre de
-navigation. Les couleurs sont celles du thème par défaut, pas celles de K-B. Elle a demandé un seul menu, une barre
-en haut, un menu rangé par partie du produit, et la charte du back office du site de K-B. Le site de la doc est le
-format de remise des fiches au jury, et la déclaration d'accessibilité en fait partie : changer les couleurs oblige
-à remesurer chaque contraste.
+En lisant le site de la doc en local, Sabine a relevé que deux menus l'entouraient (la navigation à gauche, la table
+des matières à droite), qu'il manquait une barre de navigation, et que les couleurs n'étaient pas celles de K-B. Sur
+une première version, elle a demandé ensuite : un menu de gauche plus large, numéroté par partie ; une barre du haut
+pour d'autres liens, comme le dépôt GitHub ; un pied de page ; un mode clair et un mode sombre ; le code en ligne sur
+un bleu léger ; les rappels de compétence dans un encadré. Le site de la doc est le format de remise des fiches au
+jury, et sa déclaration d'accessibilité en fait partie : chaque couleur changée se remesure.
 
 ## Le comment
 
-### Un seul menu et une barre d'onglets : trois réglages du thème
+### La disposition : réglages du thème et `nav`
 
-Material range la table des matières à droite par défaut. Trois réglages changent la disposition
-(`mkdocs.yml:34-37`) :
-
-```
-  features:
-    - navigation.tabs
-    - navigation.tabs.sticky
-    - toc.integrate
-```
-
-`navigation.tabs` fait une barre d'onglets des entrées de premier niveau du `nav`. `navigation.tabs.sticky` la garde
-visible quand la page défile. `toc.integrate` place la table des matières dans le menu de gauche, sous le lien de la
-page ouverte : il ne reste qu'un menu. Ces trois réglages ne valent que sur un écran large, de 76,25em ou plus ; en
-dessous, Material cache la barre et ouvre le menu par un bouton de l'en-tête.
-
-### Un `nav` par partie du produit
-
-Une barre d'onglets n'a de sens que si le `nav` a des rubriques : à plat, chaque fiche y prendrait un onglet. Le
-`nav` est rangé en cinq parties, le choix de Sabine (`mkdocs.yml:8-13`) :
+Trois réglages donnent un seul menu et une barre en haut (`mkdocs.yml:42-46`) : `navigation.tabs` fait une barre des
+entrées de premier niveau du `nav`, `navigation.tabs.sticky` la garde visible, `toc.integrate` place la table des
+matières de la page sous son lien, dans le menu de gauche. `navigation.sections` affiche les parties comme des
+rubriques. Le `nav` porte donc la documentation et deux liens en premier niveau, et les parties en second
+(`mkdocs.yml:10-13`) :
 
 ```
 nav:
-  - Démarrer:
-      - index.md
-      - installation_pour_docu.md
-      - architecture_pour_docu.md
+  - Documentation:
+      - K-B, mon outil de veille tech: index.md
+      - 1. Démarrer:
 ```
 
-Les autres parties sont Données, IA, Qualité et livraison, Projet. Le rangement par bloc et par compétence de la
-certification a été écarté par Sabine : le site documente le produit.
+Les deux autres entrées de premier niveau, « Le dépôt GitHub » et « Le journal des décisions », sont des adresses :
+Material en fait des onglets. La déclaration d'accessibilité sort du menu, le pied de page y mène
+(`mkdocs.yml:29-31`). Sans `not_in_nav`, le mode strict refuserait une page absente du menu.
 
-### Les couleurs : des variables du thème, pas des règles
+### Le pied de page : un gabarit surchargé
 
-Material dessine tout par des variables CSS. Les redéfinir sur `:root` suffit à changer l'en-tête, le fond, les
-liens et le focus, sans réécrire ses règles (`documentation/stylesheets/extra.css:5-8`, `:15-19`) :
+Material lit d'abord les gabarits de `custom_dir` (`mkdocs.yml:37`). `overrides/partials/copyright.html` remplace son
+pied de page par une liste de trois liens. Le lien vers la déclaration passe par le filtre `url`, qui le rend relatif
+à chaque page : `{{ 'accessibilite_pour_docu/' | url }}`.
 
-```
-:root {
-  /* The header and the bar of tabs: white on ink. */
-  --md-primary-fg-color: #1C1E21;
-  --md-primary-bg-color: #FFFFFF;
-...
-  --md-typeset-a-color: #0F5E6B;
-  --md-accent-fg-color: #0F5E6B;
-```
+### Deux modes, chaque couleur écrite une fois
 
-Les couleurs viennent de la planche « Charte graphique » des maquettes du 2026-11-09, relayées par la session qui a
-fait le front : encre `#1C1E21`, gris lin `#F4F5F2`, sarcelle `#0F5E6B`. L'accent de Material dessine l'anneau de
-focus : il prend la sarcelle, la couleur de focus de la charte. Un lien survolé garde la sarcelle foncée du front,
-`#0A434C`, par sa propre règle, code compris (`:27-34`).
-
-### L'anneau de focus sur fond d'encre
-
-Sur l'en-tête, la sarcelle ne donnerait que 2,25:1 contre l'encre : un anneau à peine visible. L'en-tête, les
-onglets, le lien d'évitement et le logo du menu d'un écran étroit prennent un anneau blanc
-(`documentation/stylesheets/extra.css:52-70`) :
+`theme.palette` déclare un schéma clair (`default`) et un schéma sombre (`slate`), chacun avec sa requête
+`prefers-color-scheme` et le libellé de son bouton (`mkdocs.yml:47-63`). À la première visite, le site prend le
+réglage du système ; ensuite, Material garde le mode affiché. Material pose `color-scheme: light` ou
+`dark` selon le schéma. La fonction CSS `light-dark()` choisit alors sa première ou sa seconde valeur, ce qui permet
+d'écrire chaque couleur une seule fois (`documentation/stylesheets/extra.css:42-43`) :
 
 ```
-.md-header__button,
-.md-nav__button,
-.md-skip,
-.md-tabs__link {
-  outline-color: #FFFFFF;
-}
-...
-.md-tabs__link {
-  padding-inline: 0.4rem;
-  outline-offset: -0.2rem;
-}
+    --md-typeset-a-color: light-dark(var(--kb-teal), var(--kb-frost));
+    --md-accent-fg-color: light-dark(var(--kb-teal), var(--kb-frost));
 ```
 
-Un onglet est aussi haut que sa liste, qui coupe ce qui dépasse : la relecture a vu l'anneau coupé en haut et en
-bas. Il est donc dessiné à l'intérieur du lien (`outline-offset` négatif), et l'espace entre deux onglets passe de
-l'élément de liste au lien, pour que l'anneau ne touche pas le texte. La liste des résultats de recherche n'avait pas
-de couleur d'anneau dans le thème : elle prend la sarcelle, au lieu du bleu du navigateur (`:72-76`).
+Le bloc est sous `@supports (color: light-dark(#000000, #FFFFFF))` (`:11`). Un navigateur sans `light-dark()` jugerait
+ces couleurs invalides : le texte blanc de l'en-tête resterait sans fond. Il saute donc le bloc et garde les couleurs
+de Material ; les règles de K-B hors du bloc ont des valeurs de repli, celles du thème. La charte n'a pas de mode sombre : il prend ses couleurs là où elles existent (encre, lin, pierre,
+« canard givré » pour les liens, sarcelle foncée), et en ajoute trois, nommées « hors charte » dans la déclaration.
 
-### Les contrastes, une ligne par paire
+### Le menu plus large
 
-La déclaration (`documentation/accessibilite_pour_docu.md`, « Les contrastes du thème ») donne le rapport de chaque
-paire de couleurs que le site dessine. Une couleur transparente du thème est d'abord posée sur son fond, puis
-mesurée : par exemple, le fond d'un résultat de recherche survolé est `#0A434C` à 10 % sur le gris lin, soit
-`#DCE3E1`. Toutes les paires passent le seuil de 4,5:1 ; la plus basse est le libellé d'une boîte au troisième
-niveau d'un schéma Mermaid, 4,85:1, calculé et non vu.
+Élargir la barre latérale (`inline-size: 15rem`) ne suffisait pas : Material tient le menu à 11,5rem par une marge
+intérieure, `padding-right: calc(100% - 11.5rem)`, quelle que soit la largeur de la barre. Une capture a montré la
+barre à 300 px et le menu à 230 px. La surcharge remet cette marge à 0,6rem (`extra.css:69-78`).
+
+### L'encadré des compétences
+
+L'extension `admonition` (`mkdocs.yml:74-76`) donne les encadrés `!!! note`. Chaque fiche réunit ses rappels dans un
+seul encadré, dont chaque citation garde son `blockquote` et sa source
+(`documentation/import_et_base_pour_docu.md:3-7`) :
+
+```
+!!! note "Compétences de la certification"
+
+    > Documentation des scripts.
+
+    — C3
+```
+
+La feuille de style lui donne l'allure d'une alerte de GitHub : un filet coloré au début, un titre coloré, ni cadre
+ni ombre (`extra.css:120-146`).
+
+### Les contrastes, mesurés par un script
+
+La déclaration donne, pour chaque texte que le site dessine, sa paire de couleurs et son rapport en mode clair et en
+mode sombre : 35 lignes. Une couleur transparente est d'abord posée sur son fond. Le calcul a trouvé une paire sous
+le seuil : en mode sombre, le voile de 12 % de Material, empilé sur trois niveaux d'un schéma Mermaid, donnait 3,62:1.
+Le voile sombre passe à 8 % : 4,89:1. La plus basse paire du site est à 4,85:1.
 
 ## Choix faits et options écartées
 
-- **Les variables du thème sur `:root`**, plutôt qu'une `palette` personnalisée de Material : sans `palette`, rien ne
-  pose d'autres couleurs sur le `body`. Écarté : `theme.palette` avec `custom`, un réglage de plus. Limite écrite
-  dans le commentaire de `extra.css:1-4` : ajouter une `palette` annulerait ces couleurs.
-- **Le focus en sarcelle `#0F5E6B`**, tranché par time-knight contre mon avis (garder `#0A434C`, plus contrasté) :
-  c'est la couleur de focus de la charte que Sabine a demandée, et 6,77:1 passe le seuil de 3:1 d'un composant
-  d'interface.
-- **La barre collante** (`navigation.tabs.sticky`) : Sabine ne trouvait pas de barre de navigation ; une barre qui
-  disparaît au défilement aurait gardé le problème.
-- **Ni largeur de 1 120 px ni pied de page de la maquette** : le contenu garde la grille de Material, et le pied de
-  page n'a pas de texte. Seuls son fond blanc et son filet de pierre sont repris.
+- **`light-dark()`**, plutôt que deux blocs de variables sur `[data-md-color-scheme=default]` et `slate` : une couleur
+  écrite une fois (demande de Sabine : du CSS moderne). Il est « Baseline » depuis mai 2024 (Chrome 123, Firefox 120,
+  Safari 17.5), et sa limite pour un navigateur plus ancien est écrite.
+- **Le focus en sarcelle `#0F5E6B`** en mode clair, tranché par time-knight contre mon avis (garder `#0A434C`) : c'est
+  la couleur de focus de la charte. En mode sombre, l'accent est le canard givré, à 12,56:1.
+- **Les liens du mode sombre en `#CFE3E6`**, la seule couleur de lien que la charte pose sur l'encre (relevé de FO). Ils
+  sont proches du texte (1,22:1) : leur soulignement les distingue.
+- **Les blocs de code restent blancs** en mode clair : sur le bleu léger du code en ligne, un mot-clé coloré passerait
+  sous 4,5:1.
+- **Les liens de la barre** : le dépôt et le journal des décisions. Le board reste privé (décision de Sabine).
 - **Sans `navigation.indexes`** : Material ne le permet pas avec `toc.integrate`.
 
 ## Preuve
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `uv run --locked --only-group docs mkdocs build --strict` : code de sortie 0 | `nav`, liens et ancres valides |
-| HTML construit : `<nav class="md-tabs" aria-label="Onglets">` à cinq entrées, `md-nav--integrated` présent, aucun `md-sidebar--secondary` | une barre, un seul menu |
-| Capture de Chrome sans interface, 1 280 px | en-tête d'encre, onglet ouvert souligné, table des matières dans le menu de gauche |
-| Capture d'un onglet atteint au clavier, avant et après correction | l'anneau était coupé ; il est entier et ne touche plus le texte |
-| Calcul des rapports par la formule des WCAG 2.1, couleurs composées comprises, refait par deux relectures neuves | chaque ligne du tableau de la déclaration |
-| Couleurs lues dans Chrome par la seconde relecture : `#00000012` sur `#F4F5F2` dessiné `#E2E3E0` | les rapports lus à l'écran perdent au plus 0,07, sans passer sous 4,5:1 |
-| Chaque renvoi `mkdocs.yml:N` et `extra.css:N` relu sur le fichier | les renvois pointent les bonnes lignes |
+| `uv run --locked --only-group docs mkdocs build --strict` : code de sortie 0 | `nav`, `not_in_nav`, liens et ancres valides |
+| HTML construit : trois onglets, `md-nav--integrated`, `data-md-color-scheme="default"` sur le `body`, deux `input` de mode avec `aria-label` | la barre, un menu, deux modes nommés |
+| Captures de Chrome sans interface, 1 500 px, en mode clair et en mode sombre | menu numéroté sur une ligne, encadré, code en ligne, pied de page |
+| Mesure dans Chrome : barre latérale 300 px, menu 230 px avant la surcharge | la cause du « K-B » coupé |
+| Script de contraste (formule des WCAG 2.1, couleurs composées) | chaque ligne du tableau des deux modes |
+| Deux relectures neuves sur la première version, une sur la seconde | renvois, rapports et rendu |
 
 ## Ce que tu dois pouvoir défendre
 
-1. **Pourquoi l'onglet ouvert est-il souligné, et pas seulement en gras ?** Une différence de graisse seule est un
-   signe faible ; le soulignement en ajoute un second, et tous les onglets ont la même couleur
-   (`documentation/stylesheets/extra.css:46-50`).
-2. **Pourquoi deux couleurs d'anneau de focus ?** Un anneau doit contraster avec son fond à 3:1. La sarcelle passe
-   sur le gris lin (6,77:1), pas sur l'encre (2,25:1) : là, il est blanc (16,71:1).
-3. **Un lecteur d'écran sait-il quel onglet est ouvert ?** Non : Material ne pose pas `aria-current`. C'est écrit
-   dans les « Limites » de la déclaration.
-4. **Et sur un téléphone ?** Pas de barre d'onglets sous 76,25em : le bouton de l'en-tête ouvre le menu sur la partie
-   ouverte, et sa flèche de retour mène aux cinq parties. Ce bouton n'est pas atteint au clavier, un défaut du thème
-   déjà présent sur `main` : il est écrit dans les « Limites », avec sa parade, et porté par #651.
-5. **Pourquoi des contrastes « calculés, non vus » ?** Un aperçu local n'affiche pas les schémas Mermaid tant que le
-   site n'est pas publié ; leurs couleurs sont calculées depuis les règles du thème.
+1. **Comment le site choisit-il son mode ?** À la première visite, le réglage du système (`prefers-color-scheme`) ;
+   ensuite, le mode gardé par Material, que le bouton de l'en-tête change. `light-dark()` lit le `color-scheme` du
+   schéma.
+2. **Et un vieux navigateur ?** Il saute le bloc `@supports` et garde les couleurs par défaut de Material, lisibles,
+   plutôt qu'un en-tête blanc sur blanc.
+3. **Pourquoi des couleurs « hors charte » ?** La charte n'a pas de mode sombre. Le mode sombre prend ses couleurs là où
+   elles existent, et nomme les trois autres dans la déclaration.
+4. **L'encadré casse-t-il la citation ?** Non : chaque rappel reste un `blockquote` suivi de sa source, dans l'encadré.
+5. **Un lecteur d'écran sait-il quel onglet est ouvert ?** Non : Material ne pose pas `aria-current`. C'est écrit dans
+   les « Limites ».
 
 ## Zones non vérifiées
 
-- Les schémas Mermaid dessinés avec ces couleurs : calculés, pas vus.
-- Le rendu à 390 px : la capture de Chrome sans interface coupe le texte à droite, sur `main` comme sur cette
-  branche ; écart de l'outil de capture ou défaut existant, non tranché.
+- Les schémas Mermaid avec ces couleurs : calculés, pas vus (un aperçu local ne les dessine pas).
+- Le mode sombre lu à l'écran : les couleurs composées sont calculées ; seul le mode clair a été comparé aux pixels.
 - Firefox et Safari, et un lecteur d'écran.
-- La planche « Charte graphique » elle-même : ses couleurs sont reprises du relevé de la session du front, non relues
-  à la source.
+- Le rendu à 390 px de la capture sans interface, qui coupait déjà le texte sur `main`.
 
 ## Ce qui reste
 
-- `aria-current` sur l'onglet et la page ouverts : il faudrait surcharger les gabarits du thème ; hors de cette PR.
+- `aria-current` sur l'onglet et la page ouverts : il faudrait surcharger d'autres gabarits du thème.
 - Le bouton du menu d'un écran étroit, atteint au clavier : #651.
-- La fiche de la conduite du projet (#512) ira dans la partie Projet, et la fiche des maquettes dans Démarrer.
+- Un vrai bouton pour le mode, nommé par son action et sensible à Espace : #653.
+- La fiche de la conduite du projet (#512) deviendra la partie 5 du menu, et la fiche des maquettes entrera dans
+  « 1. Démarrer ».

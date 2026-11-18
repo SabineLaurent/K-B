@@ -44,8 +44,8 @@ theme:
     - navigation.tabs.sticky
     - navigation.sections
     - toc.integrate
-  # A light mode and a dark mode, the system's first, then the reader's choice by the button of the header. The
-  # colours of both are in documentation/stylesheets/extra.css.
+  # A light mode and a dark mode: the system's at the first visit, then the mode kept, changed by the button of the
+  # header. The colours of both are in documentation/stylesheets/extra.css.
   palette:
     - media: "(prefers-color-scheme: light)"
       scheme: default

@@ -1,7 +1,8 @@
 /* The colours of the back office of K-B (mockups of 2026-11-09, plate « Charte graphique »; issue 649), given to the
    variables of Material 9.8.1, for its light scheme (default) and its dark one (slate). Each colour is written once,
    by light-dark(): Material sets color-scheme to light or dark with the scheme. The charter has no dark variant: the
-   dark mode takes its colours where they exist, and adds one, --kb-night. The ratio of each text on its background
+   dark mode takes its colours where they exist, and adds --kb-night and the dark colours of Material's highlighted
+   code. The ratio of each text on its background
    is in documentation/accessibilite_pour_docu.md, « Les contrastes du thème ». Material declares its colours on
    [data-md-color-scheme]: these declarations come after its own, with the same weight. */
 /* A browser without light-dark() (before Chrome 123, Firefox 120, Safari 17.5) skips this block and keeps the colours
@@ -50,6 +51,7 @@
     /* The footer. */
     --md-footer-bg-color: light-dark(#FFFFFF, var(--kb-night));
     --md-footer-bg-color--dark: light-dark(#FFFFFF, var(--kb-night));
+    --md-footer-fg-color: var(--kb-link-hover);
     --md-footer-fg-color--light: var(--md-typeset-a-color);
 
     /* K-B's own: a link under the pointer, the inline code, the rules of a code block and of the footer. */
@@ -82,22 +84,22 @@
 
   &:is(:focus, :hover),
   &:is(:focus, :hover) code {
-    color: var(--kb-link-hover);
+    color: var(--kb-link-hover, var(--md-accent-fg-color));
   }
 }
 
 /* The inline code on a light teal, not on the white of a code block. */
 .md-typeset :not(pre) > code {
-  background-color: var(--kb-code-inline-bg);
+  background-color: var(--kb-code-inline-bg, var(--md-code-bg-color));
 }
 
 /* A code block and the footer are edged: white on linen grey alone draws no edge to see. */
 .md-typeset pre > code {
-  box-shadow: inset 0 0 0 1px var(--kb-rule);
+  box-shadow: inset 0 0 0 1px var(--kb-rule, transparent);
 }
 
 .md-footer-meta {
-  border-block-start: 1px solid var(--kb-rule);
+  border-block-start: 1px solid var(--kb-rule, transparent);
 }
 
 /* The links of the footer, in a list on one line: as heavy as the rules of Material on a list of the text, which the
@@ -167,14 +169,26 @@
   }
 }
 
-/* On the dark of the header, of the tabs, of the button of the mode, of the skip link and of the logo in the title of
-   the narrow menu, the focus is outlined in white: the teal of the light mode would give 2.25:1 there. */
+/* On the dark of the header, of the tabs, of the skip link and of the logo in the title of the narrow menu, the focus
+   is outlined in white: the teal of the light mode would give 2.25:1 there. */
 .md-header__button,
-.md-header .md-option.focus-visible + label,
 .md-nav__button,
 .md-skip,
 .md-tabs__link {
   outline-color: #FFFFFF;
+}
+
+/* The button of the mode is the visible label of a radio. Material outlines the label next to the focused radio,
+   which is hidden in the dark mode at the first load: the ring goes on the label shown. */
+.md-header__option:has(.md-option.focus-visible) > label:not([hidden]) {
+  outline-style: auto;
+  outline-color: #FFFFFF;
+}
+
+/* The rule beside the table of contents of the open page, its second sign: the ink of the header would give 1.11:1
+   on the page in the dark mode. */
+[dir] .md-nav--integrated > .md-nav__list > .md-nav__item--active .md-nav--secondary {
+  border-inline-start-color: var(--md-default-fg-color--light);
 }
 
 /* The list of the search results has no outline colour of the theme: the accent, not the blue of the browser. */

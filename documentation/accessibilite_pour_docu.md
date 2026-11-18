@@ -20,11 +20,13 @@ champ de recherche (`mkdocs.yml:3-27`, `:69-70`). Sur un écran large, de 76,25e
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
 seul menu, à gauche, donne la page d'accueil, puis les quatre parties numérotées de la documentation et leurs fiches.
 La table des matières de la page ouverte est sous son lien (`mkdocs.yml:40-46`). Sur un écran plus étroit, le bouton
-de menu de l'en-tête ouvre ce menu. Ce bouton n'est pas atteint au clavier (« Limites »). Le pied de page mène à cette
+de menu de l'en-tête ouvre ce menu sur la partie ouverte. Sa flèche de retour mène aux parties, puis au premier
+niveau, qui porte aussi les deux liens de la barre. Ce bouton n'est pas atteint au clavier (« Limites »). Le pied de page mène à cette
 fiche, au dépôt et à la licence (`overrides/partials/copyright.html`); cette fiche n'est pas dans le menu
 (`mkdocs.yml:29-31`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-60`). Le site a un mode clair et un mode sombre: il suit d'abord le réglage
-du système, puis le choix de la lectrice, par un bouton de l'en-tête (`mkdocs.yml:47-63`). Le site se publie sur
+(`documentation/stylesheets/extra.css:1-62`). Le site a un mode clair et un mode sombre. À la première visite, il
+prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
+(`mkdocs.yml:47-63`). Le site se publie sur
 GitHub Pages, à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
@@ -68,18 +70,18 @@ Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue 
 | Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:46`); le menu donne la page d'accueil, puis les quatre parties numérotées et leurs fiches. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les fiches n'ont aucune image. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche |
 | Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:38-39`). | La configuration |
-| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:7-60`); l'anneau de focus de la couleur de l'accent (`:41-42`, `:180-183`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:170-178`). | Le calcul des rapports de contraste |
-| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:78-87`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:155-168`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche. Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
+| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
+| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:185-189`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:74-76`, `documentation/stylesheets/extra.css:118-144`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:199-203`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:74-76`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
 | La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:35`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:91-93`). | Le contrôle du HTML construit |
 | Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:71-72`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
 Les rapports de contraste suivants sont calculés selon la formule des WCAG 2.1, le 2026-11-18, pour le mode clair et
-pour le mode sombre. Ils portent sur les couleurs de `documentation/stylesheets/extra.css:7-60` et, pour les blocs de
+pour le mode sombre. Ils portent sur les couleurs de `documentation/stylesheets/extra.css:8-62` et, pour les blocs de
 code et les schémas, sur celles de la feuille de style construite de Material 9.8.1. Une couleur transparente du
 thème est d'abord posée sur son fond, et c'est la couleur obtenue qui est mesurée. Ces couleurs composées sont
 calculées, non lues à l'écran. En mode clair, Chrome dessine `#00000012` sur `#F4F5F2` en `#E2E3E0`, et non en
@@ -90,9 +92,9 @@ basse donne 4,85:1. Un aperçu local n'affiche pas les schémas Mermaid tant que
 
 La charte n'a pas de mode sombre. Le mode sombre prend ses couleurs là où elles existent: l'encre `#1C1E21` pour le
 fond, le gris lin `#F4F5F2` pour le texte, la pierre `#DADCD6` pour le texte secondaire, le « canard givré » `#CFE3E6`
-pour les liens, la sarcelle foncée `#0A434C` pour le fond du code en ligne. Trois de ses couleurs sont hors charte:
-`#121416`, tiré de sa teinte, pour l'en-tête, les blocs de code et le pied de page; le blanc pour un lien sous le
-pointeur; les couleurs du code coloré du mode sombre de Material. Le voile d'un titre du menu et d'une boîte d'un
+pour les liens, la sarcelle foncée `#0A434C` pour le fond du code en ligne, le blanc du texte de l'en-tête pour un
+lien sous le pointeur. Deux sortes de couleurs sont hors charte: `#121416`, tiré de sa teinte, pour l'en-tête, les
+blocs de code et le pied de page; les couleurs du code coloré du mode sombre de Material. Le voile d'un titre du menu et d'une boîte d'un
 schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisième niveau d'un schéma tomberait à
 3,62:1.
 
@@ -137,13 +139,13 @@ schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisi
 Le troisième niveau est celui du schéma du déploiement sur Azure, dans
 [la fiche de l'architecture](architecture_pour_docu.md).
 
-Hors de l'en-tête, l'anneau de focus prend la couleur de l'accent (`documentation/stylesheets/extra.css:41-42`), y
-compris sur la liste des résultats de recherche (`:180-183`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur
+Hors de l'en-tête, l'anneau de focus prend la couleur de l'accent (`documentation/stylesheets/extra.css:42-43`), y
+compris sur la liste des résultats de recherche (`:194-197`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur
 de focus de la charte, à 6,77:1 sur `#F4F5F2`. En mode sombre, c'est le canard givré `#CFE3E6`, à 12,56:1 sur
 `#1C1E21`. Les deux passent le seuil de 3:1 du RGAA 3.3 pour un composant d'interface. Sur l'en-tête, les onglets, le
 lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode, l'anneau est blanc, `#FFFFFF`: 16,71:1 sur
 `#1C1E21` en mode clair, 18,46:1 sur `#121416` en mode sombre, là où la sarcelle ne donnerait que 2,25:1
-(`:170-178`). Le contour d'un bloc de code, `#DADCD6` sur blanc ou `#4A4F57` sur `#121416`, est un décor: il ne porte
+(`:172-186`). Le contour d'un bloc de code, `#DADCD6` sur blanc ou `#4A4F57` sur `#121416`, est un décor: il ne porte
 aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
@@ -235,15 +237,21 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     390 pixels; #651). Parade: le champ de recherche, atteint au clavier, mène à chaque fiche. Une fenêtre élargie, ou
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
 - **Un navigateur sans `light-dark()` garde les couleurs de Material.** Avant Chrome 123, Firefox 120 et Safari 17.5
-    (mai 2024), le bloc des couleurs de K-B est sauté (`documentation/stylesheets/extra.css:7-10`): le site prend les
-    couleurs par défaut du thème, qui ne sont pas mesurées ici.
+    (mai 2024), le bloc des couleurs de K-B est sauté (`documentation/stylesheets/extra.css:8-11`): le site prend les
+    couleurs par défaut du thème, qui ne sont pas mesurées ici. Les règles de K-B hors de ce bloc ont alors des valeurs
+    de repli, celles du thème.
+- **Le bouton du mode clair ou sombre est un bouton radio du thème.** En mode sombre, au premier chargement, la touche
+    Tab atteint le radio nommé « Passer au mode sombre », sur une page déjà sombre, et Entrée la passe en clair: un
+    lecteur d'écran annonce l'inverse de ce qui se passe. La touche Espace ne change pas le mode; Entrée et les
+    flèches le changent (relevé le 2026-11-18 dans Chrome sans interface). Un vrai bouton est porté par #653.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
     Il vient du thème, hors du texte des fiches.
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
     rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:5`): tant que Pages n'est
-    pas activé, un aperçu local de `site/` n'affiche pas les schémas.
+    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les quatre fiches qui en ont, l'erreur de ce
+    chargement arrête aussi, dans l'aperçu seulement, le bouton du mode et la recherche.
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
