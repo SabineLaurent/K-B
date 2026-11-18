@@ -11,6 +11,7 @@ from pathlib import Path
 
 import httpx2
 import pytest
+from ai_api.test_digest_router import read_metric_points
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.metrics.export import InMemoryMetricReader
@@ -1202,8 +1203,19 @@ def test_the_choice_writes_one_metric_line_without_a_repository(
         for scope in resource.scope_metrics
         for metric in scope.metrics
         for point in metric.data.data_points
+        if metric.name != "k_b.request.duration"
     }
     assert stages == {"select"}
+
+
+def test_a_request_measures_its_duration_by_its_route(make_ai_api, metric_reader):
+    client = make_ai_api(simulate([day(offset) for offset in range(6)]))
+
+    post_trend_reports(client)
+
+    points = read_metric_points(metric_reader)
+    [(attributes, (count, _))] = points["k_b.request.duration"]
+    assert (attributes, count) == ({"http.route": "/trend-reports"}, 1)
 
 
 def test_the_choice_is_a_span_of_counts_and_refs(make_ai_api, recorded_traces):
@@ -1615,6 +1627,7 @@ def test_each_writing_writes_one_metric_line_without_a_repository(
         for scope in resource.scope_metrics
         for metric in scope.metrics
         for point in metric.data.data_points
+        if metric.name != "k_b.request.duration"
     }
     assert stages == {"select", "write_trends"}
 

@@ -78,9 +78,12 @@ def post_trend_reports(
     # the OpenAPI.
     request_id = read_request_id(request)
     tracing: Tracing = request.app.state.tracing
-    with tracing.step(
-        ROOT_SPAN, "server", ROOT_ATTRIBUTES | {"k_b.request_id": request_id}
-    ) as root:
+    with (
+        request.app.state.model_metrics.measure_request("/trend-reports"),
+        tracing.step(
+            ROOT_SPAN, "server", ROOT_ATTRIBUTES | {"k_b.request_id": request_id}
+        ) as root,
+    ):
         try:
             report = read_trend_report(
                 request,

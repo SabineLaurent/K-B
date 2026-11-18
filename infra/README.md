@@ -18,7 +18,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `key-vault.bicep` | coffre `kv-kb-…` en RBAC, suppression réversible 7 jours ; Key Vault Secrets Officer pour l'opératrice | 1 | #414 |
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420, #571 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
-| `budget.bicep` | budget `budget-kb` : 30 €/mois des coûts étiquetés `project=k-b`, e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437 |
+| `budget.bicep` | budget `budget-kb` : 40 €/mois des coûts étiquetés `project=k-b`, hébergement et inférence (la ressource du modèle comptée si elle est dans ce groupe de ressources et porte l'étiquette), e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437, #632 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
 | `api-container-app.bicep` | `ca-kb-data-api`, `ca-kb-ai-api` et `ca-kb-web` : HTTPS, 0 à 1 réplique, sondes `GET /health` ; ingress interne, sauf le site, ouvert par `exposeWeb` derrière la connexion Microsoft Entra (« Le site privé ») | 2 | #414, #571 |
@@ -242,7 +242,9 @@ redémarrer de nouveau une fois les 30 minutes passées.
 ### 5. Seconde passe : les API, le site et les jobs
 
 Les trois valeurs sont celles du `.env` de l'opératrice : `KB_LLM_BASE_URL`, `KB_LLM_MODEL` et `KB_OTLP_ENDPOINT`
-(l'adresse de base, sans `/v1/metrics`). Ce ne sont pas des secrets. `WEB_APP_ID` est l'ID de l'inscription
+(l'adresse de base, sans `/v1/metrics`). Ce ne sont pas des secrets. `LLM_MODEL` nomme le déploiement de
+gpt-6.1-sol : `main.bicep` pose l'effort `low` (`KB_LLM_REASONING_EFFORT`), le plus bas que gpt-6.1-sol accepte ; le
+modèle et l'effort partent dans la même passe, jamais l'un sans l'autre (#635). `WEB_APP_ID` est l'ID de l'inscription
 « K-B site » (#571), pas un secret non plus. S'il n'y a pas exactement une inscription de ce nom, `WEB_APP_ID` est
 vidé, et `kb_check` refuse la passe.
 

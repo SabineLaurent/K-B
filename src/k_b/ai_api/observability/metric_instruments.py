@@ -5,7 +5,10 @@ Names after the semantic conventions for generative AI, k_b. otherwise; closed a
 never a text, a title, a subject nor a request id."""
 
 import logging
-from collections.abc import Sequence
+import time
+from collections.abc import Iterator, Sequence
+from contextlib import contextmanager
+from typing import Literal
 
 from opentelemetry.sdk.metrics import MeterProvider
 from opentelemetry.sdk.resources import Resource
@@ -31,6 +34,13 @@ OK_OUTCOME = "ok"
 CALL_SECONDS_BUCKETS = (
     0.01, 0.02, 0.04, 0.08, 0.16, 0.32, 0.64, 1.28, 2.56, 5.12, 10.24, 20.48, 40.96, 81.92,
 )  # fmt: skip
+# A request of a report, from a second to the 200 of its deadline; 180 is the threshold of
+# KbRequestOverDuration (observability/grafana/alert-rules.yaml), 240 the bound of the ingress.
+REQUEST_SECONDS_BUCKETS = (
+    1, 2, 5, 10, 20, 30, 60, 90, 120, 150, 180, 200, 240,
+)  # fmt: skip
+# The routes of the reports, as http.route of their root span.
+type ReportRoute = Literal["/digests", "/trend-reports"]
 # The checks of an output run in memory: a millisecond to a few seconds.
 CHECK_SECONDS_BUCKETS = (
     0.001, 0.0025, 0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5,
@@ -126,6 +136,12 @@ class ModelMetrics:
             description="Duration of the reading of the window by the data API.",
             explicit_bucket_boundaries_advisory=CALL_SECONDS_BUCKETS,
         )
+        self._request_duration = meter.create_histogram(
+            "k_b.request.duration",
+            unit="s",
+            description="Duration of a request of a report, from its route to its answer.",
+            explicit_bucket_boundaries_advisory=REQUEST_SECONDS_BUCKETS,
+        )
 
     @classmethod
     def from_settings(
@@ -186,6 +202,17 @@ class ModelMetrics:
     def record_data_fetch(self, data_fetch_ms: int) -> None:
         """The reading of the window of a request, a model called or not."""
         self._data_fetch_duration.record(data_fetch_ms / MILLISECONDS_PER_SECOND)
+
+    @contextmanager
+    def measure_request(self, route: ReportRoute) -> Iterator[None]:
+        """The duration of the block, recorded whatever its end, a failure included."""
+        started = time.perf_counter()
+        try:
+            yield
+        finally:
+            self._request_duration.record(
+                time.perf_counter() - started, {"http.route": route}
+            )
 
     def stop(self) -> None:
         """Send what is not sent yet, within METRICS_STOP_TIMEOUT_SECONDS; a failure is logged by

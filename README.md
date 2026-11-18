@@ -79,10 +79,10 @@ dans mon coffre Obsidian, sous `veille/` :
   [docs/architecture-api-ia.md](docs/architecture-api-ia.md).
 - **Métriques** de chaque appel (durée, jetons, coût estimé, erreurs, fidélité), sur une ligne
   JSON de la sortie standard et en OpenTelemetry vers Grafana Cloud, en région UE. Un tableau de
-  bord les montre à jour et dans le temps, et trois alertes sur seuil partent par e-mail : sorties
-  invalides, fidélité basse, coût au-dessus du budget. Le tableau et les alertes sont versionnés
-  dans `observability/grafana/` ; leur installation, leur lecture et le relevé du bac à sable qui a
-  déclenché les trois alertes sont dans
+  bord les montre à jour et dans le temps, et cinq alertes sur seuil partent par e-mail : sorties
+  invalides, fidélité basse, coût au-dessus du budget, appels en échec, demande de compte rendu de
+  plus de 180 s. Le tableau et les alertes sont versionnés dans `observability/grafana/` ; leur
+  installation, leur lecture et le relevé du bac à sable qui a déclenché les trois premières sont dans
   [documentation/monitoring_pour_docu.md](documentation/monitoring_pour_docu.md).
 - **Plus tard, les fiches de lecture** : de mes clips du Web Clipper, puis des papiers que je
   garde dans Zotero, le modèle rédigera des fiches de lecture, réunies en un wiki (#168). Aucun
@@ -192,7 +192,8 @@ machine (`KB_COLLECT_ONLY`), sans que ma bibliothèque soit montée dans un cont
 (`kb serve-ai`, #156) et leur écriture en `.md` dans le coffre (`kb digest`, #209) sont codés (voir
 « Installer et lancer »), comme l'export des métriques du modèle vers Grafana Cloud (#162). Leur
 tableau de bord et leurs trois alertes sur seuil sont livrés (#164), et les trois alertes ont été
-déclenchées dans un bac à sable le 08/11. Restent, dans #164, le réimport du tableau et de la règle
+déclenchées dans un bac à sable le 08/11 ; deux de plus, appels en échec et demande de plus de 180 s, le
+18/11 (#633, #634), sans scénario du bac à sable. Restent, dans #164, le réimport du tableau et de la règle
 de fidélité, changés depuis, et l'essai d'accessibilité ; puis, au deuxième temps, l'image étant
 construite (#200), l'installation par compose (#202).
 
