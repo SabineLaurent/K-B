@@ -97,7 +97,7 @@ chacun avec l'item qui le porte. Le code garde l'affirmation si chacune de ces c
     `ai_api/stages/fidelity.py:188-194`), se retrouve à la fois dans le texte de l'affirmation
     et dans un champ envoyé de l'item qu'il cite: le titre et le résumé d'un article, par exemple
     (`ai_api/stages/fidelity.py:97-103`). Un identifiant CVE (<span lang="en">Common Vulnerabilities and
-    Exposures</span>) ou GHSA (<span lang="en">GitHub Security Advisory</span>) ne se retrouve que dans le `cve_id`
+    Exposures</span>, l'identifiant public d'une vulnérabilité) ou GHSA (<span lang="en">GitHub Security Advisory</span>) ne se retrouve que dans le `cve_id`
     ou le `ghsa_id` de l'item;
 - chaque identifiant CVE ou GHSA du texte est un fait déclaré;
 - chaque item cité porte au moins un fait retrouvé;

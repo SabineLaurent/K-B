@@ -17,7 +17,7 @@ La PR A a fait des fiches un site, et en a mis quatre en forme. Six restaient : 
 base, API IA, architecture, installation. Leurs listes étaient mal rendues, leurs schémas et leurs tableaux sans phrase
 d'annonce, et plusieurs passages décrivaient un état que `main` avait dépassé (#623). La règle 6.1 de la notice
 éditoriale d'AcceDe Web, « Déclarer les citations en ligne et les blocs de citations », était écrite « non tenue » dans
-toutes les fiches. Enfin, la relecture « jury » du 11/11 avait relevé, dans l'architecture et l'installation, des
+toutes les fiches. Enfin, la relecture du 11/11 avait relevé, dans l'architecture et l'installation, des
 renvois glissés, un état en ligne faux et des cellules surchargées.
 
 ## Le comment
@@ -91,13 +91,13 @@ y sont justes. Les tests et la livraison prolongent le leur pour les seuls passa
 - **Le bloc de citation pour l'intitulé du référentiel**, plutôt qu'un `q` : il est seul sur sa ligne, en tête de
   fiche.
 - **Les quatre routes du client `WEB` hors du tableau** des deux API (relecture n° 1) : la cellule « Routes » portait
-  huit routes et onze renvois, le défaut que visait le constat jury 10.
+  huit routes et onze renvois, le défaut que visait le constat 10 de la relecture du 11/11.
 - **Écarts acceptés par time-knight** : l'architecture décrit la lecture du conteneur `watch` par l'API de données
   (#559, #560), code de `fd956430` qu'elle omettait ; le constat d'échec du test de l'export (#495, fermée) est résumé
   en une phrase datée ; la liste de l'import commence à 1.
 - **Le registre et deux spécifications**, à la demande de time-knight : le site ne montre pas encore les comptes
-  rendus de veille (`docs/registre-traitements.md`, lignes « Destinataires » et « Site privé »), et une mention de
-  l'école est remplacée par « plus tard » dans le registre, `infra/README.md` et `docs/tendances.md`.
+  rendus de veille (`docs/registre-traitements.md`, lignes « Destinataires » et « Site privé »), et une échéance
+  passée est remplacée par « plus tard » dans le registre, `infra/README.md` et `docs/tendances.md`.
 
 ## Preuve
 

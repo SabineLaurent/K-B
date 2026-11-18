@@ -92,7 +92,7 @@ Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions plancher
 Les tests se servent aussi de dépendances de K-B lui-même: le `TestClient` de FastAPI (une application appelée
 sans socket), `uvicorn` (les deux API servies pour de vrai dans `tests/commands/test_live_apis.py`), le
 `MockTransport` de `httpx2` (une réponse HTTP écrite par le test), `psycopg` (le serveur de test) et les exportateurs
-en mémoire du SDK OpenTelemetry (`tests/ai_api/conftest.py`).
+en mémoire du SDK (le kit de développement, <span lang="en">software development kit</span>) d'OpenTelemetry (`tests/ai_api/conftest.py`).
 
 ## Lancer les tests
 
@@ -351,7 +351,7 @@ tableau suivant donne chaque cas, ses tests et leur fichier.
 |---|---|---|
 | le texte est normalisé avant toute recherche | `test_a_text_is_normalized_before_any_search` | `tests/ai_api/test_fidelity.py` |
 | une valeur n'est trouvée qu'entre ses limites, dans un seul champ | `test_a_value_is_found_only_between_its_limits`, `test_a_fact_is_found_in_one_field_never_across_two` | `tests/ai_api/test_fidelity.py` |
-| une CVE (l'identifiant public d'une vulnérabilité) du texte égale à son fait par sa forme canonique | `test_a_cve_of_the_text_equals_its_fact_by_its_canonical_form` | `tests/ai_api/test_fidelity.py` |
+| une CVE (<span lang="en">Common Vulnerabilities and Exposures</span>, l'identifiant public d'une vulnérabilité) du texte égale à son fait par sa forme canonique | `test_a_cve_of_the_text_equals_its_fact_by_its_canonical_form` | `tests/ai_api/test_fidelity.py` |
 | un identifiant du texte non déclaré en fait retire l'affirmation | `test_an_identifier_of_the_text_not_declared_removes_the_claim` | `tests/ai_api/test_fidelity.py` |
 | le piège écrit en clair, puis déguisé, est retiré | `test_the_trap_written_plainly_is_removed`, `test_the_trap_disguised_is_removed` | `tests/ai_api/test_fidelity.py` |
 | un contrôle de direction en tête du texte retire l'affirmation | `test_a_control_of_direction_at_the_start_of_the_text_removes_the_claim` | `tests/ai_api/test_fidelity.py` |

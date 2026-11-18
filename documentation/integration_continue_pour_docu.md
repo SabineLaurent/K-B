@@ -383,7 +383,7 @@ La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`
 L'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards` (2026-10-31), a eu `audit`
 en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
 (`gh run view 41215069368 --repo SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`,
-puis `pyasn1 0.6.4`, quatre identifiants publics de vulnérabilités (CVE) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
+puis `pyasn1 0.6.4`, quatre CVE (<span lang="en">Common Vulnerabilities and Exposures</span>, l'identifiant public d'une vulnérabilité) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
 
 ## Quand la CI échoue
 

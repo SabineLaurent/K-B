@@ -892,7 +892,8 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
 (`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
-`bicep-build`, un huitième check, et depuis #167, `build` de `docs.yml`, un neuvième.
+`bicep-build`, un huitième check, et depuis #167, les deux jobs de `docs.yml`, `build`, un neuvième, et `deploy`, sauté sur une
+PR, un dixième.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 

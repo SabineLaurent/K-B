@@ -384,7 +384,7 @@ règle est rejetée, avec son champ et le type d'erreur, sans sa valeur (étape 
 - **Une sorte, une source, ses champs**: un item vient de la source de sa sorte (`check_source`,
     `items.py:463-467`), remplit les champs obligatoires de sa sorte (`REQUIRED_FIELDS_BY_KIND`, `items.py:251`), et
     aucun champ propre à une autre sorte (`FIELDS_OF_ONE_KIND`, `items.py:283-291`, `items.py:485`).
-- **Identifiants à leur forme**: CVE (<span lang="en">Common Vulnerabilities and Exposures</span>), nom de dépôt,
+- **Identifiants à leur forme**: CVE (<span lang="en">Common Vulnerabilities and Exposures</span>, l'identifiant public d'une vulnérabilité), nom de dépôt,
     édition de tldr.tech, identifiant arXiv, clé Zotero (`items.py:194-203`); l'identifiant d'une alerte (GHSA,
     <span lang="en">GitHub Security Advisory</span>), d'une release (entier positif, sans zéro en tête) et d'une
     entrée Zotero dans sa source (`SOURCE_ITEM_ID_BY_KIND`, `items.py:295-303`, `items.py:516`). **Entiers** tenus sur

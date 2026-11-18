@@ -108,7 +108,8 @@ règle de la notice, son résultat, et comment il a été vérifié.
 Ses bonnes pratiques: aucun lien n'ouvre de nouvelle fenêtre (aucun `target`, le pied de page du thème retiré); aucun fichier n'est proposé au
 téléchargement; les capitales gardent leurs accents; aucun texte n'est justifié. Les sigles du domaine (RGAA, WCAG,
 AELE, RGPD, PR, ADR, CVE, DINUM, OSV) sont développés à leur premier emploi dans chaque fiche; les sigles techniques
-courants (API, HTML, URL, UTC, SHA) ne le sont pas.
+courants (API, HTML, URL, UTC, SHA) ne le sont pas. Le libellé d'un schéma ne compte pas comme premier emploi: un sigle
+peut y paraître avant le texte qui le développe.
 
 ## Vérifier
 
@@ -119,7 +120,8 @@ courants (API, HTML, URL, UTC, SHA) ne le sont pas.
     ```
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-    (`mkdocs.yml:43-49`). Le workflow `docs.yml` la lance sur chaque PR
+    (`mkdocs.yml:43-49`). Le workflow `docs.yml` la lance sur chaque demande de fusion
+    (PR, <span lang="en">pull request</span>)
     (`.github/workflows/docs.yml:6-9`, `:25`).
 
 2. Le contrôle du HTML construit, lancé sur `site/` pour chaque PR de mise en forme, compte dans chaque page: l'attribut
@@ -157,6 +159,9 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 - **La fiche du monitorage n'est pas encore mise en forme.** Elle garde, le 2026-11-18, des listes en retrait de deux
     ou trois espaces, trois renvois de position (deux « ci-dessus », un « plus bas »), et ses citations entre guillemets,
     sans `q`. Elle est mise en forme après les PR de #620 et #621, qui la changent.
+- **Les schémas larges sont réduits à la largeur du texte.** Dans l'architecture, le flux en bref et le déploiement
+    sur Azure sont dessinés sur 688 pixels de large, et leurs libellés ne se lisent qu'avec le zoom du navigateur
+    (relevé le 2026-11-18 dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
     Il vient du thème, hors du texte des fiches.
