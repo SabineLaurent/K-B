@@ -10,9 +10,11 @@
 - **Série** : suite de [`kb smoke-test`, les API et le stockage d'échange](2026-11-06-kb-smoke-test-api-et-stockage-d-echange.md)
   (#412), qui a créé le test de fumée.
 
-Les commits de la branche sont `1492a0e` (code et tests), `64a2393` (doc), `718b69c` (journal ADR) et `1368a15`
-(corrections de la revue). Les autres commits que liste `git log` sur cette branche sont ceux de `main`, déjà
-fusionnés par leurs propres PR : la note ne les couvre pas.
+Les commits de #499 sont `1492a0e` (code et tests), `64a2393` (doc), `718b69c` (journal ADR), `1368a15`
+(corrections de la revue), `9b4e03c` (cette note), `33eba04` (l'auto-évaluation), puis le commit des corrections de
+la seconde revue. `1f2abbf` est un correctif de #498, porté par cette branche parce que #643 a été fusionnée sans lui :
+la note de #498 le couvre. Les autres commits que liste `git log` sur cette branche sont ceux de `main` et ses
+fusions, déjà fusionnés par leurs propres PR : la note ne les couvre pas.
 
 ## Le pourquoi
 
@@ -41,8 +43,10 @@ le statut qu'elle doit rendre. Si une version en ligne servait une route à clé
 `src/k_b/jobs/api_probes.py:81-85`. Trois sondes par API, sur les deux API :
 
 - une route à clé, appelée sans clé, doit rendre **401** : `GET /items` pour l'API de données, `POST /digests` pour
-  l'API IA (`api_probes.py:30-31`). La clé est une dépendance FastAPI de la route, vérifiée avant le corps : une
-  requête sans corps reçoit 401 (`test_without_key_only_a_body_that_cannot_be_read_gets_422`, paramètre `None`) ;
+  l'API IA (`api_probes.py:30-31`). La clé est une dépendance FastAPI de la route. FastAPI lit le JSON du corps
+  avant elle : un corps illisible rend 422 sans clé, mais une requête sans corps, comme la sonde, reçoit 401
+  (`tests/ai_api/test_digest_router.py:519-526`, `test_without_key_only_a_body_that_cannot_be_read_gets_422`,
+  paramètre `None`) ;
 - `GET /docs` doit rendre **404** hors `sandbox`, **200** en `sandbox` : les API ne servent Swagger UI qu'en
   `sandbox` (`read_openapi_url`, `core/api_settings.py`) ;
 - `HEAD /health` doit rendre **405** : les deux API retirent le `HEAD` que Starlette ajoute à toute route `GET`
@@ -108,7 +112,7 @@ PROBE_WRITE_TIMEOUT_SECONDS = 10
 PROBE_READ_TIMEOUT_SECONDS = 10
 ```
 
-`src/k_b/core/config.py:684-687`, utilisés par `build_probe_client` (`api_probes.py:59-73`). Le premier code
+`src/k_b/core/config.py:691-694`, utilisés par `build_probe_client` (`api_probes.py:59-73`). Le premier code
 réutilisait le client du `/health`, dont la lecture attend 60 s pour couvrir le réveil. La revue a calculé le pire
 cas : deux `/health` et six sondes de 65 s chacun, plus les nouvelles tentatives du stockage, environ 966 s, au-delà
 des 900 s du `replicaTimeout` du job. Azure aurait coupé la réplique avant qu'elle écrive son résumé. Une sonde suit
@@ -160,6 +164,7 @@ leur défaut inchangé.
 | `test_a_probe_waits_a_read_shorter_than_the_wake_of_an_api` | le client des sondes lit 10 s, moins que les 60 s du réveil |
 | L'API de données construite hors `sandbox`, le 18/11 : `request method='GET' route=/items status=401`, `method='GET' route=/docs status=404`, `method='HEAD' route=/health status=405`, `client=-` | les lignes que les sondes laissent dans le journal des API, écrites dans `infra/README.md` |
 | `uv run pytest` → 5636 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts ; site MkDocs en mode strict construit | la branche ne casse rien |
+| Après la fusion d'`origin/main` à `1bef80f2`, le 18/11 : `uv run pytest` → 5643 passed ; mêmes contrôles verts | la branche, à jour de `main`, ne casse rien |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -175,7 +180,7 @@ leur défaut inchangé.
    et le test des API servies par uvicorn passe neuf contrôles sur neuf.
 4. **Pourquoi 10 s de lecture pour une sonde, et 60 s pour `/health` ?** `/health` porte le réveil d'une API à 0
    réplique ; une sonde vient juste après, sur une API éveillée. Avec 60 s, six sondes portaient le pire cas au-delà
-   du `replicaTimeout` de 900 s, et Azure aurait coupé le job avant son résumé (`config.py:684-687`,
+   du `replicaTimeout` de 900 s, et Azure aurait coupé le job avant son résumé (`config.py:691-694`,
    `smoke-test-job.bicep`).
 5. **Une sonde peut-elle fuiter une donnée dans le journal ?** Non : le corps n'est jamais lu, et l'échec ne dit que
    son état et le statut, jamais l'URL ni le message de l'exception (`api_probes.py:91-99`,
@@ -195,9 +200,9 @@ leur défaut inchangé.
 
 ## Ce qui reste
 
-- **L'auto-évaluation** (`docs/fiches-veille.md`, API8 « Évaluation automatisée » ; `docs/specs-api.md`, ligne API8) :
-  après la fusion de #498, qui réécrit la même entrée. La mesure y restera « non tenue, en partie » jusqu'au constat
-  en ligne (règle des preuves du plan).
+- **L'auto-évaluation** n'attend plus que le constat en ligne. Elle est écrite dans `33eba04`
+  (`docs/fiches-veille.md`, API8 « Évaluation automatisée », la ligne du tableau et le compte ; `docs/specs-api.md`,
+  API8) : la mesure y reste « non tenue, en partie » jusqu'à ce constat (règle des preuves du plan).
 - **Le constat en ligne** : après la fusion de #630, un tag, puis dans `log-kb` la ligne
   `smoke test finished in … s: 9 of 9 checks passed` (`infra/README.md`, « 6. Vérifier la mise en ligne ») ;
   commentaire sur #499, et la mesure passe à « tenue » dans la PR suivante qui touche l'auto-évaluation.

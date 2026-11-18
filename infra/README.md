@@ -820,7 +820,8 @@ JOBFILES=$(az storage account list -g "$RG" --query "[?starts_with(name,'stkbjob
 5. Retirer la sonde : revert de `f10e5e3` (`d2f5b6e`), puis la seconde passe. Aperçu attendu : `caj-kb-smoke-test` seul à
    modifier (son identité, son volume, sa commande). Puis
    `az containerapp job show -n caj-kb-smoke-test -g "$RG" --query "{identities:identity.userAssignedIdentities,volumes:properties.template.volumes}"`
-   ne montre plus que `id-kb-smoke-test`, sans volume, et le job repasse : `3 of 3 checks passed`.
+   ne montre plus que `id-kb-smoke-test`, sans volume, et le job repasse : `3 of 3 checks passed` au relevé de #420,
+   `9 of 9 checks passed` depuis #499.
 
 ### Les instantanés de `job-data`
 

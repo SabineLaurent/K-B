@@ -359,8 +359,9 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
 - De 0 à 1 réplique (`infra/modules/api-container-app.bicep:184-189`).
 - Les jobs en ligne sont `caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine` et
     `caj-kb-digest-watch` (`infra/deployment.json:3`). Deux appellent l'API IA:
-    - la sonde, `caj-kb-smoke-test`, par `GET /health` et ses sondes sans clé, refusées en 401, 404 et 405
-        (`commands/smoke_test_command.py:102-107`, `:145-173`, #499);
+    - la sonde, `caj-kb-smoke-test`, par `GET /health` (`commands/smoke_test_command.py:80-81`, `:117-127`). Le
+        code de #499 lui ajoute des sondes sans clé, refusées en 401, 404 et 405; en ligne, elles partent au premier
+        tag qui porte ce code, après #630;
     - `caj-kb-digest-watch`, par défaut le lundi et le jeudi à 10:00 UTC (`infra/main.bicep:31-32`), qui lance
         `kb digest-watch` (`infra/modules/digest-watch-job.bicep:95-97`): le réveil des deux API par
         `GET /health`, `kb digest`, de nouveau le réveil, `kb trend-report`, puis la publication de `veille/`

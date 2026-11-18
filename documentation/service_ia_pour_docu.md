@@ -418,9 +418,10 @@ flowchart LR
     `kb trend-report`, par défaut le lundi et le jeudi à 10:00 UTC. Lancé à la main le 2026-11-11, ce job a donné les
     premiers points de la production dans Grafana Cloud, vers 16:00 UTC. Lancé par son horaire le 2026-11-12, de
     10:00:00 à 10:02:44 UTC, ce job a appelé le modèle. Les autres jobs n'appellent pas le modèle. Ainsi, le job de
-    vérification `caj-kb-smoke-test` appelle `GET /health` de l'API IA, et l'API IA y répond sans le modèle.
-    Depuis #499, ce job lui envoie aussi des sondes sans clé, des requêtes que l'API doit refuser. L'API IA refuse
-    ainsi `POST /digests` en 401, avant tout appel au modèle.
+    vérification `caj-kb-smoke-test` appelle `GET /health` de l'API IA, et l'API IA y répond sans le modèle. Le
+    code de #499 ajoute à ce job des sondes sans clé, des requêtes que l'API doit refuser. L'API IA refuse ainsi
+    `POST /digests` en 401, avant tout appel au modèle. En ligne, les sondes partent au premier tag qui porte ce
+    code, après #630; elles n'y sont pas encore constatées.
 - **Le coffre de secrets**, en ligne, porte la clé. L'identité managée de l'API IA la lit (« La clé de K-B »).
 - **Grafana Cloud** reçoit les mesures de chaque appel au modèle. Il les reçoit par OTLP, le protocole d'export
     d'OpenTelemetry, un standard ouvert de mesure des programmes. Sous un réglage, Grafana Cloud reçoit aussi le

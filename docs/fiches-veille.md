@@ -1090,9 +1090,9 @@ API8 (revue, #497, et évaluation, #499, codée, à constater en ligne) et API10
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
-    l'atteignent. À ce commit, deux apps, les deux API, et deux jobs (`infra/deployment.json`), dont
-    un seul l'appelle : `caj-kb-smoke-test`, sur `/health` et par ses sondes, sans clé ; `kb digest` et
-    `kb trend-report`, ses clients à clé, n'ont pas de job en ligne. Ce que le certificat prouverait,
+    l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
+    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, depuis #499, par ses sondes, sans clé ; et
+    `caj-kb-digest-watch` (#423), par `kb digest` et `kb trend-report`, avec leurs clés. Ce que le certificat prouverait,
     qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
     sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
     programmes de la machine.
