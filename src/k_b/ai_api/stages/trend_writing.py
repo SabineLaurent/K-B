@@ -125,7 +125,7 @@ TREND_WRITING_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
 }
 # The longest output the bounds allow, an estimate: 1,020 characters of texts and 20 facts of 120
 # characters, about 4,000 characters of JSON, 1,350 tokens at 3 characters per token (assumed),
-# with a margin; read within LLM_CALL_TIMEOUT_SECONDS at the rate measured by #158
+# with a margin; read within LLM_CALL_TIMEOUT_SECONDS at the rate measured on gpt-6.1-sol
 # (tests/ai_api/test_llm_client.py).
 TREND_WRITING_MAX_COMPLETION_TOKENS = 2048
 # A command to run, refused with the output as a link is: a pipe into a shell, sudo, npx, curl or
