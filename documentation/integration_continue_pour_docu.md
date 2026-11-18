@@ -1,8 +1,12 @@
 # L'intégration continue de K-B
 
-« Documentation des procédures d'installation et de test de la chaîne. » — C18
+> Documentation des procédures d'installation et de test de la chaîne.
 
-« Documentation utilisateur, pour le déclenchement de la chaîne. » — C18
+— C18
+
+> Documentation utilisateur, pour le déclenchement de la chaîne.
+
+— C18
 
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
@@ -17,7 +21,7 @@ d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livr
 Chaque demande de fusion (PR, <span lang="en">pull request</span>) vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
 couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Sur
 chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le workflow `Docs`](#le-workflow-docs)). Une
-PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
+PR ne fusionne que si ses sept contrôles requis sont verts sur une branche à jour avec `main`
 ([Le ruleset de `main`](#le-ruleset-de-main)). La CI ne pousse rien et ne déploie rien sur Azure, où elle n'a aucun
 droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le site des fiches, sur GitHub Pages.
 
@@ -33,6 +37,7 @@ droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le si
 | pip-audit 2.10.1 | cherche les vulnérabilités connues des versions de `uv.lock`, de tous les groupes de dépendances, avec leurs empreintes | `ci.yml:25-26` |
 | PostgreSQL 18.6 | un service du job `tests-postgresql`, épinglé par son digest | `ci.yml:69-83` |
 | Docker Buildx | construit l'image `linux/amd64` de K-B et la contrôle | `image.yml` |
+| Grype v0.121.3 (Anchore) | cherche dans l'image les vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip` de l'image de base) et de CPython; refuse une haute ou critique qui a un correctif | `image.yml:64-82` |
 | Azure CLI et Bicep v0.48.1 | compile `infra/main.bicep`, sans connexion à Azure | `infra.yml` |
 | MkDocs 1.6.1, avec Material for MkDocs 9.8.1 | construit le site des fiches de `documentation/`, en mode strict | `mkdocs.yml`; versions dans `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) |
 | Dependabot | ouvre chaque semaine les PR de mise à jour des actions et des images de base du `Dockerfile` | `.github/dependabot.yml` |
@@ -100,23 +105,25 @@ liste ni `mkdocs` ni `mkdocs-material`, mais liste `pytest` et `mypy`, du groupe
 
 #### Le workflow `Image`
 
-`.github/workflows/image.yml`, un job, `image-build`, non requis à la fusion. Le tableau suivant donne ses étapes dans
-l'ordre, et ce que fait chacune; une étape sans nom dans `image.yml` y est décrite en français.
+`.github/workflows/image.yml`, un job, `image-build`, requis à la fusion depuis #498. Le tableau suivant donne ses
+étapes dans l'ordre, et ce que fait chacune; une étape sans nom dans `image.yml` y est décrite en français.
 
 | # | Étape (lignes d'`image.yml`) | Ce qu'elle fait |
 |---|---|---|
-| 1 | Récupérer le dépôt (l. 18) | `actions/checkout`, `.git` compris |
-| 2 | Planter des fichiers à écarter (l. 22-26) | crée des fichiers que `.dockerignore` doit écarter du contexte de construction, nommés après le tableau |
-| 3 | `Sends only what the Dockerfile copies to the build` (l. 29-35) | vérifie que le contexte de construction ne contient, à sa racine, que `README.md`, `pyproject.toml`, `src` et `uv.lock` (l. 33), et nulle part un fichier planté ni un `__pycache__` (l. 34) |
-| 4 | Construire l'image (l. 36) | `docker buildx build --platform linux/amd64 --tag k-b:ci .` |
-| 5 | `Runs as a non-root user` (l. 37-41) | vérifie que l'utilisateur de l'image n'est pas root (`id -u` différent de 0) |
-| 6 | `Holds none of the planted files` (l. 43-46) | vérifie qu'aucun chemin de l'image ne s'appelle `.env*`, `*.sqlite*`, `decoy`, `.DS_Store` ni `.git` (l. 45); `__pycache__` n'est cherché que dans le contexte (étape 3) |
-| 7 | `Refuses to start without KB_DATA_DIR` (l. 49-55) | vérifie que `kb create-db` sans `KB_DATA_DIR` sort en code 2 avec `KB_DATA_DIR must point to the data directory` |
-| 8 | `Starts kb and creates the database` (l. 58-61) | lance `kb --help`, puis `kb create-db` dans le dossier de données de l'image |
+| 1 | Récupérer le dépôt (l. 20) | `actions/checkout`, `.git` compris |
+| 2 | Planter des fichiers à écarter (l. 24-28) | crée des fichiers que `.dockerignore` doit écarter du contexte de construction, nommés après le tableau |
+| 3 | `Sends only what the Dockerfile copies to the build` (l. 31-37) | vérifie que le contexte de construction ne contient, à sa racine, que `README.md`, `pyproject.toml`, `src` et `uv.lock` (l. 35), et nulle part un fichier planté ni un `__pycache__` (l. 36) |
+| 4 | Construire l'image (l. 38) | `docker buildx build --platform linux/amd64 --tag k-b:ci .` |
+| 5 | `Runs as a non-root user` (l. 39-43) | vérifie que l'utilisateur de l'image n'est pas root (`id -u` différent de 0) |
+| 6 | `Holds none of the planted files` (l. 45-48) | vérifie qu'aucun chemin de l'image ne s'appelle `.env*`, `*.sqlite*`, `decoy`, `.DS_Store` ni `.git` (l. 47); `__pycache__` n'est cherché que dans le contexte (étape 3) |
+| 7 | `Refuses to start without KB_DATA_DIR` (l. 51-57) | vérifie que `kb create-db` sans `KB_DATA_DIR` sort en code 2 avec `KB_DATA_DIR must point to the data directory` |
+| 8 | `Starts kb and creates the database` (l. 60-63) | lance `kb --help`, puis `kb create-db` dans le dossier de données de l'image |
+| 9 | `Installs Grype v0.121.3` (l. 67-72) | télécharge l'archive de Grype de sa release et vérifie son SHA256 (l. 71), comme Bicep dans `Infra` |
+| 10 | `Has no high or critical vulnerability that has a fix` (l. 78-82) | lance `grype docker:k-b:ci --only-fixed --fail-on high`: Grype lit le système de fichiers final de l'image, tire sa base de vulnérabilités à chaque exécution (refusée si elle a plus de 5 jours, son défaut), garde les vulnérabilités qui ont un correctif (`--only-fixed`), puis échoue s'il en reste une haute ou critique (`--fail-on high`); le tableau des vulnérabilités gardées se lit dans le journal de l'étape. En dernier, pour qu'un scan rouge ne cache pas le résultat des étapes 5 à 8 |
 
 Les fichiers plantés à l'étape 2 sont, à la racine, `.env`, `.env.decoy`, `temp/decoy`, `reports/decoy` et
 `.venv/decoy`, et dans `src/k_b/`, `.env.decoy`, `decoy.sqlite`, `decoy.sqlite-wal`, `.DS_Store` et
-`__pycache__/decoy.pyc` (l. 23-26).
+`__pycache__/decoy.pyc` (l. 25-28).
 
 L'image `k-b:ci` n'est poussée nulle part: celle qui part en ligne est construite par `Deploy`, depuis le commit du
 tag.
@@ -173,15 +180,15 @@ gh pr create --repo SabineLaurent/K-B --base main
 gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin, puis un contrôle par ligne
 ```
 
-Une PR reçoit neuf contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
-depuis #496, qu'elle touche `infra/` ou non, et `build` de `Docs`. Le job `deploy` de `Docs` est sauté sur une PR
-(`docs.yml:37`). Que GitHub le liste parmi les contrôles, comme sauté, n'est pas vérifié: le 2026-11-14, `Docs` ne
-figure pas encore dans la liste des workflows du dépôt (`gh api repos/SabineLaurent/K-B/actions/workflows`).
+Une PR reçoit dix contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
+depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Neuf tournent; `deploy`
+est sauté sur une PR (`docs.yml:37`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
+à `skipping` et les neuf autres à `pass`.
 
 ### Fusionner
 
-C'est possible quand les six contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
-`bicep-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
+C'est possible quand les sept contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
+`bicep-build`, `image-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
 (`git fetch origin`, puis `git rebase origin/main` et `git push --force-with-lease`, ou
 « <span lang="en">Update branch</span> » sur la PR): la CI repasse sur le nouveau commit. La fusion se fait par un
 commit de fusion, la seule méthode permise par le ruleset.
@@ -242,8 +249,9 @@ Dans <span lang="en">Settings → Rules → Rulesets</span>, avec ces règles:
     approbation requise (`required_approving_review_count: 0`), et le réglage par défaut
     `require_extra_approval_for_unattributed_changes: true`, sans effet ici: il ajoute une approbation à une PR que
     Copilot ouvre sans personne attribuée, et rien quand aucune n'est requise;
-- exiger les contrôles `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`, rendus par GitHub
-    Actions (`integration_id` 15368), sur une branche à jour (`strict_required_status_checks_policy: true`).
+- exiger les contrôles `audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build` (depuis #496) et
+    `image-build` (depuis #498), rendus par GitHub Actions (`integration_id` 15368), sur une branche à jour
+    (`strict_required_status_checks_policy: true`).
 
 ```sh
 gh api repos/SabineLaurent/K-B/rulesets --jq '.[] | "\(.id) \(.name) \(.target) \(.enforcement)"'
@@ -295,8 +303,10 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 | version de uv | `version:` des six jobs de `ci.yml` et de `docs.yml:22`; `Dockerfile:7` | tous ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
 | version de pip-audit | `ci.yml:26` | à la main |
 | image de PostgreSQL | `ci.yml:70`, tag et digest | à la main: d'après le commentaire de `ci.yml:64-65`, Dependabot ne la met pas à jour |
-| chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:33` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
+| chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:35` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
 | version de Bicep | `infra.yml:22`, et son SHA256 à `infra.yml:24` | les deux ensemble, l'empreinte lue sur la release de Bicep |
+| version de Grype | `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71` | à la main, ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
+| version épinglée d'un paquet Debian | `Dockerfile:48-54` (zlib1g) | retirée par son issue, #647, quand l'image de base porte le correctif ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage), étape 3) |
 | versions de MkDocs et de Material | `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) | `uv lock --upgrade-package <paquet>`, puis la construction du site sur le poste |
 | fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:29` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
 | seuil de couverture | `fail_under`, `pyproject.toml:87` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
@@ -310,6 +320,11 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 - **La version de uv**: les sept `version:` (six dans `ci.yml`, une dans `docs.yml`) et `Dockerfile:7` se changent
     ensemble, dans la plage `uv_build>=0.13.6,<0.14.0` de `pyproject.toml:31`. La PR de Dependabot ne change que le
     `Dockerfile`: les `version:` des workflows se changent à la main, dans la même PR.
+- **La version de Grype**: `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71`, se changent ensemble, à
+    la main: la dernière version publiée depuis 7 jours au moins (la même attente que Dependabot, qui ne voit pas un
+    binaire téléchargé), l'empreinte lue sur sa release (le digest de `grype_<version>_linux_amd64.tar.gz`) et
+    recoupée avec `grype_<version>_checksums.txt`. La version est aussi écrite dans les pages qui la citent
+    (`grep -rn "Grype v0" README.md docs/fiches-veille.md documentation/`).
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
     (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:26-29`). Avant de
     changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
@@ -337,7 +352,7 @@ de `build` sont écrites en entier après le tableau.
 | `types` | `uv run mypy --strict` |
 | `tests-postgresql` | `KB_TEST_POSTGRESQL_URL=<URL d'un serveur> uv run pytest -m postgresql` |
 | `tests-data` | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py` |
-| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help` |
+| `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help`; avec Grype installé, `grype docker:k-b --only-fixed --fail-on high` |
 | `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:24`) |
 | `build` de `Docs` | `uv run --locked --only-group docs mkdocs build --strict`, puis le contrôle de l'empreinte de Mermaid (après le tableau) |
 
@@ -348,7 +363,7 @@ uv export --frozen --no-emit-project --all-groups --format requirements-txt -o "
 uvx pip-audit@2.10.1 --require-hashes --disable-pip -r "${TMPDIR:-/tmp}/requirements-audit.txt"
 ```
 
-Pour `image-build`, les autres étapes (`image.yml:22-61`) ne tournent que sur le runner: elles écrivent dans
+Pour `image-build`, les autres étapes (`image.yml:24-82`) ne tournent que sur le runner: elles écrivent dans
 `$RUNNER_TEMP` et plantent des fichiers dans l'arbre de travail. Leur résultat se lit dans le journal du job
 (`gh run view <id> --log`).
 
@@ -365,7 +380,8 @@ echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/ass
 reçu sept contrôles, tous verts (`gh pr checks 533 --repo SabineLaurent/K-B`): `audit` (13 s), `tests` (1 min 21 s),
 `lint` (11 s), `types` (15 s), `tests-postgresql` (1 min 1 s), `tests-data` (30 s), dans l'exécution 42617081839 de
 `CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`; `bicep-build` n'y a pas tourné. Depuis #496,
-toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième.
+toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième, et
+`deploy`, sauté, un dixième.
 
 ### Un push témoin
 
@@ -378,7 +394,7 @@ La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`
 L'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards` (2026-10-31), a eu `audit`
 en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
 (`gh run view 41215069368 --repo SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`,
-puis `pyasn1 0.6.4`, quatre identifiants publics de vulnérabilités (CVE) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
+puis `pyasn1 0.6.4`, quatre CVE (<span lang="en">Common Vulnerabilities and Exposures</span>, l'identifiant public d'une vulnérabilité) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
 
 ## Quand la CI échoue
 
@@ -407,28 +423,69 @@ Le tableau suivant donne, pour chaque job en échec, ce qu'il a vu et quoi faire
 | `types` | une erreur de mypy, avec son fichier et sa ligne | `uv run mypy --strict` |
 | `tests-postgresql` | un test en échec, ou le service qui ne démarre pas (`pg_isready` en échec 15 fois, 2 s d'écart, 5 s de délai chacune, `ci.yml:79-83`) | relancer le job; puis le test sur un serveur local |
 | `tests-data` | un test des données en échec | le même test, sur le poste |
-| `image-build` | l'étape en échec dit le contrôle: un fichier planté trouvé (son chemin), l'utilisateur root, ou un code de sortie inattendu | `docker buildx build` en local, puis la commande de l'étape |
+| `image-build` | l'étape en échec dit le contrôle: un fichier planté trouvé (son chemin), l'utilisateur root, un code de sortie inattendu, ou, pour le scan (étape 10), le tableau des vulnérabilités hautes ou critiques qui ont un correctif: le paquet, sa version, la version corrigée, son type, l'identifiant et la sévérité | `docker buildx build` en local, puis la commande de l'étape; pour le scan, « Une vulnérabilité dans l'image », ci-dessous |
 | `bicep-build` | une erreur de compilation, avec son fichier et sa ligne, ou une empreinte de Bicep différente (`sha256sum: WARNING`) | `az bicep build --file infra/main.bicep` en local; pour l'empreinte, vérifier la version et le SHA256 ensemble |
 | `build` de `Docs` | un avertissement du mode strict, qui nomme le fichier et le lien ou l'ancre; ou un autre fichier de Mermaid (`sha256sum: WARNING`) | la construction en local; pour Mermaid, [Le détail des réglages](#le-detail-des-reglages) |
 
-Un échec du runner ou du réseau (téléchargement de uv, de pip-audit ou de l'image `postgres`) se relance tel quel.
+Un échec du runner ou du réseau (téléchargement de uv, de pip-audit, de l'image `postgres`, de Grype ou de sa base)
+se relance tel quel.
+
+### Une vulnérabilité dans l'image
+
+C'est l'étape 10 d'`image-build`, un contrôle exigé: elle bloque toute PR, et la mise en ligne (`deploy.yml:51-67`).
+Dans cet ordre:
+
+1. Un paquet Python de l'environnement virtuel (type `python`, sous `/app/.venv`): `audit` échoue aussi. Monter le
+    paquet dans `uv.lock` (ligne `audit` du tableau).
+2. Un paquet Debian (type `deb`), CPython (type `binary`) ou un paquet Python de l'image de base (type `python`, sous
+    `/usr/local/lib/python3.13`, `pip` notamment, hors d'`uv.lock` et que `audit` ne voit pas), quand l'image amont a
+    déjà le correctif: monter à la main le digest des deux `FROM python:3.13-slim-trixie@sha256:…` du `Dockerfile`
+    (l. 10 et 27), dans une PR, sans attendre la PR hebdomadaire de Dependabot. Le digest du jour se lit par
+    `docker buildx imagetools inspect python:3.13-slim-trixie` (ligne `Digest:`); le scan de la PR dit si le
+    correctif y est.
+3. Un paquet Debian dont la version corrigée s'installe depuis les sources d'APT de l'image (l'archive de sécurité,
+    `trixie-security`, pour un avis DSA) mais n'est pas encore dans l'image amont: l'installer dans l'étape finale du
+    `Dockerfile`, avant `USER`, à la version corrigée écrite en entier
+    (`apt-get install --yes --no-install-recommends <paquet>=<version>`), avec une issue qui retire le bloc dès que
+    l'étape 2 apporte le correctif. La version corrigée se lit sur la page de l'avis du
+    [suivi de sécurité de Debian](https://security-tracker.debian.org/tracker/) (ligne `trixie (security)`). Fait
+    pour zlib1g le 2026-11-18 (`Dockerfile:48-54`, retiré par #647).
+4. Sinon, aucune des étapes 1 à 3 ne s'appliquant (par exemple un paquet Debian dont le correctif est encore dans
+    `trixie-proposed-updates`, que `apt-get install` ne trouve pas, ou un CPython corrigé que l'image amont n'a pas
+    encore): une entrée dans `.grype.yaml`, à la racine du dépôt, le premier fichier de réglages que Grype cherche
+    dans le dossier où il tourne. Chaque entrée est décidée par Sabine (« Une règle non tenue l'est par décision
+    écrite », `.claude/rules/conformite.md`), avec sa raison, sa date et l'issue qui la retire dès que l'étape 2 ou 3
+    apporte le correctif:
+
+```yaml
+ignore:
+  - vulnerability: CVE-AAAA-NNNNN
+    package:
+      name: <paquet>
+    reason: "<pourquoi l'accepter>, décidé par Sabine le AAAA-MM-JJ, retiré par #<issue>"
+```
+
+Le fichier n'existe pas tant qu'aucune entrée n'est décidée; `.dockerignore` le tient hors de l'image. Écarté:
+`apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image du jour de sa construction, et non plus du digest
+épinglé. L'étape 3 n'installe qu'un paquet, à une version écrite: elle révise le 2026-11-18, pour ce seul cas, la
+décision du 2026-11-14 (décision de Sabine, journal ADR).
 
 ## Limites
 
-Lues le 2026-11-10; le workflow `Docs` et les réglages du dépôt, le 2026-11-14. Chaque parade a été vérifiée à la
-source le 2026-11-10 (sources en fin de liste).
+Lues le 2026-11-10; le workflow `Docs`, les réglages du dépôt et le scan de l'image (#498), le 2026-11-14. Chaque
+parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-14 (sources en fin de liste).
 
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
     (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
     Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
-    dépôt), mais « <span lang="en">Pull request authors cannot approve their own pull requests</span> »: avec une seule
+    dépôt), mais <q lang="en">Pull request authors cannot approve their own pull requests</q>: avec une seule
     personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
     Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
-- **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `build` de `Docs` ne sont pas dans le
-    ruleset. `tests-data` et `image-build` comptent à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis
-    #496: `infra.yml` n'a plus de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
+- **Deux contrôles ne bloquent pas la fusion**: `tests-data` et `build` de `Docs` ne sont pas dans le ruleset.
+    `tests-data` compte à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis #496, `image-build` depuis #498:
+    ni `infra.yml` ni `image.yml` n'ont de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
     « <span lang="en">Pending</span> » et bloque la fusion.
-    Pour réduire le risque: ajouter ces trois contrôles aux contrôles requis du ruleset (faisable avec nos droits).
+    Pour réduire le risque: ajouter ces deux contrôles aux contrôles requis du ruleset (faisable avec nos droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
     services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
     Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
@@ -438,14 +495,39 @@ source le 2026-11-10 (sources en fin de liste).
     (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend sur l'usage inclus du
     compte, compté en montant; au-delà, il est payé s'il y a un moyen de paiement, dans la limite des budgets, et
     bloqué sinon. Public, il serait gratuit, mais coupé après 60 jours sans activité.
-- **L'image n'est pas scannée**: `audit` lit les paquets Python de `uv.lock`, pas les paquets du système de l'image
-    de base.
-    Pour réduire le risque: scanner l'image `k-b:ci` dans `image-build`, par exemple par Grype (`anchore/scan-action`,
-    v7.4.2), qui fait échouer le job à partir d'un seuil de sévérité (`severity-cutoff`, `medium` par défaut).
-    Par défaut (`only-fixed: false`), une vulnérabilité sans correctif le fait échouer aussi; `only-fixed: true` ne
-    retient que celles qui en ont un.
-    Faisable avec nos droits: une action publique, épinglée par son SHA, sans secret. En attendant, Dependabot propose
-    chaque semaine le nouveau digest des images de base du `Dockerfile` (`dependabot.yml:10-16`).
+- **Le scan ne voit pas tout** (#498, lu le 2026-11-14): avec `--only-fixed`, une vulnérabilité sans correctif ne
+    le fait pas échouer et n'est pas listée; une vulnérabilité publiée après la dernière exécution d'`Image` sur `main`
+    n'est vue qu'à la PR suivante: l'image en ligne, que `deploy.yml` reconstruit au tag (l. 102-117) sans la scanner,
+    peut la porter d'ici là. Une bibliothèque compilée dans un module d'une wheel n'est vue ni par apt ni par le scan:
+    grpcio 1.84.0 compile sa propre zlib dans `cygrpc.so`, dans la plage de CVE-2026-85091 (zlib 1.2.11 à 1.3.2),
+    mais sans `gzwrite.c`, où est le code fautif `gz_write`: son `setup.py` compile la liste de
+    `grpc_core_dependencies.py`, qui ne compte que 11 fichiers de zlib, aucun `gz*.c` (l. 1562-1572 au tag v1.84.0,
+    lu le 2026-11-18).
+    Pour réduire le risque: Dependabot propose chaque semaine le nouveau digest des images de base du `Dockerfile`
+    (`dependabot.yml:10-16`), qui apporte les correctifs de Debian et de CPython, et la CI le scanne (déjà fait). Le
+    même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable avec nos droits. Un déclenchement planifié
+    d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une PR: faisable avec nos
+    droits, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`, lu le 2026-11-14).
+- **Une vulnérabilité publiée bloque toutes les PR** (#498): `image-build` étant exigé, une vulnérabilité haute ou
+    critique corrigée qui entre dans la base de Grype rend rouge toute PR, comme `audit` le 2026-11-13 (#606), jusqu'à
+    la montée du digest, l'installation du paquet corrigé ou une entrée de `.grype.yaml`.
+    Pour réduire le risque: la marche à suivre est écrite ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage));
+    faisable avec nos droits, une PR suffit.
+- **Une version épinglée de Debian fait échouer la construction de l'image quand l'archive de sécurité la remplace**
+    (#498, 2026-11-18): l'index de `trixie-security`, lu le 2026-11-18, ne porte qu'une version de zlib1g, la
+    `+deb13u1` qu'installe le `Dockerfile` (l. 48-54). Quand une `+deb13u2` la remplacera, `apt-get install` ne
+    trouvera plus la version écrite: `image-build` et la construction de `deploy.yml` échoueront, jusqu'à une PR.
+    Pour réduire le risque: #647 retire le bloc dès qu'un digest de l'image de base porte le correctif. Le scan ne le
+    dit pas, vert tant que le bloc est là: `docker run --rm python:3.13-slim-trixie@sha256:<digest> dpkg-query -W zlib1g`
+    le dit, sur le digest de chaque PR de Dependabot. Faisable avec nos droits, par une PR.
+- **Grype v0.121.3 porte un avis que v0.122.0 corrige** (lu le 2026-11-18): GHSA-q7gw-24fr-5p69 (moyen), dans le
+    SDK OpenTelemetry pour Go que Grype embarque: la borne de longueur d'un attribut de trace ou de journal ne coupe
+    pas une valeur faite du caractère U+FFFD. Le job ne règle aucune variable `OTEL_*` (`image.yml`); que Grype
+    n'exporte alors aucune trace, et que l'avis ne change pas le résultat du scan, est une hypothèse, non vérifiée
+    dans son code. v0.122.0, publiée le 2026-11-16 à 20:41 UTC, n'a pas encore les 7 jours
+    d'attente que se donne la CI.
+    Pour réduire le risque: monter Grype à v0.122.0 après le 2026-11-23 à 20:41 UTC
+    ([Le détail des réglages](#le-detail-des-reglages), version de Grype); faisable avec nos droits, par une PR.
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml`, `infra.yml` ni `docs.yml`; le
     délai par défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
     dépôt est privé.
@@ -453,7 +535,7 @@ source le 2026-11-10 (sources en fin de liste).
     la PR n° 533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
     Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-    lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+    lance la CI et attend ses sept contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
     lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,
@@ -470,3 +552,19 @@ Sources, lues le 2026-11-10: GitHub Docs,
 [« <span lang="en">Available rules for rulesets</span> »](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/managing-rulesets/available-rules-for-rulesets)
 (Copilot); le dépôt [anchore/scan-action](https://github.com/anchore/scan-action), son
 `action.yml` et sa dernière release, v7.4.2 (2026-08-28).
+
+Sources de #498, lues le 2026-11-14: les releases de Grype,
+[v0.121.3](https://github.com/anchore/grype/releases/tag/v0.121.3) (les avis qu'elle corrige, lus sur GitHub et
+[OSV](https://osv.dev/); le 2026-11-18, le digest de `grype_0.121.3_linux_amd64.tar.gz`, recoupé avec
+`grype_0.121.3_checksums.txt`) et [v0.122.0](https://github.com/anchore/grype/releases/tag/v0.122.0) (l'avis
+qu'elle corrige, [GHSA-q7gw-24fr-5p69](https://github.com/advisories/GHSA-q7gw-24fr-5p69), lu le 2026-11-18); la [référence des réglages de Grype](https://oss.anchore.com/docs/reference/grype/configuration/)
+(ordre de recherche de `.grype.yaml`, `db.max-allowed-built-age` à 120 h, `check-for-app-update`, règles `ignore` et
+`reason`); Context7 `/anchore/grype` (`--only-fixed`, `--fail-on`); GitHub Docs,
+[« Events that trigger workflows »](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows)
+(`schedule`: « Scheduled workflows run on the latest commit on the default branch »). Le 2026-11-18, pour zlib1g:
+le suivi de sécurité de Debian, [DSA-6613-1](https://security-tracker.debian.org/tracker/DSA-6613-1) et
+[CVE-2026-85091](https://security-tracker.debian.org/tracker/CVE-2026-85091) (versions touchées, version corrigée de
+trixie), l'index `Packages.xz` de `trixie-security` pour amd64 (une seule version de zlib1g), et, pour grpcio, son
+[`setup.py`](https://github.com/grpc/grpc/blob/v1.84.0/setup.py) et
+[`grpc_core_dependencies.py`](https://github.com/grpc/grpc/blob/v1.84.0/src/python/grpcio/grpc_core_dependencies.py)
+au tag v1.84.0.

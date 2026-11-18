@@ -2,16 +2,19 @@
 
 import json
 
+import httpx2
 from digests_reference import (
     README_PATH,
     REFERENCE_PATH,
     build_ai_api,
     build_reference_base,
     open_data_api,
+    order_as_replayed,
     post_digests,
     read_reference,
     read_reference_items,
     read_stage,
+    read_subject,
     replay_settings,
 )
 
@@ -88,3 +91,45 @@ def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
             "facts_found",
         )
     ] == [26, 26, 14, 14]
+
+
+def test_the_calls_recorded_in_parallel_are_kept_in_the_order_the_replay_sends_them():
+    """The writings of a provider end in any order; the replay sends the classification, then
+    each subject in the order of the list, its attempts one after the other."""
+    recorded = [
+        (None, "classify 1"),
+        (None, "classify 2"),
+        ("research", "research"),
+        ("agent_tools", "agent_tools 1"),
+        ("security_alerts", "security_alerts"),
+        ("agent_tools", "agent_tools 2"),
+    ]
+
+    assert order_as_replayed(
+        recorded, ["security_alerts", "agent_tools", "research"]
+    ) == [
+        "classify 1",
+        "classify 2",
+        "security_alerts",
+        "agent_tools 1",
+        "agent_tools 2",
+        "research",
+    ]
+
+
+def test_the_subject_of_a_writing_is_read_in_its_user_message():
+    def request(schema_name, user_data):
+        body = {
+            "response_format": {"json_schema": {"name": schema_name}},
+            "messages": [
+                {"role": "system", "content": "a prompt"},
+                {"role": "user", "content": json.dumps(user_data)},
+            ],
+        }
+        return httpx2.Request("POST", "https://models.example", json=body)
+
+    writing = request("digest", {"subject": {"name": "research"}})
+    classification = request("classification", {"items": []})
+
+    assert read_subject(writing) == "research"
+    assert read_subject(classification) is None

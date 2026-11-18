@@ -1,6 +1,6 @@
 # La documentation de K-B
 
-K-B est « une bibliothèque de veille tech qui se range toute seule »: un pipeline collecte chaque jour l'actualité
+K-B est <q>une bibliothèque de veille tech qui se range toute seule</q>: un pipeline collecte chaque jour l'actualité
 tech de plusieurs sources et la range en items datés dans une base, que deux API servent. Le produit est décrit dans
 le [README du dépôt](https://github.com/SabineLaurent/K-B/blob/main/README.md). Ce site rassemble ses
 fiches de documentation, une par sujet. Chacune dit, sous son titre, la compétence de la certification qu'elle sert.

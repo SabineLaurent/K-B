@@ -87,7 +87,7 @@ SELECTION_RETRY_REMINDERS: Mapping[FailedCheck, str] = {
     "criteria the repository meets.",
 }
 # 5 choices of a few criteria and subjects each, about 50 tokens each, with a wide margin; under
-# the read timeout at the rate measured by #158 (tests/ai_api/test_llm_client.py).
+# the read timeout at the rate measured on gpt-6.1-sol (tests/ai_api/test_llm_client.py).
 SELECTION_MAX_COMPLETION_TOKENS = 1024
 
 

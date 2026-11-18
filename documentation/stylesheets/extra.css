@@ -8,3 +8,9 @@
 .md-typeset a {
   text-decoration: underline;
 }
+
+/* An inline citation is a q element (AcceDe Web, rule 6.1; RGAA 9.4): the browser draws its marks, here the French
+   ones typed elsewhere in the sheets, with the same inner space. */
+.md-typeset q {
+  quotes: "« " " »";
+}
