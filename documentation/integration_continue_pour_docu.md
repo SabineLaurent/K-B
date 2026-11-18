@@ -306,6 +306,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 | chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:35` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
 | version de Bicep | `infra.yml:22`, et son SHA256 à `infra.yml:24` | les deux ensemble, l'empreinte lue sur la release de Bicep |
 | version de Grype | `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71` | à la main, ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
+| version épinglée d'un paquet Debian | `Dockerfile:48-54` (zlib1g) | retirée par son issue, #647, quand l'image de base porte le correctif ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage), étape 3) |
 | versions de MkDocs et de Material | `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) | `uv lock --upgrade-package <paquet>`, puis la construction du site sur le poste |
 | fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:29` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
 | seuil de couverture | `fail_under`, `pyproject.toml:87` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
@@ -442,10 +443,16 @@ Dans cet ordre:
     (l. 10 et 27), dans une PR, sans attendre la PR hebdomadaire de Dependabot. Le digest du jour se lit par
     `docker buildx imagetools inspect python:3.13-slim-trixie` (ligne `Digest:`); le scan de la PR dit si le
     correctif y est.
-3. Sinon, l'image amont n'ayant pas encore le correctif: une entrée dans `.grype.yaml`, à la racine du dépôt, le
-    premier fichier de réglages que Grype cherche dans le dossier où il tourne. Chaque entrée est décidée par Sabine
-    (« Une règle non tenue l'est par décision écrite », `.claude/rules/conformite.md`), avec sa raison, sa date et
-    l'issue qui la retire dès que l'étape 2 apporte le correctif:
+3. Un paquet Debian dont le correctif est dans l'archive de sécurité de Debian (`trixie-security`) mais pas encore
+    dans l'image amont: l'installer dans l'étape finale du `Dockerfile`, avant `USER`, à la version corrigée écrite en
+    entier (`apt-get install --yes --no-install-recommends <paquet>=<version>`), avec une issue qui retire le bloc dès
+    que l'étape 2 apporte le correctif. La version corrigée se lit sur la page de l'avis du
+    [suivi de sécurité de Debian](https://security-tracker.debian.org/tracker/) (ligne `trixie (security)`). Fait
+    pour zlib1g le 2026-11-18 (`Dockerfile:48-54`, retiré par #647).
+4. Sinon, aucune version corrigée n'étant publiée pour l'image: une entrée dans `.grype.yaml`, à la racine du dépôt,
+    le premier fichier de réglages que Grype cherche dans le dossier où il tourne. Chaque entrée est décidée par
+    Sabine (« Une règle non tenue l'est par décision écrite », `.claude/rules/conformite.md`), avec sa raison, sa
+    date et l'issue qui la retire dès que l'étape 2 ou 3 apporte le correctif:
 
 ```yaml
 ignore:
@@ -457,7 +464,8 @@ ignore:
 
 Le fichier n'existe pas tant qu'aucune entrée n'est décidée; `.dockerignore` le tient hors de l'image. Écarté:
 `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image du jour de sa construction, et non plus du digest
-épinglé.
+épinglé. L'étape 3 n'installe qu'un paquet, à une version écrite: elle révise le 2026-11-18, pour ce seul cas, la
+décision du 2026-11-14 (décision de Sabine, journal ADR).
 
 ## Limites
 
@@ -495,9 +503,16 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     droits, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`, lu le 2026-11-14).
 - **Une vulnérabilité publiée bloque toutes les PR** (#498): `image-build` étant exigé, une vulnérabilité haute ou
     critique corrigée qui entre dans la base de Grype rend rouge toute PR, comme `audit` le 2026-11-13 (#606), jusqu'à
-    la montée du digest ou une entrée de `.grype.yaml`.
+    la montée du digest, l'installation du paquet corrigé ou une entrée de `.grype.yaml`.
     Pour réduire le risque: la marche à suivre est écrite ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage));
     faisable avec nos droits, une PR suffit.
+- **Une version épinglée de Debian fait échouer la construction de l'image quand l'archive de sécurité la remplace**
+    (#498, 2026-11-18): l'index de `trixie-security`, lu le 2026-11-18, ne porte qu'une version de zlib1g, la
+    `+deb13u1` qu'installe le `Dockerfile` (l. 48-54). Quand une `+deb13u2` la remplacera, `apt-get install` ne
+    trouvera plus la version écrite: `image-build` et la construction de `deploy.yml` échoueront, jusqu'à une PR.
+    Pour réduire le risque: #647 retire le bloc dès qu'un digest de l'image de base porte le correctif. Le scan ne le
+    dit pas, vert tant que le bloc est là: `docker run --rm python:3.13-slim-trixie@sha256:<digest> dpkg-query -W zlib1g`
+    le dit, sur le digest de chaque PR de Dependabot. Faisable avec nos droits, par une PR.
 - **Grype v0.121.3 porte un avis que v0.122.0 corrige** (lu le 2026-11-18): GHSA-q7gw-24fr-5p69 (moyen), dans le
     SDK OpenTelemetry pour Go que Grype embarque: la borne de longueur d'un attribut de trace ou de journal ne coupe
     pas une valeur faite du caractère U+FFFD. Le job ne règle aucune variable `OTEL_*` (`image.yml`); que Grype

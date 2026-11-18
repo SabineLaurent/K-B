@@ -12,7 +12,8 @@
 La liste des commits donnée à la note compte aussi ceux de `main` jusqu'à `57ff235` (#560, #596, #559, #496, #606…) :
 ils sont entrés par d'autres PR, qui ont leur note. `1b67dbd` ne fait que fusionner `main` dans la branche ; seul le
 journal ADR y a eu un conflit, deux entrées du 14/11 ajoutées au même endroit, gardées toutes les deux. Cette note
-couvre `b110816` et `d05927e`.
+couvre `b110816` et `d05927e`, puis, le 18/11, le digest de la base monté (`b38fd16`) et l'installation de zlib1g
+(section 6).
 
 ## Le pourquoi
 
@@ -90,12 +91,15 @@ plan le 14/11.
 Exigé par le ruleset, `image-build` bloque la fusion de toute PR tant qu'une vulnérabilité haute ou critique corrigée
 est dans l'image. Une vulnérabilité publiée un matin rend donc rouges toutes les PR, comme `audit` le 13/11 (#606).
 C'est le prix du contrôle. La doc de la CI donne la marche à suivre, dans cet ordre
-(`documentation/integration_continue_pour_docu.md:271-297`) :
+(`documentation/integration_continue_pour_docu.md:433-468`) :
 
 1. un paquet Python de l'environnement virtuel : `audit` échoue aussi, on monte le paquet dans `uv.lock` ;
 2. un paquet Debian, CPython ou un paquet Python de l'image de base, quand l'image `python` amont a déjà le
    correctif : on monte à la main le digest des deux `FROM` du `Dockerfile`, sans attendre la PR de Dependabot ;
-3. sinon : une entrée dans `.grype.yaml`, décidée par Sabine, avec sa raison, sa date et l'issue qui la retire.
+3. un paquet Debian dont le correctif est dans `trixie-security` mais pas encore dans l'image amont : on l'installe
+   dans l'étape finale du `Dockerfile`, à la version corrigée écrite en entier, avec une issue qui retire le bloc
+   (ajoutée le 18/11, section 6) ;
+4. sinon : une entrée dans `.grype.yaml`, décidée par Sabine, avec sa raison, sa date et l'issue qui la retire.
 
 ```yaml
 ignore:
@@ -122,6 +126,31 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
   déploiement viennent avec #499. Les exécutions du scan, vert sur l'image du jour et rouge sur l'essai, y seront
   citées une fois qu'elles existeront : l'auto-évaluation ne s'écrit jamais d'avance.
 
+### 6. Le premier scan rouge : zlib1g, installé à sa version corrigée
+
+Le 18/11, le scan de la PR a été rouge sur l'image du jour : zlib1g `1:1.3.dfsg+really1.3.1-1`, la bibliothèque de
+compression de Debian, porte CVE-2026-85091 (haute). Debian l'a corrigée le 07/11 (DSA-6613-1), mais dans son archive
+de sécurité seulement, `trixie-security` : l'image `python` du jour, au digest `e48f59c…` monté à la main (étape 2),
+ne l'a pas (exécution 44279945350). Sabine a choisi d'installer la version corrigée dans l'image
+(`Dockerfile:52-54`) :
+
+```dockerfile
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
+```
+
+`apt-get update` lit les index des sources de l'image de base. `apt-get install` remplace la zlib1g installée par la
+version écrite. Grype lit les paquets dans la base de `dpkg`, qui nomme alors la version corrigée. Les index sont
+retirés après coup : ils ne servent plus et alourdiraient l'image. Le bloc est placé juste avant `USER 10001:10001`,
+parce qu'installer un paquet demande root. Il est placé après `ENV` pour qu'aucun renvoi `Dockerfile:<ligne>` des
+fiches ne bouge, ni maintenant ni au retrait.
+
+La version est écrite en entier : l'image reste celle de son `Dockerfile`, pas celle du jour de sa construction.
+C'est pourquoi `apt-get upgrade` reste écarté. Le revers : l'index de `trixie-security`, lu le 18/11, ne porte
+qu'une version de zlib1g ; quand une `+deb13u2` remplacera la `+deb13u1`, la construction échouera. Le bloc est provisoire : #647 le retire dès
+qu'un digest de l'image de base porte le correctif.
+
 ## Choix faits et options écartées
 
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
@@ -134,6 +163,7 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
 | La place | en dernière étape (revue de code, tranché par time-knight) | juste après la construction (le plan) : un scan rouge cachait les autres contrôles |
 | Exigé ou non | exigé par le ruleset (plan, point 6, validé par Sabine le 13/11) | non exigé : un scan rouge laisserait fusionner et ne bloquerait qu'au déploiement |
 | Quand il bloque | digest de l'image de base monté à la main, sinon `.grype.yaml` décidé par Sabine | `apt-get upgrade` dans le `Dockerfile` : l'image dépendrait du jour de sa construction, plus du digest épinglé |
+| zlib1g, le 18/11 | installé dans l'image à la version corrigée, écrite en entier, et retiré par #647 (décision de Sabine sur la recommandation de time-knight : le correctif existe et l'image en ligne porte la faille) | une entrée de `.grype.yaml` : elle accepte un risque qu'on peut corriger ; attendre l'image amont : toutes les PR restent rouges d'ici là |
 | Les téléchargements | sans nouvelle tentative ni cache (revue de code, écarté par time-knight) | un cache de la base : une action de plus ; une relance est un clic, déjà écrite dans la doc |
 
 ## Preuve
@@ -168,8 +198,10 @@ Les deux dernières lignes n'existent pas encore au moment de cette note : elles
 
 ## Zones non vérifiées
 
-- **Le job n'a pas encore tourné** : ni sur l'image du jour, ni sur l'essai rouge. Si l'image du jour porte déjà une
-  vulnérabilité haute corrigée, le scan sera rouge dès la PR ; l'issue prévoit alors de monter le digest de la base.
+- **Le scan n'a pas encore été vert** : rouge sur l'essai (exécution 44275262249, comme attendu), puis sur l'image
+  du jour, au digest monté (44279945350, zlib1g). Que l'installation de zlib1g le rende vert se lira à l'exécution
+  qui suivra le push. Que les sources d'APT de l'image de base comptent `trixie-security` n'a pas été lu dans
+  l'image (le démon Docker du Mac ne tournait pas) : la construction le dira, en échouant sinon.
 - **Le code de sortie exact de `--fail-on`** : l'aide de la CLI dit 2, la description du réglage dit 1. Le workflow ne
   dépend que d'un code non nul.
 - **Les types que Grype donne** (`deb`, `python`, `binary` pour CPython) viennent de sa documentation et de son code
@@ -183,6 +215,7 @@ Les deux dernières lignes n'existent pas encore au moment de cette note : elles
 - **Dans cette PR, après le push** : les exécutions verte et rouge, citées dans l'auto-évaluation par un commit de
   plus ; le geste de Sabine (`image-build` au ruleset) juste avant la fusion, et sa lecture citée.
 - **La montée à Grype v0.122.0** après le 23/11 à 20:41 UTC, par une PR.
+- **#647** : retirer l'installation de zlib1g quand l'image de base porte le correctif.
 - **#626** : le même scan dans `deploy.yml`, avant la mise en ligne.
 - **#499** : les sondes sans clé après déploiement, qui tiendront le reste de l'« évaluation automatisée ».
 - **#497** : la revue périodique de la configuration en ligne, le dernier morceau d'API8.

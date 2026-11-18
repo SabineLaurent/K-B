@@ -45,6 +45,13 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     KB_LOG_TO_FILE=false \
     PYTHONUNBUFFERED=1
+# zlib1g of trixie-security (DSA-6613-1, CVE-2026-85091, high): the base image above ships
+# 1:1.3.dfsg+really1.3.1-1, which the scan of image.yml refuses. Pinned, so the image does not depend
+# on the day of its build; the build fails once trixie-security replaces this version. Removed by
+# #647 when the base image carries the fix (decision of Sabine of 2026-11-18, journal ADR).
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 # Exec form: kb is PID 1 and receives SIGTERM itself (.claude/rules/poc.md, rule 6). No init
 # process: docker stop of kb serve-data is measured in the pull request of #200. As PID 1, a command

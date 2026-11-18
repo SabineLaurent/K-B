@@ -7475,6 +7475,27 @@ d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le 
   170 s (4 % de marge) ; un délai par étape (aucun besoin écrit). Un test garde le calcul (la plus longue sortie au
   débit mesuré tient dans le délai) et l'égalité avec l'échéance. — PR de #640
 
+### Scan de l'image : zlib1g installé à sa version corrigée (#498)
+
+- **L'étape finale du `Dockerfile` installe zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1`, la version écrite en entier,
+  et #647 retire ce bloc dès qu'un digest de l'image de base porte le correctif.** Révise en partie la décision du
+  2026-11-14 (« Écarté : `apt-get upgrade` dans le `Dockerfile` »). Ce qui a changé entre-temps : le premier scan de
+  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1` y porte CVE-2026-85091 (haute), et le
+  digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
+  DSA-6613-1, du 2026-11-07 (liste des DSA du suivi de sécurité de Debian), mais seulement dans `trixie-security`
+  (index lu le 2026-11-18). Décision de Sabine du 2026-11-18, sur la recommandation de time-knight : « Le correctif
+  existe et la production porte la faille ; A accepte un risque qu'on peut corriger ». Options écartées : une entrée de
+  `.grype.yaml` datée, qui accepte un risque qu'on peut corriger ; attendre l'image amont, ce qui laisse #643 rouge et,
+  une fois `image-build` exigé, toute PR. `apt-get upgrade` reste écarté : il monterait tous les paquets à leur
+  version du jour de la construction, alors que le bloc ne monte qu'un paquet, à une version écrite. La marche à
+  suivre de la doc de la CI gagne une étape 3, avant `.grype.yaml` : un paquet Debian corrigé dans `trixie-security`
+  et pas encore dans l'image amont s'installe ainsi, avec son issue de retrait. Limite assumée : l'index de
+  `trixie-security` ne porte qu'une version de zlib1g. Quand une `+deb13u2` la remplacera, `apt-get install` ne
+  trouvera plus la version écrite, et la construction échouera dans `image-build` comme dans `deploy.yml`, jusqu'à
+  une PR. Le scan reste vert tant que le bloc est là : c'est `dpkg-query -W zlib1g`, lu sur le digest de la base, qui
+  dit quand le retirer. Le bloc est placé juste avant `USER` et après `ENV`, pour qu'aucun renvoi `Dockerfile:<ligne>`
+  des fiches ne bouge, ni maintenant ni au retrait. — PR #643
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
