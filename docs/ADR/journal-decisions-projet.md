@@ -7398,6 +7398,37 @@ par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrate
   réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
   restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
 
+### Test de fumée : les sondes sans clé (#499)
+
+Plan validé par Sabine le 2026-11-13 (§ 4, point 7), sur sa décision du 08/11 de tenir l'« évaluation automatisée »
+d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10.
+
+- **`kb smoke-test` envoie trois sondes sans clé à chacune des deux API, après son `/health`, qui la réveille : une
+  route à clé doit rendre 401 (`GET /items`, `POST /digests`), `GET /docs` 404, et `HEAD /health` 405. Neuf
+  contrôles au lieu de trois ; un échec n'arrête pas les autres.** Pourquoi : le test de fumée prouvait que la version
+  déployée répond, pas qu'elle refuse ce qu'elle doit refuser (API8, « Évaluation automatisée »). Les mêmes sondes sur
+  l'API de données, puisque `docs/specs-api.md` renvoie, pour elle, aux mêmes issues. Écartés : des essais avec une clé
+  de test en ligne (un secret de plus, qui fait dépenser le modèle ; les routes à clé sont couvertes par les tests de
+  la CI) ; l'API IA seule. Limite assumée : les sondes ne disent rien des routes à clé une fois la clé donnée, que
+  seuls les tests de la CI couvrent, sur le code de l'image. — PR de #499
+- **Le statut attendu de `GET /docs` suit `KB_DEPLOYMENT_ENVIRONMENT` du job : 200 en `sandbox`, 404 ailleurs, la
+  règle de `read_openapi_url` des API.** Pourquoi : une seule règle, déjà écrite ; en ligne, ni le job ni les API
+  n'ont `sandbox`. Limite assumée : un job et des API réglés différemment font échouer la sonde, ce qui signale
+  l'écart. — PR de #499
+- **Le corps d'une réponse à une sonde n'est jamais lu, et l'échec d'une sonde est un état nommé :
+  `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`, jamais l'URL.** Pourquoi :
+  seul le statut prouve le refus ; un corps non lu n'a rien à valider ni à citer au journal (règle 3 de
+  `conventions.md`). Le client et ses délais sont ceux du `/health` (`build_health_client`). — PR de #499
+- **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
+  (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
+  `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :
+  les chemins et les statuts des sondes sont une seconde copie de ce que les API répondent ; sans ce test, un écart ne
+  se verrait qu'en ligne, au premier tag. Écarté : les seuls tests de `kb smoke-test`, sur des API simulées, qui
+  répondent ce que le test leur dit. — PR de #499
+- **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) attend un tag, posé après la fusion
+  de #630.** Pourquoi : décision de Sabine du 2026-11-18, aucun redéploiement avant #630 ; un tag déploie. Tranché par
+  time-knight. Limite assumée : d'ici là, la mesure reste « non tenue, en partie » dans l'auto-évaluation. — PR de #499
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
