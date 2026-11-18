@@ -4,11 +4,11 @@
 
 — C8
 
-Cette fiche documente le service d'IA de K-B. Ce service est le déploiement d'un modèle de langage, `gpt-6.1-sol`,
-dans Microsoft Foundry. Microsoft Foundry, anciennement Azure AI Foundry, est la plateforme de Microsoft qui héberge
-des modèles d'IA et les rend appelables par Internet. Mettre un modèle à disposition dans Foundry s'appelle un
-déploiement. Le déploiement de `gpt-6.1-sol` a été fait à la main, dans le portail web de Foundry. Le code de K-B ne
-le décrit donc pas.
+Cette fiche documente le service d'intelligence artificielle (IA) de K-B. Ce service est le déploiement d'un modèle
+de langage, `gpt-6.1-sol`, dans Microsoft Foundry. Microsoft Foundry, anciennement Azure AI Foundry, est la
+plateforme de Microsoft qui héberge des modèles d'IA et les rend appelables par Internet. Mettre un modèle à
+disposition dans Foundry s'appelle un déploiement. Le déploiement de `gpt-6.1-sol` a été fait à la main, dans le
+portail web de Foundry. Le code de K-B ne le décrit donc pas.
 
 La fiche dit qui accède au service, comment l'installer et le tester, de quoi il dépend, et quelles données il
 reçoit. Le programme de K-B qui appelle ce service est l'API IA. Cette API a sa propre fiche,
@@ -438,7 +438,7 @@ modèle des fiches » et « Envoi des dépôts au modèle du compte rendu des te
     blanche nomme les seuls champs permis. Pour chaque publication, l'API IA envoie aussi `item_id` et `kind`.
     - Un papier, c'est-à-dire un article de recherche: `title`, `summary`.
     - Une vulnérabilité: `cve_id`, `title`, `description`, `vendor`, `product`, `ransomware_use`.
-    - Une release, c'est-à-dire une version publiée d'un logiciel: `repository_name`, `tag_name`, `title`, `body`.
+    - Une <span lang="en">release</span>, c'est-à-dire une version publiée d'un logiciel: `repository_name`, `tag_name`, `title`, `body`.
     - Un avis de sécurité: `ghsa_id`, `cve_id`, `title`, `cve_listed_in_cisa_kev`, `packages`.
     - Un article de lettre d'information: `edition`, `title`, `summary`.
 
