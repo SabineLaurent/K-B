@@ -337,7 +337,8 @@ aussi `minimal` et `low`, pour les modèles du banc de C7 dont l'effort ne desce
 Hydrogen ; toute autre valeur arrête le démarrage. À `minimal` ou `low`, le modèle raisonne, et ses
 jetons de raisonnement comptent dans `max_completion_tokens` (référence de l'API OpenAI,
 `chat/completions`, lue le 2026-11-17) : la sélection des tendances (1 024), la classification et
-la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_invalid_output`.
+la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_truncated`
+(`finish_reason: length`, contrôle 1).
 Mesure du banc de C7 (16/11, `wip/banc-c7/results/passages.jsonl` de time-knight) : gpt-6.1-sol à
 `low`, lancement `20261116T142308Z`, 5 passages complets, choix des dépôts valide 5 fois sur 5, 274
 à 588 jetons de raisonnement par passage, toutes étapes comprises (textes : 91 à 207, lancement
