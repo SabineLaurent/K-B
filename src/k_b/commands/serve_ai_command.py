@@ -75,6 +75,12 @@ def run_serve_ai(environ: Mapping[str, str]) -> int:
     # The provider and the model, never the URL nor the key: an AI API set on the replay by
     # mistake says it.
     logger.info("LLM provider %s, model %s", llm_settings.provider, llm_settings.model)
+    # Left out, the provider may keep a prompt cache of the items (docs/registre-traitements.md).
+    logger.info(
+        "LLM reasoning effort %s, prompt_cache_options %s",
+        llm_settings.reasoning_effort or "not set",
+        "sent" if llm_settings.send_prompt_cache_options else "left out",
+    )
     logger.info("digest window by default: %s days", settings.window_days)
     logger.info("GitHub token of the trend reports loaded")
     # The environment and the content sent with the traces, never the endpoint nor the headers.

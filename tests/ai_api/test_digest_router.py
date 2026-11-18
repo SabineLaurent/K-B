@@ -876,7 +876,7 @@ def test_the_cost_is_the_tokens_at_the_prices_of_the_config(make_ai_api, capsys)
         6,
     )
     assert {line["cost_estimated"] for line in read_metric_lines(capsys)} == {expected}
-    assert expected == 0.00024
+    assert expected == 0.0048
 
 
 def test_the_fidelity_rate_is_the_facts_found_over_the_facts_checked(
@@ -921,6 +921,7 @@ METRIC_ATTRIBUTES = {
     "gen_ai.request.model",
     "gen_ai.token.modality",
     "error.type",
+    "http.route",
     "k_b.stage",
     "k_b.outcome",
     "k_b.schema_valid",
@@ -1056,7 +1057,16 @@ def test_a_measure_carries_closed_attributes_never_a_text(make_ai_api, metric_re
         key for name in points for attributes, _ in points[name] for key in attributes
     }
     assert keys <= METRIC_ATTRIBUTES
-    assert values <= {"chat", "replay", "classify", "write", "ok", "True", "text"}
+    assert values <= {
+        "chat",
+        "replay",
+        "classify",
+        "write",
+        "ok",
+        "True",
+        "text",
+        "/digests",
+    }
     assert response.json()["request_id"] not in values
 
 
@@ -1120,6 +1130,28 @@ def test_a_call_that_fails_carries_its_outcome_as_error_type(
     )
 
 
+def test_a_request_measures_its_duration_by_its_route(make_ai_api, metric_reader):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    post_digests(client)
+
+    points = read_metric_points(metric_reader)
+    [(attributes, (count, _))] = points["k_b.request.duration"]
+    assert (attributes, count) == ({"http.route": "/digests"}, 1)
+
+
+def test_a_request_that_fails_measures_its_duration_too(make_ai_api, metric_reader):
+    client, _ = make_ai_api([INVALID_OUTPUT, INVALID_OUTPUT])
+
+    response = post_digests(client)
+
+    assert response.status_code != 200
+    points = read_metric_points(metric_reader)
+    assert (
+        find_point(points, "k_b.request.duration", **{"http.route": "/digests"})[0] == 1
+    )
+
+
 def test_an_empty_window_measures_its_reading_without_a_call(
     make_ai_api, metric_reader
 ):
@@ -1131,7 +1163,7 @@ def test_an_empty_window_measures_its_reading_without_a_call(
     post_digests(client)
 
     points = read_metric_points(metric_reader)
-    assert set(points) == {"k_b.digest.data_fetch.duration"}
+    assert set(points) == {"k_b.digest.data_fetch.duration", "k_b.request.duration"}
     [(attributes, (count, _))] = points["k_b.digest.data_fetch.duration"]
     assert (attributes, count) == ({}, 1)
 

@@ -42,6 +42,9 @@ dev = [
     "types-defusedxml>=0.7.0.20260504",
     "types-pyyaml>=6.0.12.20260906",
 ]
+docs = [
+    "mkdocs-material>=9.8.1",
+]
 
 [project.scripts]
 kb = "k_b.cli:main"

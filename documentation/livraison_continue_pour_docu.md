@@ -33,11 +33,11 @@ L'image livrée est construite par `deploy`, depuis le commit du tag. Celle d'`i
 |---|---|---|
 | GitHub Actions | lance la CI et `Deploy`; chaque action est épinglée par son SHA (`actions/checkout` v7.0.1, `azure/login` v3.1.0) | `.github/workflows/` |
 | Rulesets de tags et environnement `production` de GitHub | disent qui peut poser un tag et quel job peut se connecter à Azure | réglages du dépôt |
-| OIDC de GitHub et identité managée `id-kb-deploy` | connexion à Azure sans aucun mot de passe: GitHub signe un jeton court, qu'Azure accepte s'il vient de l'environnement `production` | [infra/modules/deploy-access.bicep](../infra/modules/deploy-access.bicep) |
+| OIDC de GitHub et identité managée `id-kb-deploy` | connexion à Azure sans aucun mot de passe: GitHub signe un jeton court, qu'Azure accepte s'il vient de l'environnement `production` | [infra/modules/deploy-access.bicep](https://github.com/SabineLaurent/K-B/blob/main/infra/modules/deploy-access.bicep) |
 | Docker Buildx | construit l'image `linux/amd64`, lit son label et son digest (`docker buildx imagetools inspect`) | `deploy.yml` |
-| Azure Container Registry (`crkb…`) | garde les images `k-b:<tag>` | [infra/modules/container-registry.bicep](../infra/modules/container-registry.bicep) |
+| Azure Container Registry (`crkb…`) | garde les images `k-b:<tag>` | [infra/modules/container-registry.bicep](https://github.com/SabineLaurent/K-B/blob/main/infra/modules/container-registry.bicep) |
 | Azure CLI (`az`) | met les apps et les jobs à l'image, lance les jobs, lit leur état | `deploy.yml` |
-| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database`, `caj-kb-smoke-test`, `caj-kb-daily-routine` et `caj-kb-digest-watch` | `infra/main.bicep` et ses modules; [infra/deployment.json](../infra/deployment.json) liste ceux que la livraison met à jour |
+| Azure Container Apps | fait tourner `ca-kb-data-api`, `ca-kb-ai-api`, et les jobs `caj-kb-migrate-database`, `caj-kb-smoke-test`, `caj-kb-daily-routine` et `caj-kb-digest-watch` | `infra/main.bicep` et ses modules; [infra/deployment.json](https://github.com/SabineLaurent/K-B/blob/main/infra/deployment.json) liste ceux que la livraison met à jour |
 | `gh` et `jq` | `check` lit les exécutions de la CI du commit; `deploy` lit `deployment.json`, et l'état des apps et de leur dernière révision | `deploy.yml` |
 
 ### Les déclencheurs
@@ -139,7 +139,7 @@ reconstruite.
 L'installation se fait une fois, à la main: par une administratrice du dépôt GitHub pour les réglages de GitHub,
 et par une propriétaire (Owner) du groupe de ressources Azure pour le Bicep, qui donne des rôles aux identités, ce
 que la CI n'a jamais le droit de faire. Les commandes de chaque étape sont dans
-[infra/README.md](../infra/README.md), qui en garde la seule copie. L'ordre compte.
+[infra/README.md](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), qui en garde la seule copie. L'ordre compte.
 
 1. **Le socle Azure** (`infra/README.md`, « Appliquer », étapes 0 à 4): la passe 1 du Bicep crée entre autres le
    registre et l'identité `id-kb-deploy`; une première image est poussée à la main; les secrets des API sont posés
@@ -209,7 +209,7 @@ version en ligne).
 
 Une ligne par refus. « Vu » dit s'il a été observé sur une exécution réelle de GitHub, ou seulement simulé par la
 session de #415, avec de faux `az` et `gh` ou un registre local
-([note du 2026-11-06](../docs/journaling/2026-11-06-deployer-une-version-taguee-par-oidc.md), « Preuve »).
+([note du 2026-11-06](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-11-06-deployer-une-version-taguee-par-oidc.md), « Preuve »).
 
 | Cas | Refusé par | Ce qui s'affiche | Vu |
 |---|---|---|---|

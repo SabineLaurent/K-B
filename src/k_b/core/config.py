@@ -252,16 +252,29 @@ LLM_CALL_TIMEOUT_SECONDS = 90
 # since each read has its own timeout: the bound of the whole is the one of the request (#205).
 LLM_RETRY_WAIT_SECONDS = 2
 LLM_RETRY_AFTER_MAX_SECONDS = 20
-# Not set: temperature=0. "none" for a reasoning model, which takes no temperature alone
-# (gpt-6-luna refuses temperature 0 without it: 400 unsupported_value, #158).
-LLM_REASONING_EFFORT: Literal["none"] | None = None
+# Not set: temperature=0. "none", "minimal" or "low" for a reasoning model, which takes no
+# temperature alone (gpt-6-luna refuses temperature 0 without it: 400 unsupported_value, #158);
+# "minimal" for gpt-5-nano and gpt-5-mini, whose effort goes no lower; "low" for gpt-6.1-sol, and
+# Gemini 3.8 Flash and Gemini 4 Hydrogen on Google Cloud, whose effort goes no lower either (bench
+# of C7, #627).
+type ReasoningEffort = Literal["none", "minimal", "low"]
+REASONING_EFFORTS: tuple[ReasoningEffort, ...] = get_args(ReasoningEffort.__value__)
+LLM_REASONING_EFFORT: ReasoningEffort | None = None
+# Not set: each request sends prompt_cache_options, which writes no prompt cache on GPT-5.6 and
+# later (docs/registre-traitements.md); false leaves it out, for a model before GPT-5.6, which
+# refuses it with a 400, or another provider.
+LLM_SEND_PROMPT_CACHE_OPTIONS = True
 # The base URL of the replay provider: a reserved domain (RFC 6761), never resolved, since the
 # replay answers in the client itself.
 LLM_REPLAY_BASE_URL = "https://replay.invalid/v1"
-# The name of a model: a deployment name of Azure, a model of OpenAI or of Mistral. Checked by the
-# AI API in KB_LLM_MODEL, then by kb digest in the response, before it enters a sheet (#209);
+# The name of a model: a deployment name of Azure, a model of OpenAI or of Mistral, or a model
+# behind its publisher (google/<model> on Google Cloud): one slash at most, the same characters on
+# each side. Sent to the provider in the JSON body only, never in a URL nor a header. Checked by
+# the AI API in KB_LLM_MODEL, then by kb digest in the response, before it enters a sheet (#209);
 # quoted in a log as it is.
-MODEL_NAME = re.compile(r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}")
+MODEL_NAME = re.compile(
+    r"[A-Za-z0-9][A-Za-z0-9._:-]{0,99}(?:/[A-Za-z0-9][A-Za-z0-9._:-]{0,99})?"
+)
 # The largest token count read in an answer of the provider (prompt, completion, reasoning): an
 # answer beyond it is not read (llm_unavailable), since the answer of a provider is an input not
 # trusted (OWASP API10:2023). Far above a call of K-B (about 9,000 input tokens and 8,192 output
@@ -277,17 +290,17 @@ MAX_TOKENS_READ_PER_ANSWER = 10_000_000
 # bytes per token doubled by the escaping of a JSON output inside the JSON of the completion,
 # assumed, not measured; the margin covers the annotations of the content filter of Azure.
 MAX_LLM_ANSWER_BYTES = 1_000_000
-# The prices of gpt-6-luna (ADR of 2026-10-17, "Modèle des fiches : gpt-6-luna sur l'abonnement
-# de l'organisme de formation"), in USD per million tokens, for cost_estimated of each metric
-# line: Data Zone Standard, France Central, short context, effective from 2026-09-01. Read on
-# 2026-10-21 in the Azure Retail Prices API (https://prices.azure.com/api/retail/prices,
-# armRegionName francecentral, meters "6-luna ShortCo Inp Std DZ 1M Tokens" and "6-luna ShortCo
-# Opt Std DZ 1M Tokens"), described by the page "Azure Retail Prices overview" of Microsoft Learn
-# (https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices,
-# the address a web search of the same day gave).
+# The prices of gpt-6.1-sol, the model of production since the bench of C7 (thresholds of Sabine of
+# 2026-11-18, docs/ADR/journal-decisions-projet.md), in USD per million tokens, for cost_estimated
+# of each metric line: Data Zone Standard, France Central, short context, effective from
+# 2026-10-01. Read on 2026-11-18 in the Azure Retail Prices API
+# (https://prices.azure.com/api/retail/prices, api-version 2023-01-01-preview, armRegionName
+# francecentral, meters "6.1-sol ShortCo Inp Std DZ 1M Tokens" and "6.1-sol ShortCo Opt Std DZ 1M
+# Tokens"), described by the page "Azure Retail Prices overview" of Microsoft Learn
+# (https://learn.microsoft.com/ar-sa/rest/api/cost-management/retail-prices/azure-retail-prices).
 # Every call is counted at these prices, the replay and another KB_LLM_MODEL included.
-LLM_INPUT_USD_PER_MILLION_TOKENS = 0.12
-LLM_OUTPUT_USD_PER_MILLION_TOKENS = 0.60
+LLM_INPUT_USD_PER_MILLION_TOKENS = 2.40
+LLM_OUTPUT_USD_PER_MILLION_TOKENS = 12.00
 
 # The local defaults of kb serve-ai, each changed by its variable (ai_api/settings.py;
 # .claude/rules/poc.md, rule 2): the AI API listens on the machine only, beside kb serve-data.

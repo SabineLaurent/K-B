@@ -6,8 +6,9 @@ resource budget 'Microsoft.Consumption/budgets@2024-08-01' = {
   name: 'budget-kb'
   properties: {
     category: 'Cost'
-    // In the billing currency (EUR); the deployment plan estimates about 22 a month.
-    amount: 30
+    // In the billing currency (EUR), for all of K-B, hosting and inference (thresholds of Sabine of
+    // 2026-11-18): the resource of the model counts only in this resource group, tagged project=k-b.
+    amount: 40
     timeGrain: 'Monthly'
     // The first of a month; no end date, so Azure sets 10 years.
     timePeriod: {

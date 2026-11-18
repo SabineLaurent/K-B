@@ -91,9 +91,12 @@ def post_digests(
     )
     request_id = read_request_id(request)
     tracing: Tracing = request.app.state.tracing
-    with tracing.step(
-        ROOT_SPAN, "server", ROOT_ATTRIBUTES | {"k_b.request_id": request_id}
-    ) as root:
+    with (
+        request.app.state.model_metrics.measure_request("/digests"),
+        tracing.step(
+            ROOT_SPAN, "server", ROOT_ATTRIBUTES | {"k_b.request_id": request_id}
+        ) as root,
+    ):
         try:
             digests = answer_digests(
                 request,

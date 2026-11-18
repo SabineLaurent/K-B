@@ -83,13 +83,162 @@ def test_an_empty_reasoning_effort_is_not_set():
     assert settings.reasoning_effort is None
 
 
-def test_reasoning_effort_none_is_read():
+@pytest.mark.parametrize("effort", ["none", "minimal", "low"])
+def test_a_reasoning_effort_allowed_is_read(effort):
     settings = read_llm_settings_or_refusal(
-        PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "none"}
+        PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": effort}
     )
 
     assert isinstance(settings, LlmSettings)
-    assert settings.reasoning_effort == "none"
+    assert settings.reasoning_effort == effort
+
+
+@pytest.mark.parametrize(
+    ("environment", "is_sent"),
+    [
+        (PROVIDER_ENVIRONMENT, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": ""}, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true"}, True),
+        (PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"}, False),
+    ],
+    ids=["not-set", "empty", "true", "false"],
+)
+def test_the_prompt_cache_options_are_sent_unless_set_to_false(environment, is_sent):
+    settings = read_llm_settings_or_refusal(environment)
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.send_prompt_cache_options is is_sent
+
+
+def test_the_prompt_cache_options_left_out_are_refused_in_production():
+    """Left out, the provider may keep a prompt cache of the items, as KB_TRACE_CONTENT=all
+    would send them: both refused in production."""
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT
+        | {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": "production",
+        }
+    )
+
+    assert refusal == (
+        "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: false refused"
+        " with KB_DEPLOYMENT_ENVIRONMENT production"
+    )
+
+
+@pytest.mark.parametrize("environment", ["Production", "prod", " production"])
+def test_the_prompt_cache_options_left_out_are_refused_with_an_environment_out_of_the_list(
+    environment,
+):
+    """Fail closed: a deployment environment misspelled must not let them be left out in
+    production."""
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT
+        | {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": environment,
+        }
+    )
+
+    assert refusal == (
+        f"KB_DEPLOYMENT_ENVIRONMENT: {environment!r} not sandbox nor production,"
+        " with KB_LLM_SEND_PROMPT_CACHE_OPTIONS false"
+    )
+
+
+@pytest.mark.parametrize(
+    "settings",
+    [
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false",
+            "KB_DEPLOYMENT_ENVIRONMENT": "sandbox",
+        },
+        {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"},
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true",
+            "KB_DEPLOYMENT_ENVIRONMENT": "production",
+        },
+        {"KB_DEPLOYMENT_ENVIRONMENT": "production"},
+        {
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "true",
+            "KB_DEPLOYMENT_ENVIRONMENT": "prod",
+        },
+        {"KB_DEPLOYMENT_ENVIRONMENT": "prod"},
+    ],
+    ids=[
+        "false-in-sandbox",
+        "false-local",
+        "true-in-production",
+        "default-in-production",
+        "true-with-an-environment-out-of-the-list",
+        "default-with-an-environment-out-of-the-list",
+    ],
+)
+def test_the_prompt_cache_options_are_refused_left_out_in_production_only(settings):
+    settings_read = read_llm_settings_or_refusal(PROVIDER_ENVIRONMENT | settings)
+
+    assert isinstance(settings_read, LlmSettings)
+    assert settings_read.send_prompt_cache_options is (
+        settings.get("KB_LLM_SEND_PROMPT_CACHE_OPTIONS") != "false"
+    )
+
+
+def test_the_replay_reads_whether_the_prompt_cache_options_are_sent(
+    replay_environment,
+):
+    settings = read_llm_settings_or_refusal(
+        replay_environment | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "false"}
+    )
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.send_prompt_cache_options is False
+
+
+@pytest.mark.parametrize(
+    "model",
+    ["gpt-5-mini", "google/gemini-2.5-flash", f"{'p' * 100}/{'m' * 100}"],
+    ids=["without-publisher", "with-publisher", "longest-of-each-side"],
+)
+def test_a_model_with_or_without_its_publisher_is_read(model):
+    settings = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": model}
+    )
+
+    assert isinstance(settings, LlmSettings)
+    assert settings.model == model
+
+
+@pytest.mark.parametrize(
+    "model",
+    [
+        "google/gemini/2.5",
+        "google//gemini",
+        "/gemini-2.5-flash",
+        "google/",
+        "google/-gemini",
+        "google /gemini",
+        f"{'p' * 101}/gemini",
+        f"google/{'m' * 101}",
+    ],
+    ids=[
+        "two-slashes",
+        "double-slash",
+        "no-publisher",
+        "no-model",
+        "model-starting-with-a-dash",
+        "space-before-the-slash",
+        "publisher-too-long",
+        "model-too-long",
+    ],
+)
+def test_a_model_out_of_the_publisher_form_is_refused(model):
+    refusal = read_llm_settings_or_refusal(
+        PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": model}
+    )
+
+    assert isinstance(refusal, str)
+    assert refusal.startswith("KB_LLM_MODEL: ")
 
 
 @pytest.mark.parametrize(
@@ -143,11 +292,18 @@ def test_reasoning_effort_none_is_read():
         ),
         (
             PROVIDER_ENVIRONMENT | {"KB_LLM_MODEL": "gpt 5\n"},
-            r"KB_LLM_MODEL: 'gpt 5\n' not [A-Za-z0-9][A-Za-z0-9._:-]{0,99}",
+            (
+                r"KB_LLM_MODEL: 'gpt 5\n' not [A-Za-z0-9][A-Za-z0-9._:-]{0,99}"
+                r"(?:/[A-Za-z0-9][A-Za-z0-9._:-]{0,99})?"
+            ),
         ),
         (
-            PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "low"},
-            "KB_LLM_REASONING_EFFORT: 'low' not none",
+            PROVIDER_ENVIRONMENT | {"KB_LLM_REASONING_EFFORT": "medium"},
+            "KB_LLM_REASONING_EFFORT: 'medium' not none nor minimal nor low",
+        ),
+        (
+            PROVIDER_ENVIRONMENT | {"KB_LLM_SEND_PROMPT_CACHE_OPTIONS": "no"},
+            "KB_LLM_SEND_PROMPT_CACHE_OPTIONS: 'no' not true nor false",
         ),
     ],
     ids=[
@@ -164,7 +320,8 @@ def test_reasoning_effort_none_is_read():
         "port-not-digits",
         "host-out-of-pattern",
         "model-out-of-pattern",
-        "reasoning-effort-other-than-none",
+        "reasoning-effort-other-than-none-minimal-or-low",
+        "prompt-cache-options-other-than-true-or-false",
     ],
 )
 def test_a_setting_refused_gives_its_reason(environment, message):

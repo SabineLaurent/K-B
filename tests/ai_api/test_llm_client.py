@@ -232,15 +232,41 @@ def test_the_user_message_keeps_its_text_unescaped():
     assert user_messages(sent_bodies(transport)[0]) == ['{"title": "Modèle européen"}']
 
 
-def test_a_reasoning_model_gets_reasoning_effort_none_and_no_temperature():
-    settings = replace(REPLAY_SETTINGS, reasoning_effort="none")
+@pytest.mark.parametrize("effort", ["none", "minimal", "low"])
+def test_a_reasoning_model_gets_its_reasoning_effort_and_no_temperature(effort):
+    settings = replace(REPLAY_SETTINGS, reasoning_effort=effort)
 
     _, transport, _ = call([completion()], settings=settings)
     (body,) = sent_bodies(transport)
 
-    assert body["reasoning_effort"] == "none"
+    assert body["reasoning_effort"] == effort
     assert "temperature" not in body
     assert body["prompt_cache_options"] == {"mode": "explicit"}
+
+
+def test_a_model_that_refuses_the_prompt_cache_options_is_called_without_them():
+    settings = replace(REPLAY_SETTINGS, send_prompt_cache_options=False)
+
+    _, transport, _ = call([completion()], settings=settings)
+    (body,) = sent_bodies(transport)
+
+    assert "prompt_cache_options" not in body
+    assert body["temperature"] == 0
+
+
+def test_the_name_of_a_model_behind_its_publisher_goes_in_the_body_only():
+    model = "google/gemini-2.5-flash"
+    settings = replace(PROVIDER_SETTINGS, model=model)
+
+    _, transport, _ = call([completion()], settings=settings)
+    (request,) = transport.requests
+
+    assert json.loads(request.content)["model"] == model
+    assert str(request.url) == "https://models.example/openai/v1/chat/completions"
+    for side in model.split("/"):
+        for name, value in request.headers.items():
+            assert side not in name.lower()
+            assert side not in value.lower()
 
 
 def test_an_output_refused_twice_is_llm_invalid_output():

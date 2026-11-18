@@ -20,8 +20,9 @@ jobs:
           version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
           save-cache: false # the jobs share one cache key: only tests saves it
       - run: uv sync --locked
-      # Audit the versions pinned by uv.lock, with their hashes, against known vulnerabilities.
-      - run: uv export --frozen --no-emit-project --format requirements-txt -o requirements-audit.txt
+      # Audit the versions pinned by uv.lock, with their hashes, against known vulnerabilities:
+      # every group, docs included, which uv export leaves out by default.
+      - run: uv export --frozen --no-emit-project --all-groups --format requirements-txt -o requirements-audit.txt
       - run: uvx pip-audit@2.10.1 --require-hashes --disable-pip -r requirements-audit.txt
 
   tests:

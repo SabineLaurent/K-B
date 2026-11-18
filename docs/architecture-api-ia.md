@@ -39,8 +39,8 @@ Le schéma se lit ainsi :
 - **L'API IA appelle le modèle** par une interface compatible OpenAI, sur le chemin `chat/completions`
   (`ai_api/connectors/llm_client.py:40`). Le fournisseur est `openai_compatible` ou `replay`
   (`ai_api/connectors/llm_settings.py:31`). Aucune branche du code n'est propre à Azure : l'adresse et le modèle
-  sont des réglages (`infra/main.bicep:218-222`). Les prix du coût estimé restent ceux de gpt-6-luna, en
-  constantes, appliqués à tout modèle (`core/config.py:264-274`). Le modèle retenu est gpt-6-luna sur Azure AI
+  sont des réglages (`infra/main.bicep:218-222`). Les prix du coût estimé sont ceux de gpt-6.1-sol, en
+  constantes, appliqués à tout modèle (`core/config.py:293-303`, #631). Le modèle retenu est gpt-6-luna sur Azure AI
   Foundry (journal ADR, « Modèle des fiches : gpt-6-luna sur l'abonnement de l'organisme de formation »).
 - **L'API IA lit GitHub** pour les seules tendances : la fiche de chaque candidat et le README de chaque dépôt
   choisi (`ai_api/connectors/github_client.py:169`, `:189`).
