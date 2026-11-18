@@ -23,7 +23,7 @@ dépendances à part, `docs` (`pyproject.toml`), que ni les tests ni l'image de 
 
 ## Les recommandations suivies
 
-Trois sources, lues le 2026-11-14:
+Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-11-18.
 
 - **L'association Valentin Haüy** (AVH), la page « L'essentiel à savoir » sur l'accessibilité des documents. Elle
   vise les documents de bureautique. Ses règles de structure valent pour une page HTML, et ce sont elles que la
@@ -33,9 +33,17 @@ Trois sources, lues le 2026-11-14:
 - **Microsoft**, la page <span lang="en">« Make your Word documents accessible to people with disabilities »</span>,
   pour deux règles que l'AVH ne détaille pas: un texte de lien qui a un sens lu seul, et des tableaux simples, pour
   les données seulement, à en-têtes de colonne.
-- **Le RGAA 4.1.2**, le référentiel français pour le HTML (WCAG 2.1, niveaux A et AA), version en vigueur le
-  2026-11-14; le RGAA 5 est annoncé pour la fin de 2026. Ses critères donnent la mesure de chaque règle dans les pages
-  construites.
+- **Le RGAA 4.1.2**, le référentiel général d'amélioration de l'accessibilité, le référentiel français pour le
+  HTML (WCAG 2.1, les <span lang="en">Web Content Accessibility Guidelines</span> du W3C, niveaux A et AA), version
+  en vigueur le 2026-11-14; le RGAA 5 est annoncé pour la fin de 2026. Ses critères donnent la mesure de chaque règle
+  dans les pages construites.
+- **La notice d'accessibilité éditoriale d'AcceDe Web**, publiée par Atalan, dans sa version en ligne (les notices
+  AcceDe Web en version 4.1.2). Elle s'adresse aux « contributrices et contributeurs éditoriaux » d'un outil de
+  publication: ici, l'outil est MkDocs, et ses règles portent sur le texte des fiches. Elle dit d'elle-même: « Cette
+  version en ligne couvre actuellement les WCAG 2.2 et le RGAA 4.1.2 »; sa section 9 dit que ses règles
+  supplémentaires sont « nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1 ». Les fiches mises en forme
+  sont vérifiées selon elle, règle par règle
+  ([La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web)).
 
 ## Les règles appliquées aux fiches
 
@@ -70,6 +78,36 @@ style construite de Material 9.8.1, le 2026-11-14. Le seuil du RGAA 3.2 est de 4
 | Le texte de l'en-tête | blanc sur `#4051b5` | 6,86:1 |
 | Le code | `#36464e` sur `#f5f5f5` | 8,99:1 |
 
+## La vérification selon la notice d'AcceDe Web
+
+Le 2026-11-18, les quatre fiches mises en forme (`index.md`, cette fiche, `service_ia_pour_docu.md` et
+`integration_continue_pour_docu.md`) ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale
+d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture. Le tableau suivant donne chaque
+règle de la notice, son résultat, et comment il a été vérifié.
+
+| Règle de la notice | Résultat | Vérifiée par |
+|---|---|---|
+| 1. Ne pas utiliser les sauts de lignes multiples | Tenue: aucune balise `br` hors des schémas Mermaid, aucun paragraphe vide. | Le HTML construit |
+| 2. Utiliser correctement la hiérarchie des titres | Tenue: un titre de niveau 1 par page, puis aucun saut de niveau. | Le HTML construit |
+| 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
+| 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue: aucun lien n'a d'attribut `title`. | Le HTML construit |
+| 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
+| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour le seul schéma des quatre fiches, celui du service d'IA: un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et la liste qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
+| 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, aucune liste tapée à la main. | Le HTML construit |
+| 6.1. Déclarer les citations en ligne et les blocs de citations | **Non tenue**: les citations sont entre guillemets, sans `q` ni `blockquote` (RGAA 9.4). Raison: séparer, guillemet par guillemet, les citations des titres de page ou de section cités demande de relire chaque fiche. Parade: la correction dans la PR suivante de la mise en forme, pour toutes les fiches. | Le HTML construit |
+| 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais est balisé `<span lang="en">`. | Le HTML construit |
+| 6.3. Ne pas faire référence à un élément en se basant uniquement sur sa couleur, sa taille, sa forme ou sa position | Tenue: un renvoi nomme l'élément et suit l'ordre de lecture (« le tableau suivant donne… »), jamais une place à l'écran. | La relecture; le contrôle des renvois vagues |
+| 7.1. Contrastes entre le texte et l'arrière-plan | Tenue ([Les contrastes du thème](#les-contrastes-du-theme)). | Le calcul des rapports de contraste |
+| 7.2. Les couleurs ne sont pas le seul moyen de porter une information | Tenue. | La relecture |
+| 8.1. Associer une description détaillée aux contenus riches | Tenue: chaque schéma Mermaid a sa description en texte. | La relecture |
+| 8.2 et 8.3. Contenus en mouvement; vidéos | Sans objet: ni l'un ni l'autre. | Le HTML construit |
+| 9. Fournir une alternative textuelle aux contenus textuels ambigus (émoticônes, art ASCII) | Tenue: aucune émoticône ni art ASCII. La flèche « → » sert à écrire un chemin de menu ou le résultat d'une commande; ce qu'en dit un lecteur d'écran n'est pas vérifié. | Le HTML construit |
+
+Ses bonnes pratiques: aucun lien n'ouvre de nouvelle fenêtre (aucun `target`); aucun fichier n'est proposé au
+téléchargement; les capitales gardent leurs accents; aucun texte n'est justifié. Les sigles du domaine (RGAA, WCAG,
+AELE, RGPD, PR, ADR, CVE, DINUM, OSV) sont développés à leur premier emploi dans chaque fiche; les sigles techniques
+courants (API, HTML, URL, UTC, SHA) ne le sont pas.
+
 ## Vérifier
 
 1. Construire le site en mode strict:
@@ -79,7 +117,8 @@ style construite de Material 9.8.1, le 2026-11-14. Le seuil du RGAA 3.2 est de 4
    ```
 
    Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-   (`mkdocs.yml:43-49`). Le workflow `docs.yml` la lance sur chaque PR (`.github/workflows/docs.yml:6-9`, `:25`).
+   (`mkdocs.yml:43-49`). Le workflow `docs.yml` la lance sur chaque demande de fusion (PR)
+   (`.github/workflows/docs.yml:6-9`, `:25`).
 2. Le contrôle du HTML construit, lancé sur `site/` pour chaque PR de mise en forme, compte dans chaque page: l'attribut
    `lang`, les titres de niveau 1 et les sauts de niveau, les tableaux sans `th`, les liens dont le texte est une
    adresse, « ici » ou « plus haut », et les ressources chargées hors du site. Il n'est pas dans le dépôt: son résultat
@@ -106,6 +145,9 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
   en dit. Parade: un essai avec VoiceOver par Sabine sur une fiche de chaque lot, le site construit.
+- **Les citations ne sont pas déclarées** (notice d'AcceDe Web, règle 6.1; RGAA 9.4): voir
+  [La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web). Parade: la correction
+  dans la PR suivante de la mise en forme, pour toutes les fiches.
 - **Les fiches ne sont pas encore toutes mises en forme.** Cette fiche et la PR qui l'introduit couvrent `index.md`,
   le service d'IA et l'intégration continue; les autres fiches suivent, chacune dans sa PR.
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
@@ -127,12 +169,20 @@ Lues le 2026-11-14:
   [page de l'accessibilité des documents](https://www.avh.asso.fr/nos-solutions/accessibilite/accessibilite-numerique/documents-courriels/essentiel-savoir).
 - Microsoft, <span lang="en">« Make your Word documents accessible to people with disabilities »</span>,
   [page du support de Microsoft](https://support.microsoft.com/en-us/office/make-your-word-documents-accessible-to-people-with-disabilities-d9bf3683-87ac-47ea-b91a-78dcacb3c66d).
-- DINUM, RGAA 4.1.2, [critères et tests](https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/), qui
-  annonce le RGAA 5 pour la fin de 2026.
+- Direction interministérielle du numérique (DINUM), RGAA 4.1.2,
+  [critères et tests](https://accessibilite.numerique.gouv.fr/methode/criteres-et-tests/), qui annonce le RGAA 5 pour la fin de 2026.
 - GitHub, <span lang="en">« What is GitHub Pages? »</span>,
   [page de la documentation de GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/what-is-github-pages),
   pour l'offre qui permet Pages sur un dépôt privé.
 - GitHub, <span lang="en">« Configuring a publishing source for your GitHub Pages site »</span>,
   [page de la documentation de GitHub](https://docs.github.com/en/pages/getting-started-with-github-pages/configuring-a-publishing-source-for-your-github-pages-site).
 - Material for MkDocs, [notes de la version 9.8.1](https://github.com/squidfunk/mkdocs-material/releases/tag/9.8.1),
-  pour sa fin de vie; versions de MkDocs et de Material lues sur PyPI, sans faille connue dans la base OSV.
+  pour sa fin de vie; versions de MkDocs et de Material lues sur PyPI, sans faille connue dans la base OSV
+  (<span lang="en">Open Source Vulnerabilities</span>).
+
+Lue le 2026-11-18:
+
+- Atalan, AcceDe Web, « Notice d'accessibilité éditoriale »,
+  [version en ligne](https://www.accede-web.com/notices/editoriale/), ses neuf sections et ses bonnes pratiques
+  (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
+  une recherche web du même jour.

@@ -14,7 +14,7 @@ d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livr
 
 ## La chaîne en bref
 
-Chaque PR vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
+Chaque demande de fusion (PR, <span lang="en">pull request</span>) vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
 couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Sur
 chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le workflow `Docs`](#le-workflow-docs)). Une
 PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
@@ -156,8 +156,8 @@ et `Infra` comprises (`deploy.yml:51-67`). Un contrôle non requis à la fusion 
 `Docs` compte aussi. Sur un commit de `main`, il ne tourne que lancé à la main (`docs.yml:6-9`), et une telle
 exécution en échec, ou pas encore finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer
 `Docs` jusqu'à ce qu'il passe (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant. `Deploy`
-n'écarte pas `Docs` de son contrôle: c'est un contrôle de sécurité de la livraison (journal ADR, 2026-11-14,
-« Documentation publiée par un site MkDocs sur GitHub Pages »).
+n'écarte pas `Docs` de son contrôle: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou ADR,
+2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »).
 
 ## Déclencher la chaîne
 
@@ -378,7 +378,7 @@ La dernière exécution d'`Infra` sur `main` était alors 42750689052, `success`
 L'exécution 41215069368 de `CI`, sur la PR de la branche `feat/trend-report-github-cards` (2026-10-31), a eu `audit`
 en échec, et ses trois autres jobs (`tests`, `lint`, `types`) verts. Son journal
 (`gh run view 41215069368 --repo SabineLaurent/K-B --log-failed`) donne `Found 4 known vulnerabilities in 1 package`,
-puis `pyasn1 0.6.4`, quatre CVE et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
+puis `pyasn1 0.6.4`, quatre identifiants publics de vulnérabilités (CVE) et la version corrigée, `0.6.5`. Ce journal se relit jusque vers le 2027-01-29.
 
 ## Quand la CI échoue
 
