@@ -471,9 +471,11 @@ Des données personnelles partent pourtant, d'après le registre.
     completions are stored in the model. Additionally, prompts and completions are not used to train, retrain, or
     improve the base models.</q>
 - **Le cache de la consigne est coupé.** À chaque requête, l'API IA envoie
-    `prompt_cache_options: {"mode": "explicit"}`, sans point d'arrêt. Un point d'arrêt est une marque, dans la
-    demande, qui désigne ce que ce mode met en cache. L'API IA n'en pose aucun, donc ce réglage n'écrit aucun cache. La coupure a été vérifiée une fois, sur
-    `gpt-6-luna`, le 2026-10-17: `cache_write_tokens` valait 0 sur 20 réponses. Sur `gpt-6.1-sol`, elle n'a pas été
+    `prompt_cache_options: {"mode": "explicit"}`, sans point d'arrêt. La page « <span lang="en">Prompt
+    caching</span> » de Microsoft Learn définit ce terme. Un point d'arrêt marque la fin du début de demande que le
+    cache peut réutiliser: <q lang="en">mark the end of a reusable prompt prefix</q>. En mode explicite, seuls les
+    points d'arrêt posés dans la demande servent au cache. L'API IA n'en pose aucun, donc ce réglage n'écrit aucun
+    cache. La coupure a été vérifiée une fois, sur `gpt-6-luna`, le 2026-10-17: `cache_write_tokens` valait 0 sur 20 réponses. Sur `gpt-6.1-sol`, elle n'a pas été
     relevée, parce que le client du modèle ne suit pas ce champ.
 - **La surveillance des abus garde les demandes signalées.** Microsoft surveille les abus, c'est-à-dire les usages
     contraires à ses règles. Une demande et sa réponse peuvent être stockées pour une revue humaine dans deux cas.
@@ -656,7 +658,10 @@ Lectures par `az`, en lecture seule, le 2026-11-18: les déploiements, la ressou
 `DeepSeek-V4-Flash` seulement (« Ce qu'est le service »). Appels du 2026-11-10 vers 00:03 UTC, avec la clé et sans
 clé, sur `gpt-6-luna` (« Le test »). Microsoft Learn, référence de
 [<span lang="en">az role assignment</span>](https://learn.microsoft.com/en-us/cli/azure/role/assignment?view=azure-cli-latest),
-lue le 2026-11-18, pour l'option `--include-groups`.
+lue le 2026-11-18, pour l'option `--include-groups`. Microsoft Learn,
+[<span lang="en">Prompt caching</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/prompt-caching),
+lue le 2026-11-18 par Context7 et par une recherche web, pour la définition du point d'arrêt et du mode explicite;
+sa date `ms.date` n'a pas été relevée.
 
 Hors du dépôt: les captures du portail Foundry du 2026-11-17 (le catalogue des modèles, le formulaire de
 déploiement de `gpt-6.1-sol` avec ses réglages), et le relevé de l'essai de bout en bout du 2026-11-17 (« Le test »).
