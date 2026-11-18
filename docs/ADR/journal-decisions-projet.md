@@ -7283,6 +7283,36 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
   ci-dessus. — PR de #560
 
+### Documentation publiée par un site MkDocs sur GitHub Pages (#167)
+
+- **Les fiches de `documentation/` deviennent un site statique, construit par MkDocs 1.6.1 avec le thème Material for
+  MkDocs 9.8.1, en mode strict sur chaque PR (`docs.yml`), et publié sur GitHub Pages à la main.** Le format, un site
+  publié par MkDocs ou un équivalent sur GitHub Pages, est la décision de Sabine du 2026-11-11 pour le critère du
+  « format qui respecte les recommandations d'accessibilité » (tri des relectures « jury » des fiches) ; l'outil, son
+  « go » du 2026-11-12, sur la recommandation de time-knight. Pourquoi MkDocs avec Material : c'est l'outil demandé pour le format
+  (rapporté par time-knight) ; Material reçoit ses corrections de sécurité jusqu'au
+  2027-05-05, après le rendu et la soutenance ; il borne MkDocs sous la version 2. Options écartées : Zensical 0.1.1,
+  successeur de Material par la même équipe, en Beta depuis le 2026-11-10 (il lit `mkdocs.yml` : migration possible
+  plus tard) ; Sphinx avec MyST (les schémas Mermaid à reprendre) ; Jekyll (Ruby, une seconde pile). La dépendance
+  vit dans un groupe à part, `docs`, que ni les tests ni l'image n'installent (choix 2 du même « go »). Les règles
+  suivies (AVH, Microsoft, RGAA 4.1.2) et leur contrôle : `documentation/accessibilite_pour_docu.md`.
+- **Écarts du 2026-11-14 au plan, acceptés par time-knight sous la délégation de Sabine du 15/10.** L'audit de la CI
+  exporte tous les groupes (`--all-groups`) : `uv export` laisse le groupe `docs` de côté par défaut, et une faille de
+  MkDocs ou de Material fait donc échouer `audit` sur toute PR. `actions/configure-pages` retiré : ses sorties ne
+  servent qu'à l'adresse du site, déjà fixée par `site_url`. La publication est bornée à `main`, car un
+  `workflow_dispatch` peut nommer toute branche. L'accent du thème passe de `#526cfe` (4,26:1 sur blanc, sous le seuil
+  du RGAA 3.2) à `#303f9f` (8,98:1). Mermaid, que le plugin `privacy` télécharge d'unpkg dans sa version flottante
+  `mermaid@11`, est vérifié par son empreinte, celle de Mermaid 11.17.2 recoupée avec l'intégrité publiée par npm ;
+  option écartée : une version exacte chargée par `extra_javascript`, qui fixe aussi le fichier mais charge 3,5 Mo
+  sur chaque page, au lieu des seules pages à schéma. `deploy.yml` ne change pas : une exécution manuelle de `Docs`
+  en échec fait refuser le tag de son commit, parade écrite dans la fiche de l'intégration continue (relancer `Docs`,
+  ou livrer un commit suivant) ; exclure `docs.yml` de son contrôle est écarté, car c'est un contrôle de sécurité de la
+  livraison.
+- Limites assumées : le rendu au lecteur d'écran n'est pas vérifié (parade : un essai VoiceOver par Sabine sur une
+  fiche par lot) ; la publication attend que le dépôt soit public, puisqu'un site publié depuis un dépôt privé est
+  public ; Material est en fin de vie le 2027-05-05, sans migration faite ; une nouvelle version 11 de Mermaid demande
+  de revérifier et de changer l'empreinte. — PR A de la tâche 2 (Refs #167, #623)
+
 ## 2026-11-17
 
 ### Appel du modèle : les réglages des modèles du banc de C7 (#627)

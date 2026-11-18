@@ -165,15 +165,19 @@ je fusionne. Les décisions et leur pourquoi sont consignées dans le
 ### Planning
 
 Les jalons et leurs issues sont sur la
-[page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons à venir, relevés
-le 18/10/2026 :
+[page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons encore ouverts,
+relevés le 14/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
 
-| Jalon | Échéance |
-|---|---|
-| POC 25/10 | 25/10/2026 |
-| Comptes rendus de veille tous les 3 jours | 01/11/2026 |
-| Mise en ligne 08/11 | 08/11/2026 |
-| Wiki : ingest des clips | sans date, après le 29/10 |
+| Jalon | Échéance | Issues fermées | Issues ouvertes |
+|---|---|---|---|
+| POC 25/10 | 25/10/2026 | 54 | 8 |
+| Oral blanc E1 E3 29/10 | 29/10/2026 | 6 | 2 |
+| Fiches de veille tous les 3 jours | 01/11/2026 | 0 | 2 |
+| Mise en ligne 08/11 | 08/11/2026 | 8 | 7 |
+| Wiki : ingest des clips | sans date | 0 | 1 |
+
+Les quatre premiers jalons, « Cadrage et socle », « Fusion et base », « API « quoi de neuf » » et
+« Collecte multi-sources », sont fermés.
 
 ### Le POC du 25/10 et la suite
 
@@ -816,16 +820,18 @@ Sous 96 % (lignes et branches), les deux commandes échouent : c'est le `fail_un
 (journal ADR, 2026-11-08). La CI le vérifie dans le job `tests`. Seules les commandes avec `--cov` le
 vérifient (`make test` et `uv run pytest`, non) ; sur une partie de la suite, ajouter `--cov-fail-under=0`.
 
-**La CI** (GitHub Actions, `.github/workflows/`) : quatre workflows. `ci.yml` et `image.yml` tournent sur chaque
+**La CI** (GitHub Actions, `.github/workflows/`) : cinq workflows. `ci.yml` et `image.yml` tournent sur chaque
 PR vers `main` et sur chaque push sur `main`, donc après chaque fusion, et `infra.yml` de même, sans filtre de
 chemin depuis #496 ; `deploy.yml`, sur un tag `vX.Y.Z` poussé, ou à la main
-(`gh workflow run deploy.yml --ref <tag>`). Le jeton de chaque workflow ne lit que le dépôt
-(`permissions: contents: read`), sauf ce que les jobs de `deploy.yml` ajoutent. Chaque action est épinglée par
-son SHA, sa version en commentaire.
+(`gh workflow run deploy.yml --ref <tag>`) ; `docs.yml` (#167), sur chaque PR vers `main`, ou à la main, et il ne
+publie le site des fiches de `documentation/` sur GitHub Pages que lancé depuis `main`
+([documentation/accessibilite_pour_docu.md](documentation/accessibilite_pour_docu.md), « Publier »). Le jeton de
+chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce que les jobs de `deploy.yml` et le job
+`deploy` de `docs.yml` ajoutent. Chaque action est épinglée par son SHA, sa version en commentaire.
 
 | Job | Workflow | Ce qu'il fait |
 |---|---|---|
-| `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, avec leurs empreintes (`uv export`, puis pip-audit 2.10.1) |
+| `audit` | `ci.yml` | cherche les vulnérabilités connues des versions de `uv.lock`, de tous les groupes de dépendances (`docs` compris), avec leurs empreintes (`uv export --all-groups`, puis pip-audit 2.10.1) |
 | `tests` | `ci.yml` | `uv run pytest --cov --cov-report=term-missing:skip-covered` : la suite, sans `e2e` ni `postgresql`, et le seuil de couverture |
 | `lint` | `ci.yml` | `uv run ruff check` et `uv run ruff format --check` |
 | `types` | `ci.yml` | `uv run mypy --strict` |
@@ -833,11 +839,13 @@ son SHA, sa version en commentaire.
 | `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
 | `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
+| `build` | `docs.yml` | construit le site des fiches de `documentation/` par MkDocs, en mode strict (un lien ou une ancre absents le font échouer), et vérifie l'empreinte du fichier de Mermaid téléchargé ; lancé à la main depuis `main`, dépose le site en artefact de Pages |
+| `deploy` | `docs.yml` | lancé à la main depuis `main` seulement, publie le site sur GitHub Pages ; sauté sur une PR |
 | `check` | `deploy.yml` | refuse un tag hors de la forme `vX.Y.Z`, dont le commit n'est pas sur `main`, ou dont la CI n'est pas finie et verte |
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
 
-Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixée dans chacun des six
-(`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
+Les jobs de `ci.yml` et le job `build` de `docs.yml` installent uv par `astral-sh/setup-uv`, à la version fixée
+dans chacun des sept (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
 `pyproject.toml`. Sur le Mac, la même version s'installe par `uv self update 0.13.6`.
 
 **Dependabot** (`.github/dependabot.yml`) ouvre chaque semaine les PR de mise à jour des actions des workflows
@@ -845,8 +853,8 @@ Les jobs de `ci.yml` installent uv par `astral-sh/setup-uv`, à la version fixé
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des six jobs de `ci.yml` se change
-à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
+majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des six jobs de `ci.yml` et celle de
+`docs.yml` se changent à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
 la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
 réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
 à jour de sécurité peut ouvrir une PR sur `uv.lock`. Aucune PR de sécurité n'a encore été ouverte.
@@ -860,11 +868,14 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
   #496, `bicep-build` ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`image-build` et `tests-data` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
+`image-build`, `tests-data` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
 PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de `infra.yml`). Les
 non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
-GitHub crée lui-même (Dependabot). Sur un dépôt neuf, ce ruleset se recrée dans
+GitHub crée lui-même (Dependabot). `docs.yml` ne tourne sur un commit de `main` que lancé à la main : une telle
+exécution en échec fait refuser le tag de ce commit, jusqu'à une relance réussie
+([documentation/integration_continue_pour_docu.md](documentation/integration_continue_pour_docu.md), « Après la
+CI »). Sur un dépôt neuf, ce ruleset se recrée dans
 Settings → Rules → Rulesets, avec ces règles. Les rulesets des tags, l'environnement `production` et les secrets
 du déploiement se posent par [infra/README.md](infra/README.md), « Les réglages de GitHub, une fois, avant la
 passe 2 » et « Les secrets du dépôt, après la passe 2 ».
@@ -875,13 +886,13 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
   l'environnement `production` ; `check` lit les exécutions de la CI par le jeton du workflow (`github.token`).
 - `tests-postgresql` pose `KB_TEST_POSTGRESQL_URL` dans le job, vers son service, sans mot de passe
   (`POSTGRES_HOST_AUTH_METHOD: trust` : un serveur que seul le runner joint).
-- Aucun workflow ne lit de variable du dépôt (`vars.`), et les trois autres ne lisent aucun secret.
+- Aucun workflow ne lit de variable du dépôt (`vars.`), et les quatre autres ne lisent aucun secret.
 
 **Une PR témoin** : [#533](https://github.com/SabineLaurent/K-B/pull/533) a passé, avant sa fusion le
 2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
 (`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
-`bicep-build`, un huitième check.
+`bicep-build`, un huitième check, et depuis #167, `build` de `docs.yml`, un neuvième.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 
