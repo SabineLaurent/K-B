@@ -14,10 +14,11 @@ arrivent avec cette fiche.
 
 Les fiches sont écrites en Markdown dans `documentation/`. MkDocs 1.6.1, avec le thème Material for MkDocs 9.8.1, en
 fait un site HTML statique: une page par fiche, une page d'accueil ([La documentation de K-B](index.md)) et un
-champ de recherche (`mkdocs.yml:3-25`, `:43-44`). En haut de chaque page, une barre d'onglets mène aux cinq parties de
-la documentation. À gauche, un seul menu donne les fiches de la partie ouverte et la table des matières de la page
-(`mkdocs.yml:34-37`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-28`). Le site se publie sur GitHub Pages, à la main (section
+champ de recherche (`mkdocs.yml:3-25`, `:43-44`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
+une barre d'onglets en haut de chaque page mène aux cinq parties de la documentation. Un seul menu, à gauche, y donne
+les fiches de la partie ouverte et la table des matières de la page (`mkdocs.yml:34-37`). Sur un écran plus étroit, le
+bouton de menu de l'en-tête ouvre un menu qui donne les cinq parties. Les couleurs sont celles du back office du site
+de K-B, tirées de ses maquettes du 2026-11-09 (`documentation/stylesheets/extra.css:1-25`). Le site se publie sur GitHub Pages, à la main (section
 [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
@@ -61,43 +62,61 @@ Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue 
 | Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:37`); la barre d'onglets des parties et le menu de la partie ouverte. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les fiches n'ont aucune image. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche |
 | Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:30-31`). | La configuration |
-| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:4-28`); l'anneau de focus en blanc sur l'en-tête et les onglets (`:46-51`). | Le calcul des rapports de contraste |
-| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:63-66`): sa couleur seule, `#0F5E6B` contre le texte `#1C1E21`, ne donne que 2,25:1, sous le seuil de 3:1. L'onglet de la partie ouverte est en gras et souligné (`:40-44`), pas seulement d'une autre couleur. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
+| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:5-31`); l'anneau de focus sarcelle, et blanc sur l'en-tête, les onglets et le lien d'évitement (`:49-65`). | Le calcul des rapports de contraste |
+| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:77-80`): sa couleur seule, `#0F5E6B` contre le texte `#1C1E21`, ne donne que 2,25:1, sous le seuil de 3:1. L'onglet de la partie ouverte est en demi-gras et souligné (`:43-47`), de la même couleur que les autres onglets. Dans le menu, la page ouverte n'a que sa couleur pour se distinguer des autres liens, à 2,25:1; sur un écran large, sa table des matières est aussi dépliée sous son lien, bordée d'un filet à gauche. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:68-72`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:82-86`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
 | La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:29`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:63-65`). | Le contrôle du HTML construit |
 | Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:45-46`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
 Les rapports de contraste suivants sont calculés selon la formule des WCAG 2.1, le 2026-11-18. Ils portent sur les
-couleurs de `documentation/stylesheets/extra.css:4-28` et, pour le code, sur celles de la feuille de style construite
-de Material 9.8.1. Une couleur transparente du thème est d'abord posée sur son fond, et c'est la couleur obtenue qui
-est mesurée. Le seuil du RGAA 3.2 est de 4,5:1 pour un texte de taille normale. Toutes les paires le passent.
+couleurs de `documentation/stylesheets/extra.css:5-31` et, pour le code et les schémas, sur celles de la feuille de
+style construite de Material 9.8.1. Une couleur transparente du thème est d'abord posée sur son fond, et c'est la couleur obtenue qui
+est mesurée. Le seuil du RGAA 3.2 est de 4,5:1 pour un texte de taille normale. Toutes les paires le passent. Un
+aperçu local n'affiche pas les schémas Mermaid tant que le site n'est pas publié (« Limites »): leurs paires sont
+calculées, non vues.
 
 | Texte | Couleurs | Rapport |
 |---|---|---|
-| Le texte d'une fiche, d'un tableau et du menu | `#1C1E21` sur `#F4F5F2` | 15,27:1 |
-| Un texte secondaire: le titre de niveau 1, un bloc de citation, l'indication du champ de recherche ouvert | `#4A4F57` sur `#F4F5F2` | 7,53:1 |
-| Le titre d'une partie dans le menu, l'en-tête d'un résultat de recherche | `#4A4F57` sur `#E3E4E1` | 6,46:1 |
-| Un lien, la page ouverte dans le menu | `#0F5E6B` sur `#F4F5F2` | 6,77:1 |
-| Un lien survolé ou atteint au clavier | `#0A434C` sur `#F4F5F2` | 9,99:1 |
+| Le texte d'une fiche, d'un tableau, du menu; le titre d'un résultat de recherche | `#1C1E21` sur `#F4F5F2` | 15,27:1 |
+| Une ligne de tableau sous le pointeur | `#1C1E21` sur `#EBECE9` | 14,09:1 |
+| Un texte secondaire: le titre de niveau 1, un bloc de citation, le titre d'une partie dans le menu d'un écran large, l'extrait d'un résultat de recherche, l'indication du champ de recherche ouvert | `#4A4F57` sur `#F4F5F2` | 7,53:1 |
+| Le titre d'une partie dans le menu d'un écran étroit, l'en-tête des résultats de recherche | `#4A4F57` sur `#E3E4E1` | 6,46:1 |
+| Un lien; la page ouverte dans le menu; un lien du menu sous le pointeur ou le focus; un mot cherché, souligné dans un résultat de recherche; le lien des autres résultats d'une même page | `#0F5E6B` sur `#F4F5F2` | 6,77:1 |
+| Un lien d'une fiche sous le pointeur ou le focus | `#0A434C` sur `#F4F5F2` | 9,99:1 |
+| Un résultat de recherche sous le pointeur ou le focus: son titre | `#1C1E21` sur `#DCE3E1` | 12,82:1 |
+| Un résultat de recherche sous le pointeur ou le focus: son extrait | `#4A4F57` sur `#DCE3E1` | 6,33:1 |
+| Un résultat de recherche sous le pointeur ou le focus: un mot cherché; le lien des autres résultats d'une même page sous le pointeur | `#0F5E6B` sur `#DCE3E1` | 5,69:1 |
 | Le texte de l'en-tête et des onglets | `#FFFFFF` sur `#1C1E21` | 16,71:1 |
 | L'indication du champ de recherche, dans l'en-tête | `#CFE3E6` sur `#151618` | 13,61:1 |
+| L'indication du champ de recherche, dans l'en-tête, sous le pointeur | `#CFE3E6` sur `#38393C` | 8,68:1 |
 | Le lien d'évitement | `#F4F5F2` sur `#1C1E21` | 15,27:1 |
 | Le code | `#36464E` sur `#FFFFFF` | 9,80:1 |
-| Le code coloré: commentaire, variable, opérateur | `#4A4F57` sur `#FFFFFF` | 8,24:1 |
+| Le code coloré: commentaire, variable, opérateur, ponctuation | `#4A4F57` sur `#FFFFFF` | 8,24:1 |
 | Le code coloré: mot-clé | `#3F6EC6` sur `#FFFFFF` | 4,93:1 |
 | Le code coloré: nombre | `#D52A2A` sur `#FFFFFF` | 5,01:1 |
 | Le code coloré: commande intégrée | `#6E59D9` sur `#FFFFFF` | 5,13:1 |
 | Le code coloré: chaîne | `#1C7D4D` sur `#FFFFFF` | 5,13:1 |
 | Le code coloré: caractère échappé | `#DB1457` sur `#FFFFFF` | 4,94:1 |
-| Le libellé d'une boîte d'un schéma | `#36464E` sur `#DCE3E1` | 7,52:1 |
-| Le libellé d'une flèche d'un schéma | `#36464E` sur `#F4F5F2` | 8,95:1 |
+| Le libellé d'une flèche d'un schéma | `#36464E` sur `#F4F5F2` | 8,95:1, calculé, non vu |
+| Le libellé d'une boîte d'un schéma, hors de tout sous-graphe | `#36464E` sur `#DCE3E1` | 7,52:1, calculé, non vu |
+| Le titre d'un sous-graphe d'un schéma, premier niveau | `#36464E` sur `#E3E4E1` | 7,68:1, calculé, non vu |
+| Le titre d'un sous-graphe d'un schéma, deuxième niveau | `#36464E` sur `#D3D4D1` | 6,58:1, calculé, non vu |
+| Le titre d'un sous-graphe d'un schéma, troisième niveau | `#36464E` sur `#C4C5C2` | 5,65:1, calculé, non vu |
+| Le libellé d'une boîte dans un sous-graphe de premier niveau | `#36464E` sur `#CDD4D2` | 6,51:1, calculé, non vu |
+| Le libellé d'une boîte dans un sous-graphe de deuxième niveau | `#36464E` sur `#BFC5C3` | 5,60:1, calculé, non vu |
+| Le libellé d'une boîte dans un sous-graphe de troisième niveau | `#36464E` sur `#B1B8B6` | 4,85:1, calculé, non vu |
 
-L'anneau de focus, sur l'en-tête et les onglets, est blanc: 16,71:1 sur `#1C1E21`. Le bleu sarcelle foncé du reste du
-site n'y donnerait que 1,53:1. Le contour d'un bloc de code, `#DADCD6` sur blanc, est un décor: il ne porte aucune
+Le troisième niveau est celui du schéma du déploiement sur Azure, dans
+[la fiche de l'architecture](architecture_pour_docu.md).
+
+Hors de l'en-tête, l'anneau de focus est sarcelle, `#0F5E6B`, la couleur de focus de la charte. Il donne 6,77:1 sur
+`#F4F5F2`, au-dessus du seuil de 3:1 du RGAA 3.3 pour un composant d'interface. Sur l'en-tête, les onglets et le lien
+d'évitement, il est blanc, `#FFFFFF`: 16,71:1 sur `#1C1E21`, là où la sarcelle ne donnerait que 2,25:1
+(`documentation/stylesheets/extra.css:49-65`). Le contour d'un bloc de code, `#DADCD6` sur blanc, est un décor: il ne porte aucune
 information.
 
 ## La vérification selon la notice d'AcceDe Web

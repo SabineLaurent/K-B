@@ -1,11 +1,10 @@
 /* The colours of the back office of K-B (mockups of 2026-11-09, plate « Charte graphique »; issue 649), given to the
-   variables of Material 9.8.1. The ratio of each text on its background is in documentation/accessibilite_pour_docu.md,
-   « Les contrastes du thème ». */
+   variables of Material 9.8.1. They hold while theme.palette is unset in mkdocs.yml: a palette would put its own
+   colours on the body, over these. The ratio of each text on its background is in
+   documentation/accessibilite_pour_docu.md, « Les contrastes du thème ». */
 :root {
   /* The header and the bar of tabs: white on ink. */
   --md-primary-fg-color: #1C1E21;
-  --md-primary-fg-color--light: #4A4F57;
-  --md-primary-fg-color--dark: #1C1E21;
   --md-primary-bg-color: #FFFFFF;
   /* The placeholder of the search field, in the header: the colour of « ← Front office » in the mockup. */
   --md-primary-bg-color--light: #CFE3E6;
@@ -13,18 +12,22 @@
   --md-default-fg-color: #1C1E21;
   --md-default-fg-color--light: #4A4F57;
   --md-default-bg-color: #F4F5F2;
-  /* A link in teal; under the pointer or the focus, the deep teal of the front. */
+  /* A link in teal; the accent, which draws the focus ring and the colour of a link of the menu under the pointer,
+     in the same teal, the colour of the focus in the charter. */
   --md-typeset-a-color: #0F5E6B;
-  --md-accent-fg-color: #0A434C;
+  --md-accent-fg-color: #0F5E6B;
   --md-accent-fg-color--transparent: #0A434C1A;
   /* The code on white, as a card of the mockups. */
   --md-code-bg-color: #FFFFFF;
   /* The footer white, as in the mockup. */
   --md-footer-bg-color: #FFFFFF;
   --md-footer-bg-color--dark: #FFFFFF;
-  --md-footer-fg-color: #1C1E21;
-  --md-footer-fg-color--light: #4A4F57;
-  --md-footer-fg-color--lighter: #4A4F57;
+}
+
+/* A link of a sheet under the pointer or the focus: the deep teal of the front, darker than the link. */
+.md-typeset a:focus,
+.md-typeset a:hover {
+  color: #0A434C;
 }
 
 /* The tabs as the navigation of the back office: each part in white, where Material dims it to 0.7; the current one
@@ -43,11 +46,22 @@
   text-underline-offset: 0.25em;
 }
 
-/* On the ink of the header and of the tabs, the focus is outlined in white: the deep teal of the accent would give
-   1.53:1 there. */
+/* On the ink of the header, of the tabs and of the skip link, the focus is outlined in white: the teal of the focus
+   would give 2.25:1 there. A tab is as high as its list, which clips what overflows: its ring is drawn inside it,
+   and the space between two tabs moves from the item into the link, so the ring does not touch the text. */
 .md-header__button,
+.md-skip,
 .md-tabs__link {
   outline-color: #FFFFFF;
+}
+
+.md-tabs__item {
+  padding-inline: 0.2rem;
+}
+
+.md-tabs__link {
+  padding-inline: 0.4rem;
+  outline-offset: -0.2rem;
 }
 
 /* A block of code and the footer are edged in stone, as the cards and the footer of the mockup: white on linen grey
