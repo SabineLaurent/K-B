@@ -369,7 +369,8 @@ echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/ass
 reçu sept contrôles, tous verts (`gh pr checks 533 --repo SabineLaurent/K-B`): `audit` (13 s), `tests` (1 min 21 s),
 `lint` (11 s), `types` (15 s), `tests-postgresql` (1 min 1 s), `tests-data` (30 s), dans l'exécution 42617081839 de
 `CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`; `bicep-build` n'y a pas tourné. Depuis #496,
-toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième.
+toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième, et
+`deploy`, sauté, un dixième.
 
 ### Un push témoin
 

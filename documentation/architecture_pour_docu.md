@@ -285,7 +285,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
 3. **De la base aux deux API.** `kb serve-data` lit la base en lecture seule et sert les items et les tendances
     (`database/engine.py:58-87`, `database/reading.py:365`, `:468`, `:576`). Avec `KB_EXCHANGE_BLOB_URL` et
     `AZURE_CLIENT_ID`, posées en ligne, il lit aussi le conteneur `watch` et sert les jumeaux JSON des fiches des
-    tops et des comptes rendus; sans elles, ces routes répondent 503 `watch_unconfigured`
+    tops et des comptes rendus; sans l'une d'elles, ces routes répondent 503 `watch_unconfigured`
     (`commands/serve_data_command.py:47-60`, `data_api/watch_reading.py:1-4`, `infra/main.bicep:261-263`).
     `kb serve-ai` ne lit jamais la base: il demande les items et les tendances à l'API de données, par HTTP
     (`ai_api/connectors/data_api_client.py:266-268`, `:289`, `:308`).
@@ -375,7 +375,7 @@ La liste suivante donne chaque paquet de `src/k_b/`, son rôle, puis ce que les 
 - **`commands/`**, une commande `kb` par module (`<commande>_command.py`), et leur code commun;
     `commands/environment.py` est le seul à lire l'environnement. Les tests lui interdisent d'importer `cli`
     (`tests/architecture/test_layers.py:81`) et d'atteindre une étape de l'ETL autrement que par `etl/pipeline.py`
-    (`:172`). Hors de `commands/environment.py`, seul `etl/sources/github/api.py` lit l'environnement, toléré pour
+    (`tests/architecture/test_layers.py:172`). Hors de `commands/environment.py`, seul `etl/sources/github/api.py` lit l'environnement, toléré pour
     l'instant (`tests/architecture/test_environment.py:23`, `:162`).
 - **`etl/`**, la collecte (`extract.py`) et l'import (`transform.py`, puis `load.py`); `pipeline.py` est la seule
     porte des deux parcours pour `commands/`; une source par module, dans `etl/sources/`. Les tests lui interdisent
@@ -416,7 +416,7 @@ La liste suivante donne chaque paquet de `src/k_b/`, son rôle, puis ce que les 
 
 Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
 (`tests/architecture/test_packages.py:14`) et ceux d'`etl/` (`:20`); un autre veut chaque `__init__.py` vide
-(`:33`). Un module de source a la même forme partout, un bloc EXTRACT puis un bloc TRANSFORM
+(`tests/architecture/test_packages.py:33`). Un module de source a la même forme partout, un bloc EXTRACT puis un bloc TRANSFORM
 (`tests/architecture/test_source_modules.py:67`).
 
 ## La collecte
@@ -468,11 +468,15 @@ Le tableau suivant compare les deux API, propriété par propriété.
 |---|---|---|
 | Commande | `kb serve-data` | `kb serve-ai` |
 | Adresse par défaut, sur le Mac | `127.0.0.1:8000` (`core/config.py:214-215`) | `127.0.0.1:8001` (`core/config.py:307-308`) |
-| Routes | `GET /items` (`data_api/routers/item_router.py:101`), `GET /items/{item_id}` (`:148`), `GET /trends` (`data_api/routers/trend_router.py:23`); pour le seul client `WEB` (`core/config.py:376-381`), `GET /tops/{top}` et `GET /tops/{top}/days` (`data_api/routers/top_router.py:40`, `:63`), `GET /digests/{subject}` et `GET /digests/{subject}/days` (`data_api/routers/watch_digest_router.py:34`, `:47`) | `POST /digests` (`ai_api/routers/digest_router.py:70`), `POST /trend-reports` (`ai_api/routers/trend_report_router.py:61`) |
+| Routes | `GET /items` (`data_api/routers/item_router.py:101`), `GET /items/{item_id}` (`:148`), `GET /trends` (`data_api/routers/trend_router.py:23`), et quatre routes du seul client `WEB`, que la phrase qui suit le tableau nomme | `POST /digests` (`ai_api/routers/digest_router.py:70`), `POST /trend-reports` (`ai_api/routers/trend_report_router.py:61`) |
 | Sans clé | `GET /health` (`data_api/app.py:82`) | `GET /health` (`ai_api/app.py:100`) |
 | Clients | chacun sa clé, `KB_DATA_API_KEY_<CLIENT>` (`core/api_keys.py:12`); l'API IA est le client `AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`), le site le client `WEB` (`core/config.py:375`) | `kb digest`, client `KB_DIGEST`, pour `POST /digests`; `kb trend-report`, client `KB_TREND_REPORT`, pour `POST /trend-reports` (`core/config.py:346-351`) |
 | Lit | la base, en lecture seule (`database/engine.py:58-87`); en ligne, le conteneur `watch`, pour les routes du client `WEB` (`data_api/watch_reading.py:1-4`) | l'API de données, le modèle, l'API GitHub |
 | Contrat | [le contrat OpenAPI de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json) | [le contrat OpenAPI de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-ia.json) |
+
+Les quatre routes de l'API de données réservées au client `WEB` (`core/config.py:376-381`) sont `GET /tops/{top}` et
+`GET /tops/{top}/days` (`data_api/routers/top_router.py:40`, `:63`), `GET /digests/{subject}` et
+`GET /digests/{subject}/days` (`data_api/routers/watch_digest_router.py:34`, `:47`).
 
 Les deux API n'écrivent rien de durable, hors du journal de fonctionnement que tient leur commande
 (`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:28`, `:30`): l'API de données ne peut pas
@@ -550,7 +554,9 @@ quand `exposeWeb` l'ouvre (`infra/main.bicep:347`;
 Le schéma suivant dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait en pointillés est
 prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des appels
 sans donnée de la veille: les deux `GET /health`, par lesquels le job de vérification teste les deux API, et « met à
-jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Sur une app ou un job, le nœud porte
+jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Le réveil des deux API par `caj-kb-digest-watch`, un
+`GET /health` à chacune avant `kb digest` puis avant `kb trend-report` (`commands/digest_watch_command.py:43-48`,
+`:61`, `:67`), reste hors du dessin. Sur une app ou un job, le nœud porte
 son identité managée; sur une flèche, le rôle qui la permet. La liste qui suit le schéma le décrit flèche par flèche,
 puis une seconde liste donne le détail de chaque partie, avec ses renvois au code.
 
@@ -632,9 +638,11 @@ Les flèches du schéma, une à une:
     à la passe qui pose `exposeWeb`.
 - De `ca-kb-ai-api` à Grafana Cloud (« OTLP »): déployé.
 - De l'API GitHub à `ca-kb-ai-api` (« fiches et README »): déployé.
-- Entre `ca-kb-ai-api` et le modèle de langage (« chat/completions »), dans les deux sens: déployé. Le Bicep règle
-    l'effort de raisonnement de `gpt-6.1-sol`; l'adresse et le nom du déploiement viennent de la seconde passe, et,
-    jusqu'au passage de la production à `gpt-6.1-sol`, l'API IA en ligne appelle `gpt-6-luna`.
+- Entre `ca-kb-ai-api` et le modèle de langage (« chat/completions »), dans les deux sens: déployé. Le Bicep de
+    `main` règle l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:301-304`); l'adresse et le nom du
+    déploiement viennent de la seconde passe. L'état en ligne n'est pas relu ici: selon
+    [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6-luna` jusqu'au passage de
+    la production à `gpt-6.1-sol`.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
     API (« GET /health »): déployé.
 - Du Mac à la lecture choisie (« make upload-library », en pointillés): prévu (#542).
@@ -692,8 +700,8 @@ Le détail de chaque partie:
     (`infra/modules/budget.bicep:1`, `:27-58`).
 - **Hors du Bicep**: le modèle `gpt-6.1-sol` est déployé à la main dans Microsoft Foundry (anciennement Azure AI
     Foundry), en France Central, en zone de données de l'Union européenne; `gpt-6-luna`, le modèle d'avant, y reste
-    déployé, et l'API IA en ligne l'appelle jusqu'au passage de la production à `gpt-6.1-sol`
-    ([la fiche du service d'IA](service_ia_pour_docu.md)). Les mesures et les traces vont à Grafana Cloud, pile
+    déployé, et l'API IA en ligne l'appelle jusqu'au passage de la production à `gpt-6.1-sol`, selon
+    [la fiche du service d'IA](service_ia_pour_docu.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
     `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
     paramètres, les secrets et l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:22-29`, `:301-304`).
 - **Prévu**: l'envoi depuis le Mac viendra avec #542 (la relecture de `watch` est codée par #424), la copie de

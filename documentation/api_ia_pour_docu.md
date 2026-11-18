@@ -118,7 +118,7 @@ cités, `items_removed_by_checks` (`ai_api/stages/checking.py:63-119`).
 4. Elle lit sur GitHub la fiche de chaque candidat (`:181`). Le modèle en choisit 5 au plus (`:192`,
     `core/config.py:478`).
 5. Elle lit le README des seuls dépôts choisis, puis le modèle rédige quatre textes par dépôt, un appel par dépôt
-    (`ai_api/trend_reports.py:205-206`). Le code retire un texte, et le nomme dans `texts_removed`, s'il sort de
+    (`ai_api/trend_reports.py:204-206`). Le code retire un texte, et le nomme dans `texts_removed`, s'il sort de
     ses bornes, s'il n'a pas de source, si l'un de ses faits ne se retrouve pas à la fois dans le texte et dans la
     source de ce texte, s'il contient un identifiant CVE ou GHSA, s'il porte un nombre qui n'est pas un fait
     déclaré, ou s'il se déguise (`ai_api/stages/trend_writing.py:468-523`, `:539-547`).
@@ -380,9 +380,11 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
     besoin.
 - **Sur le Mac, la clé passe en clair**, en HTTP sur `127.0.0.1`: la machine seule l'écoute. En ligne, le
     transport est en HTTPS.
-- **En ligne, les comptes rendus ne sont demandés qu'à l'horaire de `caj-kb-digest-watch`, sans nouvelle
-    tentative.** Le job part le lundi et le jeudi à 10:00 UTC par défaut (`infra/main.bicep:31-32`), et n'a pas de
-    nouvelle tentative: un passage qui échoue n'est pas relancé par Container Apps
+- **En ligne, les comptes rendus ne sont demandés qu'à l'horaire de `caj-kb-digest-watch` ou par un lancement du
+    job à la main, sans nouvelle tentative.** Le job part le lundi et le jeudi à 10:00 UTC par défaut
+    (`infra/main.bicep:31-32`); un lancement à la main suit les règles du
+    [README de l'infrastructure](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « La règle des
+    heures ». Le job n'a pas de nouvelle tentative: un passage qui échoue n'est pas relancé par Container Apps
     (`infra/modules/digest-watch-job.bicep:72-74`).
 
 ## Vérifier cette fiche

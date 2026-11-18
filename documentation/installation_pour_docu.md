@@ -154,7 +154,7 @@ les variables des commandes qu'ils enchaînent; avec `--dry-run`, ils ne lisent 
     `production`). Seul `sandbox` sert `/docs` et `/openapi.json` (`read_openapi_url`, `core/api_settings.py`).
 - **`KB_AI_API_URL`**: lue par `kb digest`, `kb trend-report`, `kb smoke-test` et `kb digest-watch`. Facultative.
 - **`KB_EXCHANGE_BLOB_URL`, `AZURE_CLIENT_ID`**: lues par `kb smoke-test`, `kb daily-routine` et `kb digest-watch`,
-    pour qui elles sont obligatoires, et par `kb serve-data`, pour qui elles sont facultatives: sans elles, ses routes
+    pour qui elles sont obligatoires, et par `kb serve-data`, pour qui elles sont facultatives: sans l'une d'elles, ses routes
     des tops et des comptes rendus répondent 503 `watch_unconfigured` (`read_watch_settings_or_refusal`,
     `data_api/settings.py`). `kb download-watch-sheets` ne lit que `KB_EXCHANGE_BLOB_URL`, obligatoire: sur le Mac,
     il agit par le compte d'`az login`. `AZURE_CLIENT_ID` est lue aussi avec `KB_DATABASE_AUTH=entra`.
@@ -184,7 +184,7 @@ Le tableau suivant donne chaque dépendance, son plancher et sa borne haute dans
 | `google-cloud-bigquery` | 3.46 | < 4 | 3.46.1 | la requête de GH Archive sur BigQuery (`etl/sources/gh_archive.py`) |
 | `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), le site vers l'API de données (`web/data_api_client.py`), les `/health` des jobs (`jobs/api_health.py`) |
 | `jinja2` | 3.1.6 | — | 3.1.6 | les gabarits des pages du site, rendus par le serveur, chaque valeur échappée (`autoescape=True`, `web/rendering.py`) |
-| `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | < 1.46 | 1.45.2 | l'export des mesures, des traces et des journaux de l'API IA par OTLP, le protocole d'export d'OpenTelemetry (`ai_api/connectors/metrics_export.py`, `ai_api/connectors/trace_export.py`, `ai_api/tracing.py`, `ai_api/observability/metric_instruments.py`). La borne: `trace_export.py` importe des modules privés du SDK et de son exportateur, qui changent d'une version à l'autre |
+| `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | < 1.46 | 1.45.2 | l'export des mesures, des traces et des journaux de l'API IA par OTLP, le protocole d'export d'OpenTelemetry (`ai_api/connectors/metrics_export.py`, `ai_api/connectors/trace_export.py`, `ai_api/tracing.py`, `ai_api/observability/metric_instruments.py`). La borne: `trace_export.py` importe des modules privés du SDK (le kit de développement, <span lang="en">software development kit</span>) et de son exportateur, qui changent d'une version à l'autre |
 | `psycopg[binary]` | 3.3.8 | — | 3.3.8, avec `psycopg-binary` 3.3.8 | la connexion à PostgreSQL (`database/postgresql.py`, `database/errors.py`). L'option `binary` apporte libpq: la machine n'a pas à l'installer (documentation de psycopg, <span lang="en">« Installation »</span>, lue par Context7 le 2026-11-08) |
 | `psycopg-pool` | 3.3.3 | — | 3.3.3 | le pool des connexions de lecture de l'API de données sur PostgreSQL (`database/postgresql.py`) |
 | `pydantic` | 2.13.5 | — | 2.13.5 | la validation des entrées: les items des sources (`items.py`, `etl/sources/`), les schémas et les réglages des API (`data_api/`, `ai_api/`), les réponses que lisent `kb digest` et `kb trend-report` (`post/`) |

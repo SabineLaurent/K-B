@@ -229,7 +229,7 @@ az role assignment list --assignee "$(az ad signed-in-user show --query id -o ts
 - **Le 2026-11-17, sur `gpt-6.1-sol`**, par `kb serve-ai` sur le Mac, au commit `f1eac19c`, avec
     `KB_LLM_REASONING_EFFORT=low` et l'export des mesures vers Grafana Cloud dans le bac à sable
     (`KB_DEPLOYMENT_ENVIRONMENT=sandbox`), sans écrire de fiche dans le coffre. Sa ligne de démarrage dit
-    « `LLM provider openai_compatible, model gpt-6.1-sol` » et « `LLM reasoning effort low, prompt_cache_options sent` ».
+    `LLM provider openai_compatible, model gpt-6.1-sol` et `LLM reasoning effort low, prompt_cache_options sent`.
     - Une demande de comptes rendus de veille (`POST /digests`) sur 14 jours, 300 items (le plafond): 200 en 200,0 s,
         l'échéance de la demande. 4 fiches sur 9; les 5 autres sujets en `llm_timeout`, un appel coupé par l'échéance,
         puis quatre jamais appelés. 12 requêtes au modèle, chacune en une tentative: 11 `ok` (`finish_reason: stop`),
@@ -406,7 +406,7 @@ registre (« Envoi des mesures à Grafana Cloud »).
     (`ai_api/connectors/metrics_export.py:186-187`).
 - **Dans le bac à sable**, aucun fichier du dépôt ne le pose (`.env.example:173-178`, `.env.e2e_test.example`), et
     `make sandbox-alerts` tourne sur le rejeu, sans le modèle et sans traces (`tests/e2e/test_sandbox_alerts.py`).
-    L'essai du 2026-11-17 l'a gardé à `none` (« `model content none` » au démarrage).
+    L'essai du 2026-11-17 l'a gardé à `none` (`model content none` au démarrage).
 - **À la main**, `KB_TRACE_CONTENT=all` peut être posé pour un essai hors production. Le contenu des appels part
     alors dans Grafana Cloud, qui le garde 14 jours (registre, « Envoi des mesures à Grafana Cloud », « Durée de
     conservation »). Un essai l'a posé le 2026-10-28, avec 10 requêtes à `gpt-6-luna` (note du contenu des appels,

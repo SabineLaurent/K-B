@@ -150,12 +150,12 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
     en dit. Parade: un essai avec VoiceOver par Sabine sur une fiche de chaque lot, le site construit.
-- **Lue sur GitHub, une citation en ligne n'a pas les guillemets du site.** Le rendu de GitHub garde le `q` (vérifié
-    le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le navigateur y
-    dessine les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS `quotes`, valeur `auto`). Ce
-    rendu n'a pas été vu. Le format de remise est le site.
+- **Lue sur GitHub, une citation en ligne ne reçoit pas la feuille de style du site.** Le rendu de GitHub garde le
+    `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
+    navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
+    `quotes`, valeur `auto`). Ce rendu n'a pas été vu. Le format de remise est le site.
 - **La fiche du monitorage n'est pas encore mise en forme.** Elle garde, le 2026-11-18, des listes en retrait de deux
-    ou trois espaces, quatre renvois de position (« plus haut », « ci-dessus »), et ses citations entre guillemets,
+    ou trois espaces, trois renvois de position (deux « ci-dessus », un « plus bas »), et ses citations entre guillemets,
     sans `q`. Elle est mise en forme après les PR de #620 et #621, qui la changent.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
