@@ -15,7 +15,7 @@ l'application » (#165).
 
 ## Ce que le monitorage suit
 
-L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 15 instruments OpenTelemetry, dans
+L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 17 instruments OpenTelemetry, dans
 `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 20 noms de séries, relevés dans
 Explore le 2026-11-08, par exemple `k_b_llm_calls_total` (les appels), `k_b_llm_cost_total` (le coût estimé),
 `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total` (la fidélité). Chaque série porte son
