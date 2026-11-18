@@ -179,14 +179,14 @@
 }
 
 /* The button of the mode is the visible label of a radio. Material outlines the label next to the focused radio,
-   which is hidden in the dark mode at the first load: the ring goes on the label shown. */
+   which is hidden at each page load in the dark mode: the ring goes on the label shown. */
 .md-header__option:has(.md-option.focus-visible) > label:not([hidden]) {
   outline-style: auto;
   outline-color: #FFFFFF;
 }
 
-/* The rule beside the table of contents of the open page, its second sign: the ink of the header would give 1.11:1
-   on the page in the dark mode. */
+/* The rule beside the table of contents of the open page, its second sign: the colour of the header would give
+   1.11:1 on the page in the dark mode. */
 [dir] .md-nav--integrated > .md-nav__list > .md-nav__item--active .md-nav--secondary {
   border-inline-start-color: var(--md-default-fg-color--light);
 }

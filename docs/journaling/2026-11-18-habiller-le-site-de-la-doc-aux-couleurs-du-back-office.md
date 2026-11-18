@@ -61,7 +61,8 @@ d'écrire chaque couleur une seule fois (`documentation/stylesheets/extra.css:42
 Le bloc est sous `@supports (color: light-dark(#000000, #FFFFFF))` (`:11`). Un navigateur sans `light-dark()` jugerait
 ces couleurs invalides : le texte blanc de l'en-tête resterait sans fond. Il saute donc le bloc et garde les couleurs
 de Material ; les règles de K-B hors du bloc ont des valeurs de repli, celles du thème. La charte n'a pas de mode sombre : il prend ses couleurs là où elles existent (encre, lin, pierre,
-« canard givré » pour les liens, sarcelle foncée), et en ajoute trois, nommées « hors charte » dans la déclaration.
+« canard givré » pour les liens, sarcelle foncée), et en ajoute deux sortes, nommées « hors charte » dans la déclaration : `#121416` et les couleurs du code coloré
+sombre de Material.
 
 ### Le menu plus large
 
@@ -126,7 +127,7 @@ Le voile sombre passe à 8 % : 4,89:1. La plus basse paire du site est à 4,85:1
 2. **Et un vieux navigateur ?** Il saute le bloc `@supports` et garde les couleurs par défaut de Material, lisibles,
    plutôt qu'un en-tête blanc sur blanc.
 3. **Pourquoi des couleurs « hors charte » ?** La charte n'a pas de mode sombre. Le mode sombre prend ses couleurs là où
-   elles existent, et nomme les trois autres dans la déclaration.
+   elles existent, et nomme les autres dans la déclaration.
 4. **L'encadré casse-t-il la citation ?** Non : chaque rappel reste un `blockquote` suivi de sa source, dans l'encadré.
 5. **Un lecteur d'écran sait-il quel onglet est ouvert ?** Non : Material ne pose pas `aria-current`. C'est écrit dans
    les « Limites ».
@@ -142,6 +143,6 @@ Le voile sombre passe à 8 % : 4,89:1. La plus basse paire du site est à 4,85:1
 
 - `aria-current` sur l'onglet et la page ouverts : il faudrait surcharger d'autres gabarits du thème.
 - Le bouton du menu d'un écran étroit, atteint au clavier : #651.
-- Un vrai bouton pour le mode, nommé par son action et sensible à Espace : #653.
+- Un vrai bouton pour le mode, nommé par son action, qu'Entrée et Espace changent de la même façon : #653.
 - La fiche de la conduite du projet (#512) deviendra la partie 5 du menu, et la fiche des maquettes entrera dans
   « 1. Démarrer ».

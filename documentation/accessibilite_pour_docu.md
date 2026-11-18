@@ -20,9 +20,9 @@ champ de recherche (`mkdocs.yml:3-27`, `:69-70`). Sur un écran large, de 76,25e
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
 seul menu, à gauche, donne la page d'accueil, puis les quatre parties numérotées de la documentation et leurs fiches.
 La table des matières de la page ouverte est sous son lien (`mkdocs.yml:40-46`). Sur un écran plus étroit, le bouton
-de menu de l'en-tête ouvre ce menu sur la partie ouverte. Sa flèche de retour mène aux parties, puis au premier
-niveau, qui porte aussi les deux liens de la barre. Ce bouton n'est pas atteint au clavier (« Limites »). Le pied de page mène à cette
-fiche, au dépôt et à la licence (`overrides/partials/copyright.html`); cette fiche n'est pas dans le menu
+de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil.
+Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
+n'est pas atteint au clavier (« Limites »). Le pied de page mène à cette fiche, au dépôt et à la licence (`overrides/partials/copyright.html`); cette fiche n'est pas dans le menu
 (`mkdocs.yml:29-31`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
 (`documentation/stylesheets/extra.css:1-62`). Le site a un mode clair et un mode sombre. À la première visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
@@ -240,10 +240,12 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     (mai 2024), le bloc des couleurs de K-B est sauté (`documentation/stylesheets/extra.css:8-11`): le site prend les
     couleurs par défaut du thème, qui ne sont pas mesurées ici. Les règles de K-B hors de ce bloc ont alors des valeurs
     de repli, celles du thème.
-- **Le bouton du mode clair ou sombre est un bouton radio du thème.** En mode sombre, au premier chargement, la touche
-    Tab atteint le radio nommé « Passer au mode sombre », sur une page déjà sombre, et Entrée la passe en clair: un
-    lecteur d'écran annonce l'inverse de ce qui se passe. La touche Espace ne change pas le mode; Entrée et les
-    flèches le changent (relevé le 2026-11-18 dans Chrome sans interface). Un vrai bouton est porté par #653.
+- **Le bouton du mode clair ou sombre est un bouton radio du thème.** À chaque chargement d'une page en mode sombre,
+    la touche Tab atteint le radio nommé « Passer au mode sombre », sur une page déjà sombre: un lecteur d'écran
+    annonce l'inverse de ce qui se passe. Entrée change toujours le mode. Espace et les flèches cochent un radio, dont
+    le nom dit l'inverse du mode qu'il pose. À la première touche sur une page sombre, Espace la passe en clair et les
+    flèches la laissent sombre; ensuite, Espace ne change rien et les flèches changent le mode (relevé le 2026-11-18
+    dans Chrome sans interface). Un vrai bouton est porté par #653.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
     Il vient du thème, hors du texte des fiches.
