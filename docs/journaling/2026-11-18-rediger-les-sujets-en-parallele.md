@@ -42,7 +42,7 @@ en deux. La boucle qui reste ne fait que du calcul local (quels items, à partir
     return DigestsResult(
         digests=tuple(w.digest for w in writings if w.digest is not None),
 ```
-(`src/k_b/ai_api/digests.py:111-115`)
+(`src/k_b/ai_api/digests.py:113-117`)
 
 Chaque rédaction rend un `SubjectWriting` (fiche ou échec, son appel au modèle, ses comptes d'items). Le résultat
 final est assemblé **après**, dans l'ordre de la liste : une rédaction n'écrit dans aucune liste partagée, donc
@@ -57,7 +57,7 @@ deux fils ne se marchent jamais dessus.
                 contextvars.copy_context().run,
                 write_one_subject,
 ```
-(`src/k_b/ai_api/digests.py:173-177`)
+(`src/k_b/ai_api/digests.py:175-179`)
 
 `ThreadPoolExecutor`, de la bibliothèque standard, lance chaque rédaction dans un fil. Des fils suffisent : un appel
 au modèle passe son temps à **attendre** le réseau, et Python relâche le verrou global (GIL) pendant cette attente.
@@ -66,7 +66,7 @@ Les 9 requêtes HTTP sont donc vraiment en vol en même temps.
 ```python
         return [future.result() for future in futures]
 ```
-(`src/k_b/ai_api/digests.py:188`)
+(`src/k_b/ai_api/digests.py:190`)
 
 Les résultats sont lus **dans l'ordre de soumission**, pas dans l'ordre d'arrivée : la fiche de `vulnerabilities`
 reste la première même si elle finit la dernière. `future.result()` relève aussi l'exception d'un fil : un défaut
@@ -95,12 +95,17 @@ chaque fil ouvre ses propres spans sans toucher au contexte des autres.
         # In series, stopped by a fault: the answers of the replay follow the order of the
         # requests (connectors/llm_replay.py).
 ```
-(`src/k_b/ai_api/digests.py:158-160`)
+(`src/k_b/ai_api/digests.py:160-162`)
 
 Le fournisseur `replay` rejoue des réponses enregistrées **dans l'ordre des requêtes** : la 2e requête reçoit la 2e
 réponse. En parallèle, l'ordre d'arrivée des requêtes dépend de l'ordonnanceur, et `agent_frameworks` pourrait
 recevoir la fiche de `vulnerabilities`. En série, le jeu de référence de #479 et les tests existants restent
 valables sans changement.
+
+L'**enregistrement** de ce jeu, lui, parle à un vrai fournisseur, donc en parallèle : les réponses arrivent dans
+n'importe quel ordre. L'enregistreur garde chaque appel avec son sujet, lu dans le message utilisateur
+(`read_subject`), et rend les appels dans l'ordre où le replay les enverra : le classement, puis chaque sujet dans
+l'ordre de la liste (`order_as_replayed`, `tests/ai_api/digests_reference.py:283`). Constat C1 de la revue.
 
 La série a un second effet, voulu : si une rédaction lève une exception, la boucle s'arrête et les sujets suivants ne
 partent pas, comme avant. Avec un pool, même d'un seul fil, les tâches déjà soumises auraient continué.
@@ -111,12 +116,12 @@ partent pas, comme avant. Avec un pool, même d'un seul fil, les tâches déjà 
     if digest is None and llm_call.saw_rate_limit:
         rate_limited.set()
 ```
-(`src/k_b/ai_api/digests.py:234-235`)
+(`src/k_b/ai_api/digests.py:236-237`)
 
 La règle de #205 : après un 429 (débit dépassé) qu'une rédaction n'a pas surmonté, plus aucun sujet n'est envoyé,
 pour ne pas envoyer des items vers une réponse refusée (minimisation, RGPD art. 5.1.c). En série, un booléen
 suffisait. Ici, un `threading.Event`, sûr entre fils, le remplace : un fil le pose, et chaque rédaction le lit avant
-d'envoyer (`find_skipped_state(rate_limited.is_set(), deadline)`, `:207`).
+d'envoyer (`find_skipped_state(rate_limited.is_set(), deadline)`, `:209`).
 
 Mais en parallèle, les 9 sujets partent **en même temps**, avant qu'un 429 puisse revenir. La règle ne vaut donc
 plus que pour un sujet pas encore parti, c'est-à-dire aucun en pratique (sauf en série, pour le replay). Sabine l'a
@@ -156,12 +161,13 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `test_the_subjects_of_a_provider_are_written_all_at_once` (`tests/ai_api/test_digests.py:1407`) | Chaque rédaction attend à une `threading.Barrier` de 3 que les trois soient en vol. En série, la première attendrait seule : `BrokenBarrierError` au bout de 5 s (échec observé avant le code, le 18/11 à 03:10Z) |
-| `test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in` (`:1424`) | Le premier sujet répond le dernier ; les fiches et les appels (`stage_calls`) restent dans l'ordre de la liste |
-| `test_a_subject_written_in_its_thread_keeps_its_span_under_the_request` (`:1457`) | Chaque `write_subject` a pour parent le span de la demande, et chaque `chat` de rédaction a pour parent son `write_subject` : la copie du contexte fonctionne |
-| `test_a_fault_in_a_thread_is_raised` (`:1485`) | Une exception dans un fil remonte à l'appelant, elle n'est pas perdue |
+| `test_the_subjects_of_a_provider_are_written_all_at_once` (`tests/ai_api/test_digests.py:1405`) | Chaque rédaction attend à une `threading.Barrier` de 3 que les trois soient en vol. En série, la première attendrait seule : `BrokenBarrierError` au bout de 5 s (échec observé avant le code, le 18/11 à 03:10Z) |
+| `test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in` (`:1422`) | Le premier sujet répond le dernier ; les fiches et les appels (`stage_calls`) restent dans l'ordre de la liste |
+| `test_a_subject_written_in_its_thread_keeps_its_span_under_the_request` (`:1455`) | Chaque `write_subject` a pour parent le span de la demande, et chaque `chat` de rédaction a pour parent son `write_subject` : la copie du contexte fonctionne |
+| `test_a_fault_in_a_thread_is_raised` (`:1483`) | Une exception dans un fil remonte à l'appelant, elle n'est pas perdue |
+| `test_the_calls_recorded_in_parallel_are_kept_in_the_order_the_replay_sends_them` (`tests/ai_api/test_digests_reference.py:96`) | Des rédactions enregistrées dans le désordre sont rendues dans l'ordre du replay, les tentatives d'un sujet groupées |
 | Les tests existants de `test_digests.py` et `test_digest_router.py`, inchangés | Le replay en série garde l'ordre, le 429 et l'échéance comme avant |
-| `test_the_read_timeout_covers_the_longest_output_at_the_measured_rate` et `test_the_read_timeout_is_the_deadline_of_a_request` (`tests/ai_api/test_llm_client.py:686`, `:694`) | 8 192 jetons à 20 ms (163,84 s) tiennent dans le délai, et le délai égale les deux échéances ; échecs observés avant le code (`163.84 <= 90`, `90 == 200`) |
+| `test_the_read_timeout_covers_the_longest_output_at_the_measured_rate` et `test_the_read_timeout_is_the_deadline_of_a_request` (`tests/ai_api/test_llm_client.py:686`, `:695`) | 8 192 jetons à 20 ms (163,84 s) tiennent dans le délai, et le délai égale les deux échéances ; échecs observés avant le code (`163.84 <= 90`, `90 == 200`) |
 | `uv run pytest` : 5 626 réussis ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Aucun recul ailleurs |
 | Essai de bout en bout sur gpt-6.1-sol | **À faire**, lancé par Sabine : critère 9 sujets sur 9 avant 200 s ; relevé dans `essai-c8/` |
 
@@ -169,10 +175,10 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 
 1. **Pourquoi des fils, alors que Python a un GIL ?** Le GIL empêche deux fils d'exécuter du code Python en même
    temps, mais il est relâché pendant une attente réseau. Une rédaction est presque entièrement une attente (environ
-   30 s de réponse du modèle, quelques millisecondes de calcul) : les 9 attentes se recouvrent. (`digests.py:173`)
+   30 s de réponse du modèle, quelques millisecondes de calcul) : les 9 attentes se recouvrent. (`digests.py:175`)
 2. **Que se passe-t-il pour les traces dans Grafana ?** Sans la copie du contexte, chaque rédaction serait une trace
    orpheline. `contextvars.copy_context().run` donne à chaque fil le contexte de la demande, et un test le vérifie.
-   (`digests.py:176`, `test_digests.py:1457`)
+   (`digests.py:178`, `test_digests.py:1455`)
 3. **La minimisation RGPD après un 429 tient-elle encore ?** En partie seulement, et c'est écrit : en parallèle, les
    items des 9 sujets partent avant qu'un 429 puisse revenir. Accepté par Sabine, car le quota couvre la demande.
    (`docs/fiches-veille.md`, « Après un 429 » ; journal ADR du 2026-11-18)
@@ -184,6 +190,9 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
    `docs/fiches-veille.md` et l'ADR. (`deadline.py:37`, `config.py:238-253`)
 
 ## Zones non vérifiées
+
+- **L'enregistrement du jeu de référence** : le tri est testé, mais aucun enregistrement réel n'a été lancé (un appel
+  payant, réservé à Sabine).
 
 - **L'essai réel n'est pas encore fait** : les gains (environ 105 s au lieu de 200 s) sont une estimation tirée des
   durées du 17/11. Rien ne dit encore que gpt-6.1-sol répond aussi vite à 9 requêtes simultanées qu'à une seule.
@@ -201,6 +210,9 @@ pour un classement, qui part en premier et fait alors échouer toute la demande 
 - L'essai de bout en bout sur gpt-6.1-sol (lancé par Sabine), puis la revue, la PR et la fusion.
 - Si l'essai ne tient pas l'échéance : classer en parallèle, ou passer en asynchrone. C'est hors de cette mission, à
   proposer à time-knight d'abord.
+- Les limites écrites après la revue (C2, C4, C5) : un appel en cours relance encore après le 429 d'un autre sujet ;
+  des fils refusés ensemble relancent ensemble ; une sortie proche du plafond peut être coupée par l'échéance, faute
+  des 130 s nécessaires. Rien n'est changé dans `llm_client.py`.
 - `MIN_SECONDS_FOR_LLM_REQUEST` (10 s) a été calculé sur la rédaction la plus lente de gpt-6-luna (9,3 s). Avec
   gpt-6.1-sol, une rédaction lancée avec 11 s restantes sera presque toujours coupée. Non traité ici.
 - Après la fusion : le passage de la production à gpt-6.1-sol, par les gestes de Sabine.

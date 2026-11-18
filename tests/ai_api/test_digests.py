@@ -1372,7 +1372,6 @@ class ProviderInParallel(httpx2.MockTransport):
     def __init__(self, wait_for_turn):
         super().__init__(self.answer)
         self.wait_for_turn = wait_for_turn
-        self.answered_subjects = []
 
     def answer(self, request):
         body = json.loads(request.content)
@@ -1380,7 +1379,6 @@ class ProviderInParallel(httpx2.MockTransport):
             return to_response(classified())
         subject = json.loads(messages_of(body, "user")[0])["subject"]["name"]
         self.wait_for_turn(subject)
-        self.answered_subjects.append(subject)
         return to_response(OUTPUT_BY_SUBJECT[subject])
 
 
@@ -1436,11 +1434,11 @@ def test_the_digests_keep_the_order_of_the_list_whatever_order_they_end_in(readi
             if answered == others:
                 others_answered.set()
 
-    transport = ProviderInParallel(answer_the_first_subject_last)
+    # The first subject is answered once the two others are: its wait returns True only then.
+    result = digest_in_parallel(
+        reading, ProviderInParallel(answer_the_first_subject_last)
+    )
 
-    result = digest_in_parallel(reading, transport)
-
-    assert transport.answered_subjects[-1] == "security_alerts"
     assert [digest.subject for digest in result.digests] == [
         "security_alerts",
         "agent_tools",

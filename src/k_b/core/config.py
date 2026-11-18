@@ -567,10 +567,11 @@ BIDI_CONTROLS = frozenset(
 CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
-# the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
-# Container Apps gives a request, with 40 for the last call under way and the answer. Measured by
-# #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
-# calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
+# the model, the batches of the classification one after the other, then the subjects written at
+# once (#630). Under the 240 seconds the HTTP ingress of Azure Container Apps gives a request,
+# with 40 for the last call under way and the answer. Measured on gpt-6.1-sol on 2026-11-17, in
+# series: 7 batches of 6.2 to 14.3 s, writings of 23.4 to 30.7 s, so that 4 subjects of 9 were
+# written. Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # The bound of a trend report request: 1 + 31 GET /trends at most on a service of the same network,
 # then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other, then the
@@ -619,8 +620,9 @@ MAX_AI_API_ANSWER_BYTES = 8_000_000
 WAIT_LOG_INTERVAL_SECONDS = 10
 # The time a request to the model needs at least: none is sent with less left, so that the items
 # are not sent for an answer the deadline would throw away. Above the slowest writing measured by
-# #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
-# started with less time left can still end in llm_timeout.
+# #158 on gpt-6-luna (9.3 s), not above the longest one the output cap allows (about 164 s on
+# gpt-6.1-sol, LLM_CALL_TIMEOUT_SECONDS): a longer writing started with less time left can still
+# end in llm_timeout.
 MIN_SECONDS_FOR_LLM_REQUEST = 10
 
 # The export of the metrics of the AI API in OpenTelemetry (ai_api/connectors/metrics_export.py,

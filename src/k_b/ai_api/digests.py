@@ -1,8 +1,10 @@
 """The digests of a request: the items classified in batches, then the subjects written at once,
 under the deadline; nothing is written nor logged here, each step is a span.
 
-After a writing failed with a 429, nothing more is sent: the items of the next subjects would
-leave for an answer refused (minimisation, GDPR art. 5.1.c)."""
+After a writing failed with a 429, no subject not sent yet is sent: its items would leave for an
+answer refused (minimisation, GDPR art. 5.1.c). In parallel, the subjects leave at once, before
+any 429 is known, and a call under way still makes its own retry (decision of Sabine of
+2026-11-18, #630)."""
 
 import contextvars
 import threading

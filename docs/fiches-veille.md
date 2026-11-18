@@ -2017,7 +2017,10 @@ Sources, lues le 2026-10-27 :
   jeton sur gpt-6-luna, 90 s). **Ce que cela change** : le délai d'un appel ne coupe plus avant
   l'échéance de 200 s, qui devient la seule borne d'un appel (chaque délai est ramené au temps
   restant, `ai_api/deadline.py`) ; un appel bloqué n'est plus relancé, un classement compris, qui
-  part en premier et emporte alors la demande (`llm_timeout`, 504). Une réponse envoyée par
+  part en premier et emporte alors la demande (`llm_timeout`, 504). **Limite** : une rédaction
+  part une fois la lecture et le classement faits, environ 130 s avant l'échéance le 2026-11-17 ;
+  une sortie valide proche du plafond (environ 164 s) y serait coupée en `llm_timeout` par
+  l'échéance, non par le délai de l'appel (constat C5 de la revue de #630). Une réponse envoyée par
   morceaux peut durer plus, car chaque lecture a son propre délai : la borne totale est celle de
   la demande, `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture
   plafonnée »).
@@ -2051,7 +2054,12 @@ Sources, lues le 2026-10-27 :
   Les items de tous les sujets partent donc même quand l'un d'eux recevra un 429. Accepté : les
   9 rédactions tiennent sous le quota (environ 150 000 jetons estimés sur 250 000 par minute,
   section « Lecture plafonnée ») ; borner le nombre de fils coûterait environ 60 s pour peu de
-  protection.
+  protection. **Limites** (constats C2 et C4 de la revue de #630, tranchés par time-knight,
+  délégation de Sabine du 2026-10-15) : un appel en cours fait encore sa propre nouvelle tentative
+  après le 429 d'un autre sujet, et renvoie ses items ; des fils qui reçoivent un 429 au même moment
+  relancent ensemble après la même attente (`LLM_RETRY_WAIT_SECONDS` ou le même `Retry-After`), et
+  peuvent recevoir un 429 de nouveau. Rien de cela dans `llm_client.py` : le quota de gpt-6.1-sol,
+  250 000 jetons par minute, est loin au-dessus d'une demande seule.
 - **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
   dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
   d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502

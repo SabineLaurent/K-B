@@ -684,8 +684,9 @@ MEASURED_MS_PER_OUTPUT_TOKEN = 20
     ],
 )
 def test_the_read_timeout_covers_the_longest_output_at_the_measured_rate(output_cap):
-    """An answer not streamed comes in one block: a valid output near the cap must not end in
-    llm_timeout, which is not retried."""
+    """An answer not streamed comes in one block: the read timeout of a call does not cut a valid
+    output near the cap. The deadline of the request can: a writing starts once the reading and
+    the classification are done, about 130 s before it on 2026-11-17."""
     seconds_at_cap = MEASURED_MS_PER_OUTPUT_TOKEN * output_cap / 1000
 
     assert seconds_at_cap <= LLM_CALL_TIMEOUT_SECONDS

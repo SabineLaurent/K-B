@@ -129,7 +129,7 @@ class ReferenceItem(ReferenceModel):
 
 
 class RecordedCall(ReferenceModel):
-    """A request to the model, in the order sent, and its answer as it came."""
+    """A request to the model, in the order the replay sends it, and its answer as it came."""
 
     stage: DigestStage
     prompt_version: str
@@ -270,6 +270,29 @@ def read_stage(request: httpx2.Request) -> DigestStage:
     return STAGE_BY_SCHEMA_NAME[schema_name]
 
 
+def read_subject(request: httpx2.Request) -> str | None:
+    """The subject of a writing, by its user message; None for a classification."""
+    if read_stage(request) != "write":
+        return None
+    body = json.loads(request.content)
+    user_message = next(m for m in body["messages"] if m["role"] == "user")
+    subject: str = json.loads(user_message["content"])["subject"]["name"]
+    return subject
+
+
+def order_as_replayed[CallT](
+    recorded: Sequence[tuple[str | None, CallT]], subject_names: Sequence[str]
+) -> list[CallT]:
+    """The calls in the order the replay sends them: the classification, then the writings in
+    the order of the list. A provider writes the subjects at once (#630), so they end in any
+    order; the attempts of a subject, made one after the other in its thread, keep theirs."""
+    position = {name: index for index, name in enumerate(subject_names)}
+    in_order = sorted(
+        recorded, key=lambda pair: -1 if pair[0] is None else position[pair[0]]
+    )
+    return [call for _, call in in_order]
+
+
 def read_response_model(body: bytes) -> str | None:
     """The model a completion names, if it is one; None for any other body."""
     try:
@@ -284,12 +307,19 @@ class RecordingTransport(httpx2.BaseTransport):
     it answers; an answer is given back read, without its encoding, so that the client decodes
     it once."""
 
-    def __init__(self, settings: LlmSettings) -> None:
+    def __init__(self, settings: LlmSettings, subject_names: Sequence[str]) -> None:
         # trust_env=False, as open_http_client: no certificate of the environment is read.
         self.provider = httpx2.HTTPTransport(trust_env=False)
         self.settings = settings
-        self.calls: list[RecordedCall] = []
+        self.subject_names = subject_names
+        # Each call with its subject, in the order the answers came: one thread per subject
+        # appends to it, a list.append being atomic.
+        self.recorded: list[tuple[str | None, RecordedCall]] = []
         self.transport_errors = 0
+
+    @property
+    def calls(self) -> list[RecordedCall]:
+        return order_as_replayed(self.recorded, self.subject_names)
 
     def handle_request(self, request: httpx2.Request) -> httpx2.Response:
         try:
@@ -303,22 +333,21 @@ class RecordingTransport(httpx2.BaseTransport):
             raise
         stage = read_stage(request)
         retry_after = response.headers.get("Retry-After")
-        self.calls.append(
-            RecordedCall(
-                stage=stage,
-                prompt_version=PROMPT_VERSION_BY_STAGE[stage],
-                model=self.settings.model,
-                response_model=read_response_model(body),
-                reasoning_effort=self.settings.reasoning_effort,
-                called_at=datetime.now(UTC).replace(microsecond=0),
-                step=ResponseStep(
-                    kind="response",
-                    status=response.status_code,
-                    body=body.decode(),
-                    retry_after=retry_after,
-                ),
-            )
+        call = RecordedCall(
+            stage=stage,
+            prompt_version=PROMPT_VERSION_BY_STAGE[stage],
+            model=self.settings.model,
+            response_model=read_response_model(body),
+            reasoning_effort=self.settings.reasoning_effort,
+            called_at=datetime.now(UTC).replace(microsecond=0),
+            step=ResponseStep(
+                kind="response",
+                status=response.status_code,
+                body=body.decode(),
+                retry_after=retry_after,
+            ),
         )
+        self.recorded.append((read_subject(request), call))
         headers = {"Content-Type": response.headers.get("Content-Type", "")}
         if retry_after is not None:
             headers["Retry-After"] = retry_after
@@ -364,7 +393,7 @@ def record(environ: Mapping[str, str]) -> int:
         ReferenceSubject(name=subject.name, definition=subject.definition)
         for subject in DIGEST_SUBJECTS
     ]
-    transport = RecordingTransport(settings)
+    transport = RecordingTransport(settings, [subject.name for subject in subjects])
     with (
         tempfile.TemporaryDirectory() as data_dir,
         open_data_api(build_reference_base(Path(data_dir))) as data_api,
