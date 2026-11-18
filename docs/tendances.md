@@ -652,7 +652,7 @@ Des pistes, sans décision :
 Hors de ce compte rendu, et ce n'est pas une piste : les **fiches de veille** partent du `until`
 de la fiche précédente de leur sujet depuis #565 ([fiches-veille.md](fiches-veille.md), « Fenêtre »),
 et leur rattrapage rejouera chaque créneau manqué (une requête par créneau, sa fenêtre de 3 ou 4
-jours, fiche datée du créneau), après l'oral blanc du 13/11 (décision de Sabine du 2026-10-26,
+jours, fiche datée du créneau), plus tard (décision de Sabine du 2026-10-26,
 ~10:07Z et ~15:09Z, relayée par time-knight le 30/10 ; redite le 2026-11-11).
 
 ## Sources
