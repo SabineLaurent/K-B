@@ -140,7 +140,7 @@ tourne sur chaque PR vers `main` et quand on le lance à la main (`workflow_disp
   ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:43-49`). Puis
   `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
   11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 26-29). Lancé à la main depuis
-  `main`, il envoie enfin `site/` à GitHub Pages (l. 30-33).
+  `main`, il dépose enfin `site/` en artefact de Pages (l. 30-33), que `deploy` publie.
 - `deploy` (l. 35-49) ne tourne que lancé à la main depuis `main` (l. 37), après `build` (l. 38). Il a les droits
   `pages: write` et `id-token: write` (l. 41-43), dans l'environnement `github-pages` (l. 44-46), et publie le site
   par `actions/deploy-pages` (l. 48-49).
@@ -152,6 +152,12 @@ voir [GitHub Pages](#github-pages).
 
 `Deploy` ne met en ligne qu'un commit dont toutes les exécutions des workflows du dépôt sont finies et vertes, `Image`
 et `Infra` comprises (`deploy.yml:51-67`). Un contrôle non requis à la fusion compte donc à la livraison.
+
+`Docs` compte aussi. Sur un commit de `main`, il ne tourne que lancé à la main (`docs.yml:6-9`), et une telle
+exécution en échec, ou pas encore finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer
+`Docs` jusqu'à ce qu'il passe (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant. `Deploy`
+n'écarte pas `Docs` de son contrôle: c'est un contrôle de sécurité de la livraison (journal ADR, 2026-11-14,
+« Documentation publiée par un site MkDocs sur GitHub Pages »).
 
 ## Déclencher la chaîne
 

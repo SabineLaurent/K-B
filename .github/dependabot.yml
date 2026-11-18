@@ -20,7 +20,7 @@ updates:
     # Digest and patch updates only: a minor update changes the tag itself (3.13-slim-trixie to
     # 3.14-slim-trixie: same suffix, higher version, dependabot-core docker/README.md, "Semver").
     # Python stays at the 3.13 of .python-version; uv in the uv_build range of pyproject.toml. A patch
-    # update of astral-sh/uv changes the version of setup-uv in the 6 jobs of ci.yml too, by hand.
+    # update of astral-sh/uv changes the uv of setup-uv in ci.yml (6 jobs) and docs.yml too, by hand.
     ignore:
       - dependency-name: "python"
         update-types: ["version-update:semver-minor", "version-update:semver-major"]
