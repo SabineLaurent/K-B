@@ -7289,8 +7289,8 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   MkDocs 9.8.1, en mode strict sur chaque PR (`docs.yml`), et publié sur GitHub Pages à la main.** Le format, un site
   publié par MkDocs ou un équivalent sur GitHub Pages, est la décision de Sabine du 2026-11-11 pour le critère du
   « format qui respecte les recommandations d'accessibilité » (tri des relectures « jury » des fiches) ; l'outil, son
-  « go » du 2026-11-12, sur la recommandation de time-knight. Pourquoi MkDocs avec Material : c'est l'outil que la
-  responsable de formation a nommé (rapporté par time-knight) ; Material reçoit ses corrections de sécurité jusqu'au
+  « go » du 2026-11-12, sur la recommandation de time-knight. Pourquoi MkDocs avec Material : c'est l'outil demandé pour le format
+  (rapporté par time-knight) ; Material reçoit ses corrections de sécurité jusqu'au
   2027-05-05, après le rendu et la soutenance ; il borne MkDocs sous la version 2. Options écartées : Zensical 0.1.1,
   successeur de Material par la même équipe, en Beta depuis le 2026-11-10 (il lit `mkdocs.yml` : migration possible
   plus tard) ; Sphinx avec MyST (les schémas Mermaid à reprendre) ; Jekyll (Ruby, une seconde pile). La dépendance

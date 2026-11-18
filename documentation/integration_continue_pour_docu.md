@@ -135,15 +135,15 @@ tourne sur chaque PR vers `main` et quand on le lance à la main (`workflow_disp
 (`docs.yml:6-9`).
 
 - `build` (l. 16-33) récupère le dépôt (l. 19) et installe uv 0.13.6, sans enregistrer le cache (l. 20-23). Il
-  construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 24-25): le groupe `docs` seul, aux
-  versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
-  ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:43-49`). Puis
-  `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
-  11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 26-29). Lancé à la main depuis
-  `main`, il dépose enfin `site/` en artefact de Pages (l. 30-33), que `deploy` publie.
+    construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 24-25): le groupe `docs` seul, aux
+    versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
+    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:43-49`). Puis
+    `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
+    11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 26-29). Lancé à la main depuis
+    `main`, il dépose enfin `site/` en artefact de Pages (l. 30-33), que `deploy` publie.
 - `deploy` (l. 35-49) ne tourne que lancé à la main depuis `main` (l. 37), après `build` (l. 38). Il a les droits
-  `pages: write` et `id-token: write` (l. 41-43), dans l'environnement `github-pages` (l. 44-46), et publie le site
-  par `actions/deploy-pages` (l. 48-49).
+    `pages: write` et `id-token: write` (l. 41-43), dans l'environnement `github-pages` (l. 44-46), et publie le site
+    par `actions/deploy-pages` (l. 48-49).
 
 Sur une PR, `deploy` est donc sauté. GitHub Pages n'est pas activé sur le dépôt le 2026-11-14:
 voir [GitHub Pages](#github-pages).
@@ -221,7 +221,7 @@ un dépôt neuf n'a pas été essayée.
 Dans <span lang="en">Settings → Actions → General</span>:
 
 - Actions activées, toutes les actions permises (`allowed_actions: all`, pour les actions tierces), et le SHA complet
-  exigé pour chaque action (`sha_pinning_required`);
+    exigé pour chaque action (`sha_pinning_required`);
 - jeton par défaut des workflows en lecture seule, sans droit d'approuver une PR.
 
 ```sh
@@ -239,11 +239,11 @@ Dans <span lang="en">Settings → Rules → Rulesets</span>, avec ces règles:
 - cible: la branche par défaut et `refs/heads/main`;
 - interdire la suppression (`deletion`) et le push forcé (`non_fast_forward`);
 - exiger une PR (`pull_request`), fusion par commit de fusion seulement (`allowed_merge_methods: ["merge"]`), aucune
-  approbation requise (`required_approving_review_count: 0`), et le réglage par défaut
-  `require_extra_approval_for_unattributed_changes: true`, sans effet ici: il ajoute une approbation à une PR que
-  Copilot ouvre sans personne attribuée, et rien quand aucune n'est requise;
+    approbation requise (`required_approving_review_count: 0`), et le réglage par défaut
+    `require_extra_approval_for_unattributed_changes: true`, sans effet ici: il ajoute une approbation à une PR que
+    Copilot ouvre sans personne attribuée, et rien quand aucune n'est requise;
 - exiger les contrôles `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`, rendus par GitHub
-  Actions (`integration_id` 15368), sur une branche à jour (`strict_required_status_checks_policy: true`).
+    Actions (`integration_id` 15368), sur une branche à jour (`strict_required_status_checks_policy: true`).
 
 ```sh
 gh api repos/SabineLaurent/K-B/rulesets --jq '.[] | "\(.id) \(.name) \(.target) \(.enforcement)"'
@@ -308,15 +308,15 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 ### Le détail des réglages
 
 - **La version de uv**: les sept `version:` (six dans `ci.yml`, une dans `docs.yml`) et `Dockerfile:7` se changent
-  ensemble, dans la plage `uv_build>=0.13.6,<0.14.0` de `pyproject.toml:31`. La PR de Dependabot ne change que le
-  `Dockerfile`: les `version:` des workflows se changent à la main, dans la même PR.
+    ensemble, dans la plage `uv_build>=0.13.6,<0.14.0` de `pyproject.toml:31`. La PR de Dependabot ne change que le
+    `Dockerfile`: les `version:` des workflows se changent à la main, dans la même PR.
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
-  (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:26-29`). Avant de
-  changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
-  [la section Limites de la fiche de l'accessibilité](accessibilite_pour_docu.md#limites).
+    (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:26-29`). Avant de
+    changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
+    [la section Limites de la fiche de l'accessibilité](accessibilite_pour_docu.md#limites).
 - **Dependabot**: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, `dependabot.yml:8-9` et
-  `:15-16`), sauf une mise à jour de sécurité (l. 9) et `astral-sh/uv`, dont ghcr.io ne donne pas la date, à vérifier
-  à la main avant la fusion (l. 17-19). Pour `python` et `astral-sh/uv`, ni version mineure ni majeure (l. 24-28).
+    `:15-16`), sauf une mise à jour de sécurité (l. 9) et `astral-sh/uv`, dont ghcr.io ne donne pas la date, à vérifier
+    à la main avant la fusion (l. 17-19). Pour `python` et `astral-sh/uv`, ni version mineure ni majeure (l. 24-28).
 
 Une action nouvelle s'écrit par son SHA complet, sa version en commentaire: le dépôt refuse une action non épinglée
 (`sha_pinning_required`).
@@ -339,7 +339,7 @@ de `build` sont écrites en entier après le tableau.
 | `tests-data` | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py` |
 | `image-build` | `docker buildx build --platform linux/amd64 --tag k-b .`, puis `docker run --rm k-b --help` |
 | `bicep-build` | `az bicep install --version v0.48.1`, puis `az bicep build --file infra/main.bicep --stdout > /dev/null`; sans le contrôle du SHA256 (`infra.yml:24`) |
-| `build` de `Docs` | `uv run --only-group docs mkdocs build --strict`, puis le contrôle de l'empreinte de Mermaid (après le tableau) |
+| `build` de `Docs` | `uv run --locked --only-group docs mkdocs build --strict`, puis le contrôle de l'empreinte de Mermaid (après le tableau) |
 
 Pour `audit`, la liste des versions s'écrit hors du dépôt, où git ne l'ignorerait pas:
 
@@ -355,7 +355,7 @@ Pour `image-build`, les autres étapes (`image.yml:22-61`) ne tournent que sur l
 Pour `build` de `Docs`, sur macOS, `shasum -a 256` remplace le `sha256sum` du runner:
 
 ```sh
-uv run --only-group docs mkdocs build --strict
+uv run --locked --only-group docs mkdocs build --strict
 echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js" | shasum -a 256 --check
 ```
 
@@ -419,42 +419,42 @@ Lues le 2026-11-10; le workflow `Docs` et les réglages du dépôt, le 2026-11-1
 source le 2026-11-10 (sources en fin de liste).
 
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
-  (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
-  Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
-  dépôt), mais « <span lang="en">Pull request authors cannot approve their own pull requests</span> »: avec une seule
-  personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
-  Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
+    (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
+    Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
+    dépôt), mais « <span lang="en">Pull request authors cannot approve their own pull requests</span> »: avec une seule
+    personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
+    Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
 - **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `build` de `Docs` ne sont pas dans le
-  ruleset. `tests-data` et `image-build` comptent à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis
-  #496: `infra.yml` n'a plus de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
-  « <span lang="en">Pending</span> » et bloque la fusion.
-  Pour réduire le risque: ajouter ces trois contrôles aux contrôles requis du ruleset (faisable avec nos droits).
+    ruleset. `tests-data` et `image-build` comptent à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis
+    #496: `infra.yml` n'a plus de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
+    « <span lang="en">Pending</span> » et bloque la fusion.
+    Pour réduire le risque: ajouter ces trois contrôles aux contrôles requis du ruleset (faisable avec nos droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
-  services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
-  Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
-  `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
-  tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une
-  vraie requête BigQuery pour `gh_archive`, et des clés de plus dans GitHub. Le dépôt est privé
-  (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend sur l'usage inclus du
-  compte, compté en montant; au-delà, il est payé s'il y a un moyen de paiement, dans la limite des budgets, et
-  bloqué sinon. Public, il serait gratuit, mais coupé après 60 jours sans activité.
+    services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
+    Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
+    `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
+    tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une
+    vraie requête BigQuery pour `gh_archive`, et des clés de plus dans GitHub. Le dépôt est privé
+    (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend sur l'usage inclus du
+    compte, compté en montant; au-delà, il est payé s'il y a un moyen de paiement, dans la limite des budgets, et
+    bloqué sinon. Public, il serait gratuit, mais coupé après 60 jours sans activité.
 - **L'image n'est pas scannée**: `audit` lit les paquets Python de `uv.lock`, pas les paquets du système de l'image
-  de base.
-  Pour réduire le risque: scanner l'image `k-b:ci` dans `image-build`, par exemple par Grype (`anchore/scan-action`,
-  v7.4.2), qui fait échouer le job à partir d'un seuil de sévérité (`severity-cutoff`, `medium` par défaut).
-  Par défaut (`only-fixed: false`), une vulnérabilité sans correctif le fait échouer aussi; `only-fixed: true` ne
-  retient que celles qui en ont un.
-  Faisable avec nos droits: une action publique, épinglée par son SHA, sans secret. En attendant, Dependabot propose
-  chaque semaine le nouveau digest des images de base du `Dockerfile` (`dependabot.yml:10-16`).
+    de base.
+    Pour réduire le risque: scanner l'image `k-b:ci` dans `image-build`, par exemple par Grype (`anchore/scan-action`,
+    v7.4.2), qui fait échouer le job à partir d'un seuil de sévérité (`severity-cutoff`, `medium` par défaut).
+    Par défaut (`only-fixed: false`), une vulnérabilité sans correctif le fait échouer aussi; `only-fixed: true` ne
+    retient que celles qui en ont un.
+    Faisable avec nos droits: une action publique, épinglée par son SHA, sans secret. En attendant, Dependabot propose
+    chaque semaine le nouveau digest des images de base du `Dockerfile` (`dependabot.yml:10-16`).
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml`, `infra.yml` ni `docs.yml`; le
-  délai par défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
-  dépôt est privé.
-  Pour réduire le risque: un `timeout-minutes` par job, à quelques fois sa durée observée (1 min 21 s au plus sur
-  la PR n° 533). Faisable avec nos droits, par un changement des workflows.
+    délai par défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
+    dépôt est privé.
+    Pour réduire le risque: un `timeout-minutes` par job, à quelques fois sa durée observée (1 min 21 s au plus sur
+    la PR n° 533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
-  Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-  lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
-  lancerait aussi la CI sur les autres PR (faisable avec nos droits).
+    Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
+    lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+    lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,
 [« <span lang="en">Approving a pull request with required reviews</span> »](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews),

@@ -7,8 +7,8 @@ fiches de documentation, une par sujet. Chacune dit, sous son titre, la compéte
 
 ## Les fiches
 
-- [L'accessibilité de cette documentation](accessibilite_pour_docu.md): la recommandation suivie, ses règles et ce
-  qui n'est pas vérifié.
+- [L'accessibilité de cette documentation](accessibilite_pour_docu.md): les recommandations suivies, leurs règles et
+    ce qui n'est pas vérifié.
 - [L'installation et l'environnement de développement](installation_pour_docu.md)
 - [L'architecture de l'application](architecture_pour_docu.md)
 - [L'agrégation, l'import et la base](import_et_base_pour_docu.md)
@@ -22,5 +22,5 @@ fiches de documentation, une par sujet. Chacune dit, sous son titre, la compéte
 ## Lire une fiche
 
 Chaque page a sa « Table des matières », et le champ « Rechercher » cherche dans toutes les fiches. Un
-renvoi `fichier:ligne` vise le code du dépôt, au commit que la fiche nomme dans son introduction. Un lien vers un
+renvoi `fichier:ligne` vise le code du dépôt, au commit ou à la date que la fiche nomme dans son introduction. Un lien vers un
 fichier hors de ces fiches mène à sa page sur GitHub, sur la branche `main`.

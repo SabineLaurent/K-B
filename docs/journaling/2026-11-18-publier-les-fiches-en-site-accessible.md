@@ -81,15 +81,16 @@ La fiche de l'intégration continue l'écrit, avec la parade : relancer `Docs`, 
 
 ### La fiche du service d'IA, sur `gpt-6.1-sol`
 
-Les réglages du déploiement viennent des captures du portail du 2026-11-17, que le déploiement réponde vient de
-l'essai de bout en bout du même jour ; les lectures `az` du 2026-11-09 sur la ressource restent, datées. Le schéma
+Les déploiements, la ressource et les rôles de l'opératrice viennent de lectures `az` du 2026-11-18 ; le type du
+déploiement, d'une capture du portail du 2026-11-17 ; que le déploiement réponde, de l'essai de bout en bout du
+même jour. Une lecture du 2026-11-09, dont la ressource n'est pas établie, n'est plus citée. Le schéma
 porte un titre et une description courts pour un lecteur d'écran :
 
 ```text
     accTitle: Qui appelle le service d'IA et ce dont l'appel dépend
 ```
 
-`documentation/service_ia_pour_docu.md:309`. Mermaid les rend en `title` et `desc` du dessin, liés par
+`documentation/service_ia_pour_docu.md:302`. Mermaid les rend en `title` et `desc` du dessin, liés par
 `aria-labelledby` et `aria-describedby` (documentation de Mermaid 11.17.2, lue par Context7 le 2026-11-18).
 
 ## Choix faits et options écartées
@@ -99,6 +100,13 @@ porte un titre et une description courts pour un lecteur d'écran :
 - **Une empreinte** plutôt qu'une version exacte de Mermaid par `extra_javascript` : celle-ci chargerait 3,5 Mo sur
   chaque page, au lieu des seules pages à schéma.
 - **`actions/configure-pages` retiré** : ses sorties ne servent qu'à l'adresse, fixée par `site_url`.
+- **Des listes en retrait de quatre espaces** : Python-Markdown, qui construit les pages, ne rattache à un point de
+  liste que ce qui est en retrait de quatre ; à deux ou trois espaces, les sous-listes s'aplatissaient et une liste
+  numérotée se coupait en listes d'un seul point (constat de la relecture neuve). Écartée : l'extension
+  `mdx_truly_sane_lists`, une dépendance de plus. Les autres fiches sont corrigées dans la PR B.
+- **Des liens soulignés** (`documentation/stylesheets/extra.css:7-10`) : la couleur seule d'un lien donne 2,35:1
+  contre le texte, sous les 3:1 du RGAA 10.6. **Le pied de page du thème retiré** (`mkdocs.yml:51-53`) : il était
+  en anglais, et son lien ouvrait une nouvelle fenêtre.
 - **L'accent du thème à `#303f9f`** (`documentation/stylesheets/extra.css:3-5`) : celui de Material, `#526cfe`, donne
   4,26:1 sur blanc, sous le seuil de 4,5:1 du RGAA 3.2.
 - **`deploy.yml` inchangé** (tranché par time-knight) : en exclure `docs.yml` affaiblirait un contrôle de sécurité de
@@ -143,7 +151,8 @@ porte un titre et une description courts pour un lecteur d'écran :
 - Qu'une relance réussie de `Docs` fasse passer le contrôle de `deploy.yml` : déduit de la requête de
   `deploy.yml:61-62`, non essayé.
 - La publication sur Pages : jamais lancée.
-- Les réglages de `gpt-6.1-sol` et les rôles de l'opératrice, non relus par `az` ; la cause de l'incident TLS (#629).
+- Le type des déploiements et le stockage de la surveillance des abus, non relus par `az` ; la cause de l'incident
+  TLS (#629).
 
 ## Ce qui reste
 

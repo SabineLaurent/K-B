@@ -3,3 +3,8 @@
 :root {
   --md-accent-fg-color: #303f9f;
 }
+
+/* A link of a sheet is underlined: its colour alone gives 2.35:1 against the text, under the 3:1 of RGAA 10.6. */
+.md-typeset a {
+  text-decoration: underline;
+}
