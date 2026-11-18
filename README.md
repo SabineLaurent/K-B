@@ -166,7 +166,7 @@ je fusionne. Les décisions et leur pourquoi sont consignées dans le
 
 Les jalons et leurs issues sont sur la
 [page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons encore ouverts,
-relevés le 14/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
+relevés le 18/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
 
 | Jalon | Échéance | Issues fermées | Issues ouvertes |
 |---|---|---|---|

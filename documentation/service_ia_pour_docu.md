@@ -18,8 +18,9 @@ reçoit. Le programme de K-B qui appelle ce service est l'API IA. Cette API a sa
 
 Le code cité est celui de K-B dans sa version du 2026-11-18. Ce qui est hors du code vient de trois relevés.
 
-- Trois lectures de l'état d'Azure, faites le 2026-11-18 avec `az`, l'outil d'Azure en ligne de commande, en lecture
-    seule. Elles portent sur la ressource, ses déploiements et les rôles de l'opératrice (« Relire l'état »).
+- Quatre lectures de l'état d'Azure, faites le 2026-11-18 avec `az`, l'outil d'Azure en ligne de commande, en lecture
+    seule. Elles portent sur la ressource, ses déploiements, les rôles de l'opératrice et l'app de l'API IA en ligne
+    (« Relire l'état »).
 - Des captures d'écran du portail Foundry, du 2026-11-17. Elles montrent le catalogue des modèles et le formulaire
     de déploiement de `gpt-6.1-sol`, avec son type, sa limite de jetons par minute et sa zone de données.
 - L'essai de bout en bout du 2026-11-17 (« Le test »).
@@ -40,15 +41,17 @@ Ses commandes les écrivent donc `<ressource Foundry>` et `<groupe de ressources
 
 La ressource porte deux déploiements, d'après la lecture du 2026-11-18. Cette lecture ne montre pas leur type, parce
 que `az` ne l'affiche pas dans un tableau. Le type de `gpt-6.1-sol` vient donc de la capture de son déploiement, du
-2026-11-17. La production désigne ici K-B en ligne, sur Azure. Son passage de `gpt-6-luna` à `gpt-6.1-sol` demande
-des réglages posés à la main (« Le branchement de K-B »).
+2026-11-17. La production désigne ici K-B en ligne, sur Azure. Elle est passée de `gpt-6-luna` à `gpt-6.1-sol` le
+2026-11-18, à la seconde passe de l'infrastructure, avec des réglages posés à la main (« Le branchement de K-B »).
+Cette passe a réussi à 11:26 UTC. La lecture de l'app de l'API IA, vers 11:28 UTC, montre sa révision
+`ca-kb-ai-api--0000013`, l'image `k-b:v0.1.6`, le modèle `gpt-6.1-sol` et l'effort `low` (« Relire l'état »).
 
 Le tableau suivant décrit les deux déploiements.
 
 | Déploiement | Version | Type | Capacité | Mise à jour de la version | Filtre de contenu | Qui l'appelle |
 |---|---|---|---|---|---|---|
-| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, sur le Mac depuis le 2026-11-17, et en ligne après le passage de la production |
-| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol` |
+| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, sur le Mac depuis le 2026-11-17, et en ligne depuis le 2026-11-18 |
+| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18; plus personne depuis |
 
 Les sections suivantes expliquent le type, la version figée et le filtre de contenu. Trois points complètent le
 tableau.
@@ -267,15 +270,15 @@ Ces réglages appellent quatre remarques.
     L'essai du 2026-11-17 montre que `gpt-6.1-sol` accepte ce champ, car aucune requête n'y a été refusée. Si la
     variable vaut `false`, `kb serve-ai` refuse de démarrer en production.
 - **La passe 2.** Ses paramètres et le secret sont décrits dans le README de l'infrastructure, aux étapes « 4. Poser
-    les secrets » et « 5. Seconde passe ». Le passage de la production à `gpt-6.1-sol` demande l'effort `low` en
-    ligne, déjà fixé dans le fichier Bicep. Il demande aussi l'adresse (`llmBaseUrl`), le nom (`llmModel`) et la
+    les secrets » et « 5. Seconde passe ». Le passage de la production à `gpt-6.1-sol`, fait le 2026-11-18, demande
+    l'effort `low` en ligne, déjà fixé dans le fichier Bicep. Il demande aussi l'adresse (`llmBaseUrl`), le nom (`llmModel`) et la
     clé (`kb-llm-api-key`) de ce déploiement, posés à la main à la passe 2.
 - **Le nom du modèle.** Le dépôt de code ne fixe pas la valeur de `KB_LLM_MODEL`. Cette valeur vient du `.env` sur
     le Mac, et du paramètre `llmModel` en ligne.
 
 ### Relire l'état
 
-Les trois lectures du 2026-11-18 sont faites en lecture seule, et aucune n'affiche de clé. Dans son format tableau
+Les quatre lectures du 2026-11-18 sont faites en lecture seule, et aucune n'affiche de clé. Dans son format tableau
 (`-o table`), `az` ne montre aucune colonne nommée `type`, ni `id`, ni `etag`. Le type des déploiements n'apparaît
 donc pas dans la sortie de la première lecture. Une portée est l'endroit où un rôle s'applique: un abonnement, un
 groupe ou une ressource. La dernière lecture affiche des portées complètes, avec l'identifiant de l'abonnement et les
@@ -294,6 +297,9 @@ az cognitiveservices account show -g "$RG" -n "$RESOURCE" \
 # Les rôles du compte connecté, et leur portée.
 az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all \
   --query "[].{role:roleDefinitionName, portee:scope}" -o table
+# L'app de l'API IA en ligne: sa révision, son image et ses variables (sortie du 2026-11-18 vers 11:28 UTC:
+# ca-kb-ai-api--0000013, k-b:v0.1.6, KB_LLM_MODEL gpt-6.1-sol, KB_LLM_REASONING_EFFORT low).
+az containerapp show -g "$RG" -n ca-kb-ai-api
 ```
 
 ## Le test
@@ -398,9 +404,9 @@ texte, élément par élément.
 ```mermaid
 flowchart LR
     accTitle: Qui appelle le service d'IA et ce dont l'appel dépend
-    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, sur le Mac, et en ligne après le passage de la production, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
+    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, sur le Mac, et en ligne depuis le 2026-11-18, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
     digest["kb digest<br>kb trend-report"] -->|"POST /digests<br>POST /trend-reports"| ai["API IA<br>kb serve-ai"]
-    ai -->|"chat/completions, clé de la ressource<br>sur le Mac, en ligne après le passage"| model["Foundry<br>déploiement gpt-6.1-sol"]
+    ai -->|"chat/completions, clé de la ressource<br>sur le Mac et en ligne"| model["Foundry<br>déploiement gpt-6.1-sol"]
     ai -->|"OTLP: mesures, traces"| grafana["Grafana Cloud"]
     vault["coffre de secrets<br>kb-llm-api-key"] -.->|"en ligne: la clé,<br>par l'identité managée"| ai
 ```
@@ -412,8 +418,8 @@ flowchart LR
     l'API IA. Le jeu de référence est un ensemble de sorties du modèle, enregistrées pour être rejouées par les tests.
     Le script qui l'enregistre, lancé à la main, passe lui aussi par l'API IA, dans le même processus.
 - **En ligne, le modèle est appelé depuis le 2026-11-11.** L'app `ca-kb-ai-api` est réglée pour joindre le
-    déploiement que nomment ses paramètres `llmBaseUrl` et `llmModel`. Ce déploiement est `gpt-6-luna`, jusqu'au
-    passage à `gpt-6.1-sol` (« Le branchement de K-B »). Un job est un programme qu'Azure lance à heure fixe ou à la
+    déploiement que nomment ses paramètres `llmBaseUrl` et `llmModel`. Ce déploiement est `gpt-6.1-sol` depuis le
+    2026-11-18; avant, c'était `gpt-6-luna` (« Le branchement de K-B »). Un job est un programme qu'Azure lance à heure fixe ou à la
     main, et qui s'arrête une fois son travail fait. Le job `caj-kb-digest-watch` lance `kb digest`, puis
     `kb trend-report`, par défaut le lundi et le jeudi à 10:00 UTC. Lancé à la main le 2026-11-11, ce job a donné les
     premiers points de la production dans Grafana Cloud, vers 16:00 UTC. Lancé par son horaire le 2026-11-12, de
@@ -551,8 +557,8 @@ la section « Envoi des mesures à Grafana Cloud ».
 - **Le coût que l'API IA estime est compté aux prix de `gpt-6.1-sol`**, en contexte court. Le contexte est le texte
     que le modèle reçoit en une demande. Un contexte long peut avoir son propre prix. Tout appel est compté aux
     prix de `gpt-6.1-sol`, quel que soit `KB_LLM_MODEL`. Le prix du contexte long n'est pas distingué.
-- **`gpt-6-luna` reste déployé.** La production l'appelle jusqu'à son passage à `gpt-6.1-sol`. Ensuite, l'API IA ne
-    l'appellera plus, mais la clé le permettra encore.
+- **`gpt-6-luna` reste déployé.** La production ne l'appelle plus depuis son passage à `gpt-6.1-sol`, le
+    2026-11-18. La clé de la ressource permet encore de l'appeler, tant qu'il n'est pas retiré.
 - **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union. La première dit
     <q lang="en">that or any other European Union Member Nation</q> (« <span lang="en">Data, privacy, and
     security</span> »). La seconde parle de la limite des données de l'Union, qui peut compter des pays de l'AELE

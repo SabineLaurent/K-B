@@ -6,7 +6,8 @@
 
 « La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du monitorage de l'application. » — C20
 
-Écrit le 2026-11-08 pour #164. Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
+Écrit le 2026-11-08 pour #164; le compte des noms de séries revu le 2026-11-18 d'après `main` au commit `1bef80f2`
+(#623). Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
 tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq règles d'alerte,
 `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry
 depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
@@ -16,8 +17,8 @@ l'application » (#165).
 ## Ce que le monitorage suit
 
 L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 17 instruments OpenTelemetry, dans
-`src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 20 noms de séries, relevés dans
-Explore le 2026-11-08, par exemple `k_b_llm_calls_total` (les appels), `k_b_llm_cost_total` (le coût estimé),
+`src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 22 noms de séries, relevés dans
+Explore le 2026-11-08 (`tests/test_grafana_files.py:28-51`), par exemple `k_b_llm_calls_total` (les appels), `k_b_llm_cost_total` (le coût estimé),
 `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total` (la fidélité). Chaque série porte son
 environnement, `deployment_environment_name`: `production` pour l'API en ligne, `sandbox` pour le bac à sable. Les trois
 noms de la durée d'une demande, `k_b_request_duration_seconds_*` (#634, 2026-11-18), ne sont pas encore relevés dans

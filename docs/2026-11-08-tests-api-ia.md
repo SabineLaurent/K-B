@@ -9,6 +9,69 @@ Les tests ont été lancés le 2026-11-08, de 11:17:45 à 11:18:34 UTC, sur le M
 `f91bb97`. Chaque `fichier:ligne` vaut pour ce commit. Les chemins `tests/…` partent de la racine du dépôt, les
 autres de `src/k_b/`. La section « Rejouer ce compte rendu » donne les commandes.
 
+## Relance du 2026-11-18
+
+Les commandes locales de ce compte rendu ont été relancées le 2026-11-18, de 17:15:02 à 17:16:05 UTC, sur le Mac,
+sans variable `KB_` ni `OTEL_` dans l'environnement. Le code lancé est celui de `main` au commit `a7d7c309` : la
+branche de la relance n'en diffère que par la documentation (`git diff --stat a7d7c309 -- src tests Makefile
+pyproject.toml uv.lock` est vide). Ces fichiers sont les mêmes au commit `1bef80f2`, où cette section est écrite. Le reste de ce compte rendu, à partir de « Résultat de l'exécution », date du
+2026-11-08 et du commit `f91bb97` : ses `fichier:ligne` valent pour ce commit-là.
+
+| Commande | Ce qu'elle lance | 2026-11-08, `f91bb97` | 2026-11-18, `a7d7c309` |
+|---|---|---|---|
+| `make test` | toute la suite, comme `uv run pytest` | 4061 réussis, 328 écartés | 5628 réussis, 365 écartés, en 36,95 s |
+| `make test-ai-api` (1re commande) | `tests/ai_api` | 1087 réussis | 1154 réussis, en 13,66 s |
+| `make test-ai-api` (2e commande) | les tests du code commun aux deux API | 8 réussis | 8 réussis, en 0,44 s |
+| `uv run pytest` sur la partie `kb` (« Rejouer ce compte rendu ») | `tests/post` sans `test_top_sheets.py`, et quatre fichiers de `tests/commands/` | 455 réussis, 33 écartés | 543 réussis, 48 écartés, en 2,68 s |
+
+Aucun échec, aucun test sauté. Le périmètre compte **1705 tests** (1154 + 8 + 543), tous réussis. Les 365 tests
+écartés par `make test` sont 15 tests `e2e` et 350 tests `postgresql` (`uv run pytest -m e2e --co -q`, puis
+`-m postgresql`).
+
+**Non relancés : les tests `e2e` et `postgresql`.** Les tests `e2e` lisent les clés de `.env.e2e_test` et appellent
+de vrais services, dont Grafana Cloud pour l'export des mesures : la relance se limite aux commandes locales, sans
+clé ni appel réseau. Les tests `postgresql` demandent un serveur PostgreSQL ; aucun des 1705 tests du périmètre ne
+porte ce marqueur. La CI les lance à chaque PR et à chaque fusion : sur `main` au commit `a7d7c309`, le job
+`tests-postgresql` a réussi (`gh run list --branch main --event push --workflow ci.yml --limit 1`).
+
+Le tableau suivant recompte les groupes de la section « Les groupes » sur `a7d7c309`, fichier par fichier, avec la
+commande de comptage de « Rejouer ce compte rendu ».
+
+| Groupe | 2026-11-08 | 2026-11-18 | Fichiers dont le nombre a changé |
+|---|---|---|---|
+| Routes et démarrage | 227 | 243 | `test_digest_router.py` 81 → 92, `test_serve_ai.py` 39 → 43, `test_trend_report_router.py` 87 → 88 |
+| Contrôles | 440 | 453 | `test_fidelity.py` 108 → 115, `test_digests.py` 64 → 70 |
+| Modèle de remplacement | 163 | 201 | `test_llm_settings.py` 28 → 57, `test_llm_client.py` 125 → 130, `test_digests_reference.py` nouveau (4) |
+| Lecture de la veille et de GitHub | 183 | 183 | aucun |
+| Mesures et traces | 82 | 82 | aucun |
+| Chaîne côté `kb` | 452 | 540 | `tests/post/test_digest_sheets.py` 92 → 153, `tests/commands/test_digest_command.py` 25 → 38, `tests/post/test_ai_api_client.py` 59 → 69, `tests/post/test_vault_files.py` 24 → 26, `tests/commands/test_trend_report_command.py` 27 → 28, `tests/post/test_trend_report_sheets.py` 69 → 70 |
+| Bout en bout | 3 | 3 | aucun |
+| **Total** | **1550** | **1705** | |
+
+Les fichiers des trois premiers groupes sont dans `tests/ai_api/`. `test_digests_reference.py` est nouveau : il
+rejoue le jeu de référence des sorties de gpt-6-luna (#479), il est donc compté avec le modèle de remplacement.
+
+Les PR fusionnées qui ont modifié ces fichiers depuis `f91bb97`, du plus ancien au plus récent
+(`git log --first-parent --merges f91bb97..a7d7c309 -- <fichiers>`), sont les suivantes. Le nombre de tests que
+chacune a ajoutés n'est pas compté.
+
+- #516 (#479) : le jeu de référence de sorties réelles de `POST /digests`.
+- #524 (#518) : les faits trouvés dans leur item et dans leur texte, comptés à part.
+- #539 (#295) : une fiche ou un brut écrit une seule fois, même quand deux lancements se chevauchent.
+- #548 (#424) : les fiches de la veille téléchargées dans le coffre du Mac.
+- #574 (#566, #569) : l'en-tête `Server` retiré de `kb serve-data` et de `kb serve-ai`.
+- #582 (#565) : chaque compte rendu d'un sujet commence au `until` de sa fiche précédente.
+- #625 (#560) : les comptes rendus servis au site depuis le jumeau JSON de leur fiche.
+- #628 (#627) : l'API IA appelle les modèles du banc de C7.
+- #636 (#631 à #635) : K-B passe à gpt-6.1-sol (seuils du monitorage, prix, durée d'une demande, effort `low` en
+  production).
+- #645 (#630, #640) : les sujets d'une demande rédigés en parallèle, et le délai de lecture d'un appel réglé sur
+  l'échéance.
+
+Les issues que ce compte rendu cite, relues le 2026-11-18 par `gh issue view` : #210, #370 et #436 sont encore
+ouvertes ; #280 et #462 sont fermées depuis le 2026-11-08, et la PR #472 est fusionnée. Les manques de « Ce que les
+tests ne prouvent pas » restent donc portés par les mêmes issues.
+
 ## Résultat de l'exécution
 
 | Commande | Ce qu'elle lance | Résultat |
