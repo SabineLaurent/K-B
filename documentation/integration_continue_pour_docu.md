@@ -1,8 +1,12 @@
 # L'intégration continue de K-B
 
-« Documentation des procédures d'installation et de test de la chaîne. » — C18
+> Documentation des procédures d'installation et de test de la chaîne.
 
-« Documentation utilisateur, pour le déclenchement de la chaîne. » — C18
+— C18
+
+> Documentation utilisateur, pour le déclenchement de la chaîne.
+
+— C18
 
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
@@ -173,10 +177,10 @@ gh pr create --repo SabineLaurent/K-B --base main
 gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin, puis un contrôle par ligne
 ```
 
-Une PR reçoit neuf contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
-depuis #496, qu'elle touche `infra/` ou non, et `build` de `Docs`. Le job `deploy` de `Docs` est sauté sur une PR
-(`docs.yml:37`). Que GitHub le liste parmi les contrôles, comme sauté, n'est pas vérifié: le 2026-11-14, `Docs` ne
-figure pas encore dans la liste des workflows du dépôt (`gh api repos/SabineLaurent/K-B/actions/workflows`).
+Une PR reçoit dix contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
+depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Neuf tournent; `deploy`
+est sauté sur une PR (`docs.yml:37`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
+à `skipping` et les neuf autres à `pass`.
 
 ### Fusionner
 
@@ -421,7 +425,7 @@ source le 2026-11-10 (sources en fin de liste).
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
     (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
     Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
-    dépôt), mais « <span lang="en">Pull request authors cannot approve their own pull requests</span> »: avec une seule
+    dépôt), mais <q lang="en">Pull request authors cannot approve their own pull requests</q>: avec une seule
     personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
     Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
 - **Trois contrôles ne bloquent pas la fusion**: `tests-data`, `image-build` et `build` de `Docs` ne sont pas dans le

@@ -1,8 +1,9 @@
 # L'accessibilité de la documentation de K-B
 
-« La documentation est communiquée dans un format qui respecte les recommandations d'accessibilité (par exemple
-celles de l'association Valentin Haüy ou de Microsoft). » — C8.5, C9.11, C11.9, C12.7, C13.8, C17.12, C18.7, C19.7,
-C20.7
+> La documentation est communiquée dans un format qui respecte les recommandations d'accessibilité (par exemple
+> celles de l'association Valentin Haüy ou de Microsoft).
+
+— C8.5, C9.11, C11.9, C12.7, C13.8, C17.12, C18.7, C19.7, C20.7
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
@@ -38,18 +39,17 @@ Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-1
     en vigueur le 2026-11-14; le RGAA 5 est annoncé pour la fin de 2026. Ses critères donnent la mesure de chaque règle
     dans les pages construites.
 - **La notice d'accessibilité éditoriale d'AcceDe Web**, publiée par Atalan, dans sa version en ligne (les notices
-    AcceDe Web en version 4.1.2). Elle s'adresse aux « contributrices et contributeurs éditoriaux » d'un outil de
-    publication: ici, l'outil est MkDocs, et ses règles portent sur le texte des fiches. Elle dit d'elle-même: « Cette
-    version en ligne couvre actuellement les WCAG 2.2 et le RGAA 4.1.2 »; sa section 9 dit que ses règles
-    supplémentaires sont « nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1 ». Les fiches mises en forme
+    AcceDe Web en version 4.1.2). Elle s'adresse aux <q>contributrices et contributeurs éditoriaux</q> d'un outil de
+    publication: ici, l'outil est MkDocs, et ses règles portent sur le texte des fiches. Elle dit d'elle-même: <q>Cette
+    version en ligne couvre actuellement les WCAG 2.2 et le RGAA 4.1.2</q>; sa section 9 dit que ses règles
+    supplémentaires sont <q>nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1</q>. Les fiches mises en forme
     sont vérifiées selon elle, règle par règle
     ([La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web)).
 
 ## Les règles appliquées aux fiches
 
 Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue dans les fiches mises en forme
-(`index.md`, cette fiche, le service d'IA et l'intégration continue), et comment elle se vérifie. Les autres fiches
-suivent (« Limites »).
+(toutes, sauf celle du monitorage), et comment elle se vérifie. La fiche du monitorage suit (« Limites »).
 
 | Règle | Source | Comment elle est tenue | Vérifiée par |
 |---|---|---|---|
@@ -62,6 +62,7 @@ suivent (« Limites »).
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:7-10`): sa couleur seule, `#4051b5` contre le texte, ne donne que 2,35:1, sous le seuil de 3:1. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:14-16`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
 | La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:23`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:51-53`). | Le contrôle du HTML construit |
 | Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:33-34`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
@@ -73,7 +74,7 @@ style construite de Material 9.8.1, le 2026-11-14. Le seuil du RGAA 3.2 est de 4
 | Texte | Couleurs | Rapport |
 |---|---|---|
 | Le texte d'une fiche | `#000000de` sur blanc | 16,10:1 |
-| Un texte secondaire du thème | `#0000008a` sur blanc | 4,61:1 |
+| Un texte secondaire du thème, dont un bloc de citation | `#0000008a` sur blanc | 4,61:1 |
 | Un lien | `#4051b5` sur blanc | 6,86:1 |
 | Un lien survolé, couleur du thème | `#526cfe` sur blanc | 4,26:1, sous le seuil |
 | Un lien survolé, couleur de K-B | `#303f9f` sur blanc | 8,98:1 |
@@ -82,8 +83,7 @@ style construite de Material 9.8.1, le 2026-11-14. Le seuil du RGAA 3.2 est de 4
 
 ## La vérification selon la notice d'AcceDe Web
 
-Le 2026-11-18, les quatre fiches mises en forme (`index.md`, cette fiche, `service_ia_pour_docu.md` et
-`integration_continue_pour_docu.md`) ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale
+Le 2026-11-18, les dix pages mises en forme, toutes sauf la fiche du monitorage, ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale
 d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture. Le tableau suivant donne chaque
 règle de la notice, son résultat, et comment il a été vérifié.
 
@@ -96,7 +96,7 @@ règle de la notice, son résultat, et comment il a été vérifié.
 | 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
 | 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour le seul schéma des quatre fiches, celui du service d'IA: un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et la liste qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
-| 6.1. Déclarer les citations en ligne et les blocs de citations | **Non tenue**: les citations sont entre guillemets, sans `q` ni `blockquote` (RGAA 9.4). Raison: séparer, guillemet par guillemet, les citations des titres de page ou de section cités demande de relire chaque fiche. Parade: la correction dans la demande de fusion (PR) suivante de la mise en forme, pour toutes les fiches. | Le HTML construit |
+| 6.1. Déclarer les citations en ligne et les blocs de citations | Tenue: une citation en ligne est un `q`, un bloc de citation un `blockquote` (règle « Des citations déclarées » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). Chaque paire de guillemets tapés a été triée: celles qui restent entourent un titre, un mot dont on parle ou un libellé. | Le HTML construit; la relecture |
 | 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais du texte des fiches est balisé `<span lang="en">`; le pied de page anglais du thème est retiré. | Le HTML construit |
 | 6.3. Ne pas faire référence à un élément en se basant uniquement sur sa couleur, sa taille, sa forme ou sa position | Tenue: un renvoi nomme l'élément et suit l'ordre de lecture (« le tableau suivant donne… »), jamais une place à l'écran. | La relecture; le contrôle des renvois vagues |
 | 7.1. Contrastes entre le texte et l'arrière-plan | Tenue ([Les contrastes du thème](#les-contrastes-du-theme)). | Le calcul des rapports de contraste |
@@ -127,7 +127,8 @@ courants (API, HTML, URL, UTC, SHA) ne le sont pas.
     adresse, « ici » ou « plus haut », et les ressources chargées hors du site. Il n'est pas dans le dépôt: son résultat
     est écrit dans la PR.
 
-3. Relire chaque fiche: les vraies listes, la phrase avant chaque schéma et chaque tableau, l'absence de couleur seule.
+3. Relire chaque fiche: les vraies listes, la phrase avant chaque schéma et chaque tableau, l'absence de couleur seule,
+    et chaque paire de guillemets tapés, qui n'entoure pas une citation.
 
 ## Publier
 
@@ -149,13 +150,13 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
     en dit. Parade: un essai avec VoiceOver par Sabine sur une fiche de chaque lot, le site construit.
-- **Les citations ne sont pas déclarées** (notice d'AcceDe Web, règle 6.1; RGAA 9.4): voir
-    [La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web). Parade: la correction
-    dans la PR suivante de la mise en forme, pour toutes les fiches.
-- **Les fiches ne sont pas encore toutes mises en forme.** Cette fiche et la PR qui l'introduit couvrent `index.md`,
-    le service d'IA et l'intégration continue. Les autres fiches gardent, le 2026-11-18, des listes en retrait de deux
-    ou trois espaces, mal rendues, des schémas sans phrase d'annonce, et, pour le monitorage, un second titre de
-    niveau 1; la PR suivante de la mise en forme les corrige.
+- **Lue sur GitHub, une citation en ligne n'a pas les guillemets du site.** Le rendu de GitHub garde le `q` (vérifié
+    le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le navigateur y
+    dessine les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS `quotes`, valeur `auto`). Ce
+    rendu n'a pas été vu. Le format de remise est le site.
+- **La fiche du monitorage n'est pas encore mise en forme.** Elle garde, le 2026-11-18, des listes en retrait de deux
+    ou trois espaces, quatre renvois de position (« plus haut », « ci-dessus »), et ses citations entre guillemets,
+    sans `q`. Elle est mise en forme après les PR de #620 et #621, qui la changent.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
     Il vient du thème, hors du texte des fiches.
@@ -193,8 +194,11 @@ Lues le 2026-11-14:
     pour sa fin de vie; versions de MkDocs et de Material lues sur PyPI, sans faille connue dans la base OSV
     (<span lang="en">Open Source Vulnerabilities</span>).
 
-Lue le 2026-11-18:
+Lues le 2026-11-18:
 
+- MDN, la propriété CSS `quotes`,
+    [page de MDN](https://developer.mozilla.org/docs/Web/CSS/quotes), par Context7 et une recherche web: les
+    guillemets d'un `q` se fixent par des paires de chaînes; la valeur `auto`, par défaut, suit la langue héritée.
 - Atalan, AcceDe Web, « Notice d'accessibilité éditoriale »,
     [version en ligne](https://www.accede-web.com/notices/editoriale/), ses neuf sections et ses bonnes pratiques
     (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
