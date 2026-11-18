@@ -757,7 +757,7 @@
       "id": 17,
       "type": "stat",
       "title": "Appels en échec sur 24 h",
-      "description": "Part des appels au modèle en échec après leur nouvelle tentative: délai dépassé, service indisponible, trop de requêtes ou filtre de contenu. Seuil: 0 %, tout appel en échec déclenche l'alerte KbModelCallFailures.",
+      "description": "Part des appels au modèle en échec après leur nouvelle tentative: délai dépassé, service indisponible, trop de requêtes, filtre de contenu ou sortie coupée au plafond de jetons. Seuil: 0 %, tout appel en échec déclenche l'alerte KbModelCallFailures.",
       "datasource": {
         "type": "prometheus",
         "uid": "${datasource}"
@@ -775,7 +775,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered|llm_truncated\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
           "legendFormat": "Valeur",
           "instant": true,
           "range": false,
@@ -787,7 +787,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "((sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))) > bool 0",
+          "expr": "((sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered|llm_truncated\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))) > bool 0",
           "legendFormat": "État",
           "instant": true,
           "range": false,
@@ -1005,7 +1005,7 @@
             "type": "prometheus",
             "uid": "${datasource}"
           },
-          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
+          "expr": "(sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\",k_b_outcome=~\"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered|llm_truncated\"}[24h])) or vector(0)) / sum(max_over_time(k_b_llm_calls_total{deployment_environment_name=\"$env\"}[24h]))",
           "legendFormat": "Appels en échec",
           "instant": false,
           "range": true,

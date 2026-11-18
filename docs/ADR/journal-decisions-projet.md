@@ -7347,8 +7347,10 @@ par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrate
   assumée, inchangée : tout appel est compté à ces prix, quel que soit `KB_LLM_MODEL`, et le contexte long
   (4,80 et 18,00 USD) n'est pas distingué. — PR de #631
 - **Une alerte `KbModelCallFailures` : la part des appels en échec après leur nouvelle tentative, sur 24 h, au-dessus
-  de 0 %.** Un échec est un délai dépassé, un service indisponible, un 429 ou le filtre de contenu (`k_b_outcome`,
-  aux mêmes valeurs que `error.type`). Seuil : recommandation de la session et de time-knight, choisie par Sabine
+  de 0 %.** Un échec est un délai dépassé, un service indisponible, un 429, le filtre de contenu (`k_b_outcome`,
+  aux mêmes valeurs que `error.type`) ou une sortie coupée au plafond de jetons (`llm_truncated`, ajoutée par
+  Sabine sur le constat C1 de la revue de code : aucune alerte ne la voyait, et le raisonnement de l'effort
+  `low` compte dans ce plafond). Seuil : recommandation de la session et de time-knight, choisie par Sabine
   le 2026-11-18. Pourquoi : un appel en échec est un sujet ou un compte rendu qui manque. Limite assumée : jusqu'à
   #630, l'alerte se déclenchera à chaque fiche de veille (le 2026-11-17, 5 sujets sur 9 étaient en
   `llm_timeout`), et c'est un vrai signal. — PR de #633

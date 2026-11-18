@@ -56,7 +56,7 @@ groups:
           description: "Coût estimé des appels au modèle sur 7 jours, aux prix de core/config.py: {{ humanize $value }} USD. Tableau de bord: K-B, modèle."
       - alert: KbModelCallFailures
         expr: |
-          sum by (deployment_environment_name) (max_over_time(k_b_llm_calls_total{k_b_outcome=~"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered"}[24h]))
+          sum by (deployment_environment_name) (max_over_time(k_b_llm_calls_total{k_b_outcome=~"llm_timeout|llm_unavailable|llm_rate_limited|llm_content_filtered|llm_truncated"}[24h]))
             / sum by (deployment_environment_name) (max_over_time(k_b_llm_calls_total[24h]))
             > 0
         for: 0m
@@ -64,7 +64,7 @@ groups:
           severity: warning
         annotations:
           summary: "K-B, {{ $labels.deployment_environment_name }}: appels au modèle en échec sur 24 h, au-dessus du seuil de 0 %"
-          description: "Part des appels au modèle en échec après leur nouvelle tentative, sur 24 h: délai dépassé (llm_timeout), service indisponible (llm_unavailable), trop de requêtes (llm_rate_limited) ou filtre de contenu (llm_content_filtered). {{ humanizePercentage $value }}. Tableau de bord: K-B, modèle."
+          description: "Part des appels au modèle en échec après leur nouvelle tentative, sur 24 h: délai dépassé (llm_timeout), service indisponible (llm_unavailable), trop de requêtes (llm_rate_limited), filtre de contenu (llm_content_filtered) ou sortie coupée au plafond de jetons (llm_truncated). {{ humanizePercentage $value }}. Tableau de bord: K-B, modèle."
       - alert: KbRequestOverDuration
         expr: |
           (sum by (deployment_environment_name) (max_over_time(k_b_request_duration_seconds_count[24h]))
