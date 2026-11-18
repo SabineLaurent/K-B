@@ -1,12 +1,14 @@
 # Les tests de K-B
 
-> Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests.
+!!! note "Compétences de la certification"
 
-— C12
+    > Rédaction de documentation technique pour la configuration de l'environnement et pour l'exécution des tests.
 
-> Rédaction de la documentation technique.
+    — C12
 
-— C17
+    > Rédaction de la documentation technique.
+
+    — C17
 
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de

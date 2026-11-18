@@ -1,8 +1,10 @@
 # Le service d'IA de K-B: le déploiement du modèle gpt-6.1-sol
 
-> Rédaction de la documentation.
+!!! note "Compétences de la certification"
 
-— C8
+    > Rédaction de la documentation.
+
+    — C8
 
 Cette fiche documente le service d'IA de K-B: le déploiement du modèle `gpt-6.1-sol` dans Microsoft Foundry
 (anciennement Azure AI Foundry), fait à la main dans le portail, hors du code de K-B. Elle dit qui y accède,
