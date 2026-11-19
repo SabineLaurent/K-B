@@ -347,8 +347,8 @@ leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnem
 écrit sur sa sortie standard pour chaque appel au modèle (`ai_api/observability/metrics.py:50`). Restent hors des
 dessins aussi trois appels qui ne portent pas de donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie
 les deux API et `kb digest-watch` les réveille (`commands/smoke_test_command.py:80-81`,
-`commands/digest_watch_command.py:60-64`), les sondes sans clé de `kb smoke-test`, refusées en 401, 404 et 405,
-ajoutées par #499 après le commit de cette fiche, et la demande d'un jeton à l'identité managée (`exchange/storage.py:198`,
+`commands/digest_watch_command.py:60-64`), les sondes sans clé de `kb smoke-test` (#499), refusées en 401, 404 et
+405, et la demande d'un jeton à l'identité managée (`exchange/storage.py:198`,
 `database/entra.py:57`). `kb openapi` écrit le contrat des deux API dans le dépôt, `docs/api/openapi-donnees.json` et
 `docs/api/openapi-ia.json` (`commands/openapi_command.py:30-32`, `:50`). Les contrôles du coffre avant une écriture
 restent hors des dessins aussi: ils ne lisent que l'état d'un fichier (existence, lien, date, taille). `kb digest` et
@@ -557,7 +557,7 @@ quand `exposeWeb` l'ouvre (`infra/main.bicep:347`;
 Le schéma suivant dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait en pointillés est
 prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des appels
 sans donnée de la veille: les deux « GET /health, sondes sans clé », par lesquelles le job de vérification teste les
-deux API (les sondes viennent de #499, après le commit de cette fiche), et « met à jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Le réveil des deux API par `caj-kb-digest-watch`, un
+deux API (les sondes de #499), et « met à jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Le réveil des deux API par `caj-kb-digest-watch`, un
 `GET /health` à chacune avant `kb digest` puis avant `kb trend-report` (`commands/digest_watch_command.py:43-48`,
 `:61`, `:67`), reste hors du dessin. Sur une app ou un job, le nœud porte
 son identité managée; sur une flèche, le rôle qui la permet. La liste qui suit le schéma le décrit flèche par flèche,
@@ -647,8 +647,8 @@ Les flèches du schéma, une à une:
     [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6-luna` jusqu'au passage de
     la production à `gpt-6.1-sol`.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
-    API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes viennent de #499, après le commit
-    de cette fiche.
+    API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
+    porte #499.
 - Du Mac à la lecture choisie (« make upload-library », en pointillés): prévu (#542).
 - Des sources de veille à `caj-kb-daily-routine` (« collecte »): déployé.
 - Du conteneur des clips à `caj-kb-daily-routine` (« clips, Blob Data Reader »): déployé.

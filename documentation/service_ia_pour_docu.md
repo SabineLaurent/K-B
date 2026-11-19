@@ -421,7 +421,7 @@ flowchart LR
     vérification `caj-kb-smoke-test` appelle `GET /health` de l'API IA, et l'API IA y répond sans le modèle. Le
     code de #499 ajoute à ce job des sondes sans clé, des requêtes que l'API doit refuser. L'API IA refuse ainsi
     `POST /digests` en 401, avant tout appel au modèle. En ligne, les sondes partent au premier tag qui porte ce
-    code, après #630; elles n'y sont pas encore constatées.
+    code.
 - **Le coffre de secrets**, en ligne, porte la clé. L'identité managée de l'API IA la lit (« La clé de K-B »).
 - **Grafana Cloud** reçoit les mesures de chaque appel au modèle. Il les reçoit par OTLP, le protocole d'export
     d'OpenTelemetry, un standard ouvert de mesure des programmes. Sous un réglage, Grafana Cloud reçoit aussi le

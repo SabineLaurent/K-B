@@ -11,9 +11,10 @@
   (#412), qui a créé le test de fumée.
 
 Les commits de #499 sont `1492a0e` (code et tests), `64a2393` (doc), `718b69c` (journal ADR), `1368a15`
-(corrections de la revue), `9b4e03c` (cette note), `33eba04` (l'auto-évaluation), puis le commit des corrections de
-la seconde revue. `1f2abbf` est un correctif de #498, porté par cette branche parce que #643 a été fusionnée sans lui :
-la note de #498 le couvre. Les autres commits que liste `git log` sur cette branche sont ceux de `main` et ses
+(corrections de la revue), `9b4e03c` (cette note), `33eba04` (l'auto-évaluation), `ecfc7fc` (corrections de la
+seconde revue et de la relecture des docs), puis un commit de relecture de la doc. `1f2abbf` et `c1516c7` sont des
+correctifs de #498, portés par cette branche parce que #643 a été fusionnée avant eux : la note de #498 les couvre.
+Les autres commits que liste `git log` sur cette branche sont ceux de `main` et ses
 fusions, déjà fusionnés par leurs propres PR : la note ne les couvre pas.
 
 ## Le pourquoi
@@ -21,8 +22,9 @@ fusions, déjà fusionnés par leurs propres PR : la note ne les couvre pas.
 L'auto-évaluation OWASP API Security Top 10 (2023) de l'API IA (`docs/fiches-veille.md`, API8 « Security
 Misconfiguration ») compte la mesure « évaluation automatisée et continue dans tous les environnements » parmi les
 non tenues. #498 en tient une moitié, le scan de l'image dans la CI. L'autre moitié est l'environnement déployé : après
-chaque mise en ligne, `deploy.yml` lance le job `caj-kb-smoke-test`, qui ne demandait que `GET /health` aux deux API.
-Il prouvait que la version déployée **répond**, pas qu'elle **refuse ce qu'elle doit refuser**.
+chaque mise en ligne, `deploy.yml` lance le job `caj-kb-smoke-test`, qui demande `GET /health` aux deux API : il
+prouve que la version déployée **répond**. #499 lui fait prouver, sur la version déployée, qu'elle **refuse ce
+qu'elle doit refuser**.
 
 #499 ajoute au test de fumée des sondes sans clé : des requêtes qu'une API bien configurée doit refuser, chacune avec
 le statut qu'elle doit rendre. Si une version en ligne servait une route à clé sans clé, exposait `/docs`, ou répondait
@@ -112,12 +114,12 @@ PROBE_WRITE_TIMEOUT_SECONDS = 10
 PROBE_READ_TIMEOUT_SECONDS = 10
 ```
 
-`src/k_b/core/config.py:691-694`, utilisés par `build_probe_client` (`api_probes.py:59-73`). Le premier code
-réutilisait le client du `/health`, dont la lecture attend 60 s pour couvrir le réveil. La revue a calculé le pire
-cas : deux `/health` et six sondes de 65 s chacun, plus les nouvelles tentatives du stockage, environ 966 s, au-delà
-des 900 s du `replicaTimeout` du job. Azure aurait coupé la réplique avant qu'elle écrive son résumé. Une sonde suit
-le `/health` qui a réveillé son API : 10 s de lecture suffisent, et le pire cas descend à environ 666 s (commentaire de
-`infra/modules/smoke-test-job.bicep`, recalculé ; aucune passe d'infra).
+`src/k_b/core/config.py:691-694`, utilisés par `build_probe_client` (`api_probes.py:59-73`). Le client du
+`/health` lit 60 s pour couvrir le réveil ; à ce délai, deux `/health` et six sondes de 65 s chacun, plus les
+nouvelles tentatives du stockage, porteraient le pire cas à environ 966 s, au-delà des 900 s du `replicaTimeout` du
+job : Azure couperait la réplique avant qu'elle écrive son résumé. Une sonde suit le `/health` qui a réveillé son
+API : 10 s de lecture suffisent, et le pire cas est d'environ 666 s (commentaire de
+`infra/modules/smoke-test-job.bicep` ; aucune passe d'infra).
 
 ### 5. Un test de contrat : la sonde contre l'API elle-même
 
@@ -147,7 +149,7 @@ leur défaut inchangé.
 | Un `/health` en échec | les sondes de l'API tournent quand même (« un échec n'arrête pas les autres », revue, tranché par time-knight) | les sauter : une sonde dit autre chose que `/health`, et leur coût est borné (45 s par API) |
 | Les délais des sondes | leur client, lecture 10 s (revue, tranché par time-knight) | le client du `/health` (pire cas au-delà du `replicaTimeout`) ; monter le `replicaTimeout` (une passe d'infra, aucune avant la fusion de #630) |
 | Le contrat | un test par API contre l'application (écart au plan, tranché par time-knight) | les seuls tests sur API simulées : une sonde fausse ne se verrait qu'en ligne |
-| `ProbeError` | une classe à part, comme `HealthCheckError` | une classe commune : deux occurrences, `code.md` factorise à la troisième |
+| `ProbeError` | une classe à part, comme `HealthCheckError` | une classe commune dans cette PR : la mise en forme a trois copies (`jobs/api_health.py`, `jobs/api_probes.py`, `post/ai_api_client.py`), factorisées par #656 |
 
 ## Preuve
 
@@ -179,8 +181,8 @@ leur défaut inchangé.
    l'application elle-même, en `sandbox` et hors `sandbox` (`test_digest_router.py:1282`, `test_api_keys.py:149`) ;
    et le test des API servies par uvicorn passe neuf contrôles sur neuf.
 4. **Pourquoi 10 s de lecture pour une sonde, et 60 s pour `/health` ?** `/health` porte le réveil d'une API à 0
-   réplique ; une sonde vient juste après, sur une API éveillée. Avec 60 s, six sondes portaient le pire cas au-delà
-   du `replicaTimeout` de 900 s, et Azure aurait coupé le job avant son résumé (`config.py:691-694`,
+   réplique ; une sonde vient juste après, sur une API éveillée. Avec 60 s, six sondes porteraient le pire cas au-delà
+   du `replicaTimeout` de 900 s, et Azure couperait le job avant son résumé (`config.py:691-694`,
    `smoke-test-job.bicep`).
 5. **Une sonde peut-elle fuiter une donnée dans le journal ?** Non : le corps n'est jamais lu, et l'échec ne dit que
    son état et le statut, jamais l'URL ni le message de l'exception (`api_probes.py:91-99`,
@@ -191,12 +193,12 @@ leur défaut inchangé.
 - **En ligne, rien n'est encore constaté.** Les statuts viennent des applications ; qu'ils traversent l'entrée
   d'Azure Container Apps (Envoy) sans changer, en particulier le 405 de `HEAD` et le 404 de `/docs`, n'est pas
   observé. Le constat attend un tag, posé après la fusion de #630.
-- **Les lignes de journal de l'API IA** : relevées sur l'API de données seule. L'API IA est supposée écrire les
-  mêmes, par le même module (`core/api_request_log.py`), avec `route=/digests` ; non observé.
-- **Le pire cas de 666 s** est un calcul sur les délais configurés et sur l'estimation de 7 min des nouvelles
-  tentatives du stockage reprise du commentaire du Bicep, pas une mesure.
-- **Des en-têtes qui arrivent octet par octet** ne sont pas coupés par le délai de lecture, comme pour `/health`
-  (limite connue, #436).
+- **Les lignes de journal de l'API IA** : l'API IA les écrit par le même middleware, `log_request`
+  (`ai_api/app.py:96`, `core/api_request_log.py`), avec `route=/digests` ; relevées sur l'API de données.
+- **Le pire cas**, environ 666 s, est calculé sur les délais configurés et sur l'estimation de 7 min des nouvelles
+  tentatives du stockage, reprise du commentaire du Bicep : environ 234 s sous le `replicaTimeout` de 900 s.
+- **Le délai de lecture vaut entre deux morceaux reçus**, comme pour `/health` (#436) : le `replicaTimeout` de
+  900 s borne le job entier (`infra/modules/smoke-test-job.bicep`).
 
 ## Ce qui reste
 

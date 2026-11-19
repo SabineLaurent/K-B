@@ -1013,7 +1013,7 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne attend un tag posé après #630 ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne se fait au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb` ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
 | API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
@@ -1091,7 +1091,7 @@ API8 (revue, #497, et évaluation, #499, codée, à constater en ligne) et API10
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
     l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
-    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, depuis #499, par ses sondes, sans clé ; et
+    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
     `caj-kb-digest-watch` (#423), par `kb digest` et `kb trend-report`, avec leurs clés. Ce que le certificat prouverait,
     qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
     sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
@@ -1392,18 +1392,19 @@ dépend que du code garde son état et sa preuve.
   `/health`, trois sondes sans clé, et échoue sur tout autre statut : une route à clé (`GET /items`,
   `POST /digests`) doit rendre 401, `GET /docs` 404 hors `sandbox`, et `HEAD /health` 405
   (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:95-109`). Il vérifie ainsi,
-  sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée, et non
-  plus seulement qu'elle répond. Prouvé par les tests, sur des API simulées
+  sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée.
+  Prouvé par les tests, sur des API simulées
   (`test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run`,
   `tests/commands/test_smoke_test_command.py`) et sur les apps elles-mêmes, en `sandbox` et hors
   `sandbox` (`test_each_probe_of_kb_smoke_test_gets_the_status_it_expects`, dans
-  `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Pas encore constaté en
-  ligne : aucune version qui porte #499 n'est déployée.
+  `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Le constat en ligne se fait
+  au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb`.
   **Pour la tenir** : le premier test de fumée en ligne d'une version qui porte #499, sur un tag posé
   après la fusion de #630 (décision de Sabine du 2026-11-18), sa ligne `9 of 9 checks passed` lue
-  dans `log-kb` et citée ici. XS. **Limite**, même tenue : les sondes ne disent rien d'une route à
-  clé une fois la clé donnée, que seuls les tests de la CI couvrent, sur le code de l'image (journal
-  ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
+  dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes vérifient les refus
+  sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le code de l'image, sans
+  clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel payant au modèle
+  (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
   **Pour réduire le risque** : `pip-audit` audite chaque version de `uv.lock`, uvicorn et h11
   compris (`.github/workflows/ci.yml:23-25`), et Grype l'image ; les réponses sans clé des routes
   (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur

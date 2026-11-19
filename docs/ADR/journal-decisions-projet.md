@@ -7504,12 +7504,12 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
 
 - **`kb smoke-test` envoie trois sondes sans clé à chacune des deux API, après son `/health`, qui la réveille : une
   route à clé doit rendre 401 (`GET /items`, `POST /digests`), `GET /docs` 404, et `HEAD /health` 405. Neuf
-  contrôles au lieu de trois ; un échec n'arrête pas les autres.** Pourquoi : le test de fumée prouvait que la version
-  déployée répond, pas qu'elle refuse ce qu'elle doit refuser (API8, « Évaluation automatisée »). Les mêmes sondes sur
+  contrôles au lieu de trois ; un échec n'arrête pas les autres.** Pourquoi : prouver, sur la version déployée,
+  qu'elle refuse ce qu'elle doit refuser (API8, « Évaluation automatisée »). Les mêmes sondes sur
   l'API de données, puisque `docs/specs-api.md` renvoie, pour elle, aux mêmes issues. Écartés : des essais avec une clé
   de test en ligne (un secret de plus, qui fait dépenser le modèle ; les routes à clé sont couvertes par les tests de
-  la CI) ; l'API IA seule. Limite assumée : les sondes ne disent rien des routes à clé une fois la clé donnée, que
-  seuls les tests de la CI couvrent, sur le code de l'image. — PR de #499
+  la CI) ; l'API IA seule. Limite assumée : en ligne, les sondes vérifient les refus sans clé ; une route à clé,
+  clé donnée, se vérifie par les tests de la CI, sur le code de l'image. — PR de #499
 - **Le statut attendu de `GET /docs` suit `KB_DEPLOYMENT_ENVIRONMENT` du job : 200 en `sandbox`, 404 ailleurs, la
   règle de `read_openapi_url` des API.** Pourquoi : une seule règle, déjà écrite ; en ligne, ni le job ni les API
   n'ont `sandbox`. Limite assumée : un job et des API réglés différemment font échouer la sonde, ce qui signale
@@ -7525,8 +7525,8 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
   résumé ; avec 15 s par sonde, environ 666 s (`infra/modules/smoke-test-job.bicep`). Une sonde suit le `/health`
   de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra, aucune avant #630) ; sauter
   les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et une sonde dit autre chose
-  que `/health`). Limite assumée : comme pour `/health` (#436), une réponse dont les en-têtes arrivent octet par
-  octet, chacun sous le délai de lecture, n'est pas coupée. — PR de #499
+  que `/health`). Limite assumée, comme pour `/health` (#436) : le délai de lecture vaut entre deux morceaux
+  reçus ; le `replicaTimeout` de 900 s borne le job entier (`infra/modules/smoke-test-job.bicep`). — PR de #499
 - **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
   (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
   `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :
@@ -7535,7 +7535,8 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
   répondent ce que le test leur dit. — PR de #499
 - **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) attend un tag, posé après la fusion
   de #630.** Pourquoi : décision de Sabine du 2026-11-18, aucun redéploiement avant #630 ; un tag déploie. Tranché par
-  time-knight. Limite assumée : d'ici là, la mesure reste « non tenue, en partie » dans l'auto-évaluation. — PR de #499
+  time-knight. Par choix, la mesure reste « non tenue, en partie » jusqu'à ce constat : l'auto-évaluation
+  ne s'écrit que sur un résultat observé. — PR de #499
 
 ## Décisions encore ouvertes
 
