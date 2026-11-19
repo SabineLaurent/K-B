@@ -38,7 +38,8 @@ et « Se déconnecter » est à la fin de l'en-tête (#587).
 **Description de la planche.** En tête, « Charte graphique », puis « Interface web de K-B: front office (veille) et
 back office (suivi) », et à droite « Maquettes du 09/11/2026, avant intégration ». La planche range la charte en six
 encadrés: trois colonnes de couleurs, puis les polices et les icônes, puis les contrastes. Chaque couleur y est montrée
-par un aplat, suivi de son code, de son nom et de son usage.
+par un aplat, suivi de son code, de son nom et de son usage. Le titre de chaque encadré, souligné, est écrit dans une
+police manuscrite, Shantell Sans: c'est la police des titres de la planche, pas une police du site.
 
 ### Couleurs principales
 
