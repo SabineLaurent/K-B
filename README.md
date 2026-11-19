@@ -837,7 +837,7 @@ chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce q
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
 | `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
-| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
+| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; enfin, la scanne par Grype v0.121.3, vérifié par son SHA256, et refuse une vulnérabilité haute ou critique qui a un correctif (paquets Debian, paquets Python de l'environnement virtuel et de l'image de base, CPython) ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `build` | `docs.yml` | construit le site des fiches de `documentation/` par MkDocs, en mode strict (un lien ou une ancre absents le font échouer), et vérifie l'empreinte du fichier de Mermaid téléchargé ; lancé à la main depuis `main`, dépose le site en artefact de Pages |
 | `deploy` | `docs.yml` | lancé à la main depuis `main` seulement, publie le site sur GitHub Pages ; sauté sur une PR |
@@ -864,13 +864,13 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
 - `main` ne se supprime pas et ne reçoit pas de push forcé ;
 - tout changement passe par une PR, fusionnée par un commit de fusion (la seule méthode permise), sans
   approbation requise ;
-- 6 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et, depuis
-  #496, `bicep-build` ;
+- 7 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build`
+  (depuis #496) et `image-build` (depuis #498) ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`image-build`, `tests-data` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
-PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de `infra.yml`). Les
-non requis comptent au déploiement : `check` exige
+`tests-data` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 et
+`image-build` depuis #498 : ils tournent sur toute PR, car un check qu'un filtre de chemin saute reste en attente et
+bloque la fusion (commentaire de `infra.yml`). Les non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
 GitHub crée lui-même (Dependabot). `docs.yml` ne tourne sur un commit de `main` que lancé à la main : une telle
 exécution en échec fait refuser le tag de ce commit, jusqu'à une relance réussie
@@ -892,7 +892,8 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
 (`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
-`bicep-build`, un huitième check, et depuis #167, `build` de `docs.yml`, un neuvième.
+`bicep-build`, un huitième check, et depuis #167, les deux jobs de `docs.yml`, `build`, un neuvième, et `deploy`, sauté sur une
+PR, un dixième.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 

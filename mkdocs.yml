@@ -5,27 +5,65 @@ site_name: Documentation de K-B
 site_url: https://sabinelaurent.github.io/K-B/
 docs_dir: documentation
 
+# The bar at the top holds the documentation and two pages of the repository; the menu on the left holds the home
+# page, then the parts of the documentation, numbered (Sabine's choices of 2026-11-18, issue 649).
 nav:
-  - index.md
-  - accessibilite_pour_docu.md
-  - installation_pour_docu.md
-  - architecture_pour_docu.md
-  - maquettes_et_parcours_pour_docu.md
-  - import_et_base_pour_docu.md
-  - api_ia_pour_docu.md
-  - service_ia_pour_docu.md
-  - monitoring_pour_docu.md
-  - tests_pour_docu.md
-  - integration_continue_pour_docu.md
-  - livraison_continue_pour_docu.md
+  - Documentation:
+      - K-B, mon outil de veille tech: index.md
+      - 1. Démarrer:
+          - installation_pour_docu.md
+          - architecture_pour_docu.md
+          - maquettes_et_parcours_pour_docu.md
+      - 2. Les données:
+          - import_et_base_pour_docu.md
+      - 3. La brique d'intelligence artificielle:
+          - api_ia_pour_docu.md
+          - service_ia_pour_docu.md
+          - monitoring_pour_docu.md
+      - 4. Qualité et livraison:
+          - tests_pour_docu.md
+          - integration_continue_pour_docu.md
+          - livraison_continue_pour_docu.md
+  - Le dépôt GitHub: https://github.com/SabineLaurent/K-B
+  - Le journal des décisions: https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md
+
+# Out of the menu on purpose: the footer links to it (overrides/partials/copyright.html).
+not_in_nav: |
+  accessibilite_pour_docu.md
 
 theme:
   name: material
   language: fr
+  # The footer of the site: overrides/partials/copyright.html.
+  custom_dir: overrides
   # No Google Fonts: the fonts of the system, no request out of the site.
   font: false
+  # A bar of tabs at the top, kept in view while scrolling; one menu, on the left, with the parts as sections and the
+  # table of contents of the page under its link (issue 649).
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - toc.integrate
+  # A light mode and a dark mode: the system's at the first visit, then the mode kept, changed by the button of the
+  # header. The colours of both are in documentation/stylesheets/extra.css.
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-7
+        name: Passer au mode sombre
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: custom
+      accent: custom
+      toggle:
+        icon: material/brightness-4
+        name: Passer au mode clair
 
-# A link underlined, not told by its colour alone, and darker under the pointer (documentation/accessibilite_pour_docu.md).
+# The colours of the back office of K-B, the tabs, and a link underlined (documentation/accessibilite_pour_docu.md).
 extra_css:
   - stylesheets/extra.css
 
@@ -35,6 +73,8 @@ plugins:
   - privacy
 
 markdown_extensions:
+  # The box of the competences at the head of a sheet: `!!! note "Compétences de la certification"`.
+  - admonition
   - pymdownx.superfences:
       custom_fences:
         - name: mermaid

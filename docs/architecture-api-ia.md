@@ -243,8 +243,8 @@ comprise, et chaque clé de l'API de données a les mêmes droits (`:60-64`).
 
 Les bornes ne sont pas des variables. Ce sont des constantes de `core/config.py` : corps de demande de 1 024 octets
 au plus (`:283`), 20 demandes par jour et par route (`:304-307`), 200 s par demande (`:451`, `:459`). Chaque lecture
-de la réponse du modèle attend 90 s au plus (`:232`, `ai_api/connectors/llm_client.py:221`) ; l'ensemble est borné
-par les 200 s de la demande (`core/config.py:233-236`). La liste fermée des sujets est aussi une constante (`:392`).
+de la réponse du modèle attend 200 s au plus, l'échéance de la demande (`:253`, `ai_api/connectors/llm_client.py:221` ; #640) :
+l'échéance est la seule borne d'un appel, et un appel bloqué n'est plus relancé (`core/config.py:238-253`). La liste fermée des sujets est aussi une constante (`:392`).
 
 ### Les métriques et les journaux
 
