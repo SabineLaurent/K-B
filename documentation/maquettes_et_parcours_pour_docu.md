@@ -33,7 +33,7 @@ et « Se déconnecter » est à la fin de l'en-tête (#587).
 
 ## La charte graphique
 
-![Planche « Charte graphique » des maquettes du 09/11/2026: couleurs, polices, icônes et contrastes, décrits en texte ci-dessous](images/charte-graphique_20261109.png)
+![Planche « Charte graphique » des maquettes du 09/11/2026: couleurs, polices, icônes et contrastes, décrits en texte dans la section « La charte graphique »](images/charte-graphique_20261109.png)
 
 **Description de la planche.** En tête, « Charte graphique », puis « Interface web de K-B: front office (veille) et
 back office (suivi) », et à droite « Maquettes du 09/11/2026, avant intégration ». La planche range la charte en six
@@ -63,12 +63,12 @@ police manuscrite, Shantell Sans: c'est la police des titres de la planche, pas 
 | `#FFF1E6` | Pêche pâle | Fond du bandeau CISA KEV |
 | `#8A8F96` | Gris galet | Bordure des champs de saisie |
 
-Sous ces couleurs, un bouton « Filtrer » porte l'anneau de focus, avec sa légende: « Anneau de focus: trait de 3 px
-en #0F5E6B, décalé de 2 px, sur tout élément atteint au clavier ». Un encadré bordé de rouille, sur fond pêche pâle,
+Sous ces couleurs, un bouton « Filtrer » porte l'anneau de focus, avec sa légende: <q>Anneau de focus: trait de 3 px
+en #0F5E6B, décalé de 2 px, sur tout élément atteint au clavier</q>. Un encadré bordé de rouille, sur fond pêche pâle,
 signale une couleur. Son titre, en gras et en rouille sombre (`#7C2D12`): « Couleur signalée: #8A8F96 en texte ». Son
-texte, en 14 px et en brun brûlé (`#5B2410`): « 3,26:1 sur blanc, sous le seuil AA de 4,5:1. Réservée aux bordures de
+texte, en 14 px et en brun brûlé (`#5B2410`): <q>3,26:1 sur blanc, sous le seuil AA de 4,5:1. Réservée aux bordures de
 champs, où le critère 1.4.11 demande 3:1 (atteint). Correction: le texte d'aide et les indications passent en #4A4F57
-(8,24:1). »
+(8,24:1).</q>
 
 ### Couleurs de texte
 
@@ -87,9 +87,9 @@ champs, où le critère 1.4.11 demande 3:1 (atteint). Correction: le texte d'aid
 Deux polices, chacune montrée par ses exemples, puis nommée en 14 px et en gris ardoise:
 
 - « Quoi de neuf » en 30 px gras, puis « Texte courant, sans empattement » en 16 px: system-ui, -apple-system, Segoe UI,
-  Roboto, sans-serif, la police du système. « Aucun fichier de police à télécharger (éco-conception). »
+  Roboto, sans-serif, la police du système. <q>Aucun fichier de police à télécharger (éco-conception).</q>
 - « CVE-2026-45134 » en 20 px et « GHSA-3644-q5cj-c5c7 » en 16 px, en chasse fixe: ui-monospace, Menlo, Consolas,
-  monospace, « les identifiants seulement (CVE, GHSA, arXiv) ».
+  monospace, <q>les identifiants seulement (CVE, GHSA, arXiv)</q>.
 
 Le tableau suivant donne les cinq niveaux de texte, du titre de page aux métadonnées.
 
@@ -104,8 +104,8 @@ Le tableau suivant donne les cinq niveaux de texte, du titre de page aux métado
 Sur la planche, chaque exemple de la colonne « Exemple » est écrit à sa taille et à sa graisse, celui des métadonnées
 en gris ardoise.
 
-Sous le tableau: « Tailles en rem: le texte suit la taille choisie dans le navigateur. Texte courant à 16 px au
-minimum, 14 px pour les seules métadonnées. »
+Sous le tableau: <q>Tailles en rem: le texte suit la taille choisie dans le navigateur. Texte courant à 16 px au
+minimum, 14 px pour les seules métadonnées.</q>
 
 ### Icônes
 
@@ -116,14 +116,14 @@ Quatre icônes au trait, chacune suivie de son sens:
 - une flèche vers la gauche, en bleu canard: « Retour au fil »;
 - une coche, en vert forêt: « État « OK » du suivi, toujours suivi du mot ».
 
-Sous elles: « SVG en ligne, au trait, décoratifs (aria-hidden): le texte à côté porte le sens. Aucune image
-décorative. »
+Sous elles: <q>SVG en ligne, au trait, décoratifs (aria-hidden): le texte à côté porte le sens. Aucune image
+décorative.</q>
 
 ### Contrastes WCAG 2.2 des couples texte / fond
 
-« Calculés par un script (luminance relative de WCAG 2.2). Seuils: AA 4,5:1 pour le texte courant, 3:1 pour un
-composant d'interface ou un texte de 24 px; AAA 7:1. » Puis, en 14 px: « Note: critères de contraste (1.4.3, 1.4.6,
-1.4.11) et formule de la luminance relative identiques à WCAG 2.1, base du RGAA 4.1.2 en vigueur. » Sur la planche,
+<q>Calculés par un script (luminance relative de WCAG 2.2). Seuils: AA 4,5:1 pour le texte courant, 3:1 pour un
+composant d'interface ou un texte de 24 px; AAA 7:1.</q> Puis, en 14 px: <q>Note: critères de contraste (1.4.3, 1.4.6,
+1.4.11) et formule de la luminance relative identiques à WCAG 2.1, base du RGAA 4.1.2 en vigueur.</q> Sur la planche,
 chaque ligne montre aussi un aperçu, « Aa texte » écrit dans le couple de couleurs. Le tableau suivant donne les 23
 couples.
 
@@ -158,7 +158,7 @@ Les couleurs du site suivent cette charte: `web/static/site.css` les déclare, e
 
 ## Les maquettes du fil de veille
 
-![Planche « Maquettage - 3) Les maquettes graphiques »: le fil de veille en version mobile, tablette et desktop, décrit en texte ci-dessous](images/maquettes-fil-de-veille_20261109.png)
+![Planche « Maquettage - 3) Les maquettes graphiques »: le fil de veille en version mobile, tablette et desktop, décrit en texte dans la section « Les maquettes du fil de veille »](images/maquettes-fil-de-veille_20261109.png)
 
 **Description de la planche.** En tête, « Maquettage - 3) Les maquettes graphiques », puis « Réalisées dans l'outil
 Design de claude.ai, à partir des wireframes et de la charte graphique. » et « - Le fil de veille, page d'accueil du
@@ -189,8 +189,8 @@ De haut en bas, sur le fond blanc papier:
 5. **Les cartes des items**, sur fond blanc, bordées de gris pierre. Chaque carte commence par une ligne en 14 px: la
    sorte en capitales, encadrée d'un trait noir, la date, les identifiants, et pour la faille la pastille « Exploitée
    (KEV) », en blanc sur rouille. Viennent ensuite le titre de l'item, un lien, puis le lien vers la source, suivi
-   d'une flèche « ↗ ».
-6. **La pagination**: « Page suivante → », un bouton bordé de bleu canard, à droite.
+   d'une flèche oblique vers le haut et la droite.
+6. **La pagination**: à droite, un bouton bordé de bleu canard, « Page suivante », suivi d'une flèche vers la droite.
 7. **Le pied de page**: « Sources et conditions d'utilisation » et « Accessibilité ».
 
 Les cartes de la maquette (les titres entre crochets sont des emplacements):
