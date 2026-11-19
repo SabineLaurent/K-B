@@ -218,3 +218,18 @@
 .md-typeset table:not([class]) {
   font-size: inherit;
 }
+
+/* « K-B », and in a table a date and each word of the code, kept on one line (documentation/javascripts/nowrap.js). */
+.kb-nowrap {
+  white-space: nowrap;
+}
+
+/* The skip link out of the screen until it has the focus, opaque, rather than transparent as Material sets it (WebAIM,
+   « Skip Navigation Links »): its text keeps its colours, and the focus brings it back where Material shows it. */
+.md-skip {
+  opacity: 1;
+}
+
+.md-skip:not(:focus) {
+  inset-inline-start: -10000px;
+}
