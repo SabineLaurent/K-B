@@ -26,8 +26,9 @@ n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sa
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
 (`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
 (`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
-une ligne « K-B », et dans un tableau une date et chaque mot du code (`documentation/javascripts/nowrap.js`,
-`extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première visite, il
+une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
+(`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
+visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:45-61`). Le site se publie sur
 GitHub Pages, à la main (section [Publier](#publier)).

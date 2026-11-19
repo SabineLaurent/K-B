@@ -41,6 +41,19 @@ function positionOf(nodes, starts, index) {
   return [nodes[n], index - starts[n]];
 }
 
+// A match is wrapped only when the elements it cuts at its two ends are <mark>s of a search result: a link or any
+// other element is never split in two.
+function cutsOnlyMarks(range) {
+  const common = range.commonAncestorContainer;
+  const top = common.nodeType === Node.TEXT_NODE ? common.parentElement : common;
+  for (const boundary of [range.startContainer, range.endContainer]) {
+    for (let element = boundary.parentElement; element !== top; element = element.parentElement) {
+      if (element.tagName !== "MARK") return false;
+    }
+  }
+  return true;
+}
+
 function wrapGroup(nodes, pattern) {
   const starts = [];
   let length = 0;
@@ -55,13 +68,17 @@ function wrapGroup(nodes, pattern) {
     range.setStart(...positionOf(nodes, starts, match.index));
     const [endNode, endOffset] = positionOf(nodes, starts, match.index + match[0].length - 1);
     range.setEnd(endNode, endOffset + 1);
+    // The text of the range is the match alone: no nested block nor skipped text lies between its characters.
+    if (range.toString() !== match[0] || !cutsOnlyMarks(range)) continue;
     const span = document.createElement("span");
     span.className = "kb-nowrap";
     span.append(range.extractContents());
     range.insertNode(span);
-    // An element cut at the start or the end of the match, such as a <mark>, can be left empty beside the span.
+    // A <mark> cut at the start or the end of the match can be left empty beside the span.
     for (const sibling of [span.previousSibling, span.nextSibling]) {
-      if (sibling?.nodeType === Node.ELEMENT_NODE && sibling.textContent === "") sibling.remove();
+      if (sibling?.nodeType === Node.ELEMENT_NODE && sibling.tagName === "MARK" && sibling.textContent === "") {
+        sibling.remove();
+      }
     }
   }
 }
@@ -77,5 +94,10 @@ wrapMatches(document.body, KB);
 // Material writes the search results after the page has loaded, at each search.
 const searchResults = document.querySelector(".md-search-result__list");
 if (searchResults) {
-  new MutationObserver(() => wrapMatches(searchResults, KB)).observe(searchResults, { childList: true, subtree: true });
+  const observer = new MutationObserver(() => {
+    wrapMatches(searchResults, KB);
+    // The records of this wrapping itself: they would only run the same search again.
+    observer.takeRecords();
+  });
+  observer.observe(searchResults, { childList: true, subtree: true });
 }
