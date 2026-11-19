@@ -241,7 +241,7 @@ Les sections suivantes du plan disent, composante par composante, les cas testé
 fichier. Les tests de `POST /trend-reports` sont listés dans
 [la section « Ce qui le prouve » de la spécification du compte rendu des tendances](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md#ce-qui-le-prouve).
 Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
-[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+[le compte rendu des tests de l'API IA du 2026-11-08, relancé le 2026-11-18](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
 
 ### Types de test
 
@@ -429,4 +429,4 @@ Le tableau suivant donne chaque cas, ses tests et leur fichier.
 
 Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors du bout en bout, les dépendances de
 production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
-[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+[le compte rendu des tests de l'API IA du 2026-11-08, relancé le 2026-11-18](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
