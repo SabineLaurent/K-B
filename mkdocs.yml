@@ -23,12 +23,10 @@ nav:
           - tests_pour_docu.md
           - integration_continue_pour_docu.md
           - livraison_continue_pour_docu.md
+      # Without a number, and in the footer too, so the page keeps its table of contents (Sabine's choice, issue 654).
+      - Accessibilité: accessibilite_pour_docu.md
   - Le dépôt GitHub: https://github.com/SabineLaurent/K-B
   - Le journal des décisions: https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md
-
-# Out of the menu on purpose: the footer links to it (overrides/partials/copyright.html).
-not_in_nav: |
-  accessibilite_pour_docu.md
 
 theme:
   name: material
@@ -65,6 +63,10 @@ theme:
 # The colours of the back office of K-B, the tabs, and a link underlined (documentation/accessibilite_pour_docu.md).
 extra_css:
   - stylesheets/extra.css
+
+# The list of the search results out of the Tab key, where it would get the focus folded (issue 654).
+extra_javascript:
+  - javascripts/search-list.js
 
 plugins:
   - search
