@@ -68,7 +68,7 @@ Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue 
 | Des titres hiérarchisés | AVH; Microsoft; RGAA 9.1 | Un seul titre de niveau 1 par fiche, puis `##` à `####` sans saut de niveau. Un paragraphe en gras n'est pas un titre. | Le contrôle du HTML construit |
 | De vraies listes | AVH; RGAA 9.3 | Les listes Markdown, rendues en `ul` et `ol`. Chaque niveau est en retrait de quatre espaces: Python-Markdown, qui construit les pages, ne rattache à un point de liste que ce qui est en retrait de quatre espaces. | Le HTML construit |
 | Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:45`); le menu donne la page d'accueil, puis les quatre parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
-| Une alternative à chaque élément non textuel | AVH; Microsoft | Les fiches n'ont aucune image. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche |
+| Une alternative à chaque élément non textuel | AVH; Microsoft | Les deux images, les planches de la fiche des maquettes, ont chacune un texte de remplacement court qui nomme la section de leur description; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche |
 | Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:37-38`). | La configuration |
 | Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
@@ -150,8 +150,9 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Le 2026-11-18, les dix pages mises en forme, toutes sauf la fiche du monitorage, ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale
-d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture. Le tableau suivant donne chaque
+Les onze pages mises en forme, toutes sauf la fiche du monitorage, ont été vérifiées selon chaque règle de la notice
+d'accessibilité éditoriale d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le
+2026-11-18, la fiche des maquettes le 2026-11-19. Le tableau suivant donne chaque
 règle de la notice, son résultat, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
@@ -160,15 +161,15 @@ règle de la notice, son résultat, et comment il a été vérifié.
 | 2. Utiliser correctement la hiérarchie des titres | Tenue: un titre de niveau 1 par page, puis aucun saut de niveau. | Le HTML construit |
 | 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
 | 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Les deux liens du logo du thème, dans l'en-tête et dans le menu, en portent un, le nom du site (« Limites »). | Le HTML construit |
-| 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
-| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les huit schémas des fiches mises en forme (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
+| 4.1 à 4.3. Images décoratives, informatives, images-liens | Tenue: deux images informatives, les planches de la fiche des maquettes, chacune avec son texte de remplacement; aucune image décorative ni image-lien. | Le HTML construit |
+| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les neuf schémas des fiches mises en forme (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base, un dans les maquettes): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Tenue pour les deux planches de la fiche des maquettes: chacune a un texte de remplacement court, qui nomme la section de sa description détaillée. Le schéma des maquettes a été rendu le 2026-11-19 par le Mermaid du site, dans Chrome sans interface: son `title` et son `desc` y sont. Le rendu des huit autres dans un navigateur n'est pas vérifié. | La relecture; pour le schéma des maquettes, son rendu dans Chrome sans interface |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
 | 6.1. Déclarer les citations en ligne et les blocs de citations | Tenue: une citation en ligne est un `q`, un bloc de citation un `blockquote` (règle « Des citations déclarées » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). Chaque paire de guillemets tapés a été triée: celles qui restent entourent un titre, un mot dont on parle ou un libellé. | Le HTML construit; la relecture |
 | 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais du texte des fiches est balisé `<span lang="en">`; le pied de page anglais du thème est retiré. | Le HTML construit |
 | 6.3. Ne pas faire référence à un élément en se basant uniquement sur sa couleur, sa taille, sa forme ou sa position | Tenue: un renvoi nomme l'élément et suit l'ordre de lecture (« le tableau suivant donne… »), jamais une place à l'écran. | La relecture; le contrôle des renvois vagues |
 | 7.1. Contrastes entre le texte et l'arrière-plan | Tenue ([Les contrastes du thème](#les-contrastes-du-theme)). | Le calcul des rapports de contraste |
 | 7.2. Les couleurs ne sont pas le seul moyen de porter une information | Tenue: un lien est souligné. | La relecture; la feuille de style |
-| 8.1. Associer une description détaillée aux contenus riches | Tenue: chaque schéma Mermaid a sa description en texte. | La relecture |
+| 8.1. Associer une description détaillée aux contenus riches | Tenue: chaque schéma Mermaid et chaque planche a sa description en texte. | La relecture |
 | 8.2 et 8.3. Contenus en mouvement; vidéos | Sans objet: ni l'un ni l'autre. | Le HTML construit |
 | 9. Fournir une alternative textuelle aux contenus textuels ambigus (émoticônes, art ASCII) | Tenue: aucune émoticône ni art ASCII. La flèche « → » sert à écrire un chemin de menu ou le résultat d'une commande; ce qu'en dit un lecteur d'écran n'est pas vérifié. | Le HTML construit |
 
@@ -279,7 +280,7 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
     rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:5`): tant que Pages n'est
-    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les quatre fiches qui en ont, l'erreur de ce
+    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les cinq fiches qui en ont, l'erreur de ce
     chargement arrête aussi, dans l'aperçu seulement, le bouton du mode et la recherche.
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
