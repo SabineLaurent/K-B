@@ -9,7 +9,7 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
+visent le dépôt au 2026-11-19: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
 arrivent avec cette fiche.
 
 ## Le format
@@ -24,7 +24,9 @@ de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
 n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:26-27`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-62`). Le site a un mode clair et un mode sombre. À la première visite, il
+(`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
+(`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Le site a un mode
+clair et un mode sombre. À la première visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:45-61`). Le site se publie sur
 GitHub Pages, à la main (section [Publier](#publier)).
