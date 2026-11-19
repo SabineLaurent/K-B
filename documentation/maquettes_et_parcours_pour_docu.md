@@ -1,8 +1,14 @@
 # Les maquettes du site et le parcours de l'opératrice
 
-« Les interfaces sont intégrées et respectent les maquettes. » — C17
+!!! note "Compétences de la certification"
 
-« La modélisation des parcours utilisateurs respecte un formalisme: schéma fonctionnel, wireframes, etc. » — C14
+    > La modélisation des parcours utilisateurs respecte un formalisme: schéma fonctionnel, wireframes, etc.
+
+    — C14
+
+    > Les interfaces sont intégrées et respectent les maquettes.
+
+    — C17
 
 Cette fiche montre deux planches des maquettes du site, validées par Sabine le 09/11/2026: la charte graphique et les
 maquettes du fil de veille. Chacune vient en image, suivie de sa description textuelle, qui en donne tout le contenu.
