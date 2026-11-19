@@ -208,7 +208,15 @@ peut y paraître avant le texte qui le développe.
     touche Tab avant que le focus ne bouge, et la liste repliée n'a plus de hauteur. Elle n'est plus un arrêt de la
     touche Tab (`documentation/javascripts/search-list.js`); les résultats s'atteignent par les flèches, depuis le
     champ de recherche. Sur un écran large, le parcours à la touche Tab suit l'ordre de la page, le bouton du mode
-    compris.
+    compris. Le 2026-11-19, Sabine a passé WAVE sur la fiche du monitorage en mode sombre, et l'a parcourue à la
+    touche Tab. WAVE relevait les mêmes 15 erreurs de libellé, 7 libellés vides et 8 multiples, et un seul contraste
+    très faible, sur le lien d'évitement du thème, « Aller au contenu ». Ce lien reste transparent tant qu'il n'a pas
+    le focus (`opacity: 0`), et WAVE mesure son texte transparent sur la page. Il paraît au premier appui sur la
+    touche Tab, en `#1C1E21` sur `#F4F5F2`, soit 15,27:1 ([Les contrastes du thème](#les-contrastes-du-theme)). Le
+    critère 1.4.3 des WCAG 2.1 n'impose aucun contraste à un texte que personne ne voit, et s'applique au texte qui
+    paraît au focus: le lien passe le seuil de 4,5:1 dès qu'il paraît. Le parcours à la touche Tab suivait l'ordre de
+    la page, le menu de gauche titre par titre. Le thème donne le focus à un bloc de code qui défile, pour le faire
+    défiler au clavier (WCAG 2.1, critère 2.1.1).
 
 ## Publier
 
@@ -312,3 +320,9 @@ Lues le 2026-11-18:
     [version en ligne](https://www.accede-web.com/notices/editoriale/), ses neuf sections et ses bonnes pratiques
     (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
     une recherche web du même jour.
+
+Lue le 2026-11-19:
+
+- W3C, <span lang="en">« Understanding SC 1.4.3: Contrast (Minimum) »</span>,
+    [page du W3C](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum), après une recherche web du même jour:
+    un texte que personne ne voit n'a pas d'exigence de contraste; le texte qui paraît au focus en a une.
