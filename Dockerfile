@@ -7,7 +7,7 @@
 FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 # Build stage: the virtual environment, from uv.lock, without the development dependencies.
-FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc AS builder
+FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS builder
 COPY --from=uv /uv /usr/local/bin/uv
 # The Python of the base image, never one uv downloads; .pyc compiled now, since the final image
 # cannot write them (owned by root).
@@ -24,7 +24,7 @@ COPY src/ src/
 RUN uv sync --locked --no-dev --no-editable
 
 # Final stage: the same base, the virtual environment only, without uv.
-FROM python:3.13-slim-trixie@sha256:09a17cad02668ae61ece136b4fd36ac3849e14f670ebedb637ea3e15580525bc
+FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
 # The base image ships its standard library without .pyc: compiled here, as root, or every start
 # compiles them again in memory.
 RUN python -m compileall -q /usr/local/lib/python3.13
@@ -45,6 +45,13 @@ COPY --from=builder /app/.venv /app/.venv
 ENV PATH="/app/.venv/bin:$PATH" \
     KB_LOG_TO_FILE=false \
     PYTHONUNBUFFERED=1
+# zlib1g of trixie-security (DSA-6613-1, CVE-2026-85091, high): the base image of the digest of
+# 2026-11-18 ships 1:1.3.dfsg+really1.3.1-1+b1, which the scan of image.yml refuses. Pinned, so the image
+# does not depend on the day of its build; the build fails once trixie-security replaces this version.
+# Removed by #647 when the base image carries the fix (decision of Sabine of 2026-11-18, journal ADR).
+RUN apt-get update \
+    && apt-get install --yes --no-install-recommends zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
+    && rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 # Exec form: kb is PID 1 and receives SIGTERM itself (.claude/rules/poc.md, rule 6). No init
 # process: docker stop of kb serve-data is measured in the pull request of #200. As PID 1, a command

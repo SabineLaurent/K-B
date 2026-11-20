@@ -137,7 +137,7 @@ Les utilisateurs du produit sont décrits plus haut, dans « Utilisateurs ».
 |---|---|
 | API GitHub | un jeton en lecture seule, sans frais ([docs/jeton-github.md](docs/jeton-github.md)) |
 | BigQuery (GH Archive) | bac à sable sans compte de facturation : au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([docs/bigquery.md](docs/bigquery.md)) |
-| Modèle des fiches | gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Lecture plafonnée » |
+| Modèle des fiches | gpt-6.1-sol depuis le 2026-11-18, 250 000 jetons par minute ([la fiche du service d'IA](documentation/service_ia_pour_docu.md)) ; avant, gpt-6-luna sur Azure AI Foundry, sur l'abonnement Azure de mon organisme de formation, fourni pour ce projet : région France Central, zone de données UE, 140 000 jetons par minute (journal ADR, 2026-10-17). Je n'en vois pas la facturation. Ordre de grandeur : au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal ADR, 2026-10-16) ; les appels d'une demande sont détaillés dans [docs/fiches-veille.md](docs/fiches-veille.md), « Lecture plafonnée » |
 | Mise en ligne du 08/11 : coûts communs aux deux options (France Central, prix publics en dollars relevés le 2026-10-25, mois de 730 h) | **8,96 $ par mois** sans l'offre gratuite d'Azure Container Apps, **5,26 $** avec elle ; **29,32 $**, ou environ **27,70 $**, si les deux API gardent une réplique. Le détail : le job de collecte et d'import, une exécution par jour de 15 min à 0,5 vCPU et 1 Gio (hypothèse, non mesurée), 0,41 $ au tarif actif (0,000024 $ par vCPU-seconde, 0,000003 $ par Gio-seconde) ; `kb serve-data` et `kb serve-ai`, 0,5 vCPU et 1 Gio chacune, à zéro réplique au repos (décidé le 06/11, #414) et actives 1 h par jour (hypothèse), 3,29 $, ou 23,65 $ avec une réplique gardée, au tarif de repos (0,000003 $ par vCPU-seconde et par Gio-seconde) ; le brut dans Blob Storage (Hot LRS, 0,0192 $ par Go et par mois), 10 Go supposés, non mesurés, 0,19 $ ; le registre d'images Azure Container Registry Basic (0,1666 $ par jour, 10 Go compris), 5,07 $, ou 0 $ avec le registre de GitHub (GHCR), gratuit pour un paquet public ; ACR Basic choisi le 06/11 (#414), tiré par identité managée, sans secret ; les journaux dans Log Analytics, 0 $ sous 5 Go par mois, puis 2,76 $ par Go. L'offre gratuite (180 000 vCPU-secondes, 360 000 Gio-secondes et 2 millions de requêtes par abonnement et par mois) couvre le job et les deux API à zéro réplique (123 188 vCPU-secondes, 246 375 Gio-secondes) ; elle vaut par abonnement, et celui de la mise en ligne n'est pas connu. |
 | Mise en ligne, option SQLite et Blob | **0,02 $ par mois** de plus : la base, un fichier produit par le job puis rangé dans Blob Storage, et lu par `kb serve-data` au démarrage (hypothèse : la façon de la lire n'est pas décidée), 1 Go supposé, au prix du brut |
 | Mise en ligne, option PostgreSQL | **18,13 $ par mois** de plus : Azure Database for PostgreSQL, serveur flexible Burstable B1ms (1 vCore, 2 Gio), 0,019 $ de l'heure, 13,87 $, et 32 Gio de stockage, le minimum, à 0,133 $ par Go et par mois, 4,26 $ ; une sauvegarde au-delà du stockage compris est comptée 0,10 $ par Go et par mois, non chiffrée. Microsoft déconseille le niveau Burstable pour la production. |
@@ -166,7 +166,7 @@ je fusionne. Les décisions et leur pourquoi sont consignées dans le
 
 Les jalons et leurs issues sont sur la
 [page des jalons](https://github.com/SabineLaurent/K-B/milestones). Les jalons encore ouverts,
-relevés le 14/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
+relevés le 18/11/2026 (`gh api 'repos/SabineLaurent/K-B/milestones?state=all'`) :
 
 | Jalon | Échéance | Issues fermées | Issues ouvertes |
 |---|---|---|---|
@@ -609,16 +609,21 @@ KB_DATA_DIR=<dossier> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.ne
 ```
 
 `kb smoke-test` demande `GET /health` à l'API de données (`KB_DATA_API_URL`) et à l'API IA
-(`KB_AI_API_URL`), sans clé, puis le jeton de l'identité managée attribuée au job (`AZURE_CLIENT_ID`,
+(`KB_AI_API_URL`), sans clé. Après le `/health` de chaque API, qui la réveille, trois sondes sans clé vérifient
+qu'elle refuse ce qu'elle doit refuser (#499, `jobs/api_probes.py`) : une route à clé rend 401 (`GET /items`,
+`POST /digests`), `GET /docs` rend 404 (200 avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, où les API le servent) et
+`HEAD /health` rend 405 ; le corps d'une réponse n'est jamais lu. Puis il demande le jeton de l'identité managée
+attribuée au job (`AZURE_CLIENT_ID`,
 un GUID ; sans lui, le SDK chercherait l'identité système, que les jobs de K-B n'ont pas), et liste
 une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange (`KB_EXCHANGE_BLOB_URL`,
-en `https`, sans défaut). Les trois contrôles tournent toujours. Il n'écrit que des comptes : jamais
+en `https`, sans défaut). Les neuf contrôles tournent toujours. Il n'écrit que des comptes : jamais
 le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
 (`exchange_storage_forbidden`…), son statut HTTP et son code ; l'identité sans jeton, refusée ou
 injoignable, est `exchange_storage_no_token`. Code de sortie :
 
-- 0 : les deux API répondent `{"status":"ok"}` et le conteneur est listé ;
-- 1 : un contrôle échoue (`health_failed`, `health_timeout`… pour une API) ;
+- 0 : les deux API répondent `{"status":"ok"}`, chaque sonde reçoit son statut et le conteneur est listé ;
+- 1 : un contrôle échoue (`health_failed`, `health_timeout`… pour le `/health` d'une API ;
+  `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable` pour une sonde) ;
 - 2 : rien n'est contrôlé : une variable manque ou est refusée ;
 - 143 : SIGTERM, 130 : SIGINT (Ctrl-C).
 
@@ -837,7 +842,8 @@ chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce q
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
 | `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
-| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; l'image n'est poussée nulle part |
+| `digests-reference` | `ci.yml` | rejoue le jeu de référence de `POST /digests` (#479) par `tests/ai_api/digests_evaluation.py`, et échoue sous un seuil du 15/10 : 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité (`fidelity_rate`, chaque fait du jeu compté une fois), aucun item oublié (`items_unanswered`) ; il échoue aussi si le rejeu n'envoie pas tous les appels du jeu, dans leur ordre, ou si la route ne répond pas 200 ; son rapport (chaque mesure, son seuil, le résultat) est un artefact du run, gardé 30 jours : `gh run download <id> -n digests-reference-report`. Le jeu est rejoué, jamais envoyé au modèle : le job juge les contrôles de K-B sur des sorties enregistrées, et un changement de `prompt_version` le périme ; le modèle se mesure à chaque enregistrement du jeu par Sabine (#520). |
+| `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; enfin, la scanne par Grype v0.121.3, vérifié par son SHA256, et refuse une vulnérabilité haute ou critique qui a un correctif (paquets Debian, paquets Python de l'environnement virtuel et de l'image de base, CPython) ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `build` | `docs.yml` | construit le site des fiches de `documentation/` par MkDocs, en mode strict (un lien ou une ancre absents le font échouer), et vérifie l'empreinte du fichier de Mermaid téléchargé ; lancé à la main depuis `main`, dépose le site en artefact de Pages |
 | `deploy` | `docs.yml` | lancé à la main depuis `main` seulement, publie le site sur GitHub Pages ; sauté sur une PR |
@@ -845,7 +851,7 @@ chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce q
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
 
 Les jobs de `ci.yml` et le job `build` de `docs.yml` installent uv par `astral-sh/setup-uv`, à la version fixée
-dans chacun des sept (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
+dans chacun des huit (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
 `pyproject.toml`. Sur le Mac, la même version s'installe par `uv self update 0.13.6`.
 
 **Dependabot** (`.github/dependabot.yml`) ouvre chaque semaine les PR de mise à jour des actions des workflows
@@ -853,7 +859,7 @@ dans chacun des sept (`version: "0.13.6"`) : la même que le `Dockerfile`, dans 
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des six jobs de `ci.yml` et celle de
+majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des sept jobs de `ci.yml` et celle de
 `docs.yml` se changent à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
 la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
 réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
@@ -864,13 +870,13 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
 - `main` ne se supprime pas et ne reçoit pas de push forcé ;
 - tout changement passe par une PR, fusionnée par un commit de fusion (la seule méthode permise), sans
   approbation requise ;
-- 6 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et, depuis
-  #496, `bicep-build` ;
+- 7 checks requis, rendus par GitHub Actions : `audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build`
+  (depuis #496) et `image-build` (depuis #498) ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`image-build`, `tests-data` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 : il tourne sur toute
-PR, car un check qu'un filtre de chemin saute reste en attente et bloque la fusion (commentaire de `infra.yml`). Les
-non requis comptent au déploiement : `check` exige
+`tests-data`, `digests-reference` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 et
+`image-build` depuis #498 : ils tournent sur toute PR, car un check qu'un filtre de chemin saute reste en attente et
+bloque la fusion (commentaire de `infra.yml`). Les non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
 GitHub crée lui-même (Dependabot). `docs.yml` ne tourne sur un commit de `main` que lancé à la main : une telle
 exécution en échec fait refuser le tag de ce commit, jusqu'à une relance réussie
@@ -892,7 +898,8 @@ passe 2 » et « Les secrets du dépôt, après la passe 2 ».
 2026-11-09, les 7 checks que recevait alors une PR qui ne touchait ni `infra/` ni `.github/workflows/infra.yml` : les six de CI, `audit`, `tests`,
 `lint`, `types`, `tests-postgresql` et `tests-data` (exécution 42617081839), et `image-build` (exécution 42617082007 d'Image), tous verts
 (`gh pr checks 533 --repo SabineLaurent/K-B`) ; `bicep-build` n'y a pas tourné. Depuis #496, toute PR reçoit aussi
-`bicep-build`, un huitième check, et depuis #167, `build` de `docs.yml`, un neuvième.
+`bicep-build`, un huitième check, et depuis #167, les deux jobs de `docs.yml`, `build`, un neuvième, et `deploy`, sauté sur une
+PR, un dixième.
 
 **Construire l'image** (Docker ; une image pour toutes les commandes `kb`, voir le `Dockerfile`) :
 

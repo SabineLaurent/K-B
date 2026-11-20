@@ -208,19 +208,30 @@ d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes q
   tombe entre deux sortes. Une entrée retirée ne prend pas de place sous le plafond. Avec ce
   plafond, l'offset 10 000 de `GET /items` n'est jamais atteint.
 - **Durée totale** : `DIGEST_REQUEST_TIMEOUT_SECONDS` = 200 s (#205, `core/config.py`), comptée
-  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle. Les
-  appels se font **en série**, un sujet après l'autre (décision de Sabine du 2026-10-17, plan de
-  #205) : la chaîne mesurée par #158 dure environ 98 s (113 s avec les appels les plus lents),
-  sous les 240 s que l'ingress HTTP d'Azure Container Apps laisse à une requête
+  dès l'arrivée de la demande ; elle borne la lecture et chaque appel au modèle, sous les 240 s
+  que l'ingress HTTP d'Azure Container Apps laisse à une requête
   ([Ingress in Azure Container Apps](https://learn.microsoft.com/en-us/azure/container-apps/ingress-overview),
-  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Cette
-  mesure comptait un appel de plus par sujet, la vérification du sens, sortie du contrat le
-  2026-10-20 (section « Ce que la spec ne couvre pas » ; `core/config.py`). Options
-  écartées : rédiger les sujets en parallèle (environ 30 s, mais un `replay` à refaire et des 429
-  possibles sous le quota, pour un gain sans besoin mesuré) ; une tâche de fond (un état gardé
-  entre deux requêtes, contraire à la règle 7 de `poc.md`, utile seulement au-delà de 240 s).
-  Le pire cas, 16 appels de 210 s, dépasse 240 s en série comme en parallèle : seule l'échéance
-  borne la demande.
+  section « HTTP ») ; 200 s gardent 40 s pour le dernier appel en cours et la réponse. Les lots
+  du classement partent **en série** ; puis les sujets sont **rédigés en parallèle**, un fil par
+  sujet, tous à la fois (décision de Sabine du 2026-11-17, #630 ; `write_subjects`,
+  `ai_api/digests.py`). Pourquoi : le 2026-11-17, sur 300 items et gpt-6.1-sol, la chaîne en série
+  a atteint l'échéance avec 4 fiches sur 9 (7 classements de 6,2 à 14,3 s, rédactions de 23,4 à
+  30,7 s) ; en parallèle, la rédaction dure à peu près la plus lente des rédactions, non leur
+  somme. Les fiches, les échecs et les lignes de métriques restent dans l'ordre de la liste des
+  sujets, quel que soit l'ordre où les rédactions finissent. Le client d'httpx2 est partagé entre
+  les fils : son pool est sûr entre fils (doc d'httpx2,
+  [Connection pools](https://github.com/pydantic/httpx2/blob/main/src/httpcore2/docs/connection-pools.md),
+  « Thread and task safety », lue par Context7 le 2026-11-18 ; 100 connexions par défaut).
+  Chaque fil s'exécute dans une copie du contexte de la demande, sans quoi le span
+  `write_subject` perdrait son parent : OpenTelemetry tient le span courant dans `contextvars`
+  (`ContextVarsRuntimeContext`, lu dans l'environnement le 2026-11-18), qu'un `ThreadPoolExecutor`
+  ne copie pas dans ses fils. Le `replay` rédige en série : ses réponses suivent l'ordre des
+  requêtes (`connectors/llm_replay.py`). Options écartées : borner le nombre de fils (environ
+  60 s de plus en trois vagues, pour peu de protection contre un 429) ; rendre la demande
+  asynchrone, par une tâche de fond (un état gardé entre deux requêtes, contraire à la règle 7 de
+  `poc.md` ; à reprendre seulement si la rédaction en parallèle ne suffit pas). Avant #630, les
+  sujets étaient rédigés en série (décision de Sabine du 2026-10-17, plan de #205), et le
+  parallèle écarté faute de besoin mesuré.
   - **Mécanisme** (`ai_api/deadline.py`) : aucune requête au modèle s'il reste moins de
     `MIN_SECONDS_FOR_LLM_REQUEST` = 10 s, au-dessus de la rédaction la plus lente mesurée par #158
     (9,3 s), pour que les items ne partent pas pour une réponse que l'échéance jetterait ; une
@@ -252,8 +263,10 @@ d'après celle du 2026-10-30 ; arXiv ≈ 45, releases 20 à 60, KEV et alertes q
   constante de plus.
 
 **Limites** : une seule demande à la fois est supposée (une seule utilisatrice, en local) ; le
-quota du déploiement Foundry est de 140 000 jetons et 140 requêtes par minute (en-têtes
-`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17). Selon le calcul de la doc « Manage quota »
+quota du déploiement Foundry de gpt-6-luna est de 140 000 jetons et 140 requêtes par minute (en-têtes
+`x-ratelimit-limit-*`, mesure de #158 du 2026-10-17) ; celui de gpt-6.1-sol, de 250 000 jetons
+par minute (déploiement relevé par Sabine le 2026-11-17, #630) : les 9 rédactions envoyées à la
+fois demandent au plus environ 150 000 jetons estimés (entrée plus `max_completion_tokens`). Selon le calcul de la doc « Manage quota »
 (entrée estimée plus `max_completion_tokens`), une demande approche 110 000 jetons estimés par
 minute, même en série : une seconde demande dans la même minute peut rendre un 429 (non observé :
 sur l'essai de #158, l'en-tête ne baissait que des jetons d'entrée). Les sortes rares tiennent bien sous
@@ -324,7 +337,8 @@ aussi `minimal` et `low`, pour les modèles du banc de C7 dont l'effort ne desce
 Hydrogen ; toute autre valeur arrête le démarrage. À `minimal` ou `low`, le modèle raisonne, et ses
 jetons de raisonnement comptent dans `max_completion_tokens` (référence de l'API OpenAI,
 `chat/completions`, lue le 2026-11-17) : la sélection des tendances (1 024), la classification et
-la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_invalid_output`.
+la rédaction des tendances (2 048 chacune) peuvent alors finir coupées, lues `llm_truncated`
+(`finish_reason: length`, contrôle 1).
 Mesure du banc de C7 (16/11, `wip/banc-c7/results/passages.jsonl` de time-knight) : gpt-6.1-sol à
 `low`, lancement `20261116T142308Z`, 5 passages complets, choix des dépôts valide 5 fois sur 5, 274
 à 588 jetons de raisonnement par passage, toutes étapes comprises (textes : 91 à 207, lancement
@@ -572,8 +586,8 @@ moins la plus longue sortie que ces bornes permettent (12 affirmations, 5 items 
 120 caractères chacune) : une troncature ne vient alors que d'une sortie hors bornes. #205 le
 fixe à 8 192 jetons pour la rédaction (`WRITING_MAX_COMPLETION_TOKENS`) : une **estimation**,
 environ 24 500 caractères en JSON compact à 3 caractères par jeton (hypothèse ; la note de #158
-l'estime à 6 000-7 000 jetons). C'est aussi le plus haut que permet le délai de lecture de 90 s
-au débit mesuré par #158, avec 40 % de marge (environ 8 746 jetons ; un test le garde). Au
+l'estime à 6 000-7 000 jetons). Au débit mesuré sur gpt-6.1-sol le 2026-11-17 (environ 20 ms par
+jeton), il se lit en environ 164 s, sous le délai de lecture de 200 s (un test le garde). Au
 classement, 2 048 (50 affectations d'environ 25 jetons). Chez un modèle à raisonnement, ce plafond compte aussi les jetons
 de raisonnement, attendus à 0 avec `reasoning_effort: "none"` (`reasoning_tokens`, section
 « Métriques »).
@@ -890,10 +904,28 @@ que dans un texte libre (le corps d'une release, le résumé d'un article) compt
 l'item, puisqu'elle n'est cherchée que dans `cve_id` et `ghsa_id`. Un fait sans lettre ni chiffre,
 ou un fait qui contient plus qu'un motif CVE ou GHSA (`CVE-2026-86950 critique`, sans forme
 canonique), n'est trouvé ni dans l'un ni dans l'autre (`both`). `facts_found` compte les faits
-trouvés aux deux, et le taux reste `facts_found` / `facts_checked`. Sur le jeu de référence de #479
-(`write-1`, enregistré le 2026-11-08), les 26 faits vérifiés sont dans leur item, 14 dans leur
-`text` : aucun fait absent de son item, 12 faits non recopiés dans la phrase
-(`tests/ai_api/test_digests_reference.py`).
+trouvés aux deux, et le taux reste `facts_found` / `facts_checked`.
+
+**Le jeu de référence, du 08/11 au 20/11** (#520). Le jeu de #479, enregistré le 2026-11-08 sur
+gpt-6-luna, a été remplacé le 2026-11-20 par un jeu enregistré sur ce qui est livré : gpt-6.1-sol,
+effort `low`, avec `classify-2` et `write-1` (décision de Sabine du 2026-11-20). Les deux portent sur
+les 6 mêmes items, avec les mêmes consignes ; le classement, lui, diffère : l'item 1, rangé dans
+`agent_frameworks` par gpt-6.1-sol, l'avait été dans `llm_security` par gpt-6-luna. Mesures relevées au rejeu
+de chaque jeu :
+
+| Jeu | Sujet | Items | Faits vérifiés | Dans l'item | Dans le `text` | `fidelity_rate` | Affirmations gardées | Motifs de retrait (par affirmation retirée) |
+|---|---|---|---|---|---|---|---|---|
+| 08/11, gpt-6-luna | `vulnerabilities` | 3 | 8 | 8 | 5 | 0,625 | 0 sur 3 | `fact_not_found` (`text`) : 3 |
+| 08/11, gpt-6-luna | `llm_security` | 3 | 18 | 18 | 9 | 0,5 | 1 sur 6 | `fact_not_found` (`text`) : 4 ; `cited_item_without_fact` : 3 ; `out_of_bounds` : 1 |
+| 20/11, gpt-6.1-sol | `vulnerabilities` | 3 | 14 | 14 | 14 | 1,0 | 3 sur 3 | aucun |
+| 20/11, gpt-6.1-sol | `llm_security` | 2 | 10 | 10 | 10 | 1,0 | 6 sur 6 | aucun |
+| 20/11, gpt-6.1-sol | `agent_frameworks` | 1 | 2 | 2 | 2 | 1,0 | 1 sur 1 | aucun |
+
+Au total : le 08/11, 26 faits vérifiés, tous dans leur item, 14 dans leur `text` (54 %), 1 affirmation
+gardée sur 9 ; le 20/11, 26 faits vérifiés, tous dans leur item et dans leur `text`, 10 affirmations
+gardées sur 10, chaque appel répondu à sa première tentative (`tests/ai_api/test_digests_reference.py`).
+Une affirmation retirée peut avoir plusieurs motifs : ils ne s'additionnent pas. Limite : chaque jeu
+est un seul enregistrement, sans répétition ; l'écart mesure deux sorties, pas une moyenne.
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
@@ -999,7 +1031,7 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : durcissement, construit sur toute PR et exigé par le ruleset de `main` depuis #496, à constater sur une PR qui ne touche pas `infra/` (PR de #611, citée par celle de #498) ; revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, scan de l'image (#498) et sondes après déploiement (#499). Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne se fait au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb` ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
 | API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
@@ -1007,7 +1039,7 @@ Le compte : 5 entrées tenues sur 10 (API1, API3, API5, API6, API7). Les 5 autre
 et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`, protections
 externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
 limite ; et 3 non tenues, des mesures nécessaires non intégrées : API4 (plafond de dépense, #501),
-API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jeton de Grafana Cloud,
+API8 (revue, #497, et évaluation, #499, codée, à constater en ligne) et API10 (portée du jeton de Grafana Cloud,
 #522). Ce qui ne dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
 
 ### API1:2023 Broken Object Level Authorization
@@ -1076,9 +1108,9 @@ API8 (durcissement, revue et évaluation, #496 à #499) et API10 (portée du jet
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
-    l'atteignent. À ce commit, deux apps, les deux API, et deux jobs (`infra/deployment.json`), dont
-    un seul l'appelle : `caj-kb-smoke-test`, sur `/health`, sans clé ; `kb digest` et
-    `kb trend-report`, ses clients à clé, n'ont pas de job en ligne. Ce que le certificat prouverait,
+    l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
+    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
+    `caj-kb-digest-watch` (#423), par `kb digest` et `kb trend-report`, avec leurs clés. Ce que le certificat prouverait,
     qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
     sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
     programmes de la machine.
@@ -1315,23 +1347,19 @@ configuration ; le seul élément externe d'un chemin est le nom d'un dépôt, s
 Relue point par point le 2026-11-08 (#454), contre `infra/` et l'état en ligne ; une mesure qui ne
 dépend que du code garde son état et sa preuve.
 
-- **Durcissement répétable** : non tenue, en partie : mesure nécessaire non intégrée jusqu'au constat d'une PR qui ne
-  touche pas `infra/` (consigne de Sabine du 2026-11-09). L'image (`Dockerfile`, utilisateur 10001, #200),
-  l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme le code ; depuis
-  #496, la CI construit `infra/main.bicep` sur toute PR vers `main` et tout push sur `main`, sans filtre de chemin
-  (`.github/workflows/infra.yml:3-7`, `:26` ; `grep -n "paths" .github/workflows/infra.yml` ne rend rien, le
+- **Durcissement répétable** : tenue, avec trois écarts voulus (ci-dessous). L'image (`Dockerfile`, utilisateur
+  10001, #200), l'environnement, les apps et les jobs d'ACA (`infra/`, Bicep) sont versionnés et relus en PR comme le
+  code ; depuis #496, la CI construit `infra/main.bicep` sur toute PR vers `main` et tout push sur `main`, sans filtre
+  de chemin (`.github/workflows/infra.yml:3-7`, `:26` ; `grep -n "paths" .github/workflows/infra.yml` ne rend rien, le
   2026-11-13), et `bicep-build` est un contrôle exigé du ruleset de `main` (ruleset 25257125, lu le 2026-11-14 à
-  11:57 UTC : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`, `strict`) ; une version taguée
-  part en ligne par `.github/workflows/deploy.yml` (#415). Un réglage refusé empêche le démarrage
-  (`test_serve_ai_exits_2_and_names_the_variable_refused`). Ce qui reste : le constat d'une PR qui ne touche pas
-  `infra/` et reçoit `bicep-build`, vert.
-  **Pour la tenir** : ce constat, sur la PR de #611, cité par la PR de #498. XS.
-  **Pour réduire le risque** : d'ici là, le ruleset échoue fermé : un contrôle exigé qui ne tournerait pas reste
-  « Pending » et bloque la fusion (« Associated checks stay in a "Pending" state and block merging », GitHub Docs,
-  « Troubleshooting required status checks », relu le 2026-11-14) ; faisable, déjà fait. Après une passe à la main ou
-  une version, relire la configuration en ligne (« Revue périodique », ci-dessous).
-  Trois écarts voulus, que la mesure garde une fois tenue (décision de Sabine du 2026-11-08 : tenir la construction
-  exigée, justifier le reste) :
+  11:57 UTC puis à 16:53 UTC : `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`, `strict`) ;
+  un contrôle exigé qui ne tournerait pas reste « Pending » et bloque la fusion (« Associated checks stay in a
+  "Pending" state and block merging », GitHub Docs, « Troubleshooting required status checks », relu le
+  2026-11-14). Constaté sur une PR qui ne touche pas `infra/` (consigne de Sabine du 2026-11-09) : #625, aucun de ses
+  30 fichiers sous `infra/`, a reçu `bicep-build`, vert, le 2026-11-14 à 16:53 UTC (exécution 43618055085 d'`Infra`,
+  `gh pr checks 625` ; commentaire sur #496). Une version taguée part en ligne par `.github/workflows/deploy.yml`
+  (#415). Un réglage refusé empêche le démarrage (`test_serve_ai_exits_2_and_names_the_variable_refused`).
+  Trois écarts voulus (décision de Sabine du 2026-11-08 : tenir la construction exigée, justifier le reste) :
   - **Le socle s'applique à la main**, en deux passes (`infra/README.md`, « Appliquer »). Ces fichiers donnent des
     rôles aux identités, ce qui demande le droit d'Owner sur le groupe ; la CI ne l'a jamais (moindre privilège :
     `id-kb-deploy` n'a que AcrPush et Reader sur le registre, Container Apps Contributor sur chaque app et Container
@@ -1366,18 +1394,47 @@ dépend que du code garde son état et sa preuve.
   **Pour réduire le risque** : d'ici #497, relancer à chaque version les commandes de « TLS, même
   pour une API interne » (ci-dessous), en lecture seule.
 - **Évaluation automatisée et continue dans tous les environnements** : non tenue, en partie :
-  mesure nécessaire non intégrée (#498, #499). La CI
+  mesure nécessaire non intégrée (#499). La CI
   lance `pip-audit`, les règles de sécurité de ruff, les tests et leur seuil de couverture
-  (`.github/workflows/ci.yml`), et la construction du Bicep (`infra.yml`). Après chaque
-  déploiement, `deploy.yml` lance `caj-kb-smoke-test` (l. 204-209), qui demande `GET /health` aux
-  deux API (`src/k_b/jobs/api_health.py`) et atteint le stockage d'échange par l'identité du job :
-  il vérifie que la version déployée répond, pas sa sécurité.
-  **Pour la tenir** : un scan de l'image dans la CI (l'outil, une dépendance de la CI, est à
-  choisir, #498), et des essais scriptés des points de cette section, lancés par la CI après chaque
-  déploiement, avec une clé de test à prévoir (#499 : des sondes sans clé). M.
-  **Pour réduire le risque** : `pip-audit` audite déjà chaque version de `uv.lock`, uvicorn et h11
-  compris (`.github/workflows/ci.yml:23-25`) ; restent sans contrôle les paquets Debian de l'image
-  (#498).
+  (`.github/workflows/ci.yml`), la construction du Bicep (`infra.yml`) et, depuis #498, le scan de
+  l'image : Grype v0.121.3, vérifié par son SHA256, cherche dans l'image construite les
+  vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
+  de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
+  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Constaté le 2026-11-18 :
+  rouge sur une image de base de décembre 2024 (essai #644, exécution 44275262249), vert sur l'image de #643
+  (exécution 44347407723). Un scan rouge sur `main`
+  bloque aussi la mise en ligne : `deploy.yml` ne déploie qu'un commit dont toutes les exécutions
+  sont vertes (l. 51-67). Après chaque déploiement, `deploy.yml` lance `caj-kb-smoke-test`
+  (l. 204-210), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
+  stockage d'échange par l'identité du job. Depuis #499, il envoie aussi à chaque API, après son
+  `/health`, trois sondes sans clé, et échoue sur tout autre statut : une route à clé (`GET /items`,
+  `POST /digests`) doit rendre 401, `GET /docs` 404 hors `sandbox`, et `HEAD /health` 405
+  (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:95-109`). Il vérifie ainsi,
+  sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée.
+  Prouvé par les tests, sur des API simulées
+  (`test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run`,
+  `tests/commands/test_smoke_test_command.py`) et sur les apps elles-mêmes, en `sandbox` et hors
+  `sandbox` (`test_each_probe_of_kb_smoke_test_gets_the_status_it_expects`, dans
+  `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Le constat en ligne se fait
+  au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb`.
+  **Pour la tenir** : la ligne `9 of 9 checks passed` du premier test de fumée en ligne, au premier tag
+  qui porte ce code, lue dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes
+  vérifient les refus sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le
+  code de l'image, sans clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel
+  payant au modèle (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
+  **Pour réduire le risque** : `pip-audit` audite chaque version de `uv.lock`, uvicorn et h11
+  compris (`.github/workflows/ci.yml:23-25`), et Grype l'image ; les réponses sans clé des routes
+  (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur
+  l'environnement déployé. Faisable, déjà fait.
+  **Limite du scan** : il ne voit ni une vulnérabilité sans correctif (`--only-fixed`), ni une
+  vulnérabilité publiée après la dernière exécution d'`Image` sur `main` : l'image en ligne, que
+  `deploy.yml` reconstruit au tag (l. 102-117) sans la scanner, peut en porter une jusqu'à la PR
+  suivante. **Pour réduire le risque** : Dependabot propose chaque semaine
+  le nouveau digest de l'image de base (`.github/dependabot.yml:10-16`), qui apporte les correctifs
+  de Debian et de CPython, et son scan ; faisable, déjà fait. Le même scan dans `deploy.yml`, avant
+  la mise en ligne (#626), et un déclenchement planifié d'`image.yml` (`on: schedule`), qui
+  scannerait `main` sans attendre une PR : faisables avec nos droits, le second sur les minutes du
+  compte.
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
   `127.0.0.1`, joignable de la machine seule.
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
@@ -1974,7 +2031,7 @@ Sources, lues le 2026-10-27 :
 | `llm_invalid_output` | contrôles 2 à 6, ou `finish_reason` hors liste, deux fois | 502 | le sujet va dans `failed_subjects`, avec son étape (`stage`) |
 | `llm_truncated` | `finish_reason` `length` ; pas de nouvelle tentative (même entrée, même modèle figé : même sortie attendue) | 502 | `failed_subjects` |
 | `llm_content_filtered` | `finish_reason` `content_filter` : le filtre de contenu du fournisseur a retenu la sortie (celui d'Azure peut réagir aux textes sur le jailbreak et l'injection, sujets de la veille) ; ou un 400 dont `error.code` vaut `content_filter` : il a retenu l'entrée ; pas de nouvelle tentative (même entrée) | 502 | `failed_subjects` |
-| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet suivant, sans envoi (#205) |
+| `llm_rate_limited` | 429 du fournisseur, après la nouvelle tentative ; ou un 429 dont le `Retry-After` dépasse `LLM_RETRY_AFTER_MAX_SECONDS`, sans nouvelle tentative | 503, avec le `Retry-After` du fournisseur ; sans en-tête s'il n'en a pas donné (aucune attente inventée) | `failed_subjects`, et chaque sujet pas encore envoyé, sans envoi (#205) ; en parallèle, les sujets partent à la fois, avant qu'un 429 soit connu (#630) |
 | `llm_unavailable` | 5xx, connexion refusée ou coupée, après la nouvelle tentative ; autre 4xx, réponse qui ne se décode pas, réponse au-delà de `MAX_LLM_ANSWER_BYTES` (1 000 000 d'octets, annoncés ou comptés, OWASP API10:2023), ou réponse 200 qui n'est pas une complétion lisible (pas du JSON, aucun `choices`, un type faux), sans nouvelle tentative | 502 | `failed_subjects` |
 | `llm_timeout` | pas de connexion ou pas de réponse dans le délai du client (#150), sans nouvelle tentative ; ou durée totale de la demande dépassée (`DIGEST_REQUEST_TIMEOUT_SECONDS`), pour chaque sujet pas encore rédigé, ou pendant la lecture d'une réponse | 504 | `failed_subjects` |
 | `data_api_unavailable` | API de données injoignable, ou 5xx | 502 | — |
@@ -1997,11 +2054,20 @@ Sources, lues le 2026-10-27 :
   ou une connexion refusée, elle attend `Retry-After` (en secondes ; une date HTTP compte comme un
   en-tête absent), ou `LLM_RETRY_WAIT_SECONDS` sans lui ; un `Retry-After` au-delà de
   `LLM_RETRY_AFTER_MAX_SECONDS` met fin à l'appel, car une attente plus courte rendrait la même
-  réponse. Un appel dure ainsi 210 s quand les réponses arrivent d'un bloc (deux tentatives de
-  5 s de connexion et 90 s de réponse, et 20 s d'attente) ; 90 s couvrent une sortie de 8 192
-  jetons au débit mesuré par #158 sur gpt-6-luna (environ 7,35 ms par jeton, soit ~60 s) ; une réponse envoyée par morceaux peut
-  durer plus, car chaque lecture a son propre délai : la borne totale est celle de la demande,
-  `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture plafonnée »).
+  réponse. **Délai de lecture** (`LLM_CALL_TIMEOUT_SECONDS`) : 200 s, l'échéance de la demande
+  (décision de Sabine du 2026-11-18, #640). Le calcul : au débit mesuré sur gpt-6.1-sol le
+  2026-11-17 (rédactions de 1 220 à 1 765 jetons en 23,4 à 30,7 s, environ 20 ms par jeton), une
+  sortie de 8 192 jetons prend environ 164 s, 229 s avec la marge de 40 % de #158 (7,35 ms par
+  jeton sur gpt-6-luna, 90 s). **Ce que cela change** : le délai d'un appel ne coupe plus avant
+  l'échéance de 200 s, qui devient la seule borne d'un appel (chaque délai est ramené au temps
+  restant, `ai_api/deadline.py`) ; un appel bloqué n'est plus relancé, un classement compris, qui
+  part en premier et emporte alors la demande (`llm_timeout`, 504). **Limite** : une rédaction
+  part une fois la lecture et le classement faits, environ 130 s avant l'échéance le 2026-11-17 ;
+  une sortie valide proche du plafond (environ 164 s) y serait coupée en `llm_timeout` par
+  l'échéance, non par le délai de l'appel (constat C5 de la revue de #630). Une réponse envoyée par
+  morceaux peut durer plus, car chaque lecture a son propre délai : la borne totale est celle de
+  la demande, `DIGEST_REQUEST_TIMEOUT_SECONDS` (#205), avec sa limite (section « Lecture
+  plafonnée »).
 - 502, 503 et 504 disent la panne de l'amont, comme une passerelle (RFC 9110, § 15.6) : le client
   distingue « réessayer plus tard » (503, 504) d'une sortie fautive (502).
 - **Échec partiel** : la réponse est 200 dès que le classement a réussi ; chaque sujet en échec est
@@ -2026,6 +2092,18 @@ Sources, lues le 2026-10-27 :
   `llm_unavailable`, qui mêle les pannes du fournisseur (5xx, connexion refusée) et les refus
   propres à une requête (un autre 4xx, une réponse illisible) : après une panne, les sujets
   suivants partent encore.
+  **Depuis la rédaction en parallèle** (#630, décision de Sabine du 2026-11-18) : les sujets
+  partent tous à la fois, avant qu'un 429 puisse être connu ; la règle ne vaut plus que pour un
+  sujet pas encore envoyé quand le 429 arrive, en pratique aucun, sauf en série (le `replay`).
+  Les items de tous les sujets partent donc même quand l'un d'eux recevra un 429. Accepté : les
+  9 rédactions tiennent sous le quota (environ 150 000 jetons estimés sur 250 000 par minute,
+  section « Lecture plafonnée ») ; borner le nombre de fils coûterait environ 60 s pour peu de
+  protection. **Limites** (constats C2 et C4 de la revue de #630, tranchés par time-knight,
+  délégation de Sabine du 2026-10-15) : un appel en cours fait encore sa propre nouvelle tentative
+  après le 429 d'un autre sujet, et renvoie ses items ; des fils qui reçoivent un 429 au même moment
+  relancent ensemble après la même attente (`LLM_RETRY_WAIT_SECONDS` ou le même `Retry-After`), et
+  peuvent recevoir un 429 de nouveau. Rien de cela dans `llm_client.py` : le quota de gpt-6.1-sol,
+  250 000 jetons par minute, est loin au-dessus d'une demande seule.
 - **Limite : un lot de classement en échec fait échouer toute la demande.** Prompt Shields, actif
   dans `DefaultV2`, lit le message utilisateur, où sont les items : un item réel qui parle
   d'injection d'instructions peut faire rendre un 400 `content_filter` à tout un lot (502

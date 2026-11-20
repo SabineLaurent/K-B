@@ -238,18 +238,23 @@ LOG_TO_FILE = True
 # The call to the model by the AI API (ai_api/connectors/llm_client.py; docs/fiches-veille.md). Waiting for
 # a connection, for a connection of the pool, for each write of the request, and for each read of
 # the answer: a call that is not streamed sends nothing before its answer is whole, so the read
-# timeout bounds the wait for an answer that comes in one block. Measured by #158 on gpt-6-luna
-# (2026-10-17): about 7.35 ms per output token, so 8,192 tokens take about 60 seconds; 90 leaves
-# a margin. Connection, pool and write: no failure over 20 real calls, bodies of 27,000
-# characters.
+# timeout bounds the wait for an answer that comes in one block. Measured on gpt-6.1-sol by the
+# end-to-end run of 2026-11-17 (#630): writings of 1,220 to 1,765 output tokens in 23.4 to 30.7
+# s, at most 19.2 ms per token, so about 20 ms; the 8,192 tokens of WRITING_MAX_COMPLETION_TOKENS
+# take about 164 s, 229 s with the margin of 40 % kept since #158 (7.35 ms per token on
+# gpt-6-luna, 90 s). Set to the deadline of a request, 200 s (DIGEST_REQUEST_TIMEOUT_SECONDS,
+# TREND_REPORT_REQUEST_TIMEOUT_SECONDS; decision of Sabine of 2026-11-18, #640): the deadline,
+# which shortens each timeout to the time left (ai_api/deadline.py), is the only bound of a call,
+# and a call that hangs, a classification included, leaves no time for its retry. Connection,
+# pool and write: no failure over 20 real calls, bodies of 27,000 characters.
 LLM_CONNECT_TIMEOUT_SECONDS = 5
 LLM_POOL_TIMEOUT_SECONDS = 5
 LLM_WRITE_TIMEOUT_SECONDS = 10
-LLM_CALL_TIMEOUT_SECONDS = 90
+LLM_CALL_TIMEOUT_SECONDS = 200
 # The wait before the retry after a 429, a 5xx or a failed connection without Retry-After; a
-# Retry-After above the maximum is not waited: the call ends there. A call lasts 2 × (5 + 90) +
-# 20 = 210 seconds when its answers come in one block; an answer sent in pieces can last longer,
-# since each read has its own timeout: the bound of the whole is the one of the request (#205).
+# Retry-After above the maximum is not waited: the call ends there. The deadline of the request
+# bounds a call and its retry (#205): a retry is sent only if MIN_SECONDS_FOR_LLM_REQUEST are
+# left after its wait.
 LLM_RETRY_WAIT_SECONDS = 2
 LLM_RETRY_AFTER_MAX_SECONDS = 20
 # Not set: temperature=0. "none", "minimal" or "low" for a reasoning model, which takes no
@@ -562,10 +567,11 @@ BIDI_CONTROLS = frozenset(
 CHARACTER_REFERENCE = re.compile(r"&(?=#|[A-Za-z0-9]+;)")
 
 # The bound of a digest request, from its arrival: the reading by the data API and every call to
-# the model, which go one after the other. Under the 240 seconds the HTTP ingress of Azure
-# Container Apps gives a request, with 40 for the last call under way and the answer. Measured by
-# #158 on gpt-6-luna: about 98 seconds for 8 subjects, the judge included (113 with the slowest
-# calls). Beyond it, a subject not yet written is llm_timeout, the others are returned.
+# the model, the batches of the classification one after the other, then the subjects written at
+# once (#630). Under the 240 seconds the HTTP ingress of Azure Container Apps gives a request,
+# with 40 for the last call under way and the answer. Measured on gpt-6.1-sol on 2026-11-17, in
+# series: 7 batches of 6.2 to 14.3 s, writings of 23.4 to 30.7 s, so that 4 subjects of 9 were
+# written. Beyond it, a subject not yet written is llm_timeout, the others are returned.
 DIGEST_REQUEST_TIMEOUT_SECONDS = 200
 # The bound of a trend report request: 1 + 31 GET /trends at most on a service of the same network,
 # then GITHUB_MAX_REQUESTS_PER_REPORT GET /repos at most on GitHub, one after the other, then the
@@ -614,8 +620,9 @@ MAX_AI_API_ANSWER_BYTES = 8_000_000
 WAIT_LOG_INTERVAL_SECONDS = 10
 # The time a request to the model needs at least: none is sent with less left, so that the items
 # are not sent for an answer the deadline would throw away. Above the slowest writing measured by
-# #158 (9.3 s), not above the longest one the output cap allows (about 60 s): a longer writing
-# started with less time left can still end in llm_timeout.
+# #158 on gpt-6-luna (9.3 s), not above the longest one the output cap allows (about 164 s on
+# gpt-6.1-sol, see the comment of LLM_CALL_TIMEOUT_SECONDS): a longer writing started with less
+# time left can still end in llm_timeout.
 MIN_SECONDS_FOR_LLM_REQUEST = 10
 
 # The export of the metrics of the AI API in OpenTelemetry (ai_api/connectors/metrics_export.py,
@@ -678,6 +685,13 @@ HEALTH_REQUEST_DEADLINE_SECONDS = (
 )
 # The body of GET /health is {"status":"ok"}, 15 bytes: beyond 1 KiB, it is not the answer of K-B.
 MAX_HEALTH_ANSWER_BYTES = 1024
+# A probe without key from a job (jobs/api_probes.py), after the /health of its API: the API is awake,
+# and refuses before any work (401, 404, 405), so the read waits 10 s, not the 60 s of a wake. Six
+# probes at most 15 s each keep the job within its replicaTimeout (infra/modules/smoke-test-job.bicep).
+PROBE_CONNECT_TIMEOUT_SECONDS = 5
+PROBE_POOL_TIMEOUT_SECONDS = 5
+PROBE_WRITE_TIMEOUT_SECONDS = 10
+PROBE_READ_TIMEOUT_SECONDS = 10
 # The waits of a request to the exchange storage or to the identity endpoint: those the SDK of the
 # storage sets only when it builds its transport (CONNECTION_TIMEOUT and READ_TIMEOUT,
 # azure/storage/blob/_shared/constants.py, azure-storage-blob 12.31.1); the transport of K-B would

@@ -7283,6 +7283,47 @@ sous la délégation de Sabine du 15/10. Prolonge l'entrée de #559 (2026-11-12)
   vérifie ; un type construit de `DIGEST_SUBJECTS` à l'exécution ne se vérifie pas statiquement. Limite (e)
   ci-dessus. — PR de #560
 
+### CI : l'image scannée par Grype, `image-build` exigé de `main` (#498)
+
+Plan validé par Sabine le 2026-11-13 (points 3 à 6), sur sa décision du 08/11 de tenir l'« évaluation automatisée »
+d'API8 par un outil de CI nouveau ; la version de Grype tranchée par time-knight le 2026-11-14, sous la délégation de
+Sabine du 15/10.
+
+- **`image-build` scanne l'image construite par Grype (Anchore, Apache 2.0), le binaire de sa release vérifié par
+  son SHA256 dans `image.yml`, comme Bicep dans `infra.yml` : `grype docker:k-b:ci --only-fixed --fail-on high`,
+  en dernière étape du job.** Pourquoi : `audit` ne lit que `uv.lock`, pas les paquets Debian de l'image de base.
+  Options écartées : Trivy, vecteur de l'attaque du 19/03/2026 (GHSA-69fq-xp46-6x23 : 76 tags de `trivy-action` sur
+  77 réécrits, un binaire v0.69.4 piégé), et qui ne voit pas le CPython de l'image ; Docker Scout, qui demande un
+  compte Docker ; une action GitHub (`anchore/scan-action`), du code de plus à croire, quand un binaire vérifié suffit.
+  En dernière étape, pour qu'un scan rouge ne cache pas le résultat des autres contrôles de l'image (revue de code,
+  tranché par time-knight le 2026-11-14 ; le plan le plaçait juste après la construction).
+- **Grype scanne tout ce qu'il voit : paquets Debian, paquets Python (l'environnement virtuel, et `pip` de l'image
+  de base) et CPython.**
+  Pourquoi : l'image est ce qui part en ligne. Limite assumée : une vulnérabilité d'un paquet Python d'`uv.lock` fait
+  échouer `audit` et le scan ensemble ; celle de `pip`, hors d'`uv.lock`, le scan seul.
+- **Le seuil, celui de l'issue : une vulnérabilité haute ou critique qui a un correctif (`--only-fixed`, puis
+  `--fail-on high`).** Comportement validé par Sabine avec le plan le 13/11 ; raison donnée par le plan : la CI ne
+  refuse que ce qu'une PR peut corriger. Limites assumées : une vulnérabilité sans correctif ne se voit pas ; une vulnérabilité publiée après le dernier scan de `main` n'est vue qu'à la PR suivante.
+  `deploy.yml` reconstruit l'image au tag sans la scanner. Pour réduire le risque : la PR hebdomadaire de Dependabot
+  sur le digest de l'image de base, scannée ; le même scan dans `deploy.yml` (#626) ; un déclenchement planifié
+  d'`image.yml`, faisable avec nos droits, non retenu ici.
+- **Grype v0.121.3, la dernière version publiée depuis 7 jours au moins, la même attente que Dependabot.** Le code
+  du 2026-11-14 a pris v0.121.2 : v0.121.3 (2026-11-09) n'avait que 5 jours ; elle corrige 8 avis de ses dépendances
+  (dont GO-2026-6888, critique), qui visent le démon Docker, dont Grype n'est que client, ou sont des dénis de service
+  à la décompression et à l'analyse HTML. Montée le 2026-11-18, la PR n'étant pas fusionnée (tranché par time-knight
+  le 2026-11-14). Écartée : v0.122.0 (2026-11-16), à 2 jours ; elle corrige GHSA-q7gw-24fr-5p69 (moyen, SDK
+  OpenTelemetry pour Go : une borne de longueur d'attribut contournée), lu le 2026-11-18 ; le job ne règle aucune
+  variable `OTEL_*`, et son effet sur le scan est supposé nul, non vérifié dans le code de Grype. Pour réduire le risque : monter à v0.122.0 après le 2026-11-23 à 20:41 UTC, par une PR.
+- **`image-build` devient un contrôle exigé du ruleset de `main`, posé par Sabine juste avant la fusion, comme
+  `bicep-build` (#496).** Pourquoi : la limite « Deux contrôles ne bloquent pas la fusion » de la doc de la CI (lue
+  le 2026-11-10) : non exigé, un scan rouge laisse fusionner, et ne bloque qu'au déploiement (`deploy.yml` exige
+  toutes les exécutions vertes). Limite assumée : une vulnérabilité corrigée publiée un matin bloque toutes les PR, comme `audit` le 2026-11-13 (#606). D'où la marche à suivre écrite dans
+  `documentation/integration_continue_pour_docu.md` : un paquet Python d'`uv.lock`, monté dans `uv.lock` ; sinon
+  (paquet Debian, CPython, `pip`) le digest de l'image de base monté à la main si l'image amont a le correctif ;
+  sinon une entrée de `.grype.yaml`, avec sa raison, sa date et l'issue qui la retire, décidée par Sabine (une règle
+  non tenue l'est par décision écrite). Écarté : `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image
+  du jour de sa construction. — PR de #498
+
 ### Documentation publiée par un site MkDocs sur GitHub Pages (#167)
 
 - **Les fiches de `documentation/` deviennent un site statique, construit par MkDocs 1.6.1 avec le thème Material for
@@ -7397,6 +7438,106 @@ par Sabine le 2026-11-18 (« plan validé avec les précisions de tn-orchestrate
   le modèle gpt-6.1-sol, jamais l'un sans l'autre.** Pourquoi : gpt-6.1-sol refuse `none` (« Appel du modèle : les
   réglages des modèles du banc de C7 », 2026-11-17), et gpt-6-luna était réglé à `none`. Le modèle et l'adresse
   restent des paramètres de la seconde passe, donnés par Sabine. — PR de #635
+
+### Fiches de veille : les sujets rédigés en parallèle, le délai par appel à l'échéance (#630, #640)
+
+Décisions de Sabine du 2026-11-17 (livrable E2, C7, partie 4.3) et du 2026-11-18, recopiées par la mission de
+time-knight ; plan de la session relu par time-knight, validé par Sabine le 2026-11-18 (« plan validé ; 429 :
+d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le calcul en commentaire »).
+
+- **Les sujets d'une demande de `POST /digests` sont rédigés en parallèle, un fil par sujet, tous à la fois ; le
+  classement reste en série.** **Inverse** l'option écartée le 2026-10-17 (« Fiches de veille : la durée d'une
+  demande », plan de #205 : « le parallèle […] pour un gain sans besoin mesuré »). Ce qui a changé : la mesure. Le
+  2026-11-17, sur 300 items et gpt-6.1-sol, la demande a atteint son échéance de 200 s avec 4 fiches sur 9, les
+  rédactions prenant 23,4 à 30,7 s chacune l'une après l'autre (#630). Pourquoi (Sabine) : plus simple et plus adapté
+  que le passage en asynchrone, qui ne viendra que si la parallélisation ne suffit pas (YAGNI). Les deux objections
+  du 17/10 tombent : le `replay` reste en série, donc tel quel (ses réponses suivent l'ordre des requêtes), et le
+  quota de gpt-6.1-sol, 250 000 jetons par minute, tient les 9 rédactions à la fois (environ 150 000 jetons
+  estimés). Le client d'httpx2 est partagé (pool sûr entre fils, doc d'httpx2 lue par Context7 le 2026-11-18) ;
+  chaque fil reçoit une copie du contexte, pour que son span reste sous la demande. Les fiches et les lignes de
+  métriques gardent l'ordre de la liste. Options écartées par la session : borner le nombre de fils (environ 60 s de
+  plus en trois vagues, pour peu de protection contre un 429) ; un `replay` apparié au sujet (du code et un
+  réenregistrement du jeu de référence, pour un replay que rien n'oblige à paralléliser). Limite assumée : le
+  `replay` ne passe pas par les fils ; seuls les tests du fournisseur simulé les exercent. — PR de #630
+- **Après un 429, « plus aucun envoi » ne vaut plus que pour un sujet pas encore parti.** Révise la règle du
+  2026-10-17 (#205, minimisation, RGPD art. 5.1.c) : en parallèle, les items de tous les sujets partent à la fois,
+  avant qu'un 429 puisse être connu. Accepté par Sabine le 2026-11-18, sur la recommandation de la session et de
+  time-knight : les 9 rédactions tiennent sous le quota, et borner les fils coûterait environ 60 s pour peu de
+  protection. La règle reste entière en série (le `replay`). — PR de #630
+- **Le délai de lecture d'une réponse du modèle passe de 90 à 200 s (`LLM_CALL_TIMEOUT_SECONDS`), l'échéance
+  d'une demande.** **Révise** « Appel du modèle : délai de lecture à 90 s » (2026-10-17). Ce qui a changé : le
+  modèle. Au débit mesuré sur gpt-6.1-sol le 2026-11-17 (environ 20 ms par jeton, contre 7,35 sur gpt-6-luna), une
+  sortie de 8 192 jetons prend environ 164 s, 229 s avec la marge de 40 % de #158. Valeur choisie par Sabine ; le
+  pourquoi de 200 plutôt que 229 n'a pas été dit, déduction de la session à confirmer par Sabine : l'échéance ramène
+  déjà chaque délai au temps restant (`Deadline.cap`), si bien qu'un délai au-delà de 200 s ne change rien. Ce que
+  cela change : l'échéance est la seule borne d'un appel, et un appel bloqué n'est plus relancé, un classement
+  compris, qui part en premier et emporte alors la demande (504 `llm_timeout`). Options écartées par la session :
+  170 s (4 % de marge) ; un délai par étape (aucun besoin écrit). Un test garde le calcul (la plus longue sortie au
+  débit mesuré tient dans le délai) et l'égalité avec l'échéance. — PR de #640
+
+### Scan de l'image : zlib1g installé à sa version corrigée (#498)
+
+- **L'étape finale du `Dockerfile` installe zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1`, la version écrite en entier,
+  et #647 retire ce bloc dès qu'un digest de l'image de base porte le correctif.** Révise en partie la décision du
+  2026-11-14 (« Écarté : `apt-get upgrade` dans le `Dockerfile` »). Ce qui a changé entre-temps : le premier scan de
+  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1+b1` y porte CVE-2026-85091 (haute), et
+  le digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
+  DSA-6613-1, du 2026-11-07 (liste des DSA du suivi de sécurité de Debian), mais seulement dans `trixie-security`
+  (index lu le 2026-11-18). Décision de Sabine du 2026-11-18, sur la recommandation de time-knight : « Le correctif
+  existe et la production porte la faille ; A accepte un risque qu'on peut corriger ». Options écartées : une entrée de
+  `.grype.yaml` datée, qui accepte un risque qu'on peut corriger ; attendre l'image amont, ce qui laisse #643 rouge et,
+  une fois `image-build` exigé, toute PR. `apt-get upgrade` reste écarté : il monterait tous les paquets à leur
+  version du jour de la construction, alors que le bloc ne monte qu'un paquet, à une version écrite. La marche à
+  suivre de la doc de la CI gagne une étape 3, avant `.grype.yaml` : un paquet Debian corrigé dans `trixie-security`
+  et pas encore dans l'image amont s'installe ainsi, avec son issue de retrait. Limite assumée : l'index de
+  `trixie-security` ne porte qu'une version de zlib1g. Quand une `+deb13u2` la remplacera, `apt-get install` ne
+  trouvera plus la version écrite, et la construction échouera dans `image-build` comme dans `deploy.yml`, jusqu'à
+  une PR. Le scan reste vert tant que le bloc est là : c'est `dpkg-query -W zlib1g`, lu sur le digest de la base, qui
+  dit quand le retirer. Le bloc est placé juste avant `USER` et après `ENV`, pour qu'aucun des renvois
+  `Dockerfile:<ligne>` antérieurs au bloc ne bouge, ni maintenant ni au retrait ; ceux qui citent le bloc lui-même
+  partent avec lui (#647). — PR #643
+
+### Test de fumée : les sondes sans clé (#499)
+
+Plan validé par Sabine le 2026-11-13 (§ 4, point 7), sur sa décision du 08/11 de tenir l'« évaluation automatisée »
+d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10.
+
+- **`kb smoke-test` envoie trois sondes sans clé à chacune des deux API, après son `/health`, qui la réveille : une
+  route à clé doit rendre 401 (`GET /items`, `POST /digests`), `GET /docs` 404, et `HEAD /health` 405. Neuf
+  contrôles au lieu de trois ; un échec n'arrête pas les autres.** Pourquoi : prouver, sur la version déployée,
+  qu'elle refuse ce qu'elle doit refuser (API8, « Évaluation automatisée »). Les mêmes sondes sur
+  l'API de données, puisque `docs/specs-api.md` renvoie, pour elle, aux mêmes issues. Écartés : des essais avec une clé
+  de test en ligne (un secret de plus, qui fait dépenser le modèle ; les routes à clé sont couvertes par les tests de
+  la CI) ; l'API IA seule. Limite assumée : en ligne, les sondes vérifient les refus sans clé ; une route à clé,
+  clé donnée, se vérifie par les tests de la CI, sur le code de l'image. — PR de #499
+- **Le statut attendu de `GET /docs` suit `KB_DEPLOYMENT_ENVIRONMENT` du job : 200 en `sandbox`, 404 ailleurs, la
+  règle de `read_openapi_url` des API.** Pourquoi : une seule règle, déjà écrite ; en ligne, ni le job ni les API
+  n'ont `sandbox`. Limite assumée : un job et des API réglés différemment font échouer la sonde, ce qui signale
+  l'écart. — PR de #499
+- **Le corps d'une réponse à une sonde n'est jamais lu, et l'échec d'une sonde est un état nommé :
+  `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`, jamais l'URL.** Pourquoi :
+  seul le statut prouve le refus ; un corps non lu n'a rien à valider ni à citer au journal (règle 3 de
+  `conventions.md`). — PR de #499
+- **Les sondes ont leur client, aux délais d'une API éveillée : connexion 5 s, lecture 10 s, et non les 60 s de
+  lecture du `/health`, qui couvrent le réveil d'une API à 0 réplique (`PROBE_*`, `core/config.py`).** Pourquoi
+  (revue de code, tranché par time-knight) : avec les délais du `/health`, six sondes de 65 s portaient le pire cas
+  du job à environ 966 s, au-delà de son `replicaTimeout` de 900 s, et la réplique aurait été coupée avant son
+  résumé ; avec 15 s par sonde, environ 666 s (`infra/modules/smoke-test-job.bicep`). Une sonde suit le `/health`
+  de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra ; le 2026-11-18, aucune ne
+  devait précéder #630) ; sauter les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et
+  une sonde dit autre chose que `/health`). Limite assumée, comme pour `/health` (#436) : le délai de lecture vaut
+  entre deux morceaux reçus ; le `replicaTimeout` de 900 s borne le job entier
+  (`infra/modules/smoke-test-job.bicep`). — PR de #499
+- **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
+  (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
+  `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :
+  les chemins et les statuts des sondes sont une seconde copie de ce que les API répondent ; sans ce test, un écart ne
+  se verrait qu'en ligne, au premier tag. Écarté : les seuls tests de `kb smoke-test`, sur des API simulées, qui
+  répondent ce que le test leur dit. — PR de #499
+- **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) se fait au premier tag qui porte ce
+  code.** Pourquoi : un tag déploie ; le 2026-11-18, la décision de Sabine ne permettait aucun redéploiement avant la
+  fusion de #630, faite le jour même. Tranché par time-knight. Par choix, la mesure reste « non tenue, en partie »
+  jusqu'à ce constat : l'auto-évaluation ne s'écrit que sur un résultat observé. — PR de #499
 
 ### Infra : la relecture de la configuration en ligne et deux politiques d'audit (#497)
 
