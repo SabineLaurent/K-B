@@ -1417,12 +1417,11 @@ dépend que du code garde son état et sa preuve.
   `sandbox` (`test_each_probe_of_kb_smoke_test_gets_the_status_it_expects`, dans
   `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Le constat en ligne se fait
   au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb`.
-  **Pour la tenir** : le premier test de fumée en ligne d'une version qui porte #499, sur un tag posé
-  après la fusion de #630 (décision de Sabine du 2026-11-18), sa ligne `9 of 9 checks passed` lue
-  dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes vérifient les refus
-  sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le code de l'image, sans
-  clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel payant au modèle
-  (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
+  **Pour la tenir** : la ligne `9 of 9 checks passed` du premier test de fumée en ligne, au premier tag
+  qui porte ce code, lue dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes
+  vérifient les refus sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le
+  code de l'image, sans clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel
+  payant au modèle (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
   **Pour réduire le risque** : `pip-audit` audite chaque version de `uv.lock`, uvicorn et h11
   compris (`.github/workflows/ci.yml:23-25`), et Grype l'image ; les réponses sans clé des routes
   (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur

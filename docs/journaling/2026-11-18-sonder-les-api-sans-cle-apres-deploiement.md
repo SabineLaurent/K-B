@@ -147,7 +147,7 @@ leur défaut inchangé.
 | La réponse | statut seul, corps jamais lu | lire et valider le corps : rien à en tirer, et un texte de plus à tenir hors du journal |
 | L'ordre | chaque sonde après le `/health` de son API, qui la réveille | les sondes d'abord : la première porterait le réveil |
 | Un `/health` en échec | les sondes de l'API tournent quand même (« un échec n'arrête pas les autres », revue, tranché par time-knight) | les sauter : une sonde dit autre chose que `/health`, et leur coût est borné (45 s par API) |
-| Les délais des sondes | leur client, lecture 10 s (revue, tranché par time-knight) | le client du `/health` (pire cas au-delà du `replicaTimeout`) ; monter le `replicaTimeout` (une passe d'infra, aucune avant la fusion de #630) |
+| Les délais des sondes | leur client, lecture 10 s (revue, tranché par time-knight) | le client du `/health` (pire cas au-delà du `replicaTimeout`) ; monter le `replicaTimeout` (une passe d'infra ; le 2026-11-18, aucune ne devait précéder la fusion de #630) |
 | Le contrat | un test par API contre l'application (écart au plan, tranché par time-knight) | les seuls tests sur API simulées : une sonde fausse ne se verrait qu'en ligne |
 | `ProbeError` | une classe à part, comme `HealthCheckError` | une classe commune dans cette PR : la mise en forme a trois copies (`jobs/api_health.py`, `jobs/api_probes.py`, `post/ai_api_client.py`), factorisées par #656 |
 
@@ -192,7 +192,7 @@ leur défaut inchangé.
 
 - **En ligne, rien n'est encore constaté.** Les statuts viennent des applications ; qu'ils traversent l'entrée
   d'Azure Container Apps (Envoy) sans changer, en particulier le 405 de `HEAD` et le 404 de `/docs`, n'est pas
-  observé. Le constat attend un tag, posé après la fusion de #630.
+  observé. Le constat se fait au premier tag qui porte ce code.
 - **Les lignes de journal de l'API IA** : l'API IA les écrit par le même middleware, `log_request`
   (`ai_api/app.py:96`, `core/api_request_log.py`), avec `route=/digests` ; relevées sur l'API de données.
 - **Le pire cas**, environ 666 s, est calculé sur les délais configurés et sur l'estimation de 7 min des nouvelles
@@ -205,7 +205,7 @@ leur défaut inchangé.
 - **L'auto-évaluation** n'attend plus que le constat en ligne. Elle est écrite dans `33eba04`
   (`docs/fiches-veille.md`, API8 « Évaluation automatisée », la ligne du tableau et le compte ; `docs/specs-api.md`,
   API8) : la mesure y reste « non tenue, en partie » jusqu'à ce constat (règle des preuves du plan).
-- **Le constat en ligne** : après la fusion de #630, un tag, puis dans `log-kb` la ligne
+- **Le constat en ligne** : au premier tag qui porte ce code, dans `log-kb`, la ligne
   `smoke test finished in … s: 9 of 9 checks passed` (`infra/README.md`, « 6. Vérifier la mise en ligne ») ;
   commentaire sur #499, et la mesure passe à « tenue » dans la PR suivante qui touche l'auto-évaluation.
 - **Le push et la PR**, sur l'accord de Sabine.

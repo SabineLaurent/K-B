@@ -7523,20 +7523,21 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
   (revue de code, tranché par time-knight) : avec les délais du `/health`, six sondes de 65 s portaient le pire cas
   du job à environ 966 s, au-delà de son `replicaTimeout` de 900 s, et la réplique aurait été coupée avant son
   résumé ; avec 15 s par sonde, environ 666 s (`infra/modules/smoke-test-job.bicep`). Une sonde suit le `/health`
-  de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra, aucune avant #630) ; sauter
-  les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et une sonde dit autre chose
-  que `/health`). Limite assumée, comme pour `/health` (#436) : le délai de lecture vaut entre deux morceaux
-  reçus ; le `replicaTimeout` de 900 s borne le job entier (`infra/modules/smoke-test-job.bicep`). — PR de #499
+  de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra ; le 2026-11-18, aucune ne
+  devait précéder #630) ; sauter les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et
+  une sonde dit autre chose que `/health`). Limite assumée, comme pour `/health` (#436) : le délai de lecture vaut
+  entre deux morceaux reçus ; le `replicaTimeout` de 900 s borne le job entier
+  (`infra/modules/smoke-test-job.bicep`). — PR de #499
 - **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
   (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
   `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :
   les chemins et les statuts des sondes sont une seconde copie de ce que les API répondent ; sans ce test, un écart ne
   se verrait qu'en ligne, au premier tag. Écarté : les seuls tests de `kb smoke-test`, sur des API simulées, qui
   répondent ce que le test leur dit. — PR de #499
-- **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) attend un tag, posé après la fusion
-  de #630.** Pourquoi : décision de Sabine du 2026-11-18, aucun redéploiement avant #630 ; un tag déploie. Tranché par
-  time-knight. Par choix, la mesure reste « non tenue, en partie » jusqu'à ce constat : l'auto-évaluation
-  ne s'écrit que sur un résultat observé. — PR de #499
+- **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) se fait au premier tag qui porte ce
+  code.** Pourquoi : un tag déploie ; le 2026-11-18, la décision de Sabine ne permettait aucun redéploiement avant la
+  fusion de #630, faite le jour même. Tranché par time-knight. Par choix, la mesure reste « non tenue, en partie »
+  jusqu'à ce constat : l'auto-évaluation ne s'écrit que sur un résultat observé. — PR de #499
 
 ## Décisions encore ouvertes
 
