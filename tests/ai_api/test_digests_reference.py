@@ -4,11 +4,14 @@ import json
 import re
 
 import httpx2
+import pytest
 from digests_reference import (
     README_PATH,
     REFERENCE_PATH,
+    RecordingTransport,
     build_ai_api,
     build_reference_base,
+    find_recording_refusal,
     open_data_api,
     order_as_replayed,
     post_digests,
@@ -158,3 +161,43 @@ def test_the_subject_of_a_writing_is_read_in_its_user_message():
 
     assert read_subject(writing) == "research"
     assert read_subject(classification) is None
+
+
+class FailingStream(httpx2.SyncByteStream):
+    """A body whose reading fails once its status is received."""
+
+    def __iter__(self):
+        raise httpx2.ReadError("read failed on https://spotted.example/v1")
+        yield b""
+
+
+class FailingProvider(httpx2.BaseTransport):
+    """A provider whose first request fails to connect, and whose second fails in its body."""
+
+    def __init__(self):
+        self.requests = 0
+
+    def handle_request(self, request):
+        self.requests += 1
+        if self.requests == 1:
+            try:
+                raise ConnectionRefusedError("refused by https://spotted.example")
+            except ConnectionRefusedError as error:
+                raise httpx2.ConnectError("https://spotted.example/v1") from error
+        return httpx2.Response(200, stream=FailingStream())
+
+
+def test_a_transport_error_is_refused_by_its_classes_and_its_status_never_its_message():
+    transport = RecordingTransport(replay_settings([]), ["research"])
+    transport.provider = FailingProvider()
+    request = httpx2.Request("POST", "https://models.example/v1/chat/completions")
+    for _ in range(2):
+        with pytest.raises(httpx2.TransportError):
+            transport.handle_request(request)
+
+    refusal = find_recording_refusal(httpx2.Response(200), transport)
+
+    assert refusal == (
+        "transport errors: 2"
+        " (ConnectError from ConnectionRefusedError, ReadError after status 200)"
+    )
