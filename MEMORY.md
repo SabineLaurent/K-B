@@ -181,6 +181,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   fermé et ne s'ouvre qu'à la passe suivante, sa connexion lue ; jamais `exposeWeb=true` en dur. Entra reste son seul
   fournisseur d'identité. Le secret client de l'inscription « K-B site » **expire le 2027-05-11** : la rotation se fait avant,
   avec `--append` (`infra/README.md`, « La rotation du secret client »).
+- **Jeton OTLP de la production** (#522, #611) : `kb-production-2027-01`, de la politique `kb-production` de Grafana
+  Cloud, dans le secret `kb-otlp-headers`, **expire vers le 2027-02-09** : la rotation se fait avant, comme #522 le
+  2026-11-11 (`docs/fiches-veille.md`, API10, « Pour réduire le risque »).
 - **Tags de version** (#415, décision de Sabine du 2026-11-06) : aucune session ne pose ni ne pousse de tag sans une
   demande explicite de Sabine, et aucune n'approuve un déploiement en attente (`pending_deployments`). Un tag `vX.Y.Z` sur `main` déploie en ligne (`.github/workflows/deploy.yml`), sans
   validation jusqu'au 08/11 (risque accepté, registre, « Déploiement continu »). Après un déploiement par tag, une

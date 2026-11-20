@@ -1020,7 +1020,8 @@ L ≈ 15 h), ou « non chiffré », et ce dont elle dépend ; rien n'en est cod�
 2026-11-05 : dire comment on ferait, sans le faire maintenant). Ce qui touche à ACA vient de sa
 documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'elle ne dit pas est
 écrit « à vérifier au déploiement ». API8 et API10 sont relues point par point le 2026-11-08 (#454),
-contre `infra/` et l'état en ligne.
+contre `infra/` et l'état en ligne ; API10 l'est de nouveau le 2026-11-20 (#611), depuis le jeton de
+production refait par #522.
 
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
@@ -1033,14 +1034,14 @@ contre `infra/` et l'état en ligne.
 | API7 Server Side Request Forgery | **Tenue** | — |
 | API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne se fait au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb` ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
-| API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
+| API10 Unsafe Consumption of APIs | **Tenue** | — |
 
-Le compte : 5 entrées tenues sur 10 (API1, API3, API5, API6, API7). Les 5 autres : 2 écarts voulus
-et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`, protections
-externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
-limite ; et 3 non tenues, des mesures nécessaires non intégrées : API4 (plafond de dépense, #501),
-API8 (revue, #497, et évaluation, #499, codée, à constater en ligne) et API10 (portée du jeton de Grafana Cloud,
-#522). Ce qui ne dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
+Le compte : 6 entrées tenues sur 10 (API1, API3, API5, API6, API7, API10). Les 4 autres : 2 écarts
+voulus et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`,
+protections externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B
+et nomme sa limite ; et 2 non tenues, des mesures nécessaires non intégrées : API4 (plafond de
+dépense, #501) et API8 (revue, #497, et évaluation, #499, codée, à constater en ligne). Ce qui ne
+dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
 
 ### API1:2023 Broken Object Level Authorization
 
@@ -1635,10 +1636,13 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
 ### API10:2023 Unsafe Consumption of APIs
 
 L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Grafana Cloud. Relue
-point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change.
+point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change. Relue de nouveau
+le 2026-11-20 (#611), depuis le jeton de production refait par #522 : la portée du jeton de Grafana
+Cloud est tenue.
 
-- **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
-  pages officielles de chacun, sauf la portée du jeton de Grafana Cloud : non tenue (ci-dessous).
+- **Évaluer la sécurité des fournisseurs** : tenue, sur pièces publiques, le 2026-11-05, sur les
+  pages officielles de chacun ; pour la portée du jeton de Grafana Cloud, sur la lecture de Sabine
+  dans la console de Grafana, le 2026-11-20 (#611).
   Azure publie sa version de TLS pour l'ensemble des « Foundry
   Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
   précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
@@ -1648,22 +1652,24 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
   |---|---|---|---|---|---|
   | Modèle, Azure AI Foundry (France Central, Data Zone UE) | TLS 1.2 ou 1.3 sur les points d'accès « Foundry Tools » | Clé d'API, la méthode « la plus simple mais pas la plus sûre » selon Microsoft ; deux clés pour la rotation, une clé régénérée cesse aussitôt de marcher ; le moindre privilège passe par Entra ID et un rôle d'inférence, non utilisé par K-B | SOC 2 Type 2, ISO/IEC 27001:2022 (Azure) | Microsoft Azure Bounty | Invites et réponses ni données à OpenAI ni utilisées pour l'entraînement ; traitées dans l'UE ; surveillance des abus possible, durée de conservation non trouvée |
   | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
-  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; portée non tenue : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre), et le passage à l'offre gratuite du 08/11 a supprimé les politiques, si bien que le jeton de production ne vaut plus rien (#522) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
+  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de la politique d'accès `kb-production`, aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; créée le 2026-11-11 depuis la pile de K-B (`prod-eu-west-2`), elle porte le *realm* de cette pile, et ses jetons ne valent que pour elle ; sans sélecteur d'étiquettes ni plage d'adresses ; jeton `kb-production-2027-01`, de 90 jours (jusque vers le 2027-02-09). Lu par Sabine le 2026-11-20 sur la page « Cloud access policies » de la pile, qui n'affiche que les politiques de *realm* pile : `kb-production` active, *realm* `prod-eu-west-2` (pile), droits d'écriture des métriques, des journaux et des traces seuls, aucun droit de lecture ni de suppression, 0 sélecteur, 0 plage d'adresses ; un seul jeton, `kb-production-2027-01`, non expiré, utilisé la veille. Preuves : #522 (commentaires du 2026-11-11 et du 2026-11-12) et cette lecture | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
   | API de données de K-B | `https` en ligne, par l'entrée interne et le chiffrement entre apps (API8, relu le 2026-11-08) ; `http` sur la machine | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
 
   Ce n'est pas un audit : les rapports SOC 2 et ISO sont derrière une connexion chez Microsoft et
   GitHub, et n'ont pas été lus ; la liste des services Azure couverts par ces audits n'a pas été
   lue.
 
-  **Pour la tenir**, pour Grafana Cloud : #522, une politique `kb-production` aux trois droits, sur
-  la seule pile de K-B, et son jeton, avec une date d'expiration ; puis la portée relevée par
-  Sabine, datée. XS.
-  **Pour réduire le risque** : d'ici #522, la production n'envoie rien à Grafana Cloud, son jeton ne
-  valant plus rien (#522, constat de time-knight du 2026-11-08) ; `KB_TRACE_CONTENT` vaut `none` en
-  ligne (`infra/main.bicep:235`), si bien qu'aucun contenu d'appel au modèle n'y part.
+  **Pour réduire le risque** : la production envoie à Grafana Cloud depuis le 2026-11-11, par ce
+  jeton (#522, commentaire du 2026-11-12) ; `KB_TRACE_CONTENT` vaut `none` en ligne
+  (`infra/main.bicep:297`), si bien qu'aucun contenu d'appel au modèle n'y part. Le jeton expire vers
+  le 2027-02-09 : sa rotation se fait avant, avec nos droits (administratrice de la pile, Owner du
+  groupe de ressources), comme le 2026-11-11 : un jeton neuf de la même politique, puis le secret
+  `kb-otlp-headers` refait par « Pour refaire un seul secret » d'`infra/README.md`, et la révision
+  active de `ca-kb-ai-api` redémarrée. Grafana prévient les administrateurs de la pile par courriel
+  avant l'échéance (case « Enable token expiration emails » cochée, lue par Sabine le 2026-11-20).
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
-  (`infra/main.bicep:241`), avec le chiffrement entre apps (API8, « TLS, même pour une API
+  (`infra/main.bicep:305`), avec le chiffrement entre apps (API8, « TLS, même pour une API
   interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
   `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
   #473).
@@ -1680,7 +1686,8 @@ Lues le 2026-11-05. Relues le 2026-11-08 (#454) : l'entrée et le chiffrement en
 pour API8 et API10. Relues le 2026-11-10 (#500), pour les justifications et les « Pour réduire le
 risque » : API4, API8 et API9 de l'édition 2023, la page du projet OWASP (édition en vigueur),
 l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, les sondes et la mise
-à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn.
+à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn. Relues le 2026-11-20
+(#611), pour API10 : les deux pages des politiques d'accès de Grafana Cloud.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
   section « How To Prevent » de chaque entrée ;
@@ -1705,7 +1712,9 @@ l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, l
   [SHA-1 retiré de HTTPS](https://github.blog/changelog/2026-04-20-sunsetting-sha-1-in-https-on-github/),
   [rapports de conformité](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/accessing-compliance-reports-for-your-organization),
   [bug bounty](https://bounty.github.com).
-- Grafana Cloud : [politiques d'accès](https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/),
+- Grafana Cloud : [politiques d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/)
+  et [créer une politique d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/create-access-policies/),
+  relues le 2026-11-20 (#611),
   [conformité](https://grafana.com/legal/security-compliance/),
   [signaler une vulnérabilité](https://grafana.com/legal/report-a-security-issue/).
 - Azure Container Apps : [conteneurs](https://learn.microsoft.com/en-us/azure/container-apps/containers),
