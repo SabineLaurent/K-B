@@ -137,15 +137,17 @@ Les constats de la revue ont été tranchés par time-knight, sur délégation d
 | `test_a_share_is_truncated_never_rounded_up_to_a_threshold` | 14 sur 26 donne 53,84 % ; 99 999 sur 100 000 donne 99,99 % |
 | `test_the_replay_holds_only_with_the_calls_of_the_set_in_their_order_and_a_200` | un appel manquant, un ordre changé ou un statut 502 font échouer le rejeu |
 | `test_a_degraded_set_fails_the_evaluation_and_its_report_says_which_threshold` | sur une copie du jeu où la première rédaction répond deux fois hors schéma, le script sort à 1 et la ligne des schémas dit « non tenu » |
-| `uv run python tests/ai_api/digests_evaluation.py <rapport>` sur le jeu actuel | sortie 1 : rejeu 3 sur 3, réponse 200 ; schémas 100 % ; fidélité 53,84 % (14 faits sur 26) sous 95 % ; 0 item oublié |
-| `uv run pytest` | 5646 passed |
+| `uv run python tests/ai_api/digests_evaluation.py <rapport>` sur le jeu du 08/11 (gpt-6-luna) | sortie 1 : rejeu 3 sur 3, réponse 200 ; schémas 100 % ; fidélité 53,84 % (14 faits sur 26) sous 95 % ; 0 item oublié |
+| La même commande sur le jeu du 20/11 (gpt-6.1-sol, à l'effort `low`), après la fusion de `main` dans la branche | sortie 0 : rejeu 4 sur 4, réponse 200 ; schémas 100 % (4 sur 4) ; fidélité 100 % (26 faits sur 26) ; 0 item oublié ; de même sur GitHub (run 44714259202) |
+| `uv run pytest` | 5646 passed sur 00684824 ; 5649 passed sur 5d65a66c, après la fusion de `main` |
 
 ## 5. Ce que tu dois pouvoir défendre
 
-**Le job est rouge sur le jeu actuel : pourquoi le fusionner ?** Il ne se fusionne pas rouge. Le jeu actuel a été
-enregistré avec gpt-6-luna, et sa fidélité est de 53,84 %. Fusionné rouge, le job ferait refuser chaque tag par
-`deploy.yml`. Le jeu sera réenregistré sur le modèle de production (#520) ; le seuil et l'ordre de fusion avec #659
-sont des décisions de Sabine.
+**Le job était rouge sur le jeu du 08/11 : pourquoi le fusionner ?** Il ne se fusionne pas rouge. Le jeu du 08/11 a
+été enregistré avec gpt-6-luna, et sa fidélité est de 53,84 % : fusionné rouge, le job aurait fait refuser chaque tag
+par `deploy.yml`. Le jeu du 20/11, enregistré sur le modèle de production, gpt-6.1-sol (#520, PR #659), tient les
+quatre lignes aux seuils du 15/10, inchangés : fidélité 100 % (26 faits sur 26). Le job est vert depuis la fusion de
+`main` dans la branche (run 44714259202).
 
 **Pourquoi rejouer plutôt qu'appeler le modèle en CI ?** Un appel est payant, ne se reproduit pas d'un run à l'autre, et
 demanderait une clé dans la CI. Le rejeu juge les contrôles de K-B sur des sorties fixes ; le modèle se mesure à
@@ -177,9 +179,10 @@ ordre : la ligne « Appels rejoués » est non tenue et le job échoue (`judge_r
 
 ## 7. Ce qui reste
 
-- **Le seuil et l'ordre de fusion** : décisions de Sabine, une fois le jeu réenregistré sur gpt-6.1-sol (#520, PR #659).
-- **La péremption** : aucune des deux PR ne compare les `prompt_version` du jeu à celles du code ; le point est porté à
-  Sabine.
-- **Le rejeu partagé** : déplacer `replay_reference` dans `digests_reference.py` une fois #659 et #482 fusionnées.
+- **Le seuil et l'ordre de fusion** : portés à Sabine tant que le job était rouge sur le jeu du 08/11. #659 est
+  fusionnée la première (62248c15) ; sur le jeu du 20/11, le job tient les seuils du 15/10, inchangés.
+- **La péremption** : aucune des deux PR ne compare les `prompt_version` du jeu à celles du code. Décision de Sabine du
+  20/11 : elle reste une limite écrite au README jusqu'après la certification.
+- **Le rejeu partagé** : déplacer `replay_reference` dans `digests_reference.py` une fois #482 fusionnée (#659 l'est).
 - **Le ruleset** : `digests-reference` n'est pas un contrôle requis à la fusion (geste de Sabine, hors de #482).
 - **`POST /trend-reports`** : ses seuils attendent leur revue (#370).
