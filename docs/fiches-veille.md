@@ -909,8 +909,9 @@ trouvés aux deux, et le taux reste `facts_found` / `facts_checked`.
 **Le jeu de référence, du 08/11 au 20/11** (#520). Le jeu de #479, enregistré le 2026-11-08 sur
 gpt-6-luna, a été remplacé le 2026-11-20 par un jeu enregistré sur ce qui est livré : gpt-6.1-sol,
 effort `low`, avec `classify-2` et `write-1` (décision de Sabine du 2026-11-20). Les deux portent sur
-les 6 mêmes items, avec les mêmes consignes ; le classement, lui, diffère : gpt-6-luna avait rangé
-l'item d'`agent_frameworks` dans `llm_security`. Mesures relevées au rejeu de chaque jeu :
+les 6 mêmes items, avec les mêmes consignes ; le classement, lui, diffère : l'item 1, rangé dans
+`agent_frameworks` par gpt-6.1-sol, l'avait été dans `llm_security` par gpt-6-luna. Mesures relevées au rejeu
+de chaque jeu :
 
 | Jeu | Sujet | Items | Faits vérifiés | Dans l'item | Dans le `text` | `fidelity_rate` | Affirmations gardées | Motifs de retrait (par affirmation retirée) |
 |---|---|---|---|---|---|---|---|---|
