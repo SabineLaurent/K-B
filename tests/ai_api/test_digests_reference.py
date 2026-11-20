@@ -103,11 +103,8 @@ def test_the_set_is_recorded_on_the_model_of_production():
     )
 
 
-def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
-    tmp_path, capsys
-):
-    """No fact of the set is missing from its item; 12 of its 26 are missing from the text of
-    their claim."""
+def test_the_facts_of_the_set_are_all_in_their_item_and_in_their_text(tmp_path, capsys):
+    """None of the 26 facts of the set is missing from its item or from the text of its claim."""
     replay_reference(read_reference(REFERENCE_PATH), tmp_path)
 
     lines = [json.loads(line) for line in capsys.readouterr().out.splitlines()]
@@ -120,7 +117,7 @@ def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
             "facts_found_in_text",
             "facts_found",
         )
-    ] == [26, 26, 14, 14]
+    ] == [26, 26, 26, 26]
 
 
 def test_the_calls_recorded_in_parallel_are_kept_in_the_order_the_replay_sends_them():

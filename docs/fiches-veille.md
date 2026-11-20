@@ -904,10 +904,27 @@ que dans un texte libre (le corps d'une release, le résumé d'un article) compt
 l'item, puisqu'elle n'est cherchée que dans `cve_id` et `ghsa_id`. Un fait sans lettre ni chiffre,
 ou un fait qui contient plus qu'un motif CVE ou GHSA (`CVE-2026-86950 critique`, sans forme
 canonique), n'est trouvé ni dans l'un ni dans l'autre (`both`). `facts_found` compte les faits
-trouvés aux deux, et le taux reste `facts_found` / `facts_checked`. Sur le jeu de référence de #479
-(`write-1`, enregistré le 2026-11-08), les 26 faits vérifiés sont dans leur item, 14 dans leur
-`text` : aucun fait absent de son item, 12 faits non recopiés dans la phrase
-(`tests/ai_api/test_digests_reference.py`).
+trouvés aux deux, et le taux reste `facts_found` / `facts_checked`.
+
+**Le jeu de référence, du 08/11 au 20/11** (#520). Le jeu de #479, enregistré le 2026-11-08 sur
+gpt-6-luna, a été remplacé le 2026-11-20 par un jeu enregistré sur ce qui est livré : gpt-6.1-sol,
+effort `low`, avec `classify-2` et `write-1` (décision de Sabine du 2026-11-20). Les deux portent sur
+les 6 mêmes items, avec les mêmes consignes ; le classement, lui, diffère : gpt-6-luna avait rangé
+l'item d'`agent_frameworks` dans `llm_security`. Mesures relevées au rejeu de chaque jeu :
+
+| Jeu | Sujet | Items | Faits vérifiés | Dans l'item | Dans le `text` | `fidelity_rate` | Affirmations gardées | Motifs de retrait (par affirmation retirée) |
+|---|---|---|---|---|---|---|---|---|
+| 08/11, gpt-6-luna | `vulnerabilities` | 3 | 8 | 8 | 5 | 0,625 | 0 sur 3 | `fact_not_found` (`text`) : 3 |
+| 08/11, gpt-6-luna | `llm_security` | 3 | 18 | 18 | 9 | 0,5 | 1 sur 6 | `fact_not_found` (`text`) : 4 ; `cited_item_without_fact` : 3 ; `out_of_bounds` : 1 |
+| 20/11, gpt-6.1-sol | `vulnerabilities` | 3 | 14 | 14 | 14 | 1,0 | 3 sur 3 | aucun |
+| 20/11, gpt-6.1-sol | `llm_security` | 2 | 10 | 10 | 10 | 1,0 | 6 sur 6 | aucun |
+| 20/11, gpt-6.1-sol | `agent_frameworks` | 1 | 2 | 2 | 2 | 1,0 | 1 sur 1 | aucun |
+
+Au total : le 08/11, 26 faits vérifiés, tous dans leur item, 14 dans leur `text` (54 %), 1 affirmation
+gardée sur 9 ; le 20/11, 26 faits vérifiés, tous dans leur item et dans leur `text`, 10 affirmations
+gardées sur 10, chaque appel répondu à sa première tentative (`tests/ai_api/test_digests_reference.py`).
+Une affirmation retirée peut avoir plusieurs motifs : ils ne s'additionnent pas. Limite : chaque jeu
+est un seul enregistrement, sans répétition ; l'écart mesure deux sorties, pas une moyenne.
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel

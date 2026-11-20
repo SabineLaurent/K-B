@@ -5,7 +5,7 @@
 - **Issue** : #520
 - **Fichiers principaux** : `tests/ai_api/test_digests_reference.py` (le test qui épingle le jeu, et ceux du refus
   de l'outil), `tests/ai_api/digests_reference.py` (l'enregistrement : son refus nomme maintenant chaque erreur de
-  transport). `tests/fixtures/digests_reference.json` (le jeu) ne change pas avant l'enregistrement.
+  transport). `tests/fixtures/digests_reference.json` (le jeu, réenregistré le 2026-11-20 à 09:33 UTC) ; `docs/fiches-veille.md` (ses mesures face au 08/11).
 - **Série** : le jeu et son outil viennent de
   [2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md](2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md) ;
   le passage de K-B à gpt-6.1-sol, de [2026-11-18-passer-k-b-a-gpt-6-1-sol.md](2026-11-18-passer-k-b-a-gpt-6-1-sol.md).
@@ -130,6 +130,29 @@ maintenant (`tests/ai_api/digests_reference.py:366-377`) :
 - **Le statut reçu avant l'erreur** (l. 329-339). Il est retenu dès que le fournisseur a répondu. Une erreur
   pendant la lecture du corps se lit `… after status 200`, et une erreur de connexion n'a pas de statut.
 
+### 6. La cause nommée, puis le jeu enregistré
+
+La relance de 09:10 UTC a été refusée à son tour, mais le refus nommait sa cause :
+`httpx2.ConnectError from httpcore2.ConnectError from ssl.SSLEOFError`, deux fois. La connexion a été fermée
+pendant la poignée de main TLS, avant le premier octet HTTP : ni clé ni requête ne sont parties (0 jeton, aucun
+statut). `llm_ms` compte l'attente de 2 s entre les deux tentatives (`llm_client.py:257`, `:319`, `:325`) :
+chaque tentative a duré environ 67 ms, et celles de 01:50 environ 50 ms.
+
+Une vérification sans appel au modèle a ensuite localisé la cause. Elle ouvre 35 connexions neuves vers l'hôte du
+fournisseur, avec le transport de l'outil, et envoie `GET /` sans en-tête ni corps :
+
+| Réseau | Connexions qui aboutissent |
+|---|---|
+| Réseau fixe habituel (09:14, 09:21, 09:23) | 4, 3 et 5 sur 35 |
+| Réseau mobile, par le téléphone (09:19) | 34 sur 35 |
+| Réseau mobile, par une box 4G (09:31) | 35 sur 35 |
+
+Même machine, même Python, même outil : seul le réseau change. La cause est donc ce réseau fixe, qui coupait
+environ 9 connexions TLS sur 10 vers ce point, alors que le jeu du 08/11 y avait été enregistré sans erreur. Ni
+le client de `src/`, ni l'outil, ni Azure. Le jeu a été enregistré à 09:33 UTC par la box 4G : 4 appels, chacun
+répondu à sa première tentative. Ses mesures, face à celles du 08/11, sont dans `docs/fiches-veille.md`
+(« Le jeu de référence, du 08/11 au 20/11 »).
+
 ## La commande de Sabine
 
 Dans `/Users/sabine/REPO_GIT/worktrees-temp/K-B_banc`, qui n'a pas de `.env` : celui du dépôt principal sert.
@@ -192,6 +215,10 @@ La seconde revue (`/code-review high` sur le refus qui nomme ses erreurs) a rend
 | Rejeu en local (scratchpad) : 3 rédactions en parallèle sur un faux fournisseur en HTTP, 3 essais → 0 erreur de transport | Le parallèle de l'outil ne suffit pas à causer l'erreur de 01:50 (sans TLS : pas Azure) |
 | `uv run pytest` → 1 failed, 5630 passed, 365 deselected ; le seul échec est le test qui épingle le jeu | Rien d'autre n'est cassé |
 | `uv run ruff check --no-cache`, `ruff format --check`, `uv run mypy --strict` → verts | Les contrôles du dépôt passent |
+| La relance de Sabine, 09:10 UTC → `transport errors: 2 (httpx2.ConnectError from httpcore2.ConnectError from ssl.SSLEOFError, …)`, 0 jeton | Le refus nomme sa cause : une connexion fermée pendant la poignée de main TLS, avant tout envoi HTTP |
+| La vérification sans appel au modèle (scratchpad, `probe_tls.py`) → réseau fixe 4, 3 et 5 connexions sur 35 ; réseaux mobiles 34 et 35 sur 35 | La coupure suit le réseau, pas la machine ni l'outil |
+| L'enregistrement de 09:33 UTC → `digests_reference.json: 6 items, 4 calls`, chaque appel `attempts: 1`, `outcome: ok` | Le jeu porte gpt-6.1-sol, effort `low`, sans nouvelle tentative ni échec |
+| Après l'enregistrement : `uv run pytest` → 5631 passed, 365 deselected ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` → verts | Le test d'épinglage passe sur le nouveau jeu, le rejeu aussi, avec les comptes `[26, 26, 26, 26]` |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -213,30 +240,24 @@ La seconde revue (`/code-review high` sur le refus qui nomme ses erreurs) a rend
 
 ## Zones non vérifiées
 
-- La cause des 2 erreurs de transport de 01:50 : non établie. Écartés, preuve à l'appui : un délai (ce serait
-  `llm_timeout`), une réponse d'Azure (`http_status` est nul), un corps illisible (le client ne retente pas ce
-  cas), et le parallèle de l'outil, que le rejeu en local ne reproduit pas. Si la relance nomme une cause qui
-  touche aussi le client de production (rédactions parallèles vers Azure), elle ira dans une issue à part.
-- Le nom exact que renvoie Azure pour gpt-6.1-sol (`response_model`). Le motif suppose le nom seul ou suivi
-  d'une date, comme pour gpt-6-luna. S'il en va autrement, il faudra corriger le motif, sans réenregistrer.
-- Le coût de l'enregistrement : estimé à environ 0,10 USD, pas mesuré. L'estimation part des prix de
-  `src/k_b/core/config.py` et des 1 220 à 1 765 jetons de sortie d'une rédaction mesurés le 18/11.
-- Le comportement de l'outil sur gpt-6.1-sol. Une rédaction coupée par le raisonnement (`llm_truncated`) ou une
-  nouvelle tentative serait gardée dans le jeu, car l'outil ne refuse que l'indisponibilité du fournisseur
-  (`digests_reference.py:88`). Le rejeu suppose aujourd'hui une fiche par appel de rédaction et aucun sujet en
-  échec (`test_digests_reference.py:81`). Si le jeu en contient, c'est un fait sur le modèle livré, rapporté à
-  Sabine, sans réenregistrement ni assertion changée sans sa décision.
+- La cause des 2 erreurs de transport de 01:50 : non nommée, car l'outil ne nommait pas encore ses erreurs.
+  Elles ont la forme de celles de 09:10 (environ 50 ms par tentative, sans statut), sur la même machine ; le
+  réseau de cet essai n'est pas relevé. Que ce soit la même coupure TLS reste une hypothèse.
+- Ce qui coupe les connexions dans le réseau fixe (la box ou le réseau de l'opérateur) : non cherché, hors de
+  #520.
+- Le coût réel de l'enregistrement : K-B l'estime à 0,0228 USD (somme des `cost_estimated` des 4 appels, aux prix de
+  `src/k_b/core/config.py`) ; la facture d'Azure n'a pas été lue.
+- La variance du modèle : chaque jeu est un seul enregistrement. L'écart au 08/11 compare deux sorties, pas deux
+  moyennes ; une seconde sortie de gpt-6.1-sol pourrait retirer des affirmations.
 
 ## Ce qui reste
 
-- L'enregistrement, par Sabine, avec la commande ci-dessus.
-- Après lui, dans cette PR :
-  - committer le jeu ;
-  - remplacer les comptes `[26, 26, 14, 14]` de
-    `test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text`, et sa docstring ;
-  - écrire dans `docs/fiches-veille.md` (« Fidélité ») les mesures du jeu face à celles du 08/11 : les deux
-    mesures de #518, `fidelity_rate`, les affirmations gardées et les motifs de retrait ;
-  - dans `MEMORY.md`, « Jeu de référence » : gpt-6.1-sol au lieu de gpt-6-luna ;
-  - compléter cette note avec les mesures.
+- Fait dans cette PR, après l'enregistrement de 09:33 UTC :
+  - le jeu committé : `response_model` vaut `gpt-6.1-sol-2026-09-29`, que le motif accepte ; aucune rédaction
+    coupée, aucune nouvelle tentative, aucun sujet en échec ;
+  - les comptes du test de fidélité passés à `[26, 26, 26, 26]`, et le test renommé
+    `test_the_facts_of_the_set_are_all_in_their_item_and_in_their_text`, car son ancien nom disait le contraire ;
+  - les mesures face au 08/11 dans `docs/fiches-veille.md`, « Le jeu de référence, du 08/11 au 20/11 » ;
+  - `MEMORY.md`, « Jeu de référence » : gpt-6.1-sol, effort `low`, `classify-2` et `write-1`.
 - Hors de cette PR : #519 (`write-2` et la borne commune), après la certification ; #482 (la péremption du jeu et
-  ses seuils).
+  ses seuils) ; la coupure TLS du réseau fixe, qui n'est pas un défaut de K-B.
