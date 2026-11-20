@@ -1640,8 +1640,9 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
 le 2026-11-20 (#611), depuis le jeton de production refait par #522 : la portée du jeton de Grafana
 Cloud est tenue.
 
-- **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
-  pages officielles de chacun ; la portée du jeton de Grafana Cloud, relue le 2026-11-20 (#611).
+- **Évaluer la sécurité des fournisseurs** : tenue, sur pièces publiques, le 2026-11-05, sur les
+  pages officielles de chacun ; pour la portée du jeton de Grafana Cloud, sur la lecture de Sabine
+  dans la console de Grafana, le 2026-11-20 (#611).
   Azure publie sa version de TLS pour l'ensemble des « Foundry
   Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
   précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
@@ -1668,7 +1669,7 @@ Cloud est tenue.
   avant l'échéance (case « Enable token expiration emails » cochée, lue par Sabine le 2026-11-20).
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
-  (`infra/main.bicep:241`), avec le chiffrement entre apps (API8, « TLS, même pour une API
+  (`infra/main.bicep:305`), avec le chiffrement entre apps (API8, « TLS, même pour une API
   interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
   `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
   #473).
