@@ -1664,7 +1664,8 @@ Cloud est tenue.
   le 2027-02-09 : sa rotation se fait avant, avec nos droits (administratrice de la pile, Owner du
   groupe de ressources), comme le 2026-11-11 : un jeton neuf de la même politique, puis le secret
   `kb-otlp-headers` refait par « Pour refaire un seul secret » d'`infra/README.md`, et la révision
-  active de `ca-kb-ai-api` redémarrée.
+  active de `ca-kb-ai-api` redémarrée. Grafana prévient les administrateurs de la pile par courriel
+  avant l'échéance (case « Enable token expiration emails » cochée, lue par Sabine le 2026-11-20).
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
   (`infra/main.bicep:241`), avec le chiffrement entre apps (API8, « TLS, même pour une API
