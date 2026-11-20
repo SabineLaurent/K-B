@@ -72,6 +72,7 @@ var dataApiPort = 8000
 var aiApiPort = 8001
 var webPort = 8002
 // The site, open on purpose (#571): left out of the policy that audits an external ingress (#497).
+// Also written in deployment.json (apps), read by deploy.yml: rename both together.
 var webAppName = 'ca-kb-web'
 
 module logAnalytics 'modules/log-analytics.bicep' = {

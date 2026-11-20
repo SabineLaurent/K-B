@@ -125,11 +125,10 @@ for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft
 done
 ```
 
-Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
-l'enregistrer. `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
-« `Microsoft.PolicyInsights` must be registered in your Azure subscription », et l'enregistrer demande le rôle
-Contributor ou Owner de l'abonnement (Learn, « Quickstart: Create a policy assignment to identify non-compliant
-resources by using a Bicep file », lu le 2026-11-18).
+Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un Contributor ou un Owner de l'abonnement peut
+l'enregistrer (Learn, « Quickstart: Create a policy assignment to identify non-compliant resources by using a Bicep
+file », lu le 2026-11-18). `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
+« `Microsoft.PolicyInsights` must be registered in your Azure subscription ».
 
 ### 2. Première passe : le socle
 
@@ -151,6 +150,7 @@ L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà
   - `stkbexchange…`, son service Blob, ses 4 conteneurs, leurs 8 rôles, la règle de cycle de vie et le verrou ;
     `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle SMB MI Admin, le stockage `job-data`
     de `cae-kb` et le verrou (« Le stockage ») ;
+  - les deux politiques d'audit, `audit-kb-ca-external-ingress` et `audit-kb-ca-https-only` (#497) ;
 - **à modifier** : `cae-kb` (les journaux, le chiffrement entre les apps et l'identité système), et `budget-kb`.
   - Pour `budget-kb`, c'est du bruit : `endDate` disparaît, et le format de `startDate` change. Sans date de fin,
     Azure en remet une à 10 ans.
@@ -354,7 +354,8 @@ false ; aucune route (`[]`).
 ```sh
 az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].{name:name, notScopes:notScopes}" -o json
 # Cinq minutes au moins après la passe, le temps qu'une assignation nouvelle s'applique ; puis l'évaluation à la
-# demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h.
+# demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h. Une action, pas une
+# lecture : Sabine la lance ; Owner du groupe suffit.
 az policy state trigger-scan -g "$RG"
 # Par le nom des assignations seulement : les deux ne visent que les apps (Microsoft.App/containerApps).
 az policy state list -g "$RG" \
@@ -363,7 +364,8 @@ az policy state list -g "$RG" \
 
 Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
 `ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
-référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`. Les
+référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
+`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`). Les
 apps des autres projets du groupe y figurent aussi. Une assignation nouvelle s'applique en cinq minutes environ ;
 la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
 triggers », lue le 2026-11-18).
@@ -1680,7 +1682,7 @@ la première passe l'applique, la seconde aussi.
    autre projet du groupe peut avoir assignée) :
    `az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].name" -o tsv` ne rend rien. Et
    `az provider show -n Microsoft.PolicyInsights --query registrationState -o tsv` rend `Registered` : sinon, son
-   enregistrement, un geste du propriétaire de l'abonnement, vient avant la passe.
+   enregistrement, un geste d'un Contributor ou d'un Owner de l'abonnement, vient avant la passe.
 2. La première passe (étape 2). Aperçu attendu, déduit du Bicep : **à créer** `audit-kb-ca-external-ingress` et
    `audit-kb-ca-https-only` ; **à modifier** le bruit de l'étape 2.
 3. Les constats : « La relecture de la configuration » et « Les politiques d'audit » (étape 6).
