@@ -346,9 +346,10 @@ leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnem
 (`commands/run_log.py:24`, `:28`, `:30`, `:32`), le journal d'import,
 `KB_DATA_DIR/journals/import-journal-<date>.jsonl` (`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA
 écrit sur sa sortie standard pour chaque appel au modèle (`ai_api/observability/metrics.py:50`). Restent hors des
-dessins aussi deux appels qui ne portent pas de donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie
+dessins aussi trois appels qui ne portent pas de donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie
 les deux API et `kb digest-watch` les réveille (`commands/smoke_test_command.py:80-81`,
-`commands/digest_watch_command.py:60-64`), et la demande d'un jeton à l'identité managée (`exchange/storage.py:198`,
+`commands/digest_watch_command.py:60-64`), les sondes sans clé de `kb smoke-test` (#499), refusées en 401, 404 et
+405, et la demande d'un jeton à l'identité managée (`exchange/storage.py:198`,
 `database/entra.py:57`). `kb openapi` écrit le contrat des deux API dans le dépôt, `docs/api/openapi-donnees.json` et
 `docs/api/openapi-ia.json` (`commands/openapi_command.py:30-32`, `:50`). Les contrôles du coffre avant une écriture
 restent hors des dessins aussi: ils ne lisent que l'état d'un fichier (existence, lien, date, taille). `kb digest` et
@@ -534,7 +535,7 @@ modules); le tableau suivant donne les principales.
 | `ca-kb-data-api` | lance `kb serve-data`, sur la base PostgreSQL en ligne, ouverte par l'identité managée (`KB_DATABASE_AUTH=entra`), et sur le conteneur `watch` | `infra/main.bicep:243-278` |
 | `ca-kb-ai-api` | lance `kb serve-ai`, qui lit `ca-kb-data-api` en HTTPS | `infra/main.bicep:280-317` |
 | `ca-kb-web` | lance `kb serve-web`, le site privé, qui lit `ca-kb-data-api` en HTTPS. La connexion Microsoft Entra de Container Apps n'admet que l'identifiant d'objet de l'opératrice, que le code vérifie aussi à chaque requête (`KB_WEB_OPERATOR_ID`, `web/operator_check.py:45`) | `infra/main.bicep:319-357` |
-| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test` | `infra/main.bicep:359-377`, `commands/smoke_test_command.py:68-81` |
+| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test`; depuis #499, aussi leurs sondes sans clé | `infra/main.bicep:359-377`, `commands/smoke_test_command.py:68-81`, #499 |
 | `caj-kb-migrate-database` | job manuel, lance `kb migrate-database` | `infra/main.bicep:453-469` |
 | `caj-kb-daily-routine` | job planifié chaque jour à 08:00 UTC, lance `kb daily-routine` | `infra/main.bicep:379-404`, `infra/modules/daily-routine-job.bicep:78` |
 | `caj-kb-digest-watch` | job planifié, par défaut le lundi et le jeudi à 10:00 UTC, lance `kb digest-watch` | `infra/main.bicep:32`, `:406-431` |
@@ -556,8 +557,8 @@ quand `exposeWeb` l'ouvre (`infra/main.bicep:347`;
 
 Le schéma suivant dit où est quoi en ligne, et ce qui s'y passe. Un trait plein est déployé; un trait en pointillés est
 prévu, avec son issue. Une flèche suit le sens des données, comme dans le flux en détail; trois flèches sont des appels
-sans donnée de la veille: les deux `GET /health`, par lesquels le job de vérification teste les deux API, et « met à
-jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Le réveil des deux API par `caj-kb-digest-watch`, un
+sans donnée de la veille: les deux « GET /health, sondes sans clé », par lesquelles le job de vérification teste les
+deux API (les sondes de #499), et « met à jour, lance les jobs », par laquelle le déploiement agit sur les apps et les jobs. Le réveil des deux API par `caj-kb-digest-watch`, un
 `GET /health` à chacune avant `kb digest` puis avant `kb trend-report` (`commands/digest_watch_command.py:43-48`,
 `:61`, `:67`), reste hors du dessin. Sur une app ou un job, le nœud porte
 son identité managée; sur une flèche, le rôle qui la permet. La liste qui suit le schéma le décrit flèche par flèche,
@@ -611,8 +612,8 @@ flowchart TB
     githubApi -->|"fiches et README"| aiApi
     aiApi <-->|"chat/completions"| model
     smokeContainer -->|"liste, Blob Data Reader"| smokeJob
-    smokeJob -->|"GET /health"| dataApi
-    smokeJob -->|"GET /health"| aiApi
+    smokeJob -->|"GET /health<br>sondes sans clé"| dataApi
+    smokeJob -->|"GET /health<br>sondes sans clé"| aiApi
     mac -.->|"make upload-library<br>prévu #542"| choice
     sources -->|"collecte"| dailyJob
     clipContainer -->|"clips, Blob Data Reader"| dailyJob
@@ -647,7 +648,8 @@ Les flèches du schéma, une à une:
     [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6.1-sol` depuis le passage
     de la production, le 2026-11-18, et appelait `gpt-6-luna` avant.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
-    API (« GET /health »): déployé.
+    API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
+    porte #499.
 - Du Mac à la lecture choisie (« make upload-library », en pointillés): prévu (#542).
 - Des sources de veille à `caj-kb-daily-routine` (« collecte »): déployé.
 - Du conteneur des clips à `caj-kb-daily-routine` (« clips, Blob Data Reader »): déployé.

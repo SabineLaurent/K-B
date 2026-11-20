@@ -4,6 +4,7 @@ data API of the test base, on the replay of the model and a simulated GitHub, wi
 provider nor a network outside the machine."""
 
 import json
+import re
 import secrets
 import socket
 import sqlite3
@@ -332,9 +333,20 @@ def smoke_test_environment(monkeypatch, tmp_path, live_apis):
 def test_smoke_test_reaches_the_health_of_both_apis_served(
     smoke_test_environment, capsys
 ):
+    """Out of the sandbox, as online: neither API serves /docs."""
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.SUCCEEDED
-    output = capsys.readouterr().out
-    assert "data API          ok" in output
-    assert "AI API            ok" in output
+    rows = dict(
+        re.findall(r"^(\S.*?)  +(\S.*)$", capsys.readouterr().out, re.MULTILINE)
+    )
+    assert {check: result for check, result in rows.items() if "API" in check} == {
+        "data API": "ok",
+        "data API GET /items": "401 as expected",
+        "data API GET /docs": "404 as expected",
+        "data API HEAD /health": "405 as expected",
+        "AI API": "ok",
+        "AI API POST /digests": "401 as expected",
+        "AI API GET /docs": "404 as expected",
+        "AI API HEAD /health": "405 as expected",
+    }

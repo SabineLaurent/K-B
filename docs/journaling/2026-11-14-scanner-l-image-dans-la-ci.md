@@ -123,13 +123,13 @@ Deux mesures d'API8 changent dans `docs/fiches-veille.md` :
   vert, le 14/11 à 16:53 UTC (exécution 43618055085). Le constat est posté sur #496. Le plan attendait la PR d'API10 ;
   celle de #625 est venue plus tôt, avec la même preuve (accord de time-knight).
 - **« Évaluation automatisée »** (l. 1337) reste « non tenue, en partie » : le scan y est décrit, mais les sondes après
-  déploiement viennent avec #499. Les exécutions du scan, vert sur l'image du jour et rouge sur l'essai, y seront
-  citées une fois qu'elles existeront : l'auto-évaluation ne s'écrit jamais d'avance.
+  déploiement viennent avec #499. Les exécutions du scan, rouge sur l'essai et vert sur l'image de #643, n'y ont été
+  citées qu'une fois qu'elles existaient (`1f2abbf`) : l'auto-évaluation ne s'écrit jamais d'avance.
 
 ### 6. Le premier scan rouge : zlib1g, installé à sa version corrigée
 
-Le 18/11, le scan de la PR a été rouge sur l'image du jour : zlib1g `1:1.3.dfsg+really1.3.1-1`, la bibliothèque de
-compression de Debian, porte CVE-2026-85091 (haute). Debian l'a corrigée le 07/11 (DSA-6613-1), mais dans son archive
+Le 18/11, le scan de la PR a été rouge sur l'image du jour : zlib1g `1:1.3.dfsg+really1.3.1-1+b1`, la bibliothèque
+de compression de Debian, porte CVE-2026-85091 (haute). Debian l'a corrigée le 07/11 (DSA-6613-1), mais dans son archive
 de sécurité seulement, `trixie-security` : l'image `python` du jour, au digest `e48f59c…` monté à la main (étape 2),
 ne l'a pas (exécution 44279945350). Sabine a choisi d'installer la version corrigée dans l'image
 (`Dockerfile:52-54`) :
@@ -175,10 +175,9 @@ qu'un digest de l'image de base porte le correctif.
 | `gh pr checks 625` → `bicep-build pass 20s`, exécution 43618055085, le 14/11 à 16:53 UTC | le « durcissement répétable » est tenu (#496) |
 | `uv run pytest` → 5582 passed ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts ; `yamllint` sur `image.yml` sans erreur | la branche ne casse rien ; le workflow est un YAML valide |
 | `/security-review` (sous-agent neuf, lecture seule) → aucun constat ≥ 8/10 | pas d'injection (aucun `${{ github.event.* }}` dans un `run:`), `pull_request` et non `pull_request_target`, `contents: read`, échec fermé |
-| l'exécution d'`Image` sur la PR, l'étape du scan verte (à citer) | le scan tourne et l'image du jour passe |
-| l'essai jetable « Trial, do not merge », sur une image de base ancienne, rouge (à citer) | le scan refuse bien une vulnérabilité haute ou critique corrigée |
-
-Les deux dernières lignes n'existent pas encore au moment de cette note : elles viennent après le push.
+| l'essai jetable #644, les deux `FROM` sur `python:3.13.0-slim-bookworm` (décembre 2024) : `image-build` rouge, exécution 44275262249, le 18/11 | le scan refuse bien une vulnérabilité haute ou critique corrigée |
+| l'exécution 44279945350 sur b38fd169, le 18/11 : `zlib1g 1:1.3.dfsg+really1.3.1-1+b1`, corrigé en `1:1.3.dfsg+really1.3.1-1+deb13u1`, CVE-2026-85091 `High` ; `image-build` rouge | l'image du jour, au digest monté, porte la faille ; la version installée est `+b1`, une recompilation de Debian |
+| l'exécution 44347407723 sur ccb672fc, le 18/11 à 16:27 UTC : apt prend zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1` dans `trixie-security` (« 1 upgraded, 0 newly installed »), puis le scan est vert ; restent 7 vulnérabilités de CPython, moyennes ou moindres | les sources d'APT de l'image comptent `trixie-security`, le bloc n'installe que zlib1g, et l'image passe le seuil |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -198,22 +197,19 @@ Les deux dernières lignes n'existent pas encore au moment de cette note : elles
 
 ## Zones non vérifiées
 
-- **Le scan n'a pas encore été vert** : rouge sur l'essai (exécution 44275262249, comme attendu), puis sur l'image
-  du jour, au digest monté (44279945350, zlib1g). Que l'installation de zlib1g le rende vert se lira à l'exécution
-  qui suivra le push. Que les sources d'APT de l'image de base comptent `trixie-security` n'a pas été lu dans
-  l'image (le démon Docker du Mac ne tournait pas) : la construction le dira, en échouant sinon.
 - **Le code de sortie exact de `--fail-on`** : l'aide de la CLI dit 2, la description du réglage dit 1. Le workflow ne
   dépend que d'un code non nul.
 - **Les types que Grype donne** (`deb`, `python`, `binary` pour CPython) viennent de sa documentation et de son code
   lus par Context7, pas d'une exécution sur notre image.
-- **`docker buildx imagetools inspect`**, cité dans la marche à suivre pour lire le digest du jour, n'a pas été lancé
-  (le démon Docker du Mac ne tournait pas).
+- **`docker buildx imagetools inspect`**, cité dans la marche à suivre pour lire le digest du jour, et
+  **`dpkg-query -W zlib1g`**, cité dans la limite pour savoir quand #647 s'applique, n'ont pas été lancés (le démon
+  Docker du Mac ne tournait pas) : l'image avec le bloc de zlib1g n'a été construite que par la CI.
 - **La vérification que Grype fait lui-même de sa base téléchargée** n'a pas été lue.
 
 ## Ce qui reste
 
-- **Dans cette PR, après le push** : les exécutions verte et rouge, citées dans l'auto-évaluation par un commit de
-  plus ; le geste de Sabine (`image-build` au ruleset) juste avant la fusion, et sa lecture citée.
+- **Le geste de Sabine, après la fusion de #643** (le 18/11, sans lui) : `image-build` au ruleset de `main`, et sa
+  lecture citée. Lu le 18/11 après la fusion, le ruleset exige encore six contrôles, sans `image-build`.
 - **La montée à Grype v0.122.0** après le 23/11 à 20:41 UTC, par une PR.
 - **#647** : retirer l'installation de zlib1g quand l'image de base porte le correctif.
 - **#626** : le même scan dans `deploy.yml`, avant la mise en ligne.
