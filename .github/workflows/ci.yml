@@ -107,3 +107,25 @@ jobs:
           save-cache: false # the jobs share one cache key: only tests saves it
       - run: uv sync --locked
       - run: uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py
+
+  # The reference set of POST /digests (#479), replayed and judged against the thresholds of 15/10
+  # (#482): 100 % of schemas valid after a new attempt, a fidelity of at least 95 %, no item
+  # forgotten. The report is an artifact of the run, kept even when a threshold is not met:
+  # gh run download <id> -n digests-reference-report. Last in the file, as tests-data.
+  digests-reference:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+        with:
+          version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
+          save-cache: false # the jobs share one cache key: only tests saves it
+      - run: uv sync --locked
+      - run: uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: ${{ !cancelled() }} # the report of a failing run is the one to read
+        with:
+          name: digests-reference-report
+          path: reports/digests-reference-report.md
+          if-no-files-found: error
+          retention-days: 30 # numbers only, read at the review of a PR (RGESN 1.6)

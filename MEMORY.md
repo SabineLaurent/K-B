@@ -181,6 +181,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   fermé et ne s'ouvre qu'à la passe suivante, sa connexion lue ; jamais `exposeWeb=true` en dur. Entra reste son seul
   fournisseur d'identité. Le secret client de l'inscription « K-B site » **expire le 2027-05-11** : la rotation se fait avant,
   avec `--append` (`infra/README.md`, « La rotation du secret client »).
+- **Jeton OTLP de la production** (#522, #611) : `kb-production-2027-01`, de la politique `kb-production` de Grafana
+  Cloud, dans le secret `kb-otlp-headers`, **expire vers le 2027-02-09** : la rotation se fait avant, comme #522 le
+  2026-11-11 (`docs/fiches-veille.md`, API10, « Pour réduire le risque »).
 - **Tags de version** (#415, décision de Sabine du 2026-11-06) : aucune session ne pose ni ne pousse de tag sans une
   demande explicite de Sabine, et aucune n'approuve un déploiement en attente (`pending_deployments`). Un tag `vX.Y.Z` sur `main` déploie en ligne (`.github/workflows/deploy.yml`), sans
   validation jusqu'au 08/11 (risque accepté, registre, « Déploiement continu »). Après un déploiement par tag, une
@@ -197,8 +200,9 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   (`LIBRARY_LOG_LEVELS`) : à WARNING, ils citent le texte de libpq et la connexion (hôte, utilisateur, base). `Connection` est l'union `sqlite3.Connection | PostgresConnection` ; une erreur
   du moteur se rattrape par `except ENGINE_ERRORS` (un tuple), jamais par `EngineError`, l'alias des annotations.
   Tenu par `tests/architecture/test_engine_imports.py`.
-- **Jeu de référence de `POST /digests`** (#479, 2026-11-08) : `tests/fixtures/digests_reference.json`, des sorties
-  de gpt-6-luna enregistrées par Sabine, rejouées par `tests/ai_api/test_digests_reference.py`. Une session ne lance
+- **Jeu de référence de `POST /digests`** (#479, 2026-11-08 ; réenregistré par #520, 2026-11-20) :
+  `tests/fixtures/digests_reference.json`, des sorties de gpt-6.1-sol (effort `low`, `classify-2` et `write-1`, tenus
+  par `test_the_set_is_recorded_on_the_model_of_production`) enregistrées par Sabine, rejouées par `tests/ai_api/test_digests_reference.py`. Une session ne lance
   jamais l'enregistrement (`tests/ai_api/digests_reference.py`, un appel payant, qui refuse d'écraser le jeu). Un
   changement du nombre de requêtes au modèle (lots, nouvelle tentative, étape) décale le rejeu et fait échouer ce
   test : seul un nouvel enregistrement par Sabine le répare. Un changement de `prompt_version` ne le fait pas

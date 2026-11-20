@@ -7480,8 +7480,8 @@ d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le 
 - **L'étape finale du `Dockerfile` installe zlib1g `1:1.3.dfsg+really1.3.1-1+deb13u1`, la version écrite en entier,
   et #647 retire ce bloc dès qu'un digest de l'image de base porte le correctif.** Révise en partie la décision du
   2026-11-14 (« Écarté : `apt-get upgrade` dans le `Dockerfile` »). Ce qui a changé entre-temps : le premier scan de
-  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1` y porte CVE-2026-85091 (haute), et le
-  digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
+  la PR a été rouge sur l'image du jour. zlib1g `1:1.3.dfsg+really1.3.1-1+b1` y porte CVE-2026-85091 (haute), et
+  le digest monté le 2026-11-18 (`e48f59c…`) ne la corrige pas (exécution 44279945350). Debian l'a corrigée dans
   DSA-6613-1, du 2026-11-07 (liste des DSA du suivi de sécurité de Debian), mais seulement dans `trixie-security`
   (index lu le 2026-11-18). Décision de Sabine du 2026-11-18, sur la recommandation de time-knight : « Le correctif
   existe et la production porte la faille ; A accepte un risque qu'on peut corriger ». Options écartées : une entrée de
@@ -7496,6 +7496,48 @@ d'accord, à écrire ; délai par appel : 200 s, égal à l'échéance, avec le 
   dit quand le retirer. Le bloc est placé juste avant `USER` et après `ENV`, pour qu'aucun des renvois
   `Dockerfile:<ligne>` antérieurs au bloc ne bouge, ni maintenant ni au retrait ; ceux qui citent le bloc lui-même
   partent avec lui (#647). — PR #643
+
+### Test de fumée : les sondes sans clé (#499)
+
+Plan validé par Sabine le 2026-11-13 (§ 4, point 7), sur sa décision du 08/11 de tenir l'« évaluation automatisée »
+d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10.
+
+- **`kb smoke-test` envoie trois sondes sans clé à chacune des deux API, après son `/health`, qui la réveille : une
+  route à clé doit rendre 401 (`GET /items`, `POST /digests`), `GET /docs` 404, et `HEAD /health` 405. Neuf
+  contrôles au lieu de trois ; un échec n'arrête pas les autres.** Pourquoi : prouver, sur la version déployée,
+  qu'elle refuse ce qu'elle doit refuser (API8, « Évaluation automatisée »). Les mêmes sondes sur
+  l'API de données, puisque `docs/specs-api.md` renvoie, pour elle, aux mêmes issues. Écartés : des essais avec une clé
+  de test en ligne (un secret de plus, qui fait dépenser le modèle ; les routes à clé sont couvertes par les tests de
+  la CI) ; l'API IA seule. Limite assumée : en ligne, les sondes vérifient les refus sans clé ; une route à clé,
+  clé donnée, se vérifie par les tests de la CI, sur le code de l'image. — PR de #499
+- **Le statut attendu de `GET /docs` suit `KB_DEPLOYMENT_ENVIRONMENT` du job : 200 en `sandbox`, 404 ailleurs, la
+  règle de `read_openapi_url` des API.** Pourquoi : une seule règle, déjà écrite ; en ligne, ni le job ni les API
+  n'ont `sandbox`. Limite assumée : un job et des API réglés différemment font échouer la sonde, ce qui signale
+  l'écart. — PR de #499
+- **Le corps d'une réponse à une sonde n'est jamais lu, et l'échec d'une sonde est un état nommé :
+  `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`, jamais l'URL.** Pourquoi :
+  seul le statut prouve le refus ; un corps non lu n'a rien à valider ni à citer au journal (règle 3 de
+  `conventions.md`). — PR de #499
+- **Les sondes ont leur client, aux délais d'une API éveillée : connexion 5 s, lecture 10 s, et non les 60 s de
+  lecture du `/health`, qui couvrent le réveil d'une API à 0 réplique (`PROBE_*`, `core/config.py`).** Pourquoi
+  (revue de code, tranché par time-knight) : avec les délais du `/health`, six sondes de 65 s portaient le pire cas
+  du job à environ 966 s, au-delà de son `replicaTimeout` de 900 s, et la réplique aurait été coupée avant son
+  résumé ; avec 15 s par sonde, environ 666 s (`infra/modules/smoke-test-job.bicep`). Une sonde suit le `/health`
+  de son API, qui l'a réveillée. Écartés : monter le `replicaTimeout` (une passe d'infra ; le 2026-11-18, aucune ne
+  devait précéder #630) ; sauter les sondes d'une API dont le `/health` a échoué (un échec n'arrête pas les autres, et
+  une sonde dit autre chose que `/health`). Limite assumée, comme pour `/health` (#436) : le délai de lecture vaut
+  entre deux morceaux reçus ; le `replicaTimeout` de 900 s borne le job entier
+  (`infra/modules/smoke-test-job.bicep`). — PR de #499
+- **Un test de contrat par API envoie chaque sonde à l'app elle-même, en `sandbox` et hors `sandbox`
+  (`tests/ai_api/test_digest_router.py`, `tests/data_api/test_api_keys.py`) ; les fixtures `make_ai_api` et
+  `make_client` reçoivent `openapi_url`, leur défaut inchangé.** Écart au plan, tranché par time-knight. Pourquoi :
+  les chemins et les statuts des sondes sont une seconde copie de ce que les API répondent ; sans ce test, un écart ne
+  se verrait qu'en ligne, au premier tag. Écarté : les seuls tests de `kb smoke-test`, sur des API simulées, qui
+  répondent ce que le test leur dit. — PR de #499
+- **Le constat en ligne de #499 (la ligne `9 of 9 checks passed` dans `log-kb`) se fait au premier tag qui porte ce
+  code.** Pourquoi : un tag déploie ; le 2026-11-18, la décision de Sabine ne permettait aucun redéploiement avant la
+  fusion de #630, faite le jour même. Tranché par time-knight. Par choix, la mesure reste « non tenue, en partie »
+  jusqu'à ce constat : l'auto-évaluation ne s'écrit que sur un résultat observé. — PR de #499
 
 ## Décisions encore ouvertes
 

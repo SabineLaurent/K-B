@@ -32,7 +32,7 @@ droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le si
 | Outil | Rôle dans la chaîne | Où il est réglé |
 |---|---|---|
 | GitHub Actions | lance les workflows sur des runners `ubuntu-latest`; chaque action est épinglée par son SHA, sa version en commentaire | `.github/workflows/ci.yml`, `image.yml`, `infra.yml`, `docs.yml` |
-| uv 0.13.6 | installe Python 3.13 (`.python-version`) et les dépendances de `uv.lock` (`uv sync --locked`), lance chaque outil (`uv run`) | `ci.yml`, `version: "0.13.6"` dans chacun des six jobs (l. 20, 34, 46, 58, 90, 106); `docs.yml:22` |
+| uv 0.13.6 | installe Python 3.13 (`.python-version`) et les dépendances de `uv.lock` (`uv sync --locked`), lance chaque outil (`uv run`) | `ci.yml`, `version: "0.13.6"` dans chacun des sept jobs (l. 20, 34, 46, 58, 90, 106, 121); `docs.yml:22` |
 | pytest et pytest-cov | lancent les tests et mesurent la couverture des lignes et des branches de `src/k_b/` | `pyproject.toml`, `[tool.coverage.*]` (l. 76-89) |
 | ruff | lint et format du Python | `pyproject.toml`, `[tool.ruff.*]` (l. 52-71) |
 | mypy | typage, en mode `--strict` | `ci.yml:61`, `pyproject.toml:73-74` |
@@ -98,6 +98,7 @@ Le tableau suivant donne chaque job de `CI`, ses lignes, sa tâche, et s'il est 
 | `types` (l. 52-61) | `uv run mypy --strict` sur `src` | oui |
 | `tests-postgresql` (l. 63-93) | `uv run pytest -m postgresql`, contre le service `postgres:18.6` du job (utilisateur `kb`, base en UTF8 et collation C, l. 72-76), joint par `KB_TEST_POSTGRESQL_URL` (l. 85), sans mot de passe (`POSTGRES_HOST_AUTH_METHOD: trust`, un serveur que seul le runner joint) | oui |
 | `tests-data` (l. 95-109) | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py`: les tests des données, à part, sans `--cov` (`tests` les lance aussi et garde le seuil) | non |
+| `digests-reference` (l. 111-131) | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests` (#479) et échoue sous un seuil du 15/10 (100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), ou si le rejeu n'envoie pas tous les appels du jeu dans leur ordre, ou si la route ne répond pas 200; puis `actions/upload-artifact` v7.0.2 dépose le rapport, même en échec (`gh run download <id> -n digests-reference-report`, gardé 30 jours). Le jeu est rejoué, jamais envoyé au modèle: le job juge les contrôles de K-B sur des sorties enregistrées, et un changement de `prompt_version` le périme; le modèle se mesure à chaque enregistrement du jeu par Sabine (#520). | non |
 
 Depuis #167, `audit` lit aussi le groupe `docs`, MkDocs et Material (`pyproject.toml:45-47`), que `uv export` laisse
 de côté sans `--all-groups` (`ci.yml:23-25`). Le 2026-11-14, `uv export --frozen --no-emit-project` sans l'option ne
@@ -182,10 +183,10 @@ gh pr create --repo SabineLaurent/K-B --base main
 gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin, puis un contrôle par ligne
 ```
 
-Une PR reçoit dix contrôles: les six jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
-depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Neuf tournent; `deploy`
+Une PR reçoit onze contrôles: les sept jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
+depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Dix tournent; `deploy`
 est sauté sur une PR (`docs.yml:37`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
-à `skipping` et les neuf autres à `pass`.
+à `skipping`.
 
 ### Fusionner
 
@@ -302,7 +303,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 
 | Réglage | Où | À changer avec |
 |---|---|---|
-| version de uv | `version:` des six jobs de `ci.yml` et de `docs.yml:22`; `Dockerfile:7` | tous ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
+| version de uv | `version:` des sept jobs de `ci.yml` et de `docs.yml:22`; `Dockerfile:7` | tous ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
 | version de pip-audit | `ci.yml:26` | à la main |
 | image de PostgreSQL | `ci.yml:70`, tag et digest | à la main: d'après le commentaire de `ci.yml:64-65`, Dependabot ne la met pas à jour |
 | chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:35` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |

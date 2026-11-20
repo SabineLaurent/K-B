@@ -904,10 +904,28 @@ que dans un texte libre (le corps d'une release, le résumé d'un article) compt
 l'item, puisqu'elle n'est cherchée que dans `cve_id` et `ghsa_id`. Un fait sans lettre ni chiffre,
 ou un fait qui contient plus qu'un motif CVE ou GHSA (`CVE-2026-86950 critique`, sans forme
 canonique), n'est trouvé ni dans l'un ni dans l'autre (`both`). `facts_found` compte les faits
-trouvés aux deux, et le taux reste `facts_found` / `facts_checked`. Sur le jeu de référence de #479
-(`write-1`, enregistré le 2026-11-08), les 26 faits vérifiés sont dans leur item, 14 dans leur
-`text` : aucun fait absent de son item, 12 faits non recopiés dans la phrase
-(`tests/ai_api/test_digests_reference.py`).
+trouvés aux deux, et le taux reste `facts_found` / `facts_checked`.
+
+**Le jeu de référence, du 08/11 au 20/11** (#520). Le jeu de #479, enregistré le 2026-11-08 sur
+gpt-6-luna, a été remplacé le 2026-11-20 par un jeu enregistré sur ce qui est livré : gpt-6.1-sol,
+effort `low`, avec `classify-2` et `write-1` (décision de Sabine du 2026-11-20). Les deux portent sur
+les 6 mêmes items, avec les mêmes consignes ; le classement, lui, diffère : l'item 1, rangé dans
+`agent_frameworks` par gpt-6.1-sol, l'avait été dans `llm_security` par gpt-6-luna. Mesures relevées au rejeu
+de chaque jeu :
+
+| Jeu | Sujet | Items | Faits vérifiés | Dans l'item | Dans le `text` | `fidelity_rate` | Affirmations gardées | Motifs de retrait (par affirmation retirée) |
+|---|---|---|---|---|---|---|---|---|
+| 08/11, gpt-6-luna | `vulnerabilities` | 3 | 8 | 8 | 5 | 0,625 | 0 sur 3 | `fact_not_found` (`text`) : 3 |
+| 08/11, gpt-6-luna | `llm_security` | 3 | 18 | 18 | 9 | 0,5 | 1 sur 6 | `fact_not_found` (`text`) : 4 ; `cited_item_without_fact` : 3 ; `out_of_bounds` : 1 |
+| 20/11, gpt-6.1-sol | `vulnerabilities` | 3 | 14 | 14 | 14 | 1,0 | 3 sur 3 | aucun |
+| 20/11, gpt-6.1-sol | `llm_security` | 2 | 10 | 10 | 10 | 1,0 | 6 sur 6 | aucun |
+| 20/11, gpt-6.1-sol | `agent_frameworks` | 1 | 2 | 2 | 2 | 1,0 | 1 sur 1 | aucun |
+
+Au total : le 08/11, 26 faits vérifiés, tous dans leur item, 14 dans leur `text` (54 %), 1 affirmation
+gardée sur 9 ; le 20/11, 26 faits vérifiés, tous dans leur item et dans leur `text`, 10 affirmations
+gardées sur 10, chaque appel répondu à sa première tentative (`tests/ai_api/test_digests_reference.py`).
+Une affirmation retirée peut avoir plusieurs motifs : ils ne s'additionnent pas. Limite : chaque jeu
+est un seul enregistrement, sans répétition ; l'écart mesure deux sorties, pas une moyenne.
 
 **Partie commune avec le wiki (#153).** Le contrôle de fidélité du wiki reprend d'ici la
 normalisation, la recherche mot pour mot entre deux limites et le taux calculé à chaque appel
@@ -1002,7 +1020,8 @@ L ≈ 15 h), ou « non chiffré », et ce dont elle dépend ; rien n'en est cod�
 2026-11-05 : dire comment on ferait, sans le faire maintenant). Ce qui touche à ACA vient de sa
 documentation, lue le 2026-11-05 (« Sources de l'auto-évaluation ») ; ce qu'elle ne dit pas est
 écrit « à vérifier au déploiement ». API8 et API10 sont relues point par point le 2026-11-08 (#454),
-contre `infra/` et l'état en ligne.
+contre `infra/` et l'état en ligne ; API10 l'est de nouveau le 2026-11-20 (#611), depuis le jeton de
+production refait par #522.
 
 | Entrée | État | Ce qui reste, et où |
 |---|---|---|
@@ -1013,16 +1032,16 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, sondes après déploiement (#499), l'image étant scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne se fait au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb` ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
-| API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
+| API10 Unsafe Consumption of APIs | **Tenue** | — |
 
-Le compte : 5 entrées tenues sur 10 (API1, API3, API5, API6, API7). Les 5 autres : 2 écarts voulus
-et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`, protections
-externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
-limite ; et 3 non tenues, des mesures nécessaires non intégrées : API4 (plafond de dépense, #501),
-API8 (revue et évaluation, #497 et #499) et API10 (portée du jeton de Grafana Cloud,
-#522). Ce qui ne dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
+Le compte : 6 entrées tenues sur 10 (API1, API3, API5, API6, API7, API10). Les 4 autres : 2 écarts
+voulus et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`,
+protections externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B
+et nomme sa limite ; et 2 non tenues, des mesures nécessaires non intégrées : API4 (plafond de
+dépense, #501) et API8 (revue, #497, et évaluation, #499, codée, à constater en ligne). Ce qui ne
+dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
 
 ### API1:2023 Broken Object Level Authorization
 
@@ -1090,9 +1109,9 @@ API8 (revue et évaluation, #497 et #499) et API10 (portée du jeton de Grafana 
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
-    l'atteignent. À ce commit, deux apps, les deux API, et deux jobs (`infra/deployment.json`), dont
-    un seul l'appelle : `caj-kb-smoke-test`, sur `/health`, sans clé ; `kb digest` et
-    `kb trend-report`, ses clients à clé, n'ont pas de job en ligne. Ce que le certificat prouverait,
+    l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
+    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
+    `caj-kb-digest-watch` (#423), par `kb digest` et `kb trend-report`, avec leurs clés. Ce que le certificat prouverait,
     qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
     sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
     programmes de la machine.
@@ -1382,14 +1401,28 @@ dépend que du code garde son état et sa preuve.
   l'image : Grype v0.121.3, vérifié par son SHA256, cherche dans l'image construite les
   vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
   de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
-  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Un scan rouge sur `main`
+  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Constaté le 2026-11-18 :
+  rouge sur une image de base de décembre 2024 (essai #644, exécution 44275262249), vert sur l'image de #643
+  (exécution 44347407723). Un scan rouge sur `main`
   bloque aussi la mise en ligne : `deploy.yml` ne déploie qu'un commit dont toutes les exécutions
   sont vertes (l. 51-67). Après chaque déploiement, `deploy.yml` lance `caj-kb-smoke-test`
-  (l. 204-209), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
-  stockage d'échange par l'identité du job : il vérifie que la version déployée répond, pas sa
-  sécurité.
-  **Pour la tenir** : des essais scriptés des points de cette section, lancés après chaque
-  déploiement, avec une clé de test à prévoir (#499 : des sondes sans clé). S.
+  (l. 204-210), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
+  stockage d'échange par l'identité du job. Depuis #499, il envoie aussi à chaque API, après son
+  `/health`, trois sondes sans clé, et échoue sur tout autre statut : une route à clé (`GET /items`,
+  `POST /digests`) doit rendre 401, `GET /docs` 404 hors `sandbox`, et `HEAD /health` 405
+  (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:95-109`). Il vérifie ainsi,
+  sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée.
+  Prouvé par les tests, sur des API simulées
+  (`test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run`,
+  `tests/commands/test_smoke_test_command.py`) et sur les apps elles-mêmes, en `sandbox` et hors
+  `sandbox` (`test_each_probe_of_kb_smoke_test_gets_the_status_it_expects`, dans
+  `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Le constat en ligne se fait
+  au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb`.
+  **Pour la tenir** : la ligne `9 of 9 checks passed` du premier test de fumée en ligne, au premier tag
+  qui porte ce code, lue dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes
+  vérifient les refus sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le
+  code de l'image, sans clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel
+  payant au modèle (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
   **Pour réduire le risque** : `pip-audit` audite chaque version de `uv.lock`, uvicorn et h11
   compris (`.github/workflows/ci.yml:23-25`), et Grype l'image ; les réponses sans clé des routes
   (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur
@@ -1603,10 +1636,13 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
 ### API10:2023 Unsafe Consumption of APIs
 
 L'API IA consomme le modèle, l'API de données, GitHub et l'export OTLP vers Grafana Cloud. Relue
-point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change.
+point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change. Relue de nouveau
+le 2026-11-20 (#611), depuis le jeton de production refait par #522 : la portée du jeton de Grafana
+Cloud est tenue.
 
-- **Évaluer la sécurité des fournisseurs** : tenue sur pièces publiques, le 2026-11-05, sur les
-  pages officielles de chacun, sauf la portée du jeton de Grafana Cloud : non tenue (ci-dessous).
+- **Évaluer la sécurité des fournisseurs** : tenue, sur pièces publiques, le 2026-11-05, sur les
+  pages officielles de chacun ; pour la portée du jeton de Grafana Cloud, sur la lecture de Sabine
+  dans la console de Grafana, le 2026-11-20 (#611).
   Azure publie sa version de TLS pour l'ensemble des « Foundry
   Tools », GitHub par le retrait de TLS 1.0 et 1.1, Grafana pas ; aucun pour le point d'accès
   précis qu'appelle K-B. Le client de K-B accepte TLS 1.2 au moins, par défaut de ses
@@ -1616,22 +1652,24 @@ point par point le 2026-11-08 (#454) : seul le TLS vers l'API de données change
   |---|---|---|---|---|---|
   | Modèle, Azure AI Foundry (France Central, Data Zone UE) | TLS 1.2 ou 1.3 sur les points d'accès « Foundry Tools » | Clé d'API, la méthode « la plus simple mais pas la plus sûre » selon Microsoft ; deux clés pour la rotation, une clé régénérée cesse aussitôt de marcher ; le moindre privilège passe par Entra ID et un rôle d'inférence, non utilisé par K-B | SOC 2 Type 2, ISO/IEC 27001:2022 (Azure) | Microsoft Azure Bounty | Invites et réponses ni données à OpenAI ni utilisées pour l'entraînement ; traitées dans l'UE ; surveillance des abus possible, durée de conservation non trouvée |
   | API REST de GitHub | TLS 1.0 et 1.1 retirés en 2018 ; SHA-1 retiré de HTTPS au 15/09/2026 | Jeton *fine-grained* en lecture seule ([jeton-github.md](jeton-github.md)) ; expiration de 1 à 366 jours | SOC 1 et SOC 2 Type 2, ISO/IEC 27001:2022, CSA STAR | GitHub Security Bug Bounty (HackerOne) | Le produit couvert par chaque rapport n'est pas dit |
-  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de politique d'accès aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; portée non tenue : le 2026-10-27, la politique recréée couvrait toute l'organisation (même registre), et le passage à l'offre gratuite du 08/11 a supprimé les politiques, si bien que le jeton de production ne vaut plus rien (#522) | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
+  | Grafana Cloud, export OTLP | Version de TLS non publiée | Jeton de la politique d'accès `kb-production`, aux seuls `metrics:write`, `traces:write`, `logs:write` ([registre-traitements.md](registre-traitements.md)), comme la page des politiques d'accès le recommande ; créée le 2026-11-11 depuis la pile de K-B (`prod-eu-west-2`), elle porte le *realm* de cette pile, et ses jetons ne valent que pour elle ; sans sélecteur d'étiquettes ni plage d'adresses ; jeton `kb-production-2027-01`, de 90 jours (jusque vers le 2027-02-09). Lu par Sabine le 2026-11-20 sur la page « Cloud access policies » de la pile, qui n'affiche que les politiques de *realm* pile : `kb-production` active, *realm* `prod-eu-west-2` (pile), droits d'écriture des métriques, des journaux et des traces seuls, aucun droit de lecture ni de suppression, 0 sélecteur, 0 plage d'adresses ; un seul jeton, `kb-production-2027-01`, non expiré, utilisé la veille. Preuves : #522 (commentaires du 2026-11-11 et du 2026-11-12) et cette lecture | ISO 27001, SOC 2 Type 2 (A-LIGN), CSA STAR | Divulgation sur Intigriti, sans prime | K-B ne relit rien de ce qu'il envoie |
   | API de données de K-B | `https` en ligne, par l'entrée interne et le chiffrement entre apps (API8, relu le 2026-11-08) ; `http` sur la machine | Clé `AI_DIGEST`, lecture seule | — | — | Son auto-évaluation : [specs-api.md](specs-api.md) |
 
   Ce n'est pas un audit : les rapports SOC 2 et ISO sont derrière une connexion chez Microsoft et
   GitHub, et n'ont pas été lus ; la liste des services Azure couverts par ces audits n'a pas été
   lue.
 
-  **Pour la tenir**, pour Grafana Cloud : #522, une politique `kb-production` aux trois droits, sur
-  la seule pile de K-B, et son jeton, avec une date d'expiration ; puis la portée relevée par
-  Sabine, datée. XS.
-  **Pour réduire le risque** : d'ici #522, la production n'envoie rien à Grafana Cloud, son jeton ne
-  valant plus rien (#522, constat de time-knight du 2026-11-08) ; `KB_TRACE_CONTENT` vaut `none` en
-  ligne (`infra/main.bicep:235`), si bien qu'aucun contenu d'appel au modèle n'y part.
+  **Pour réduire le risque** : la production envoie à Grafana Cloud depuis le 2026-11-11, par ce
+  jeton (#522, commentaire du 2026-11-12) ; `KB_TRACE_CONTENT` vaut `none` en ligne
+  (`infra/main.bicep:297`), si bien qu'aucun contenu d'appel au modèle n'y part. Le jeton expire vers
+  le 2027-02-09 : sa rotation se fait avant, avec nos droits (administratrice de la pile, Owner du
+  groupe de ressources), comme le 2026-11-11 : un jeton neuf de la même politique, puis le secret
+  `kb-otlp-headers` refait par « Pour refaire un seul secret » d'`infra/README.md`, et la révision
+  active de `ca-kb-ai-api` redémarrée. Grafana prévient les administrateurs de la pile par courriel
+  avant l'échéance (case « Enable token expiration emails » cochée, lue par Sabine le 2026-11-20).
 - **TLS avec toutes les API intégrées** : tenue en ligne. `https` seul vers le modèle, GitHub et
   l'export (API7) ; vers l'API de données, `https://ca-kb-data-api.internal.<defaultDomain>`
-  (`infra/main.bicep:241`), avec le chiffrement entre apps (API8, « TLS, même pour une API
+  (`infra/main.bicep:305`), avec le chiffrement entre apps (API8, « TLS, même pour une API
   interne »). `http` n'est permis vers l'API de données que vers `127.0.0.1` ou `localhost`, ou, en
   `sandbox`, vers un service du compose (#419) : `find_internal_api_url_refusal` (`core/outbound.py`,
   #473).
@@ -1648,7 +1686,8 @@ Lues le 2026-11-05. Relues le 2026-11-08 (#454) : l'entrée et le chiffrement en
 pour API8 et API10. Relues le 2026-11-10 (#500), pour les justifications et les « Pour réduire le
 risque » : API4, API8 et API9 de l'édition 2023, la page du projet OWASP (édition en vigueur),
 l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, les sondes et la mise
-à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn.
+à l'échelle d'ACA, les budgets de Cost Management, les réglages d'uvicorn. Relues le 2026-11-20
+(#611), pour API10 : les deux pages des politiques d'accès de Grafana Cloud.
 
 - [OWASP API Security Top 10, édition 2023](https://owasp.org/API-Security/editions/2023/en/0x11-t10/),
   section « How To Prevent » de chaque entrée ;
@@ -1673,7 +1712,9 @@ l'entrée, le chiffrement entre apps, les certificats clients, les conteneurs, l
   [SHA-1 retiré de HTTPS](https://github.blog/changelog/2026-04-20-sunsetting-sha-1-in-https-on-github/),
   [rapports de conformité](https://docs.github.com/en/enterprise-cloud@latest/organizations/keeping-your-organization-secure/managing-security-settings-for-your-organization/accessing-compliance-reports-for-your-organization),
   [bug bounty](https://bounty.github.com).
-- Grafana Cloud : [politiques d'accès](https://grafana.com/docs/grafana-cloud/security-and-account-management/authentication-and-permissions/access-policies/),
+- Grafana Cloud : [politiques d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/)
+  et [créer une politique d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/create-access-policies/),
+  relues le 2026-11-20 (#611),
   [conformité](https://grafana.com/legal/security-compliance/),
   [signaler une vulnérabilité](https://grafana.com/legal/report-a-security-issue/).
 - Azure Container Apps : [conteneurs](https://learn.microsoft.com/en-us/azure/container-apps/containers),
