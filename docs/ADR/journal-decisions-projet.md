@@ -7542,16 +7542,21 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
 ### Infra : la relecture de la configuration en ligne et deux politiques d'audit (#497)
 
 Plan validé par Sabine le 2026-11-13 (§ 6, points 12 et 13), sur sa décision du 08/11 de tenir la « revue périodique
-des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10.
+des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10 ;
+l'effet écrit, décision de Sabine du 2026-11-20.
 
 - **Deux définitions intégrées d'Azure Policy, assignées au groupe de ressources par `infra/`
-  (`container-apps-policies.bicep`, `policyAssignments@2026-07-01`), sans paramètre : leur effet par défaut, `Audit`
-  (versions 1.1.0 et 1.0.1, lues dans `Azure/azure-policy` le 2026-11-18), signale sans rien refuser.** Pourquoi :
+  (`container-apps-policies.bicep`, `policyAssignments@2026-07-01`), avec l'effet `Audit` écrit dans chaque
+  affectation (`parameters: { effect: { value: 'Audit' } }`), qui signale sans rien refuser.** Pourquoi :
   Sabine est propriétaire du groupe et seulement lectrice de l'abonnement (ses lectures `az` du 2026-11-18, relayées
   par time-knight) ; une définition personnalisée se crée dans un groupe d'administration ou un abonnement, une
-  assignation de définition intégrée au niveau du groupe. L'effet `Audit` est celui de l'issue. Écartés : l'effet
-  `Deny`, qui refuserait aussi le déploiement des apps des autres projets du groupe ; une identité et une `location`,
-  que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
+  assignation de définition intégrée au niveau du groupe. L'effet `Audit` est celui de l'issue. Il est écrit
+  (décision de Sabine du 2026-11-20, constat 4 du relecteur Azure du 2026-11-18) : le Bicep dit ce qu'il fait sans
+  ouvrir la définition, et une nouvelle version d'une définition ne change pas l'effet en silence. Les deux
+  définitions permettent `Audit`, `Deny` et `Disabled`, `Audit` par défaut (versions 1.1.0 et 1.0.1, lues dans
+  `Azure/azure-policy` le 2026-11-20). **Inverse** le plan du 2026-11-13 (« pas de paramètre d'effet si le défaut est
+  `Audit` »). Écartés : l'effet `Deny`, qui refuserait aussi le déploiement des apps des autres projets du groupe ;
+  une identité et une `location`, que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
   bloquée ; les apps des autres projets du groupe sont auditées aussi. — PR de #497
 - **`ca-kb-web` est hors de la politique « Container Apps should disable external network access », par
   `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; dans
