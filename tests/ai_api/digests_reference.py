@@ -12,7 +12,6 @@ import secrets
 import shutil
 import sys
 import tempfile
-import threading
 from collections.abc import Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from datetime import UTC, datetime, timedelta
@@ -87,6 +86,9 @@ PROMPT_VERSION_BY_STAGE: dict[DigestStage, str] = {
 }
 # A subject the model could not answer for: a recording with one of them is not kept.
 UNAVAILABLE_STATES = PROVIDER_FAILURES | {"llm_timeout"}
+# The links named of the chain of an error, from the error to its root: an error of httpx2 hides
+# its cause behind the same error of httpcore2.
+MAX_ERROR_CHAIN_LINKS = 5
 
 
 class Extract(NamedTuple):
@@ -316,24 +318,24 @@ class RecordingTransport(httpx2.BaseTransport):
         # Each call with its subject, in the order the answers came: one thread per subject
         # appends to it, a list.append being atomic.
         self.recorded: list[tuple[str | None, RecordedCall]] = []
-        self.transport_errors = 0
-        # The count is read then written by the threads of the writings.
-        self.transport_errors_lock = threading.Lock()
+        # Each error of the transport, described, appended by the thread that met it.
+        self.transport_errors: list[str] = []
 
     @property
     def calls(self) -> list[RecordedCall]:
         return order_as_replayed(self.recorded, self.subject_names)
 
     def handle_request(self, request: httpx2.Request) -> httpx2.Response:
+        status: int | None = None
         try:
             response = self.provider.handle_request(request)
+            status = response.status_code
             try:
                 body = response.read()
             finally:
                 response.close()
-        except BaseException:
-            with self.transport_errors_lock:
-                self.transport_errors += 1
+        except BaseException as error:
+            self.transport_errors.append(describe_transport_error(error, status))
             raise
         stage = read_stage(request)
         retry_after = response.headers.get("Retry-After")
@@ -361,12 +363,27 @@ class RecordingTransport(httpx2.BaseTransport):
         self.provider.close()
 
 
+def describe_transport_error(error: BaseException, status: int | None) -> str:
+    """An error of the transport by the classes of its chain of causes, and the status received
+    before it; never by its message, which can carry the URL of the provider."""
+    classes: list[str] = []
+    link: BaseException | None = error
+    while link is not None and len(classes) < MAX_ERROR_CHAIN_LINKS:
+        classes.append(type(link).__name__)
+        link = link.__cause__ or link.__context__
+    chain = " from ".join(classes)
+    return chain if status is None else f"{chain} after status {status}"
+
+
 def find_recording_refusal(
     response: httpx2.Response, transport: RecordingTransport
 ) -> str | None:
     """Why a recording is not kept: an answer the replay would not give the same way."""
     if transport.transport_errors:
-        return f"transport errors: {transport.transport_errors}"
+        return (
+            f"transport errors: {len(transport.transport_errors)}"
+            f" ({', '.join(transport.transport_errors)})"
+        )
     for position, call in enumerate(transport.calls, start=1):
         if call.step.status != 200:
             return f"answer {position} of {len(transport.calls)}: status {call.step.status}"
