@@ -539,7 +539,7 @@ La passe de l'étape 2, avec `modelAccountName`. Aperçu attendu :
 - **à créer** : `ag-kb-operator` et `alert-kb-model-tokens` ;
 - **à modifier** : le bruit de l'étape 2.
 
-L'aperçu montre l'adresse du groupe : elle est masquée dans toute sortie recopiée.
+L'aperçu montre l'adresse du groupe : elle est caviardée dans toute sortie recopiée et dans toute capture.
 
 Si la création échoue sur `alert-kb-model-tokens` avec une erreur qui nomme `evaluationFrequency` ou `windowSize`,
 Azure refuse le couple `P1D` et `PT15M`, que Microsoft Learn ne décrit pas : la ligne `evaluationFrequency: 'PT15M'`
