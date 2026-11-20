@@ -3,9 +3,9 @@
 - **Date** : 2026-11-20
 - **Branche** : `test/reference-set-on-production-model`
 - **Issue** : #520
-- **Fichiers principaux** : `tests/ai_api/test_digests_reference.py` (un test nouveau et ses trois constantes).
-  `tests/ai_api/digests_reference.py` (l'enregistrement) et `tests/fixtures/digests_reference.json` (le jeu) ne
-  changent pas avant l'enregistrement.
+- **Fichiers principaux** : `tests/ai_api/test_digests_reference.py` (le test qui épingle le jeu, et ceux du refus
+  de l'outil), `tests/ai_api/digests_reference.py` (l'enregistrement : son refus nomme maintenant chaque erreur de
+  transport). `tests/fixtures/digests_reference.json` (le jeu) ne change pas avant l'enregistrement.
 - **Série** : le jeu et son outil viennent de
   [2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md](2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md) ;
   le passage de K-B à gpt-6.1-sol, de [2026-11-18-passer-k-b-a-gpt-6-1-sol.md](2026-11-18-passer-k-b-a-gpt-6-1-sol.md).
@@ -99,15 +99,46 @@ C'est voulu : une relance par erreur ne coûte rien et ne détruit rien. Le mess
 Sabine supprime le jeu par `git rm`, puis lance l'outil. L'ancien jeu reste dans l'historique de git (commit
 `d10f5bf9`), et ses mesures sont déjà écrites dans `docs/fiches-veille.md` et dans la note du 08/11.
 
+### 5. Un premier essai refusé, et un refus qui nomme ses erreurs
+
+Le 20/11 à 01:50 UTC, Sabine a lancé l'enregistrement. Le classement et deux rédactions sont passés en 200. La
+rédaction d'`agent_frameworks` a fini en `llm_unavailable` : 2 tentatives en 2 101 ms, dont les 2 s d'attente avant
+la seconde (`LLM_RETRY_WAIT_SECONDS`), donc une cinquantaine de ms chacune, sans statut HTTP. L'outil a refusé le
+jeu : `not recorded: transport errors: 2`. Rien n'a été écrit, et l'appel a coûté environ 0,02 USD (la somme des
+`cost_estimated`).
+
+Ce refus ne permettait pas de trouver la cause : l'outil comptait les erreurs sans les nommer. Il les décrit
+maintenant (`tests/ai_api/digests_reference.py:366-377`) :
+
+```python
+    while link is not None and len(classes) < MAX_ERROR_CHAIN_LINKS:
+        classes.append(name_error_class(link))
+        link = link.__cause__ or link.__context__
+    if link is not None:
+        classes.append("\u2026")
+```
+
+- **La chaîne des causes, pas seulement l'erreur.** httpx2 relance l'erreur de httpcore2 sous le même nom. Sur une
+  connexion refusée, le refus lit donc `httpx2.ConnectError from httpcore2.ConnectError from
+  ConnectionRefusedError`. Un seul niveau de cause aurait dit « ConnectError from ConnectError », sans la cause
+  réelle.
+- **La classe et son paquet de tête, jamais le message** (`name_error_class`, l. 380-384). Le message d'une erreur
+  de httpx2 peut porter l'URL du point du fournisseur. Le paquet dit quelle bibliothèque a levé quel maillon ;
+  `builtins` est omis.
+- **Une chaîne bornée, et dite coupée.** 5 maillons au plus (`MAX_ERROR_CHAIN_LINKS`) ; s'il en reste, la chaîne
+  finit par ` from …`, pour qu'on ne prenne pas le cinquième maillon pour la racine.
+- **Le statut reçu avant l'erreur** (l. 329-338). Il est retenu dès que le fournisseur a répondu. Une erreur
+  pendant la lecture du corps se lit `… after status 200`, et une erreur de connexion n'a pas de statut.
+
 ## La commande de Sabine
 
-Dans `/Users/sabine/REPO_GIT/worktrees-temp/K-B_banc` :
+Dans `/Users/sabine/REPO_GIT/worktrees-temp/K-B_banc`, qui n'a pas de `.env` : celui du dépôt principal sert.
 
 ```sh
 git switch test/reference-set-on-production-model
 # Avant de lancer : le KB_LLM_MODEL du .env nomme le déploiement de gpt-6.1-sol ; sinon le test échoue après un appel payé.
 git rm -q tests/fixtures/digests_reference.json
-KB_LLM_REASONING_EFFORT=low KB_LLM_SEND_PROMPT_CACHE_OPTIONS=true uv run --env-file .env python tests/ai_api/digests_reference.py
+KB_LLM_REASONING_EFFORT=low KB_LLM_SEND_PROMPT_CACHE_OPTIONS=true uv run --env-file /Users/sabine/REPO_GIT/K-B/.env python tests/ai_api/digests_reference.py
 ```
 
 - **Les deux variables devant `uv run`** : avec uv 0.13.6, une variable du shell l'emporte sur la même variable
@@ -132,12 +163,20 @@ KB_LLM_REASONING_EFFORT=low KB_LLM_SEND_PROMPT_CACHE_OPTIONS=true uv run --env-f
 | Épingler le modèle | `response_model`, le nom renvoyé par le fournisseur | `model` : c'est le déploiement choisi par Sabine, il ne dit pas quel modèle a répondu |
 | Forme du motif | Nom seul ou suivi d'une date (revue, constat 3) | Tout suffixe : une variante `-mini` passait |
 | Code de `src/` | Aucun | Le jeu teste ce qui est livré, sans rien y changer |
+| Après le refus de 01:50 | Nommer chaque erreur de transport dans le refus, avant toute relance (écart au plan « sans code », tranché par time-knight, règle de Sabine du 08/11) | Relancer tel quel : un nouvel échec n'aurait rien dit de plus |
+| Ce que le refus nomme | La chaîne des classes jusqu'à la racine, bornée à 5 maillons | Un seul niveau de cause : « ConnectError from ConnectError ». Le message de l'erreur : il peut porter l'URL du fournisseur |
+| Un contexte masqué par `raise … from None` | Suivi quand même (revue 2, constat 3 écarté) | L'ignorer comme le fait une trace Python : un outil de diagnostic dit ce qu'il observe, et aucun message n'apparaît |
 
 La revue (`/code-review high`) a rendu 6 constats. Le tri est de time-knight, par délégation de Sabine du 15/10 :
 - corrigés : 3 (le motif), 5 (le commentaire disait que `main.bicep` fixe le modèle, alors qu'il ne fixe que
   l'effort), 6 (`classify-2` épinglé aussi) ;
 - écartés : 1 (le test est rouge avant le jeu : c'est voulu, la PR reste en brouillon) ;
 - reportés après l'enregistrement : 2 (les comptes `[26, 26, 14, 14]`) et 4 (la documentation et `MEMORY.md`).
+
+La seconde revue (`/code-review high` sur le refus qui nomme ses erreurs) a rendu 6 constats, même tri :
+- corrigés : 2 (le paquet de tête de chaque classe), 4 (une chaîne coupée le dit), 5 (la borne et le passage par
+  `__context__` testés), 6 (le premier transport du test fermé) ;
+- écartés : 1 (le test rouge, voulu) et 3 (le contexte masqué, voir le tableau).
 
 ## Preuve
 
@@ -146,7 +185,12 @@ La revue (`/code-review high`) a rendu 6 constats. Le tri est de time-knight, pa
 | `uv run pytest tests/ai_api/test_digests_reference.py` → 1 failed, 4 passed ; `AssertionError: assert ['gpt-6-luna-...a-2026-09-22'] == []` | Le test échoue sur le jeu du 08/11, à cause de son modèle |
 | Les trois assertions essayées une à une sur le jeu du 08/11 → modèle refusé, effort refusé (`none`), consignes acceptées | Le jeu du 08/11 a déjà `classify-2` et `write-1` : seuls le modèle et l'effort le séparent de la production |
 | Le motif essayé sur des noms → `gpt-6.1-sol` et `gpt-6.1-sol-2026-09-29` acceptés ; `gpt-6.1-sol-mini` et `gpt-6-luna-2026-09-22` refusés | Le motif tient le modèle sans ses variantes |
-| `uv run pytest` → 1 failed, 5628 passed, 365 deselected ; le seul échec est le test nouveau | Rien d'autre n'est cassé |
+| L'essai de Sabine, 01:50 UTC → `not recorded: transport errors: 2` | L'outil refuse un jeu dont un appel n'a pas eu de réponse, et n'écrit rien |
+| `test_a_transport_error_is_refused_by_its_classes_and_its_status_never_its_message`, rouge avant le code (`'transport errors: 2' == …`), vert après | Le refus nomme chaque erreur, et le statut reçu avant elle ; il ne contient pas l'URL des messages |
+| `test_a_chain_of_causes_is_named_through_its_contexts_and_cut_after_five_links` | Une chaîne de 5 maillons est entière, une de 6 finit par ` from …` ; `__context__` est suivi |
+| Une vraie connexion refusée (`https://127.0.0.1:1`) → `transport errors: 1 (httpx2.ConnectError from httpcore2.ConnectError from ConnectionRefusedError)` | Sur une vraie erreur de httpx2, la racine apparaît |
+| Rejeu en local (scratchpad) : 3 rédactions en parallèle sur un faux fournisseur en HTTP, 3 essais → 0 erreur de transport | Le parallèle de l'outil ne suffit pas à causer l'erreur de 01:50 (sans TLS : pas Azure) |
+| `uv run pytest` → 1 failed, 5630 passed, 365 deselected ; le seul échec est le test qui épingle le jeu | Rien d'autre n'est cassé |
 | `uv run ruff check --no-cache`, `ruff format --check`, `uv run mypy --strict` → verts | Les contrôles du dépôt passent |
 
 ## Ce que tu dois pouvoir défendre
@@ -161,11 +205,18 @@ La revue (`/code-review high`) a rendu 6 constats. Le tri est de time-knight, pa
 - **Que contrôle ce test de la production elle-même ?** Rien. Il ne lit ni `infra/main.bicep` ni l'Azure en
   ligne. Si la production change de modèle ou d'effort, le test passe toujours, et c'est une décision humaine
   de réenregistrer.
+- **Pourquoi ne pas citer le message de l'erreur ?** Il peut porter l'URL du point du fournisseur, que le dépôt
+  public ne doit pas montrer dans une sortie recopiée. Les classes suffisent à distinguer une connexion refusée,
+  coupée ou un échec du TLS (`digests_reference.py:366-384`).
 - **Quelles données partent chez Azure ?** Les mêmes que le 08/11 : les champs de 6 items sous CC0 1.0, sans
   auteur. gpt-6.1-sol est déjà nommé comme destinataire au registre des traitements.
 
 ## Zones non vérifiées
 
+- La cause des 2 erreurs de transport de 01:50 : non établie. Écartés, preuve à l'appui : un délai (ce serait
+  `llm_timeout`), une réponse d'Azure (`http_status` est nul), un corps illisible (le client ne retente pas ce
+  cas), et le parallèle de l'outil, que le rejeu en local ne reproduit pas. Si la relance nomme une cause qui
+  touche aussi le client de production (rédactions parallèles vers Azure), elle ira dans une issue à part.
 - Le nom exact que renvoie Azure pour gpt-6.1-sol (`response_model`). Le motif suppose le nom seul ou suivi
   d'une date, comme pour gpt-6-luna. S'il en va autrement, il faudra corriger le motif, sans réenregistrer.
 - Le coût de l'enregistrement : estimé à environ 0,10 USD, pas mesuré. L'estimation part des prix de
