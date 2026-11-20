@@ -162,13 +162,18 @@ ordre : la ligne « Appels rejoués » est non tenue et le job échoue (`judge_r
 
 ## 6. Zones non vérifiées
 
-- Le job n'a pas encore tourné sur GitHub : le dépôt du rapport par `actions/upload-artifact` v7.0.2 et
-  `gh run download <id> -n digests-reference-report` restent à constater sur le run de la PR.
-- La sémantique de `if: ${{ !cancelled() }}` (l'étape tourne après une étape en échec, pas après une annulation) vient
-  de la documentation de GitHub Actions telle que je la connais : elle n'a pas été relue à la source dans cette session.
+- Le job a tourné deux fois sur GitHub :
+  - sur 00684824, avec le jeu de gpt-6-luna (run 44679310659). Le script échoue, comme attendu : fidélité 53,84 %,
+    14 faits sur 26. L'étape `actions/upload-artifact` tourne après lui, et le rapport se télécharge par
+    `gh run download 44679310659 -n digests-reference-report`.
+  - sur 9590394e, après la fusion de `main` qui porte le jeu de gpt-6.1-sol (#520, PR #659 ; run 44714259202). Les
+    quatre lignes du rapport sont tenues : 4 appels rejoués sur 4, réponse 200 ; schémas 100 % (4 sur 4) ; fidélité
+    100 % (26 faits sur 26) ; aucun item oublié.
+- `if: ${{ !cancelled() }}` est constaté après un échec (run 44679310659). Après une annulation, son effet vient de la
+  documentation de GitHub Actions telle que je la connais : ni relu à la source dans cette session, ni essayé.
 - L'import de `test_digests_reference` par le script repose sur le mode d'import par défaut de pytest (`prepend`) et sur
-  le dossier du script, que Python place dans `sys.path`. Ces deux conditions sont vérifiées ici ; un passage à
-  `--import-mode=importlib` n'a pas été essayé.
+  le dossier du script, que Python place dans `sys.path`. Ces deux conditions sont vérifiées ici et sur le runner de
+  GitHub ; un passage à `--import-mode=importlib` n'a pas été essayé.
 
 ## 7. Ce qui reste
 
