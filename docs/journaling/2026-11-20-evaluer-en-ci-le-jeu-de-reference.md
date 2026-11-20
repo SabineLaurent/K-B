@@ -105,7 +105,7 @@ le dépose ensuite en artefact (`.github/workflows/ci.yml:125-131`) :
 ```
 
 Sans `if`, une étape ne tourne qu'après des étapes réussies : le rapport d'un run rouge, celui qu'on veut lire, serait
-perdu. Chaque valeur est tronquée au centième (`format_share`, `tests/ai_api/digests_evaluation.py:134`), jamais
+perdu. Chaque valeur est tronquée au centième (`format_share`, `tests/ai_api/digests_evaluation.py:129-134`), jamais
 arrondie : 99 999 sur 100 000 s'affiche 99,99 %, et non « 100 % » à côté de « non tenu ». Le rapport ne contient que
 des noms et des chiffres (modèle, `prompt_version`, mesures), jamais le texte d'un item : les artefacts d'un dépôt
 public se téléchargent.
