@@ -4,7 +4,7 @@
 
 # uv builds K-B with its own build backend: its version stays in the range of build-system.requires
 # of pyproject.toml (uv_build>=0.13.6,<0.14.0), and is the version setup-uv installs in ci.yml.
-FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
+FROM ghcr.io/astral-sh/uv:0.13.9@sha256:d3b601f0c7b118bc1753febf7c41cc80981df678445e0254284eecf84db79a7d AS uv
 
 # Build stage: the virtual environment, from uv.lock, without the development dependencies.
 FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS builder
