@@ -22,12 +22,13 @@ from digests_reference import (
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL
 
-# What the set was recorded on, delivered on 2026-11-20 (decision of Sabine, #520): the model and
-# the effort of infra/main.bicep, and the writing prompt of production. Values, not the constants
-# of the code: a new prompt_version leaves the set to its expiry (#482), not to this test.
-PRODUCTION_MODEL = re.compile(r"gpt-6\.1-sol(-[0-9A-Za-z.-]+)?")
+# What the set is recorded on (decision of Sabine of 2026-11-20, #520): the model of production
+# (parameter llmModel) and the effort set in infra/main.bicep, and the prompts of production; a
+# change of bicep does not fail this test. Values, not the constants of the code: a new
+# prompt_version leaves the set to its expiry (#482), not to this test.
+PRODUCTION_MODEL = re.compile(r"gpt-6\.1-sol(-\d{4}-\d{2}-\d{2})?")
 PRODUCTION_REASONING_EFFORT = "low"
-RECORDED_WRITING_PROMPT_VERSION = "write-1"
+RECORDED_PROMPT_VERSION_BY_STAGE = {"classify": "classify-2", "write": "write-1"}
 
 
 def read_licenses():
@@ -82,7 +83,8 @@ def test_each_recorded_output_replays_through_post_digests(tmp_path):
 
 
 def test_the_set_is_recorded_on_the_model_of_production():
-    """Each call of the set was answered by gpt-6.1-sol at effort low; each writing used write-1."""
+    """Each call of the set was answered by gpt-6.1-sol at effort low, with the prompt of its stage
+    in production."""
     calls = read_reference(REFERENCE_PATH).calls
 
     assert [
@@ -91,9 +93,9 @@ def test_the_set_is_recorded_on_the_model_of_production():
         if not PRODUCTION_MODEL.fullmatch(call.response_model or "")
     ] == []
     assert {call.reasoning_effort for call in calls} == {PRODUCTION_REASONING_EFFORT}
-    assert {call.prompt_version for call in calls if call.stage == "write"} == {
-        RECORDED_WRITING_PROMPT_VERSION
-    }
+    assert {(call.stage, call.prompt_version) for call in calls} == set(
+        RECORDED_PROMPT_VERSION_BY_STAGE.items()
+    )
 
 
 def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
