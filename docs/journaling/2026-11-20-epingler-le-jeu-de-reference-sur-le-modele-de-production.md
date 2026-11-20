@@ -29,7 +29,7 @@ L'enregistrement est un appel payant, que seule Sabine lance. Cette PR prépare 
 ### 1. Ce que le jeu garde de chaque appel
 
 L'outil d'enregistrement écrit, pour chaque appel, l'étape, la consigne, le modèle qui a répondu et l'effort
-(`tests/ai_api/digests_reference.py:342-345`) :
+(`tests/ai_api/digests_reference.py:344-347`) :
 
 ```python
             prompt_version=PROMPT_VERSION_BY_STAGE[stage],
@@ -47,7 +47,7 @@ vraiment répondu.
 
 ### 2. Les valeurs épinglées, écrites telles quelles
 
-`tests/ai_api/test_digests_reference.py:25-31` :
+`tests/ai_api/test_digests_reference.py:30-36` :
 
 ```python
 PRODUCTION_MODEL = re.compile(r"gpt-6\.1-sol(-\d{4}-\d{2}-\d{2})?")
@@ -67,7 +67,7 @@ qu'un jeu est périmé revient à #482 (`MEMORY.md`, « Jeu de référence »).
 
 ### 3. Trois assertions, chacune lisible en échec
 
-`tests/ai_api/test_digests_reference.py:85-98`. La première rend la liste des modèles refusés, pas un booléen :
+`tests/ai_api/test_digests_reference.py:90-103`. La première rend la liste des modèles refusés, pas un booléen :
 
 ```python
     assert [
@@ -87,7 +87,7 @@ passerait pas.
 
 ### 4. Le nouveau jeu remplace l'ancien par suppression
 
-L'outil refuse d'écraser le jeu (`tests/ai_api/digests_reference.py:383-387`) :
+L'outil refuse d'écraser le jeu (`tests/ai_api/digests_reference.py:409-413`) :
 
 ```python
     if REFERENCE_PATH.exists():
@@ -127,7 +127,7 @@ maintenant (`tests/ai_api/digests_reference.py:366-377`) :
   `builtins` est omis.
 - **Une chaîne bornée, et dite coupée.** 5 maillons au plus (`MAX_ERROR_CHAIN_LINKS`) ; s'il en reste, la chaîne
   finit par ` from …`, pour qu'on ne prenne pas le cinquième maillon pour la racine.
-- **Le statut reçu avant l'erreur** (l. 329-338). Il est retenu dès que le fournisseur a répondu. Une erreur
+- **Le statut reçu avant l'erreur** (l. 329-339). Il est retenu dès que le fournisseur a répondu. Une erreur
   pendant la lecture du corps se lit `… after status 200`, et une erreur de connexion n'a pas de statut.
 
 ## La commande de Sabine
@@ -199,7 +199,7 @@ La seconde revue (`/code-review high` sur le refus qui nomme ses erreurs) a rend
   d'abord. La PR reste en brouillon jusqu'à l'enregistrement, qui le fait passer sans toucher au code.
 - **Pourquoi ne pas lire `WRITING_PROMPT_VERSION` ?** Le test vérifie le jeu, pas le code. Si le code passe à
   `write-2`, le jeu reste enregistré en `write-1`. Le dire périmé revient à #482
-  (`test_digests_reference.py:25-28`).
+  (`test_digests_reference.py:30-33`).
 - **Et si le `.env` nommait encore gpt-6-luna ?** L'appel serait payé, puis le test échouerait sur
   `response_model`, et le jeu ne passerait pas la CI. D'où la ligne de vérification avant la commande.
 - **Que contrôle ce test de la production elle-même ?** Rien. Il ne lit ni `infra/main.bicep` ni l'Azure en
@@ -223,8 +223,8 @@ La seconde revue (`/code-review high` sur le refus qui nomme ses erreurs) a rend
   `src/k_b/core/config.py` et des 1 220 à 1 765 jetons de sortie d'une rédaction mesurés le 18/11.
 - Le comportement de l'outil sur gpt-6.1-sol. Une rédaction coupée par le raisonnement (`llm_truncated`) ou une
   nouvelle tentative serait gardée dans le jeu, car l'outil ne refuse que l'indisponibilité du fournisseur
-  (`digests_reference.py:89`). Le rejeu suppose aujourd'hui une fiche par appel de rédaction et aucun sujet en
-  échec (`test_digests_reference.py:76`). Si le jeu en contient, c'est un fait sur le modèle livré, rapporté à
+  (`digests_reference.py:88`). Le rejeu suppose aujourd'hui une fiche par appel de rédaction et aucun sujet en
+  échec (`test_digests_reference.py:81`). Si le jeu en contient, c'est un fait sur le modèle livré, rapporté à
   Sabine, sans réenregistrement ni assertion changée sans sa décision.
 
 ## Ce qui reste
