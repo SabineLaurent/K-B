@@ -1,0 +1,191 @@
+# Épingler le jeu de référence de `POST /digests` sur le modèle de production
+
+- **Date** : 2026-11-20
+- **Branche** : `test/reference-set-on-production-model`
+- **Issue** : #520
+- **Fichiers principaux** : `tests/ai_api/test_digests_reference.py` (un test nouveau et ses trois constantes).
+  `tests/ai_api/digests_reference.py` (l'enregistrement) et `tests/fixtures/digests_reference.json` (le jeu) ne
+  changent pas avant l'enregistrement.
+- **Série** : le jeu et son outil viennent de
+  [2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md](2026-11-08-enregistrer-un-jeu-de-reference-des-fiches.md) ;
+  le passage de K-B à gpt-6.1-sol, de [2026-11-18-passer-k-b-a-gpt-6-1-sol.md](2026-11-18-passer-k-b-a-gpt-6-1-sol.md).
+
+## Le pourquoi
+
+Le jeu de référence (#479) est l'enregistrement de vraies réponses d'un modèle à `POST /digests`. La CI le rejoue
+sans réseau ni coût. Celui du 08/11 a été enregistré sur gpt-6-luna, effort `none`. Depuis le banc de C7, la
+production tourne sur gpt-6.1-sol, effort `low` : le jeu ne mesure donc plus ce qui est livré.
+
+Décision de Sabine du 2026-11-20 : le jeu se réenregistre sur gpt-6.1-sol, avec les consignes en production
+(`write-1` pour la rédaction). Pourquoi : le jeu teste ce qui est livré. La consigne `write-2` et la borne commune
+(#519) sont renvoyées à après la certification.
+
+L'enregistrement est un appel payant, que seule Sabine lance. Cette PR prépare tout ce qui peut l'être avant lui :
+- un test qui dit sur quoi le jeu doit être enregistré, et qui échoue tant qu'il ne l'est pas ;
+- la commande exacte de l'enregistrement.
+
+## Le comment
+
+### 1. Ce que le jeu garde de chaque appel
+
+L'outil d'enregistrement écrit, pour chaque appel, l'étape, la consigne, le modèle qui a répondu et l'effort
+(`tests/ai_api/digests_reference.py:342-345`) :
+
+```python
+            prompt_version=PROMPT_VERSION_BY_STAGE[stage],
+            model=self.settings.model,
+            response_model=read_response_model(body),
+            reasoning_effort=self.settings.reasoning_effort,
+```
+
+Ces quatre champs suffisent : le test nouveau n'a besoin ni du réseau ni du rejeu. Il lit le jeu par
+`read_reference`, la même lecture que les autres tests du fichier.
+
+`response_model` est le nom que le fournisseur renvoie dans sa réponse. `model` est le nom du déploiement Azure
+(`KB_LLM_MODEL`), que Sabine choisit. Le test épingle `response_model` : c'est le seul champ qui dit quel modèle a
+vraiment répondu.
+
+### 2. Les valeurs épinglées, écrites telles quelles
+
+`tests/ai_api/test_digests_reference.py:25-31` :
+
+```python
+PRODUCTION_MODEL = re.compile(r"gpt-6\.1-sol(-\d{4}-\d{2}-\d{2})?")
+PRODUCTION_REASONING_EFFORT = "low"
+RECORDED_PROMPT_VERSION_BY_STAGE = {"classify": "classify-2", "write": "write-1"}
+```
+
+- **Le modèle** : un motif, car le nom que renvoie Azure pour gpt-6.1-sol n'est écrit nulle part dans le dépôt.
+  Pour gpt-6-luna, c'était `gpt-6-luna-2026-09-22`, le nom suivi de la date de version. Le motif accepte le nom
+  seul ou suivi d'une date, et refuse une variante (`gpt-6.1-sol-mini`).
+- **L'effort** : `low`, celui que pose `infra/main.bicep:304`.
+- **Les consignes** : `classify-2` et `write-1`, celles du code de production au 20/11.
+
+Ce sont des valeurs écrites en dur, pas `WRITING_PROMPT_VERSION` ni `CLASSIFICATION_PROMPT_VERSION`. Si le test
+lisait ces constantes, le passage à `write-2` (#519) le ferait échouer alors que le jeu n'a pas changé. Or juger
+qu'un jeu est périmé revient à #482 (`MEMORY.md`, « Jeu de référence »).
+
+### 3. Trois assertions, chacune lisible en échec
+
+`tests/ai_api/test_digests_reference.py:85-98`. La première rend la liste des modèles refusés, pas un booléen :
+
+```python
+    assert [
+        call.response_model
+        for call in calls
+        if not PRODUCTION_MODEL.fullmatch(call.response_model or "")
+    ] == []
+```
+
+En échec, pytest affiche donc le nom fautif (`'gpt-6-luna-2026-09-22'`). Un `all(...)` n'aurait affiché que
+`False`. Un `response_model` absent (`None`) devient `""` et il est refusé : un jeu dont aucune réponse ne nomme
+son modèle ne prouve rien.
+
+La troisième compare l'ensemble des couples (étape, consigne) à `{("classify", "classify-2"), ("write",
+"write-1")}`. Elle refuse une consigne de brouillon, et aussi une étape absente : un jeu sans rédaction ne
+passerait pas.
+
+### 4. Le nouveau jeu remplace l'ancien par suppression
+
+L'outil refuse d'écraser le jeu (`tests/ai_api/digests_reference.py:383-387`) :
+
+```python
+    if REFERENCE_PATH.exists():
+        print(
+            f"{REFERENCE_PATH.name}: already recorded, no call sent; remove it to record again",
+```
+
+C'est voulu : une relance par erreur ne coûte rien et ne détruit rien. Le message dit déjà comment réenregistrer.
+Sabine supprime le jeu par `git rm`, puis lance l'outil. L'ancien jeu reste dans l'historique de git (commit
+`d10f5bf9`), et ses mesures sont déjà écrites dans `docs/fiches-veille.md` et dans la note du 08/11.
+
+## La commande de Sabine
+
+Dans `/Users/sabine/REPO_GIT/worktrees-temp/K-B_banc` :
+
+```sh
+git switch test/reference-set-on-production-model
+# Avant de lancer : le KB_LLM_MODEL du .env nomme le déploiement de gpt-6.1-sol ; sinon le test échoue après un appel payé.
+git rm -q tests/fixtures/digests_reference.json
+KB_LLM_REASONING_EFFORT=low KB_LLM_SEND_PROMPT_CACHE_OPTIONS=true uv run --env-file .env python tests/ai_api/digests_reference.py
+```
+
+- **Les deux variables devant `uv run`** : avec uv 0.13.6, une variable du shell l'emporte sur la même variable
+  de `--env-file`. Je l'ai vérifié le 20/11 sur un fichier d'essai du scratchpad : `from_shell` a gagné sur
+  `from_file`. Elles imposent ce qui tourne en production, quel que soit le `.env` :
+  - l'effort `low` (`infra/main.bicep:304`) ;
+  - l'envoi des options de cache de prompt. C'est le défaut (`src/k_b/core/config.py:271`), et `main.bicep` ne pose
+    pas la variable.
+- **`KB_LLM_MODEL` n'est pas forcé** : c'est le nom du déploiement, que seule Sabine connaît. D'où la ligne de
+  vérification. Le 20/11, Sabine a vérifié que celui de son `.env` nomme bien gpt-6.1-sol.
+- **Sortie attendue** : `digests_reference.json: 6 items, N calls`. Le 08/11, N valait 3 : un classement et deux
+  rédactions.
+- **Si l'outil refuse** (`not recorded: …`) : rien n'est écrit. `git restore --staged --worktree
+  tests/fixtures/digests_reference.json` rend le jeu du 08/11.
+
+## Choix faits et options écartées
+
+| Choix | Retenu, pourquoi | Écarté, pourquoi |
+|---|---|---|
+| Remplacer l'ancien jeu | Le supprimer par `git rm` : l'outil le prévoit, aucun code | Un drapeau `--replace` : du code pour un seul usage, qui affaiblit la garde contre une relance par erreur. Garder les deux jeux : deux rejeux à tenir, et le critère de #520 n'en demande qu'un |
+| Épingler la consigne | Des valeurs écrites en dur | Les constantes du code : un `write-2` ferait échouer le test sans que le jeu ait changé, alors que la péremption revient à #482 |
+| Épingler le modèle | `response_model`, le nom renvoyé par le fournisseur | `model` : c'est le déploiement choisi par Sabine, il ne dit pas quel modèle a répondu |
+| Forme du motif | Nom seul ou suivi d'une date (revue, constat 3) | Tout suffixe : une variante `-mini` passait |
+| Code de `src/` | Aucun | Le jeu teste ce qui est livré, sans rien y changer |
+
+La revue (`/code-review high`) a rendu 6 constats. Le tri est de time-knight, par délégation de Sabine du 15/10 :
+- corrigés : 3 (le motif), 5 (le commentaire disait que `main.bicep` fixe le modèle, alors qu'il ne fixe que
+  l'effort), 6 (`classify-2` épinglé aussi) ;
+- écartés : 1 (le test est rouge avant le jeu : c'est voulu, la PR reste en brouillon) ;
+- reportés après l'enregistrement : 2 (les comptes `[26, 26, 14, 14]`) et 4 (la documentation et `MEMORY.md`).
+
+## Preuve
+
+| Test ou sortie observée | Ce que ça démontre |
+|---|---|
+| `uv run pytest tests/ai_api/test_digests_reference.py` → 1 failed, 4 passed ; `AssertionError: assert ['gpt-6-luna-...a-2026-09-22'] == []` | Le test échoue sur le jeu du 08/11, à cause de son modèle |
+| Les trois assertions essayées une à une sur le jeu du 08/11 → modèle refusé, effort refusé (`none`), consignes acceptées | Le jeu du 08/11 a déjà `classify-2` et `write-1` : seuls le modèle et l'effort le séparent de la production |
+| Le motif essayé sur des noms → `gpt-6.1-sol` et `gpt-6.1-sol-2026-09-29` acceptés ; `gpt-6.1-sol-mini` et `gpt-6-luna-2026-09-22` refusés | Le motif tient le modèle sans ses variantes |
+| `uv run pytest` → 1 failed, 5628 passed, 365 deselected ; le seul échec est le test nouveau | Rien d'autre n'est cassé |
+| `uv run ruff check --no-cache`, `ruff format --check`, `uv run mypy --strict` → verts | Les contrôles du dépôt passent |
+
+## Ce que tu dois pouvoir défendre
+
+- **Pourquoi un test rouge dans une PR ?** Il dit ce que le jeu doit être avant qu'il existe : c'est le test
+  d'abord. La PR reste en brouillon jusqu'à l'enregistrement, qui le fait passer sans toucher au code.
+- **Pourquoi ne pas lire `WRITING_PROMPT_VERSION` ?** Le test vérifie le jeu, pas le code. Si le code passe à
+  `write-2`, le jeu reste enregistré en `write-1`. Le dire périmé revient à #482
+  (`test_digests_reference.py:25-28`).
+- **Et si le `.env` nommait encore gpt-6-luna ?** L'appel serait payé, puis le test échouerait sur
+  `response_model`, et le jeu ne passerait pas la CI. D'où la ligne de vérification avant la commande.
+- **Que contrôle ce test de la production elle-même ?** Rien. Il ne lit ni `infra/main.bicep` ni l'Azure en
+  ligne. Si la production change de modèle ou d'effort, le test passe toujours, et c'est une décision humaine
+  de réenregistrer.
+- **Quelles données partent chez Azure ?** Les mêmes que le 08/11 : les champs de 6 items sous CC0 1.0, sans
+  auteur. gpt-6.1-sol est déjà nommé comme destinataire au registre des traitements.
+
+## Zones non vérifiées
+
+- Le nom exact que renvoie Azure pour gpt-6.1-sol (`response_model`). Le motif suppose le nom seul ou suivi
+  d'une date, comme pour gpt-6-luna. S'il en va autrement, il faudra corriger le motif, sans réenregistrer.
+- Le coût de l'enregistrement : estimé à environ 0,10 USD, pas mesuré. L'estimation part des prix de
+  `src/k_b/core/config.py` et des 1 220 à 1 765 jetons de sortie d'une rédaction mesurés le 18/11.
+- Le comportement de l'outil sur gpt-6.1-sol. Une rédaction coupée par le raisonnement (`llm_truncated`) ou une
+  nouvelle tentative serait gardée dans le jeu, car l'outil ne refuse que l'indisponibilité du fournisseur
+  (`digests_reference.py:89`). Le rejeu suppose aujourd'hui une fiche par appel de rédaction et aucun sujet en
+  échec (`test_digests_reference.py:76`). Si le jeu en contient, c'est un fait sur le modèle livré, rapporté à
+  Sabine, sans réenregistrement ni assertion changée sans sa décision.
+
+## Ce qui reste
+
+- L'enregistrement, par Sabine, avec la commande ci-dessus.
+- Après lui, dans cette PR :
+  - committer le jeu ;
+  - remplacer les comptes `[26, 26, 14, 14]` de
+    `test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text`, et sa docstring ;
+  - écrire dans `docs/fiches-veille.md` (« Fidélité ») les mesures du jeu face à celles du 08/11 : les deux
+    mesures de #518, `fidelity_rate`, les affirmations gardées et les motifs de retrait ;
+  - dans `MEMORY.md`, « Jeu de référence » : gpt-6.1-sol au lieu de gpt-6-luna ;
+  - compléter cette note avec les mesures.
+- Hors de cette PR : #519 (`write-2` et la borne commune), après la certification ; #482 (la péremption du jeu et
+  ses seuils).
