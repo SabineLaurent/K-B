@@ -8,7 +8,8 @@
 
 Cette fiche décrit l'architecture applicative de K-B: le flux des données de bout en bout, en bref puis en détail, les
 couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après `main` au commit
-`fd956430` (2026-11-18). « Déployé » y veut dire déclaré en ligne par le Bicep d'`infra/` et par
+`fd956430` (2026-11-18). Ce qu'elle dit du passage de la production à `gpt-6.1-sol` suit la fiche du service d'IA,
+mise à jour le 2026-11-18 (#623). « Déployé » y veut dire déclaré en ligne par le Bicep d'`infra/` et par
 `infra/deployment.json` à ce commit; la version qui tourne en ligne n'a pas été relue (section
 [Limites](#limites)). Les chemins du code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les
 autres de la racine du dépôt.
@@ -597,7 +598,7 @@ flowchart TB
     end
     grafana("Grafana Cloud, Allemagne")
     githubApi("API GitHub")
-    model("Modèle de langage, Microsoft Foundry<br>gpt-6.1-sol, après le passage de la production<br>France Central, zone de données<br>de l'Union européenne")
+    model("Modèle de langage, Microsoft Foundry<br>gpt-6.1-sol, depuis le 2026-11-18<br>France Central, zone de données<br>de l'Union européenne")
     actions -->|"pousse l'image, AcrPush"| registry
     actions -->|"met à jour, lance les jobs"| cae
     registry -->|"image, AcrPull"| cae
@@ -644,8 +645,8 @@ Les flèches du schéma, une à une:
 - Entre `ca-kb-ai-api` et le modèle de langage (« chat/completions »), dans les deux sens: déployé. Le Bicep de
     `main` règle l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:301-304`); l'adresse et le nom du
     déploiement viennent de la seconde passe. L'état en ligne n'est pas relu ici: selon
-    [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6-luna` jusqu'au passage de
-    la production à `gpt-6.1-sol`.
+    [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6.1-sol` depuis le passage
+    de la production, le 2026-11-18, et appelait `gpt-6-luna` avant.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
     API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
     porte #499.
@@ -704,7 +705,7 @@ Le détail de chaque partie:
     (`infra/modules/budget.bicep:1`, `:27-58`).
 - **Hors du Bicep**: le modèle `gpt-6.1-sol` est déployé à la main dans Microsoft Foundry (anciennement Azure AI
     Foundry), en France Central, en zone de données de l'Union européenne; `gpt-6-luna`, le modèle d'avant, y reste
-    déployé, et l'API IA en ligne l'appelle jusqu'au passage de la production à `gpt-6.1-sol`, selon
+    déployé, et l'API IA en ligne l'a appelé jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18, selon
     [la fiche du service d'IA](service_ia_pour_docu.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
     `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
     paramètres, les secrets et l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:22-29`, `:301-304`).
