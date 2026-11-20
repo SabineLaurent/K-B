@@ -7,18 +7,21 @@ from digests_evaluation import (
     EXIT_BELOW_THRESHOLD,
     evaluate,
     format_report,
+    format_share,
     judge,
+    judge_replay,
     measure_replay,
 )
 from digests_reference import REFERENCE_PATH
 
-from k_b.ai_api.observability.metrics import compute_fidelity_rate
+from k_b.ai_api.observability.metrics import LLM_CALL_EVENT
 
 OUTPUT_OUT_OF_SCHEMA = json.dumps({"claims": "not a list"})
 
 
 def classification_line(*, schema_valid=True, items_unanswered=0):
     return {
+        "event": LLM_CALL_EVENT,
         "stage": "classify",
         "schema_valid": schema_valid,
         "items_unanswered": items_unanswered,
@@ -29,6 +32,7 @@ def classification_line(*, schema_valid=True, items_unanswered=0):
 
 def writing_line(*, schema_valid=True, facts_checked=20, facts_found=20):
     return {
+        "event": LLM_CALL_EVENT,
         "stage": "write",
         "schema_valid": schema_valid,
         "items_unanswered": 0,
@@ -66,6 +70,10 @@ def test_a_replay_at_each_limit_meets_the_thresholds():
             [classification_line(), writing_line(facts_checked=0, facts_found=0)],
             id="no_fact_checked",
         ),
+        pytest.param(
+            [classification_line(), writing_line(facts_checked=1999, facts_found=1899)],
+            id="fidelity_94_9975_never_rounded_up",
+        ),
         pytest.param([], id="no_call"),
     ],
 )
@@ -74,14 +82,48 @@ def test_a_replay_under_one_threshold_fails(lines):
 
 
 def test_the_fidelity_weighs_each_fact_of_the_set_the_same():
-    """2 of 2 facts and 17 of 20: 19 of 22, under 95 %, where the mean of the two rates is 92.5 %."""
+    """1 of 2 facts and 100 of 100: 101 of 102 pass, where the mean of the two rates is 75 %."""
     lines = [
         classification_line(),
-        writing_line(facts_checked=2, facts_found=2),
-        writing_line(facts_checked=20, facts_found=17),
+        writing_line(facts_checked=2, facts_found=1),
+        writing_line(facts_checked=100, facts_found=100),
     ]
 
-    assert measure_replay(lines).fidelity_rate == compute_fidelity_rate(19, 22)
+    assert is_passed(lines)
+
+
+def test_a_line_of_another_event_is_not_counted():
+    lines = [
+        classification_line(),
+        writing_line(),
+        {"event": "another_event", "stage": "write", "schema_valid": False},
+    ]
+
+    assert measure_replay(lines).calls == 2
+
+
+@pytest.mark.parametrize(
+    ("part", "whole", "shown"),
+    [
+        (14, 26, "53,84 %"),
+        (99_999, 100_000, "99,99 %"),
+        (19, 20, "95 %"),
+        (1, 2, "50 %"),
+        (101, 1000, "10,1 %"),
+        (0, 0, "non mesurée"),
+    ],
+)
+def test_a_share_is_truncated_never_rounded_up_to_a_threshold(part, whole, shown):
+    assert format_share(part, whole) == shown
+
+
+def test_the_replay_holds_only_with_the_calls_of_the_set_in_their_order_and_a_200():
+    recorded = ["classify", "write", "write"]
+
+    assert judge_replay(recorded, recorded, 200).passed
+    assert not judge_replay(recorded, ["classify", "write"], 200).passed
+    assert not judge_replay(recorded, ["write", "classify", "write"], 200).passed
+    assert not judge_replay(recorded, recorded, 502).passed
 
 
 def test_the_report_gives_each_measure_its_value_its_threshold_and_its_result():
@@ -94,7 +136,7 @@ def test_the_report_gives_each_measure_its_value_its_threshold_and_its_result():
         in report
     )
     assert (
-        "| Fidélité (`fidelity_rate`) | 53,85 % (14 faits sur 26) | au moins 95 % | non tenu |"
+        "| Fidélité (`fidelity_rate`) | 53,84 % (14 faits sur 26) | au moins 95 % | non tenu |"
         in report
     )
     assert "| Items oubliés (`items_unanswered`) | 0 | aucun | tenu |" in report
