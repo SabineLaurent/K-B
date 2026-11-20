@@ -369,10 +369,19 @@ def describe_transport_error(error: BaseException, status: int | None) -> str:
     classes: list[str] = []
     link: BaseException | None = error
     while link is not None and len(classes) < MAX_ERROR_CHAIN_LINKS:
-        classes.append(type(link).__name__)
+        classes.append(name_error_class(link))
         link = link.__cause__ or link.__context__
+    if link is not None:
+        classes.append("\u2026")
     chain = " from ".join(classes)
     return chain if status is None else f"{chain} after status {status}"
+
+
+def name_error_class(error: BaseException) -> str:
+    """The class of an error behind its top-level package, but for a built-in one."""
+    package = type(error).__module__.split(".")[0]
+    name = type(error).__name__
+    return name if package == "builtins" else f"{package}.{name}"
 
 
 def find_recording_refusal(

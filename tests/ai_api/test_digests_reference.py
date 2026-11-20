@@ -2,6 +2,7 @@
 
 import json
 import re
+from itertools import pairwise
 
 import httpx2
 import pytest
@@ -11,6 +12,7 @@ from digests_reference import (
     RecordingTransport,
     build_ai_api,
     build_reference_base,
+    describe_transport_error,
     find_recording_refusal,
     open_data_api,
     order_as_replayed,
@@ -189,6 +191,7 @@ class FailingProvider(httpx2.BaseTransport):
 
 def test_a_transport_error_is_refused_by_its_classes_and_its_status_never_its_message():
     transport = RecordingTransport(replay_settings([]), ["research"])
+    transport.provider.close()
     transport.provider = FailingProvider()
     request = httpx2.Request("POST", "https://models.example/v1/chat/completions")
     for _ in range(2):
@@ -198,6 +201,27 @@ def test_a_transport_error_is_refused_by_its_classes_and_its_status_never_its_me
     refusal = find_recording_refusal(httpx2.Response(200), transport)
 
     assert refusal == (
-        "transport errors: 2"
-        " (ConnectError from ConnectionRefusedError, ReadError after status 200)"
+        "transport errors: 2 (httpx2.ConnectError from ConnectionRefusedError,"
+        " httpx2.ReadError after status 200)"
+    )
+
+
+def test_a_chain_of_causes_is_named_through_its_contexts_and_cut_after_five_links():
+    errors = [
+        httpx2.ReadError("https://spotted.example"),
+        OSError(),
+        ValueError(),
+        TypeError(),
+        KeyError(),
+        IndexError(),
+    ]
+    for error, context in pairwise(errors):
+        error.__context__ = context
+
+    assert describe_transport_error(errors[1], None) == (
+        "OSError from ValueError from TypeError from KeyError from IndexError"
+    )
+    assert describe_transport_error(errors[0], None) == (
+        "httpx2.ReadError from OSError from ValueError from TypeError from KeyError"
+        " from \u2026"
     )
