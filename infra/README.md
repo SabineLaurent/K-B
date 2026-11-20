@@ -145,8 +145,8 @@ kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" && az deplo
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
 
-Une passe sans `modelAccountName` saute l'alerte sur les jetons du modèle sans la supprimer : le mode incrémental ne
-supprime rien. Elle laisse donc l'alerte telle qu'en ligne, sans la reposer.
+Une passe sans `modelAccountName` ne touche pas l'alerte sur les jetons du modèle : en mode incrémental, rien n'est
+supprimé, et l'alerte reste telle qu'en ligne.
 
 L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà (#411) :
 - **à créer** :
@@ -518,9 +518,9 @@ des alertes (constat du 2026-11-06).
 
 ## L'alerte sur les jetons du modèle (#501)
 
-`budget-kb` compte la ressource du modèle depuis qu'elle porte `project=k-b` (geste de Sabine du 2026-11-18, #632),
-mais un budget n'est évalué qu'une fois par 24 h. La règle `alert-kb-model-tokens` voit les jetons eux-mêmes : elle
-écrit à `ag-kb-operator` quand la ressource dépasse 400 000 jetons sur 24 h glissantes, toutes les 15 minutes.
+`budget-kb` compte la ressource du modèle depuis qu'elle porte `project=k-b` (geste de Sabine du 2026-11-18, #632) ;
+un budget s'évalue une fois par 24 h. La règle `alert-kb-model-tokens` voit les jetons eux-mêmes, toutes les 15
+minutes : elle écrit à `ag-kb-operator` quand la ressource dépasse 400 000 jetons sur 24 h glissantes.
 
 | Réglage | Valeur |
 |---|---|
@@ -530,8 +530,8 @@ mais un budget n'est évalué qu'une fois par 24 h. La règle `alert-kb-model-to
 | Fenêtre, fréquence | `P1D`, `PT15M` |
 | Destinataire | `ag-kb-operator`, un e-mail : `budgetContactEmail`, l'adresse du budget |
 
-L'alerte prévient, elle n'arrête rien. La seule borne qui refuse est le quota du déploiement (capacité 250, soit
-250 000 jetons par minute, lue le 2026-11-20).
+L'alerte prévient ; la borne qui refuse les appels est le quota du déploiement : capacité 250, soit 250 000 jetons par
+minute (lue le 2026-11-20).
 
 ### La poser
 
@@ -541,8 +541,12 @@ La passe de l'étape 2, avec `modelAccountName`. Aperçu attendu :
 
 L'aperçu montre l'adresse du groupe : elle est masquée dans toute sortie recopiée.
 
-Azure écrit alors à cette adresse un code à usage unique, à saisir dans les 30 minutes qui suivent l'enregistrement
-du groupe ; s'il a expiré, le portail le renvoie (« Resend »).
+Si la création échoue sur `alert-kb-model-tokens` avec une erreur qui nomme `evaluationFrequency` ou `windowSize`,
+Azure refuse le couple `P1D` et `PT15M`, que Microsoft Learn ne décrit pas : la ligne `evaluationFrequency: 'PT15M'`
+de `infra/modules/model-token-alert.bicep` devient `evaluationFrequency: 'PT1H'`, puis la même passe se relance.
+
+À la création du groupe, Azure écrit à cette adresse un code à usage unique, à saisir dans les 30 minutes qui suivent
+l'enregistrement du groupe ; s'il a expiré, le portail le renvoie (« Resend »).
 
 ### La vérifier
 
@@ -555,14 +559,15 @@ az resource show --ids "$MODEL_ID" --query tags.project -o tsv
 ```
 
 Attendu : la règle active, `P1D` et `PT15M`, `TotalTokens` au-dessus de 400 000, l'identifiant de `ag-kb-operator` ;
-le groupe actif, un destinataire, `operator` ; `k-b`. Aucune de ces lectures n'affiche l'adresse.
+le groupe actif, un destinataire, `operator`, et son statut (`statuses`), relevé après la saisie du code ; `k-b`.
+Aucune de ces lectures n'affiche l'adresse.
 
 Puis un e-mail d'essai, que la commande envoie à l'adresse donnée en ligne de commande (le `show` prouve le groupe,
 l'essai prouve l'adresse) :
 
 ```sh
 kb_check "$RG" "$EMAIL" && az monitor action-group test-notifications create --action-group ag-kb-operator -g "$RG" \
-  -a email operator "$EMAIL" --alert-type metricstaticthreshold \
+  -a email operator "$EMAIL" usecommonalertschema --alert-type metricstaticthreshold \
   --query "{state:state,actions:actionDetails[].{type:MechanismType,name:Name,status:Status}}"
 ```
 
