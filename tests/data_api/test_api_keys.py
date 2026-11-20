@@ -5,8 +5,14 @@ import secrets
 import pytest
 from fastapi.routing import iter_route_contexts
 
-from k_b.core.api_settings import OPENAPI_PATH
+from k_b.core.api_settings import (
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
+    OPENAPI_PATH,
+    is_sandbox,
+    read_openapi_url,
+)
 from k_b.data_api.app import create_app
+from k_b.jobs.api_probes import DATA_API_ROUTE_WITH_KEY, list_probes
 
 INVALID_API_KEY = {"error": "invalid_api_key"}
 # Served without key: they hold no data.
@@ -137,6 +143,24 @@ def test_with_a_key_a_wrong_parameter_and_no_database_gives_503(
     response = client.get("/items?limit=101", headers=authorization)
 
     assert response.status_code == 503
+
+
+@pytest.mark.parametrize("deployment_environment", ["sandbox", "production"])
+def test_each_probe_of_kb_smoke_test_gets_the_status_it_expects(
+    make_client, items_database, api_keys, deployment_environment
+):
+    """The probes without key of kb smoke-test (jobs/api_probes.py), sent to the app itself."""
+    environ = {DEPLOYMENT_ENVIRONMENT_VARIABLE: deployment_environment}
+    client = make_client(
+        items_database, api_keys, openapi_url=read_openapi_url(environ)
+    )
+    probes = list_probes(DATA_API_ROUTE_WITH_KEY, is_sandbox(environ))
+
+    statuses = {
+        probe: client.request(probe.method, probe.path).status_code for probe in probes
+    }
+
+    assert statuses == {probe: probe.expected_status for probe in probes}
 
 
 def test_docs_openapi_and_health_are_public_and_no_other_page_is_served(client):

@@ -46,7 +46,12 @@ from k_b.ai_api.observability.metrics import write_llm_call_lines
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
 from k_b.core.api_rate_limit import RateLimiter
-from k_b.core.api_settings import OPENAPI_PATH
+from k_b.core.api_settings import (
+    DEPLOYMENT_ENVIRONMENT_VARIABLE,
+    OPENAPI_PATH,
+    is_sandbox,
+    read_openapi_url,
+)
 from k_b.core.config import (
     AI_API_CLIENT_BY_ROUTE,
     AI_API_RATE_LIMITS,
@@ -62,6 +67,7 @@ from k_b.core.config import (
     RateLimit,
 )
 from k_b.data_api.app import create_app as create_data_app
+from k_b.jobs.api_probes import AI_API_ROUTE_WITH_KEY, list_probes
 
 # The subjects of the tests, never the real ones: a change of the real list breaks no test.
 TEST_SUBJECTS = (
@@ -205,6 +211,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
         data_api_client=None,
         replay_from_settings=False,
         trace_content="none",
+        openapi_url=OPENAPI_PATH,
     ):
         settings = replace(
             REPLAY_SETTINGS, replay_steps=tuple(REPLAY_STEPS.validate_python(steps))
@@ -227,7 +234,7 @@ def make_ai_api(data_api, metric_reader, recorded_traces):
                 MeterProvider(metric_readers=[metric_reader], shutdown_on_exit=False)
             ),
             replace(recorded_traces.trace_export, content=trace_content),
-            openapi_url=OPENAPI_PATH,
+            openapi_url=openapi_url,
         )
         transport = ReplayTransport(steps)
 
@@ -1269,6 +1276,24 @@ def test_only_the_public_routes_answer_without_a_key(make_ai_api):
 
     assert routes == set(METHOD_OF_EACH_ROUTE.items())
     assert answered_without_key == {"/docs", "/openapi.json", "/health"}
+
+
+@pytest.mark.parametrize("deployment_environment", ["sandbox", "production"])
+def test_each_probe_of_kb_smoke_test_gets_the_status_it_expects(
+    make_ai_api, deployment_environment
+):
+    """The probes without key of kb smoke-test (jobs/api_probes.py), sent to the app itself;
+    nothing reaches the model."""
+    environ = {DEPLOYMENT_ENVIRONMENT_VARIABLE: deployment_environment}
+    client, transport = make_ai_api([], openapi_url=read_openapi_url(environ))
+    probes = list_probes(AI_API_ROUTE_WITH_KEY, is_sandbox(environ))
+
+    statuses = {
+        probe: client.request(probe.method, probe.path).status_code for probe in probes
+    }
+
+    assert statuses == {probe: probe.expected_status for probe in probes}
+    assert transport.requests == []
 
 
 def read_status_allow_and_body(response):

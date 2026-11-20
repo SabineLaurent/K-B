@@ -1031,7 +1031,7 @@ contre `infra/` et l'état en ligne.
 | API5 Broken Function Level Authorization | **Tenue** | — |
 | API6 Unrestricted Access to Sensitive Business Flows | **Tenue** | — (limite : en ligne, le débit repart de zéro à chaque réveil ; API4, #501) |
 | API7 Server Side Request Forgery | **Tenue** | — |
-| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé, sondes après déploiement (#499), l'image étant scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
+| API8 Security Misconfiguration | Non tenue | Mesures nécessaires non intégrées : revue périodique de la configuration en ligne (#497) ; évaluation automatisée de l'environnement déployé : les sondes sans clé du test de fumée sont codées (#499), leur constat en ligne se fait au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb` ; l'image est scannée par la CI depuis #498. Durcissement répétable tenu (#496, constaté sur #625), avec trois écarts voulus, justifiés. Chaîne Envoy → uvicorn, relue le 2026-11-08, non essayée : écart voulu, justifié le 2026-11-10 (aucun client tiers) |
 | API9 Improper Inventory Management | Écart voulu, justifié | Documentation sans clé en `sandbox` seulement : écart voulu, justifié sous API9, « Documentation réservée aux utilisateurs autorisés » ; l'API IA en ligne (`ca-kb-ai-api`) est déployée avec `KB_DEPLOYMENT_ENVIRONMENT` à `production` (`infra/main.bicep:234`, non relu en ligne), où `/docs` et `/openapi.json` rendent 404 ; protections externes : écart voulu, justifié sous API9 (aucune version exposée) |
 | API10 Unsafe Consumption of APIs | Non tenue | Portée du jeton de Grafana Cloud : mesure nécessaire non intégrée, case ouverte jusqu'au jeton de production refait par #522, sur la seule pile ; le reste tenu (relue le 2026-11-08) |
 
@@ -1039,7 +1039,7 @@ Le compte : 5 entrées tenues sur 10 (API1, API3, API5, API6, API7). Les 5 autre
 et justifiés, API2 (anti-force brute, TLS mutuel) et API9 (documentation en `sandbox`, protections
 externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
 limite ; et 3 non tenues, des mesures nécessaires non intégrées : API4 (plafond de dépense, #501),
-API8 (revue et évaluation, #497 et #499) et API10 (portée du jeton de Grafana Cloud,
+API8 (revue, #497, et évaluation, #499, codée, à constater en ligne) et API10 (portée du jeton de Grafana Cloud,
 #522). Ce qui ne dépend que du code et de la doc est tenu ou justifié ; le reste attend ces issues.
 
 ### API1:2023 Broken Object Level Authorization
@@ -1108,9 +1108,9 @@ API8 (revue et évaluation, #497 et #499) et API10 (portée du jeton de Grafana 
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
     (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
-    l'atteignent. À ce commit, deux apps, les deux API, et deux jobs (`infra/deployment.json`), dont
-    un seul l'appelle : `caj-kb-smoke-test`, sur `/health`, sans clé ; `kb digest` et
-    `kb trend-report`, ses clients à clé, n'ont pas de job en ligne. Ce que le certificat prouverait,
+    l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
+    jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
+    `caj-kb-digest-watch` (#423), par `kb digest` et `kb trend-report`, avec leurs clés. Ce que le certificat prouverait,
     qu'un appelant est un client permis, la clé le prouve déjà (« Anti-force brute », ci-dessous),
     sous le chiffrement entre apps (API8). Sur la machine, l'écoute sur `127.0.0.1` n'admet que les
     programmes de la machine.
@@ -1400,14 +1400,28 @@ dépend que du code garde son état et sa preuve.
   l'image : Grype v0.121.3, vérifié par son SHA256, cherche dans l'image construite les
   vulnérabilités connues des paquets Debian, des paquets Python (l'environnement virtuel, et `pip`
   de l'image de base) et de CPython, et fait échouer `image-build` sur une haute ou critique qui a
-  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Un scan rouge sur `main`
+  un correctif (`.github/workflows/image.yml:64-82`, `--only-fixed --fail-on high`). Constaté le 2026-11-18 :
+  rouge sur une image de base de décembre 2024 (essai #644, exécution 44275262249), vert sur l'image de #643
+  (exécution 44347407723). Un scan rouge sur `main`
   bloque aussi la mise en ligne : `deploy.yml` ne déploie qu'un commit dont toutes les exécutions
   sont vertes (l. 51-67). Après chaque déploiement, `deploy.yml` lance `caj-kb-smoke-test`
-  (l. 204-209), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
-  stockage d'échange par l'identité du job : il vérifie que la version déployée répond, pas sa
-  sécurité.
-  **Pour la tenir** : des essais scriptés des points de cette section, lancés après chaque
-  déploiement, avec une clé de test à prévoir (#499 : des sondes sans clé). S.
+  (l. 204-210), qui demande `GET /health` aux deux API (`src/k_b/jobs/api_health.py`) et atteint le
+  stockage d'échange par l'identité du job. Depuis #499, il envoie aussi à chaque API, après son
+  `/health`, trois sondes sans clé, et échoue sur tout autre statut : une route à clé (`GET /items`,
+  `POST /digests`) doit rendre 401, `GET /docs` 404 hors `sandbox`, et `HEAD /health` 405
+  (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:95-109`). Il vérifie ainsi,
+  sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée.
+  Prouvé par les tests, sur des API simulées
+  (`test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run`,
+  `tests/commands/test_smoke_test_command.py`) et sur les apps elles-mêmes, en `sandbox` et hors
+  `sandbox` (`test_each_probe_of_kb_smoke_test_gets_the_status_it_expects`, dans
+  `tests/ai_api/test_digest_router.py` et `tests/data_api/test_api_keys.py`). Le constat en ligne se fait
+  au premier tag qui porte ce code, par la ligne `9 of 9 checks passed` du journal `log-kb`.
+  **Pour la tenir** : la ligne `9 of 9 checks passed` du premier test de fumée en ligne, au premier tag
+  qui porte ce code, lue dans `log-kb` et citée ici. XS. **Choix**, même tenue : en ligne, les sondes
+  vérifient les refus sans clé. Une route à clé, clé donnée, se vérifie par les tests de la CI sur le
+  code de l'image, sans clé de test en ligne : ce serait un secret de plus et, pour l'API IA, un appel
+  payant au modèle (journal ADR, 2026-11-18, « Test de fumée : les sondes sans clé (#499) »).
   **Pour réduire le risque** : `pip-audit` audite chaque version de `uv.lock`, uvicorn et h11
   compris (`.github/workflows/ci.yml:23-25`), et Grype l'image ; les réponses sans clé des routes
   (401, 404, 405) sont prouvées par les tests de la CI, sur le code de l'image, pas sur
