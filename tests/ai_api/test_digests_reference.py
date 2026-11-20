@@ -1,6 +1,7 @@
 """The reference set of POST /digests replays through the route, on the items it was recorded on."""
 
 import json
+import re
 
 import httpx2
 from digests_reference import (
@@ -20,6 +21,13 @@ from digests_reference import (
 
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import REPLAY_MODEL
+
+# What the set was recorded on, delivered on 2026-11-20 (decision of Sabine, #520): the model and
+# the effort of infra/main.bicep, and the writing prompt of production. Values, not the constants
+# of the code: a new prompt_version leaves the set to its expiry (#482), not to this test.
+PRODUCTION_MODEL = re.compile(r"gpt-6\.1-sol(-[0-9A-Za-z.-]+)?")
+PRODUCTION_REASONING_EFFORT = "low"
+RECORDED_WRITING_PROMPT_VERSION = "write-1"
 
 
 def read_licenses():
@@ -71,6 +79,21 @@ def test_each_recorded_output_replays_through_post_digests(tmp_path):
     assert [read_stage(request) for request in requests] == [
         call.stage for call in reference.calls
     ]
+
+
+def test_the_set_is_recorded_on_the_model_of_production():
+    """Each call of the set was answered by gpt-6.1-sol at effort low; each writing used write-1."""
+    calls = read_reference(REFERENCE_PATH).calls
+
+    assert [
+        call.response_model
+        for call in calls
+        if not PRODUCTION_MODEL.fullmatch(call.response_model or "")
+    ] == []
+    assert {call.reasoning_effort for call in calls} == {PRODUCTION_REASONING_EFFORT}
+    assert {call.prompt_version for call in calls if call.stage == "write"} == {
+        RECORDED_WRITING_PROMPT_VERSION
+    }
 
 
 def test_the_facts_of_the_set_are_all_in_their_item_not_all_in_their_text(
