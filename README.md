@@ -842,6 +842,7 @@ chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce q
 | `types` | `ci.yml` | `uv run mypy --strict` |
 | `tests-postgresql` | `ci.yml` | `uv run pytest -m postgresql`, sur un service `postgres:18.6` épinglé par son digest |
 | `tests-data` | `ci.yml` | les tests des données, à part des autres : avant la base, `tests/etl`, `tests/test_schema.py` et `tests/test_items.py` (l'item commun où chaque source est lue avant l'import) ; avant le modèle, `tests/ai_api/test_watch_items.py` (les items tels que l'API IA les envoie) ; sans le test `postgresql` de `tests/etl`, que lance `tests-postgresql`, et sans `--cov`, car `tests` les lance aussi et garde le seuil |
+| `digests-reference` | `ci.yml` | rejoue le jeu de référence de `POST /digests` (#479) par `tests/ai_api/digests_evaluation.py`, et échoue sous un seuil du 15/10 : 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité (`fidelity_rate`, chaque fait du jeu compté une fois), aucun item oublié (`items_unanswered`) ; il échoue aussi si le rejeu n'envoie pas tous les appels du jeu, dans leur ordre, ou si la route ne répond pas 200 ; son rapport (chaque mesure, son seuil, le résultat) est un artefact du run, gardé 30 jours : `gh run download <id> -n digests-reference-report`. Le jeu est rejoué, jamais envoyé au modèle : le job juge les contrôles de K-B sur des sorties enregistrées, et un changement de `prompt_version` le périme ; le modèle se mesure à chaque enregistrement du jeu par Sabine (#520). |
 | `image-build` | `image.yml` | construit l'image `linux/amd64`, puis vérifie ce que la construction reçoit, l'utilisateur non root, l'absence dans l'image des fichiers que `.dockerignore` écarte (`.git`, et des `.env*` et `*.sqlite*` plantés pour l'essai), le refus de démarrer sans `KB_DATA_DIR`, puis `kb --help` et `kb create-db` ; enfin, la scanne par Grype v0.121.3, vérifié par son SHA256, et refuse une vulnérabilité haute ou critique qui a un correctif (paquets Debian, paquets Python de l'environnement virtuel et de l'image de base, CPython) ; l'image n'est poussée nulle part |
 | `bicep-build` | `infra.yml` | compile `infra/main.bicep` par Bicep v0.48.1, vérifié par son SHA256, sans aucun droit sur Azure |
 | `build` | `docs.yml` | construit le site des fiches de `documentation/` par MkDocs, en mode strict (un lien ou une ancre absents le font échouer), et vérifie l'empreinte du fichier de Mermaid téléchargé ; lancé à la main depuis `main`, dépose le site en artefact de Pages |
@@ -850,7 +851,7 @@ chaque workflow ne lit que le dépôt (`permissions: contents: read`), sauf ce q
 | `deploy` | `deploy.yml` | met le tag en ligne : [infra/README.md](infra/README.md), « Déployer une version » |
 
 Les jobs de `ci.yml` et le job `build` de `docs.yml` installent uv par `astral-sh/setup-uv`, à la version fixée
-dans chacun des sept (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
+dans chacun des huit (`version: "0.13.6"`) : la même que le `Dockerfile`, dans la plage `uv_build` de `build-system.requires` du
 `pyproject.toml`. Sur le Mac, la même version s'installe par `uv self update 0.13.6`.
 
 **Dependabot** (`.github/dependabot.yml`) ouvre chaque semaine les PR de mise à jour des actions des workflows
@@ -858,7 +859,7 @@ dans chacun des sept (`version: "0.13.6"`) : la même que le `Dockerfile`, dans 
 version nouvelle attend 7 jours avant sa PR, sauf une mise à jour de sécurité ; ghcr.io ne donne pas la date
 d'une version, et l'attente ne s'applique pas à `astral-sh/uv` : sa date se vérifie à la main avant la fusion.
 Pour `python` et `astral-sh/uv`, il ne propose que les correctifs et les digests, jamais une version mineure ou
-majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des six jobs de `ci.yml` et celle de
+majeure. Sa PR d'`astral-sh/uv` ne change que le `Dockerfile` : la `version:` des sept jobs de `ci.yml` et celle de
 `docs.yml` se changent à la main, dans la même PR. Ses mises à jour de version ne touchent ni l'image `postgres` du job `tests-postgresql`, à changer à
 la main, ni `uv.lock`. Les alertes et les mises à jour de sécurité de Dependabot sont activées dans les
 réglages du dépôt, et le graphe des dépendances y voit les paquets Python (96 le 2026-11-08) : seule une mise
@@ -873,7 +874,7 @@ personne, administratrice comprise. Il se lit par `gh api repos/SabineLaurent/K-
   (depuis #496) et `image-build` (depuis #498) ;
   `strict` : la branche doit être à jour avec `main` avant la fusion, et la CI repasse après sa mise à jour.
 
-`tests-data` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 et
+`tests-data`, `digests-reference` et `build` de `docs.yml` ne sont pas requis à la fusion. `bicep-build` l'est depuis #496 et
 `image-build` depuis #498 : ils tournent sur toute PR, car un check qu'un filtre de chemin saute reste en attente et
 bloque la fusion (commentaire de `infra.yml`). Les non requis comptent au déploiement : `check` exige
 que chaque workflow du dépôt lancé sur le commit du tag ait fini en succès, sauf Deploy et les exécutions que
