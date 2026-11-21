@@ -17,8 +17,8 @@ de `main` au commit `36c1e02d`; chaque relevé donne sa commande, qui se rejoue.
 
 ## Les outils de pilotage
 
-Le pilotage tient sur GitHub: les issues, leurs labels et leurs tailles, le tableau du projet et ses itérations, les
-jalons, les demandes de fusion et l'intégration continue. Le tableau du projet est privé, comme le dépôt:
+Le pilotage tient sur GitHub: les issues, leurs labels et leurs tailles, le tableau du projet, les jalons, les
+demandes de fusion et l'intégration continue. Le tableau du projet est privé, comme le dépôt:
 
 ```sh
 gh repo view SabineLaurent/K-B --json visibility             # {"visibility":"PRIVATE"}
@@ -28,12 +28,14 @@ gh project view 12 --owner SabineLaurent --format json \
 
 ### Les issues
 
-Un changement part d'une issue. Le corps d'une issue se range sous des intitulés en gras, le plus souvent
-« Pourquoi » et « Critère de fin », et selon le besoin « Dépend de », « Hors périmètre » et « Taille ». Trois familles
-de labels classent les issues: leur taille (`size:XS` à `size:XL`), leur partie (`etl`, `base`, `api-données`,
-`api-ia`, `coffre`, `wiki`, `cli`, `interface`, et les parties transverses `observabilité`, `données-perso`,
-`outillage`, `déploiement`) et le livrable de la certification qu'elles servent (`E1` à `E5`). Le 2026-11-21, le
-dépôt compte 367 issues, 230 fermées et 137 ouvertes:
+Un changement part le plus souvent d'une issue. Le corps d'une issue se range sous des intitulés en gras, d'ordinaire
+« Pourquoi » et « Critère de fin », et selon le besoin « Dépend de », « Hors périmètre » et « Taille », ou, jusqu'au
+2026-10-20, « Estimation ». Trois familles de labels classent les issues: leur taille (`size:XS` à `size:XL`), leur
+partie (`etl`, `base`, `api-données`, `api-ia`, `coffre`, `wiki`, `cli`, `interface`, et les parties transverses
+`observabilité`, `données-perso`, `outillage`, `déploiement`) et le livrable de la certification qu'elles servent
+(`E1` à `E5`, ou `hors E1`, `hors E3`, `hors E4` quand l'issue touche un livrable sans qu'il l'exige); s'y ajoutent
+les labels `documentation` et `accessibility`. Le 2026-11-21, le dépôt compte 367 issues, 230 fermées et
+137 ouvertes:
 
 ```sh
 gh issue list --repo SabineLaurent/K-B --state all --limit 1000 --json state \
@@ -64,7 +66,7 @@ colonne, ce qu'elle contient et son nombre de cartes le 2026-11-21:
 | <span lang="en">Backlog</span> | les issues à faire | 113 |
 | <span lang="en">Ready</span> | les issues prêtes à commencer | 0 |
 | <span lang="en">In progress</span> | les issues commencées | 8 |
-| <span lang="en">In review</span> | les issues dont la demande de fusion est ouverte | 3 |
+| <span lang="en">In review</span> | les issues en relecture | 3 |
 | <span lang="en">Done</span> | les cartes des issues fermées: une carte y passe à la fermeture de son issue, par l'automatisme « <span lang="en">Item closed</span> » du tableau du projet | 221 |
 
 ```sh
@@ -76,8 +78,8 @@ gh api graphql -f query='query{user(login:"SabineLaurent"){projectV2(number:12){
 # {"enabled":true,"name":"Item closed"}
 ```
 
-Le tableau du projet a trois autres champs: <span lang="en">Priority</span> (P0 à P2), <span lang="en">Size</span>
-(XS à XL) et <span lang="en">Iteration</span>. Il a 19 vues:
+Le tableau du projet porte aussi les champs <span lang="en">Priority</span> (P0 à P2), <span lang="en">Size</span>
+(XS à XL), <span lang="en">Iteration</span> et <span lang="en">Estimate</span>, un nombre. Il a 19 vues:
 
 - « Itération en cours » et « Itération suivante », en colonnes;
 - « <span lang="en">Prioritized backlog</span> », en colonnes, et « <span lang="en">Roadmap</span> », une frise dans
@@ -86,6 +88,9 @@ Le tableau du projet a trois autres champs: <span lang="en">Priority</span> (P0 
 - quatorze tables filtrées, par livrable ou par partie.
 
 ```sh
+gh project field-list 12 --owner SabineLaurent --format json --jq '[.fields[].name]'
+# ["Title","Assignees","Status","Labels","Linked pull requests","Milestone","Repository","Reviewers","Parent issue",
+#  "Sub-issues progress","Created","Updated","Closed","Priority","Size","Estimate","Iteration"]
 gh project field-list 12 --owner SabineLaurent --format json \
     --jq '.fields[] | select(.options) | "\(.name): \([.options[].name] | join(" "))"'
 # Status: Backlog Ready In progress In review Done
@@ -112,6 +117,7 @@ jalons le 2026-11-21, par échéance, sous le titre exact que la commande rend:
 
 | Jalon | Échéance | État | Issues fermées | Issues ouvertes |
 |---|---|---|---|---|
+| `Wiki : ingest des clips` | sans échéance | ouvert | 0 | 1 |
 | `Fusion et base` | 2026-10-07 | fermé | 13 | 0 |
 | `Cadrage et socle` | 2026-10-11 | fermé | 8 | 0 |
 | `API « quoi de neuf »` | 2026-10-12 | fermé | 5 | 0 |
@@ -120,7 +126,6 @@ jalons le 2026-11-21, par échéance, sous le titre exact que la commande rend:
 | `Oral blanc E1 E3 29/10` | 2026-10-29 | ouvert | 6 | 2 |
 | `Fiches de veille tous les 3 jours` | 2026-11-01 | ouvert | 0 | 2 |
 | `Mise en ligne 08/11` | 2026-11-08 | ouvert | 8 | 7 |
-| `Wiki : ingest des clips` | sans échéance | ouvert | 0 | 1 |
 
 ```sh
 gh api 'repos/SabineLaurent/K-B/milestones?state=all' \
@@ -129,13 +134,16 @@ gh api 'repos/SabineLaurent/K-B/milestones?state=all' \
 
 ### Les demandes de fusion
 
-Chaque changement passe par une branche, puis une demande de fusion (PR, <span lang="en">pull request</span>) vers
-`main`; une PR qui livre une issue la ferme par `Closes #n`. Le 2026-11-21, 299 PR sont fusionnées. Le ruleset
+Un changement passe par une branche, puis une demande de fusion (PR, <span lang="en">pull request</span>) vers
+`main`, ce que le ruleset de `main` exige depuis sa création, le 2026-10-16; une PR qui livre une issue la ferme par
+`Closes #n`. Le 2026-11-21, 299 PR sont fusionnées. Le ruleset
 « <span lang="en">Basic-rules-main-protect</span> » de `main` interdit la suppression de la branche et le push forcé,
 exige une PR, et ne fusionne que par commit de fusion.
 
 ```sh
 gh pr list --repo SabineLaurent/K-B --state merged --limit 1000 --json number --jq length    # 299
+gh api repos/SabineLaurent/K-B/rulesets/25257125 --jq '{name, created_at}'
+# {"created_at":"2026-10-16T19:24:02.035+02:00","name":"Basic-rules-main-protect"}
 gh api repos/SabineLaurent/K-B/rules/branches/main --jq '.[].type'
 # deletion
 # non_fast_forward
@@ -159,24 +167,23 @@ gh api repos/SabineLaurent/K-B/rules/branches/main \
 
 ## Les rituels
 
-Chaque rituel a un objectif, des modalités et une trace sur GitHub. Les rituels, leur objectif, leurs modalités et
-leur trace:
+Chaque rituel, son objectif, ses modalités et sa trace sur GitHub:
 
 | Rituel | Objectif | Modalités | Trace |
 |---|---|---|---|
-| La conception dans l'issue | décider ce qui se fait et ce qui ne se fait pas, avant le code | dix lignes au plus dans l'issue: ce qui se fait, ce qui ne se fait pas, les options et le choix; validée avant le code | l'issue, son corps et ses commentaires |
-| Le cycle d'une PR | livrer un changement vérifié | une branche depuis `main`; pour du code, les tests d'abord et une relecture du diff, son compte rendu en commentaire de la PR; les contrôles du dépôt en local; la PR vers `main`; la CI verte; la fusion | la PR: son corps, ses commentaires, ses contrôles |
+| La conception dans l'issue | décider ce qui se fait et ce qui ne se fait pas, avant le code | pour un changement de code, une conception courte dans l'issue: ce qui se fait, ce qui ne se fait pas, les options et le choix; validée avant le code | l'issue, son corps et ses commentaires |
+| Le cycle d'une PR | livrer un changement vérifié | une branche depuis `main`; pour du code, les tests d'abord et une relecture du diff, son compte rendu dans la PR, en commentaire ou dans sa description; les contrôles du dépôt en local; la PR vers `main`; la CI verte; la fusion | la PR: son corps, ses commentaires, ses contrôles |
 | La note de journal | garder ce qu'une PR a fait, pourquoi et comment | une note écrite dans la PR qu'elle explique, versionnée avec elle | `docs/journaling/`, 200 notes le 2026-11-21 |
 | Le journal des décisions d'architecture (ADR, <span lang="en">Architecture Decision Record</span>) | garder chaque décision qui engage la suite du projet, son pourquoi et les options écartées | les décisions d'un jour réunies sous sa date, chacune avec son pourquoi | `docs/ADR/journal-decisions-projet.md`, 46 journées de décisions le 2026-11-21 |
 | Le point d'arrêt | reprendre un travail interrompu sans rien perdre | quand un travail s'interrompt avant sa PR, un commentaire sur l'issue: la branche, ce qui est fait, l'état des tests, l'étape suivante, la question en attente | les commentaires « point d'arrêt » des issues |
-| Le jalon | regrouper les issues d'une échéance et en suivre l'avancement | un jalon daté; son avancement se lit par ses issues fermées et ouvertes | la [page des jalons du dépôt](https://github.com/SabineLaurent/K-B/milestones) |
+| Le jalon | regrouper les issues d'une échéance et en suivre l'avancement | un jalon, le plus souvent daté; son avancement se lit par ses issues fermées et ouvertes | la [page des jalons du dépôt](https://github.com/SabineLaurent/K-B/milestones) |
 
 ```sh
-ls docs/journaling | wc -l                                  # 200
-grep -cE "^## [0-9]{4}-" docs/ADR/journal-decisions-projet.md    # 46
+git ls-tree --name-only 36c1e02d docs/journaling/ | wc -l                           # 200
+git show 36c1e02d:docs/ADR/journal-decisions-projet.md | grep -cE "^## [0-9]{4}-"    # 46
 gh search issues --repo SabineLaurent/K-B "point d'arrêt" --limit 300 --json number --jq length    # 25
 ```
 
 Le pilotage et les rituels sont partagés par leurs traces sur GitHub: les issues, les PR, le tableau du projet, la
-CI, les notes de journal et le journal des décisions, lisibles par toute personne qui a accès au dépôt et à son
-tableau.
+CI, les notes de journal et le journal des décisions, lisibles par toute personne qui a accès au dépôt et au
+tableau du projet.

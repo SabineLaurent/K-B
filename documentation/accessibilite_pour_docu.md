@@ -9,8 +9,8 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21); ceux de
-`mkdocs.yml` visent sa version du 2026-11-21, qui ajoute la partie « 5. Conduite du projet » (#512).
+visent le dépôt au 2026-11-18, sauf ceux de `mkdocs.yml`, qui visent sa version du 2026-11-21 (la partie « 5. Conduite
+du projet », #512); les autres fichiers cités n'ont pas changé depuis (relu le 2026-11-21).
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
@@ -239,7 +239,7 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 ## Limites
 
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
-    en dit. Ce rendu se vérifie par un essai avec VoiceOver, sur une fiche de chaque lot, le site construit.
+    en dit. Le vérifier demande un essai avec un lecteur d'écran, VoiceOver par exemple, sur le site construit.
 - **Lue sur GitHub, une citation en ligne ne reçoit pas la feuille de style du site.** Le rendu de GitHub garde le
     `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
     navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
