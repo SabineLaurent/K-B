@@ -138,7 +138,7 @@ entrée et aucun rejet (`etl/withdrawals.py:24`, `:41`).
 | aucun caractère `Cc` ni `Cf`, aucune espace avant « : » ni « ; » dans les deux fiches | les règles du dépôt pour `documentation/` |
 | `uv run pytest` : 5664 passed, 365 deselected | la PR ne touche pas au code |
 | relecture par un sous-agent neuf, en lecture seule, des dessins et du texte contre le code : 13 constats, tous corrigés sur le tri de time-knight | chaque fait vérifié par un second lecteur |
-| relecture courte du delta par un autre sous-agent neuf : [à remplir] | les dessins redessinés et les cases changées tiennent contre le code |
+| relecture courte du delta par un autre sous-agent neuf : aucun trait faux ni manquant, aucun oui/non inversé ; 6 petits constats, corrigés sur le tri de time-knight | les dessins redessinés et les cases changées tiennent contre le code |
 
 ## Ce que tu dois pouvoir défendre
 
