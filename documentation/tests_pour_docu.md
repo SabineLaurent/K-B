@@ -13,8 +13,11 @@
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de
 `main` au commit `852dad4` (2026-11-08), et le test de l'export des mesures d'après `main` au commit `fd956430`
-(2026-11-18). Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du
-dépôt.
+(2026-11-18). Les comptes de tests et la couverture sont ceux du commit `cf7b8983` (tag `v0.1.8`, 2026-11-20): lus
+dans le journal de
+[l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956) pour la suite et
+`tests-postgresql`, comptés par `pytest -m e2e --collect-only -q` pour les tests de bout en bout. Les chemins du code
+de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Installer l'environnement de test
 
@@ -100,10 +103,10 @@ en mémoire du SDK (le kit de développement, <span lang="en">software developme
 
 | Commande | Ce qu'elle lance |
 |---|---|
-| `uv run pytest` | toute la suite, sauf les tests marqués `e2e` et `postgresql`: `pytest_collection_modifyitems` les écarte tant que `-m` ne les nomme pas (`MARKERS_LEFT_OUT_BY_DEFAULT`, `tests/conftest.py`). Au commit `852dad4`: 4061 tests, 328 écartés |
+| `uv run pytest` | toute la suite, sauf les tests marqués `e2e` et `postgresql`: `pytest_collection_modifyitems` les écarte tant que `-m` ne les nomme pas (`MARKERS_LEFT_OUT_BY_DEFAULT`, `tests/conftest.py`). Au commit `cf7b8983`: 5664 tests, 365 écartés |
 | `uv run pytest tests/ai_api`, `uv run pytest -k <mot>` | une partie de la suite |
-| `KB_TEST_POSTGRESQL_URL=postgresql://<rôle>@127.0.0.1:5432/postgres uv run pytest -m postgresql` | les tests marqués `postgresql` (317 au commit `852dad4`). Sans la variable, chacun échoue, il n'est jamais sauté (`postgresql_server_url`) |
-| `uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html` | les tests de bout en bout (11 au commit `852dad4`); `-rs` donne la raison de chaque test sauté, `-k <source>` n'en lance qu'un |
+| `KB_TEST_POSTGRESQL_URL=postgresql://<rôle>@127.0.0.1:5432/postgres uv run pytest -m postgresql` | les tests marqués `postgresql` (350 au commit `cf7b8983`). Sans la variable, chacun échoue, il n'est jamais sauté (`postgresql_server_url`) |
+| `uv run --env-file .env.e2e_test pytest -m e2e -rs --html=reports/e2e-report.html --self-contained-html` | les tests de bout en bout (15 au commit `cf7b8983`); `-rs` donne la raison de chaque test sauté, `-k <source>` n'en lance qu'un |
 | `make test` | comme `uv run pytest`, avec le rapport `reports/test.html` |
 | `make test-ai-api`, `make test-data-api` | `tests/ai_api` ou `tests/data_api`, puis les tests du code commun aux deux API (`API_COMMON_TESTS` du `Makefile`); rapports `reports/test-ai-api.html` ou `reports/test-data-api.html`, puis `reports/test-api-common.html` |
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
@@ -190,7 +193,7 @@ Les tests prouvent que chaque envoi est accepté et que les valeurs calculées s
 scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclenchement d'une alerte se lit dans
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
-`1d2f554`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
+`cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
 Sabine: [la fiche du monitorage](monitoring_pour_docu.md), sections « Le bac à sable » et « Relevé des alertes du
 bac à sable ».
 
@@ -207,14 +210,19 @@ Chaque job installe l'environnement par `uv sync --locked`, puis lance la comman
 | `lint` | `uv run ruff check`, puis `uv run ruff format --check` |
 | `types` | `uv run mypy --strict` |
 | `audit` | `uvx pip-audit@2.10.1` sur les versions de `uv.lock`, avec leurs empreintes |
+| `digests-reference` | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests`, sans appel au modèle, et échoue sous un seuil du 2026-10-15 (100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié); le rapport est un artefact de l'exécution (`.github/workflows/ci.yml:111-131`, `tests/ai_api/digests_evaluation.py:1-6`) |
 
-Les tests `e2e` ne tournent jamais dans la CI: ils appellent de vraies sources et un vrai service.
+Dans [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), au commit
+`cf7b8983`, les sept jobs ont réussi, `digests-reference` compris. Les tests `e2e` ne tournent jamais dans la CI: ils
+appellent de vraies sources et un vrai service.
 
 ## Calculer la couverture
 
 ```sh
-make test-cov                                   # les fichiers sous 100 % dans la console, le tableau complet dans reports/coverage.md
-uv run pytest --cov --cov-report=term-missing   # tous les fichiers dans la console, sans rapport écrit
+# les fichiers sous 100 % dans la console, le tableau complet dans reports/coverage.md
+make test-cov
+# tous les fichiers dans la console, sans rapport écrit
+uv run pytest --cov --cov-report=term-missing
 ```
 
 Les réglages sont dans `pyproject.toml`:
@@ -229,8 +237,9 @@ Les réglages sont dans `pyproject.toml`:
 
 Seules les commandes avec `--cov` vérifient le seuil (`make test` et `uv run pytest`, non). Sur une partie de la
 suite, ajouter `--cov-fail-under=0`. La CI vérifie le seuil dans le job `tests`; `tests-postgresql` ne mesure pas
-la couverture. Mesure du 2026-11-08 (18:41 UTC) au commit `852dad4`, par la commande du job `tests`: 4061 réussis,
-328 écartés, couverture totale 98,42 %.
+la couverture. Mesure du 2026-11-20 (16:10 UTC) au commit `cf7b8983`, par le job `tests` de
+[l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956): 5664 réussis,
+365 écartés, couverture totale 98,54 %. Le job `tests-postgresql` de la même exécution: 350 réussis.
 
 ## Plan de tests de `POST /digests`
 
@@ -249,9 +258,9 @@ Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
 |---|---|
 | unitaire | une fonction ou un module seul, sans application ni réseau |
 | intégration | plusieurs parties réelles ensemble, sans socket: la vraie application de l'API IA appelée par le `TestClient` de FastAPI; ou les étapes de l'API IA (`build_digests`, `read_watch`) sur la vraie API de données de la base de test et le modèle rejoué |
-| bout en bout, dans la CI | `kb digest`, puis les deux API servies par uvicorn sur `127.0.0.1`, puis la base de test (`tests/commands/test_live_apis.py`) |
+| API servies, dans la CI | `kb digest`, puis les deux API servies par uvicorn sur `127.0.0.1`, puis la base de test, sur le modèle rejoué et sans réseau hors de la machine (`tests/commands/test_live_apis.py`, lancé par le job `tests`) |
 | `postgresql` | le même test sur un serveur PostgreSQL (job `tests-postgresql`) |
-| `e2e` | un vrai service extérieur, hors de la CI |
+| `e2e` | un vrai service extérieur, hors de la CI: les tests de bout en bout, lancés à la main ([Les tests de bout en bout](#les-tests-de-bout-en-bout)) |
 
 ### Stratégies
 
