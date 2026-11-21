@@ -9,7 +9,9 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
+`mkdocs.yml`, qui a reçu à sa ligne 16 l'entrée de la fiche des maquettes dans le menu (#619): ses renvois visent
+le fichier avec cette ligne.
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
