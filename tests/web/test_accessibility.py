@@ -684,6 +684,29 @@ def test_the_page_not_found_leads_to_the_feed_and_to_the_trends():
     ] == [("/", "← Retour au fil de veille"), ("/tendances", "Voir les tendances")]
 
 
+@pytest.mark.parametrize("name", ["404", "405", "500", "/?page=2"])
+def test_the_arrow_of_a_button_stays_on_the_line_of_its_word(name):
+    """WCAG 1.4.4 and 1.4.10: at 200 % text on a phone, the arrow went alone on its line. The label
+    is one item of the flex button, a non-breaking space ties the arrow to its word."""
+    labels = [
+        label
+        for label in re.findall(
+            r'<a class="button(?:-secondary)?"[^>]*>(.*?)</a>', PAGES[name]
+        )
+        if "aria-hidden" in label
+    ]
+
+    assert labels
+    assert all(
+        re.fullmatch(
+            r'<span>(<span aria-hidden="true">←</span>&nbsp;[^<]+'
+            r'|[^<]+&nbsp;<span aria-hidden="true">→</span>)</span>',
+            label,
+        )
+        for label in labels
+    ), labels
+
+
 def test_the_sources_name_gh_archive_for_the_trends():
     assert "Tendances: GH Archive" in outline(PAGES["/sources"]).text
 

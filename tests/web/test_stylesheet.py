@@ -325,6 +325,50 @@ def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
     )
 
 
+def test_the_card_of_an_incident_never_has_a_column_wider_than_itself():
+    """WCAG 1.4.4 and 1.4.10: at 200 % text, 12rem is 384 px, wider than a phone of 320 px."""
+    rule = read_block(read_rule(".incident"), r"^\s*& dl\s*\{")
+
+    assert (
+        "grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));"
+        in strip_nested_rules(rule)
+    )
+
+
+def test_the_body_is_the_container_of_the_queries_of_a_strong_zoom():
+    """The page has no other wrapper, and main cannot query itself: the margin it gives changes."""
+    assert "container-type: inline-size;" in strip_nested_rules(read_rule("body"))
+
+
+@pytest.mark.parametrize(
+    ("selectors", "declaration"),
+    [
+        # One column of choices (Sabine, 2026-11-21): « Releases » no longer widens the form.
+        ((".choices",), "grid-template-columns: minmax(0, 1fr);"),
+        # The size of the other titles on a phone, in rem: it still follows the text (WCAG 1.4.4).
+        ((".error-page h1",), "font-size: 1.625rem;"),
+        # The margins no longer double with the text: a date field holds in 320 px at 200 %.
+        ((".site-header", "main", ".site-footer"), "--gutter: 0.25rem;"),
+        ((".feed-filters",), "padding: 0.25rem;"),
+        ((".card",), "padding-inline: 0.5rem;"),
+        (
+            (':where(input[type="search"], input[type="date"])',),
+            "padding-inline: 0.25rem;",
+        ),
+    ],
+)
+def test_a_narrow_screen_for_the_size_of_its_text_takes_one_column_and_thin_margins(
+    selectors, declaration
+):
+    """WCAG 1.4.4 and 1.4.10: no page scrolls sideways at 200 % text from 320 px. 18em of the font
+    of the body: 288 px at 100 %, never reached from 320 px; 576 px at 200 % (CSS Conditional 5,
+    5.1: the em of a container query is the font size of its container)."""
+    strong_zoom = read_block(STYLESHEET, r"@container \(inline-size < 18em\)\s*\{")
+    opening = r"^\s*" + r",\s*".join(map(re.escape, selectors)) + r"\s*\{"
+
+    assert declaration in strip_nested_rules(read_block(strong_zoom, opening))
+
+
 def test_the_counts_of_the_trends_are_aligned_as_numbers():
     """Maquette-tendances.dc.html: on the right, in tabular figures, a count never cut; the header
     of its column, « Étoiles gagnées », wraps on a narrow screen."""

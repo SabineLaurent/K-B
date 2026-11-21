@@ -5,7 +5,8 @@
    Only features Baseline "widely available" (web-features 3.45.0, read on 2026-11-11): nesting,
    cascade layers, logical properties, :where(), the dynamic viewport units, the range syntax of
    media queries. text-wrap: balance, "newly available", only adds: a browser without it loses
-   nothing (docs/site-web.md, "Feuille de style"). */
+   nothing (docs/site-web.md, "Feuille de style"). Container size queries: widely available since
+   2025-08-14 (web-features explorer, read on 2026-11-21). */
 
 @layer reset, base, layout, components;
 
@@ -60,6 +61,9 @@
 
   body {
     min-block-size: 100dvb;
+    /* The container of the queries of a strong zoom, at the end of the components: the page has no
+       other wrapper, and main cannot query itself, its margin changing. */
+    container-type: inline-size;
     display: flex;
     flex-direction: column;
     background: var(--color-paper);
@@ -360,7 +364,8 @@
 
     & dl {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      /* Never a column wider than the card: 12rem is 384 px at 200 % text. */
+      grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
       gap: 0.75rem 1.5rem;
     }
 
@@ -989,6 +994,40 @@
   .table-note {
     color: var(--color-slate);
     font-size: 0.875rem;
+  }
+
+  /* A strong zoom on a narrow screen: under 18em of the font of the body, 288 px at 100 % text,
+     never reached from 320 px, and 576 px at 200 % (the em of a container query is the font size
+     of its container, CSS Conditional 5, 5.1). One column, a smaller title that still follows the
+     text, and margins that no longer double with it: no page scrolls sideways at 200 % text from
+     320 px (WCAG 1.4.4 and 1.4.10). */
+  @container (inline-size < 18em) {
+    .site-header,
+    main,
+    .site-footer {
+      --gutter: 0.25rem;
+    }
+
+    .error-page h1 {
+      font-size: 1.625rem;
+    }
+
+    .feed-filters {
+      padding: 0.25rem;
+    }
+
+    .choices {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card {
+      padding-inline: 0.5rem;
+    }
+
+    /* A date field cannot be narrower than its day and its calendar without hiding them. */
+    :where(input[type="search"], input[type="date"]) {
+      padding-inline: 0.25rem;
+    }
   }
 
   /* A page prints its content alone (Opquast 2025, rules 195 and 196). */

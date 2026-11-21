@@ -90,9 +90,9 @@
 {% endif %}
 {% if listing.pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
-{% if listing.previous_link %}<a class="button-secondary" href="{{ listing.previous_link }}" rel="prev"><span aria-hidden="true">←</span> Page précédente</a>{% endif %}
+{% if listing.previous_link %}<a class="button-secondary" href="{{ listing.previous_link }}" rel="prev"><span><span aria-hidden="true">←</span>&nbsp;Page précédente</span></a>{% endif %}
 <p class="pagination-current">Page {{ listing.page }} sur {{ listing.pages }}</p>
-{% if listing.next_link %}<a class="button-secondary" href="{{ listing.next_link }}" rel="next">Page suivante <span aria-hidden="true">→</span></a>{% endif %}
+{% if listing.next_link %}<a class="button-secondary" href="{{ listing.next_link }}" rel="next"><span>Page suivante&nbsp;<span aria-hidden="true">→</span></span></a>{% endif %}
 </nav>
 {% endif %}
 {% endif %}

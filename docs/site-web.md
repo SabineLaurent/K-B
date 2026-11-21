@@ -314,7 +314,8 @@ Les gabarits sont lus dans le paquet. `tests/web/test_templates.py` vérifie qu'
 
 `web/static/site.css` n'emploie que des fonctions CSS Baseline « Widely available » (données web-features
 3.45.0, lues le 2026-11-11) : l'imbrication, les couches (`@layer`), les propriétés logiques, `:where()`,
-les unités `dvb` et la syntaxe d'intervalle des media queries. `text-wrap: balance`, « Newly available »,
+les unités `dvb` et la syntaxe d'intervalle des media queries ; les requêtes de conteneur, « Widely available »
+depuis le 2025-08-14 (web-features explorer, lu le 2026-11-21). `text-wrap: balance`, « Newly available »,
 ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. Les trois largeurs des maquettes
 (390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Le formulaire du fil suit chacune
 (Sabine, 2026-11-11) : sur un téléphone, les sortes et les boutons radio en deux colonnes ; sur une tablette,
@@ -322,6 +323,17 @@ les sortes en trois, et « Date de début » à droite des boutons radio ; sur u
 ligne, et le champ de date après son libellé, sur la ligne des boutons radio. Les aides restent collées à leur
 libellé. Mesuré dans Chrome le 2026-11-11, il passe de 585 à 409 px de haut à 1280 px (334 px pour la
 maquette, sans les trois aides). Une page s'imprime sans en-tête, pied de page ni boutons (`@media print`).
+
+À fort zoom sur un petit écran, la mise en page s'adapte (#599) : sous 18em de la police du corps, soit 288 px à
+texte 100 %, jamais atteints dès 320 px, et 576 px à texte 200 %. Le corps est le conteneur de cette requête
+(`@container (inline-size < 18em)`) : l'`em` d'une requête de conteneur est la taille de police de son conteneur
+(CSS Conditional 5, 5.1), il suit donc le texte agrandi. Les choix du fil passent en une colonne (Sabine,
+2026-11-21), le titre des pages d'erreur prend la taille des autres titres sur un téléphone, en rem, et les
+marges ne doublent plus avec le texte : un champ de date, qui ne peut être plus étroit que son jour et son
+calendrier sans les cacher, tient dans 320 px. La flèche d'un bouton est liée à son mot par une espace
+insécable, le libellé restant un seul élément du bouton. Mesuré dans Chrome 157 le 2026-11-21, avec la police
+système de macOS : aucune page ne défile en largeur, de 320 à 1280 px, à texte 100 et 200 % (404, 500, page
+d'erreur commune, 403, fil, fil refusé, tendances, tendances refusées).
 
 ## Accessibilité
 
@@ -354,7 +366,8 @@ l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une r
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
-vérifie l'anneau de focus, la taille du lien d'évitement et la feuille d'impression.
+vérifie l'anneau de focus, la taille du lien d'évitement, les règles du fort zoom et la feuille d'impression.
+`tests/web/test_accessibility.py` vérifie aussi la flèche de chaque bouton liée à son mot.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement
 du texte, le clavier et le lecteur d'écran.
