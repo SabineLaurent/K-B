@@ -37,6 +37,9 @@ param webAuthClientId string = ''
 @description('Second pass: true opens the site to the internet, once its sign-in is checked; false keeps it internal.')
 param exposeWeb bool = false
 
+@description('Name of the resource of the model in this resource group (sabl-certif-resource); empty: no token alert.')
+param modelAccountName string = ''
+
 var tags = {
   project: 'k-b'
 }
@@ -164,6 +167,20 @@ module budget 'modules/budget.bicep' = {
 module containerAppsPolicies 'modules/container-apps-policies.bicep' = {
   params: {
     webAppName: webAppName
+  }
+}
+
+// Tokens of the model resource in 24 hours (#501), threshold of Sabine of 2026-11-20: 4 times the 80,954 of Thursday
+// 2026-11-19, a day of collection and watch, rounded up to the next 100,000. Outside deployWorkloads: it needs
+// neither the image nor the apps.
+var modelTokenAlertThreshold = 400000
+
+module modelTokenAlert 'modules/model-token-alert.bicep' = if (!empty(modelAccountName)) {
+  params: {
+    modelAccountName: modelAccountName
+    contactEmail: budgetContactEmail
+    threshold: modelTokenAlertThreshold
+    tags: tags
   }
 }
 

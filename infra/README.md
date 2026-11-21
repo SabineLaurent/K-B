@@ -20,6 +20,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
 | `budget.bicep` | budget `budget-kb` : 40 €/mois des coûts étiquetés `project=k-b`, hébergement et inférence (la ressource du modèle comptée si elle est dans ce groupe de ressources et porte l'étiquette), e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437, #632 |
 | `container-apps-policies.bicep` | deux politiques intégrées d'Azure Policy assignées au groupe, d'effet `Audit` : `audit-kb-ca-external-ingress` (« Container Apps should disable external network access »), sauf `ca-kb-web`, et `audit-kb-ca-https-only` (« Container Apps should only be accessible over HTTPS ») ; elles n'arrêtent rien, et auditent aussi les apps des autres projets du groupe (« La relecture de la configuration ») | 1 | #497 |
+| `model-token-alert.bicep` | groupe d'actions `ag-kb-operator` (un e-mail, l'adresse du budget) ; règle `alert-kb-model-tokens` : plus de 400 000 jetons (`TotalTokens`) sur 24 h glissantes, sur toute la ressource du modèle, évaluée toutes les 15 minutes ; rien n'est coupé (« L'alerte sur les jetons du modèle ») | 1, si `modelAccountName` est donné | #501 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
 | `api-container-app.bicep` | `ca-kb-data-api`, `ca-kb-ai-api` et `ca-kb-web` : HTTPS, 0 à 1 réplique, sondes `GET /health` ; ingress interne, sauf le site, ouvert par `exposeWeb` derrière la connexion Microsoft Entra (« Le site privé ») | 2 | #414, #571 |
@@ -35,11 +36,13 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
   - `cae` pour l'environnement, `ca` pour une app, `caj` pour un job ;
   - `cr` pour le registre, `kv` pour le coffre, `st` pour un compte de stockage, `log` pour l'espace de journaux,
     `id` pour une identité managée ;
-  - `pgsql` pour la base (#421).
+  - `pgsql` pour la base (#421) ;
+  - `ag` pour le groupe d'actions (#501).
 
-  Le budget n'est pas dans cette liste : `budget-kb` suit le même modèle. Après le préfixe viennent `kb`, puis le
-  rôle de la pièce (`ca-kb-data-api`). Une assignation de politique n'a pas d'abréviation (le CAF ne donne qu'un nom
-  « descriptif » pour une définition, lu le 2026-11-18) : `audit-kb-ca-…`, l'effet, `kb`, puis ce qui est audité.
+  Le budget n'est pas dans cette liste, ni la règle d'alerte : `budget-kb` et `alert-kb-model-tokens` suivent le même
+  modèle. Après le préfixe viennent `kb`, puis le rôle de la pièce (`ca-kb-data-api`). Une assignation de politique
+  n'a pas d'abréviation (le CAF ne donne qu'un nom « descriptif » pour une définition, lu le 2026-11-18) :
+  `audit-kb-ca-…`, l'effet, `kb`, puis ce qui est audité.
 - **Suffixe** : `take(uniqueString(resourceGroup().id), 8)` (`main.bicep`), pour les seuls noms qu'Azure veut uniques
   dans tout Azure, parce que la ressource a une adresse publique : le registre, le coffre et le stockage.
   - La graine est l'identifiant complet du groupe de ressources : le même groupe donne toujours le même suffixe. Il
@@ -92,16 +95,20 @@ RG=<groupe de ressources>
 EMAIL=<adresse des alertes du budget>
 OPERATOR=$(az ad signed-in-user show --query id -o tsv)
 OPERATOR_UPN=$(az ad signed-in-user show --query userPrincipalName -o tsv)
+MODEL_ACCOUNT=sabl-certif-resource
+MODEL_ID=$(az cognitiveservices account show -n "$MODEL_ACCOUNT" -g "$RG" --query id -o tsv)
 # Refuse une valeur vide, ou laissée entre chevrons.
 kb_check() {
   for value in "$@"; do
     case "$value" in ''|*'<'*) echo "une valeur est vide ou encore un gabarit" >&2; return 1 ;; esac
   done
 }
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && echo ok
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" "$MODEL_ID" && echo ok
 ```
 
-`OPERATOR_UPN` fait de l'opératrice l'administratrice Entra du serveur PostgreSQL (#421).
+`OPERATOR_UPN` fait de l'opératrice l'administratrice Entra du serveur PostgreSQL (#421). `MODEL_ACCOUNT` est la
+ressource du modèle, dans le même groupe : la règle `alert-kb-model-tokens` la surveille (#501). `MODEL_ID` est vide si
+elle n'est pas dans ce groupe, et `kb_check` le refuse.
 
 Chaque `<…>` se remplace par sa valeur. Une valeur laissée entre chevrons part telle quelle : le 2026-11-06, une
 adresse `<adresse>` a fait refuser le budget (« Notification cannot have invalid email addresses »), et le reste du
@@ -133,12 +140,17 @@ file », lu le 2026-11-18). `Microsoft.PolicyInsights` (#497) donne les états d
 ### 2. Première passe : le socle
 
 ```sh
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group what-if -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN"
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" && az deployment group create -g "$RG" -f infra/main.bicep \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" && az deployment group what-if -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" \
+     modelAccountName="$MODEL_ACCOUNT"
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" && az deployment group create -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" \
+     modelAccountName="$MODEL_ACCOUNT" \
   --query "{state:properties.provisioningState,outputs:properties.outputs}"
 ```
+
+Une passe sans `modelAccountName` ne touche pas l'alerte sur les jetons du modèle : en mode incrémental, rien n'est
+supprimé, et l'alerte reste telle qu'en ligne.
 
 L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà (#411) :
 - **à créer** :
@@ -262,14 +274,16 @@ WEB_APP_ID=$(az ad app list --display-name "K-B site" --query "[].appId" -o tsv)
 # Ouvert seulement si sa connexion est déjà posée en ligne : un site à créer, ou sans connexion, reste fermé.
 [ "$(az containerapp auth show -n ca-kb-web -g "$RG" --query platform.enabled -o tsv 2>/dev/null)" = true ] \
   && EXPOSE_WEB=true || EXPOSE_WEB=false
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group what-if \
-  -g "$RG" -f infra/main.bicep \
-  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
-     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb="$EXPOSE_WEB"
-kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group create \
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group what-if \
   -g "$RG" -f infra/main.bicep \
   -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
      llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb="$EXPOSE_WEB" \
+     modelAccountName="$MODEL_ACCOUNT"
+kb_check "$RG" "$EMAIL" "$OPERATOR" "$OPERATOR_UPN" "$MODEL_ACCOUNT" "$TAG" "$LLM_URL" "$LLM_MODEL" "$OTLP" "$WEB_APP_ID" && az deployment group create \
+  -g "$RG" -f infra/main.bicep \
+  -p budgetContactEmail="$EMAIL" operatorObjectId="$OPERATOR" operatorPrincipalName="$OPERATOR_UPN" imageTag="$TAG" \
+     llmBaseUrl="$LLM_URL" llmModel="$LLM_MODEL" otlpEndpoint="$OTLP" webAuthClientId="$WEB_APP_ID" exposeWeb="$EXPOSE_WEB" \
+     modelAccountName="$MODEL_ACCOUNT" \
   --query "{state:properties.provisioningState}"
 ```
 
@@ -549,6 +563,89 @@ az rest --method get \
 
 `az consumption budget list` ne suffit pas : il rend `filter: null`, et il ne montre ni `thresholdType` ni `locale`
 des alertes (constat du 2026-11-06).
+
+## L'alerte sur les jetons du modèle (#501)
+
+`budget-kb` compte la ressource du modèle depuis qu'elle porte `project=k-b` (geste de Sabine du 2026-11-18, #632) ;
+un budget s'évalue une fois par 24 h. La règle `alert-kb-model-tokens` voit les jetons eux-mêmes, toutes les 15
+minutes : elle écrit à `ag-kb-operator` quand la ressource dépasse 400 000 jetons sur 24 h glissantes.
+
+| Réglage | Valeur |
+|---|---|
+| Métrique | `TotalTokens` de `Microsoft.CognitiveServices/accounts`, en entrée et en sortie, agrégation `Total` |
+| Portée | toute la ressource `$MODEL_ACCOUNT`, sans filtre de déploiement : une clé de la ressource ouvre tous ses déploiements |
+| Seuil | 400 000 jetons : 4 fois les 80 954 du jeudi 2026-11-19, jour de collecte et de veille, arrondi au 100 000 au-dessus (seuil de Sabine du 2026-11-20) |
+| Fenêtre, fréquence | `P1D`, `PT15M` |
+| Destinataire | `ag-kb-operator`, un e-mail : `budgetContactEmail`, l'adresse du budget |
+
+L'alerte prévient ; la borne qui refuse les appels est le quota du déploiement : capacité 250, soit 250 000 jetons par
+minute (lue le 2026-11-20).
+
+### La poser
+
+La passe de l'étape 2, avec `modelAccountName`. Aperçu attendu :
+- **à créer** : `ag-kb-operator` et `alert-kb-model-tokens` ;
+- **à modifier** : le bruit de l'étape 2.
+
+L'aperçu montre l'adresse du groupe : elle est caviardée dans toute sortie recopiée et dans toute capture.
+
+Constaté le 2026-11-20 : 2 ressources à créer, ces deux-là ; 31 à modifier, du bruit (les `reference(…)` non résolus
+des rôles, les valeurs par défaut qu'Azure renvoie, le diagnostic de `cae-kb` et `budget-kb`) ; 1 non analysable, le
+rôle SMB de `cae-kb` sur `stkbjobfiles…`, dont l'identifiant se calcule au déploiement ; aucune suppression. La
+création a rendu `Succeeded`.
+
+Azure a accepté le couple `P1D` et `PT15M`, que Microsoft Learn ne décrit pas. Si une création échoue sur
+`alert-kb-model-tokens` avec une erreur qui nomme `evaluationFrequency` ou `windowSize`, la ligne
+`evaluationFrequency: 'PT15M'` de `infra/modules/model-token-alert.bicep` devient `evaluationFrequency: 'PT1H'`, puis
+la même passe se relance.
+
+À la création du groupe, Azure écrit à cette adresse un code à usage unique, à saisir dans les 30 minutes qui suivent
+l'enregistrement du groupe ; s'il a expiré, le portail le renvoie (« Resend »).
+
+### La vérifier
+
+```sh
+az monitor metrics alert show -n alert-kb-model-tokens -g "$RG" \
+  --query "{enabled:enabled,window:windowSize,frequency:evaluationFrequency,criteria:criteria.allOf,actions:actions[].actionGroupId}"
+az monitor action-group show -n ag-kb-operator -g "$RG" \
+  --query "{enabled:enabled,receivers:emailReceivers[].name,statuses:emailReceivers[].status}"
+az resource show --ids "$MODEL_ID" --query tags.project -o tsv
+```
+
+Attendu : la règle active, `P1D` et `PT15M`, `TotalTokens` au-dessus de 400 000, l'identifiant de `ag-kb-operator` ;
+le groupe actif, un destinataire, `operator`, et son statut (`statuses`), relevé après la saisie du code ; `k-b`.
+Aucune de ces lectures n'affiche l'adresse.
+
+Puis un e-mail d'essai, que la commande envoie à l'adresse donnée en ligne de commande (le `show` prouve le groupe,
+l'essai prouve l'adresse) :
+
+```sh
+kb_check "$RG" "$EMAIL" && { az monitor action-group test-notifications create --action-group ag-kb-operator -g "$RG" \
+  -a email operator "$EMAIL" usecommonalertschema --alert-type metricstaticthreshold \
+  --query "{state:state,actions:actionDetails}"; } 2>&1 \
+  | sed -E -e 's#/subscriptions/[0-9A-Fa-f-]{36}#/subscriptions/<abonnement>#g' -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<adresse>/g'
+```
+
+Le `sed` masque toute adresse et l'ID d'abonnement de la sortie, rendue entière.
+
+La commande attend la fin de l'essai, qui vient plusieurs minutes après l'e-mail : l'e-mail reçu fait la preuve.
+
+Constaté le 2026-11-20, après la passe : la règle active, `P1D`, `PT15M`, `TotalTokens` au-dessus de 400 000,
+reliée à `ag-kb-operator` ; le groupe actif, un destinataire, `operator`, vérifié par le code à usage unique, à
+l'état `Enabled` ; `k-b`. L'e-mail d'essai est arrivé, déclenché à 23:23 UTC ; la commande attendait encore la fin
+de l'essai plus de 3 minutes après lui.
+
+### Si elle sonne
+
+1. Lire les jetons par jour et par déploiement, pour savoir lequel a consommé :
+
+   ```sh
+   az monitor metrics list --resource "$MODEL_ID" --metrics TotalTokens --aggregation Total --interval P1D \
+     --dimension ModelDeploymentName --offset 3d
+   ```
+
+2. Si la consommation ne vient pas de K-B : régénérer la clé de la ressource dans le portail (jamais par une commande
+   qui l'affiche), puis refaire le secret `kb-llm-api-key` (« Pour refaire un seul secret »).
 
 ## Relever la facture
 

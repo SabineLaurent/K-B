@@ -7574,6 +7574,45 @@ l'effet écrit, décision de Sabine du 2026-11-20.
   version déployée sans cette relecture n'est relue que par les politiques. Les gestes Azure de #497 attendent la
   fusion de #630 (décision de Sabine du 2026-11-18). — PR de #497
 
+## 2026-11-20
+
+### Coût du modèle : une alerte Azure Monitor sur les jetons de sa ressource (#501)
+
+Seuil et périmètre décidés par Sabine le 2026-11-20 (« ok seuil », points B3 et B4 du plan de time-knight) ; les autres
+choix, tranchés par time-knight (délégation du 15/10). Posée en ligne le 2026-11-20 (`infra/README.md`, « L'alerte sur
+les jetons du modèle (#501) »).
+
+- **Une alerte Azure Monitor par e-mail sur le total des jetons de la ressource du modèle (`TotalTokens`, agrégation
+  `Total`), en plus du budget.** Pourquoi : API4:2023 demande un plafond de dépense ou, à défaut, une alerte de
+  facturation ; `budget-kb` ne s'évalue qu'une fois par 24 h, et l'alerte Grafana `KbModelCostOverBudget` (#632) est
+  une estimation de K-B lui-même, aveugle à une clé utilisée hors de K-B et muette si l'export s'arrête. Écartés :
+  `ProcessedPromptTokens` et `GeneratedTokens`, que l'issue nommait, deux règles là où le total en fait une (plan du
+  2026-11-13, point 9) ; `FoundryModelEstimatedCost`, en préversion. Limite assumée : l'alerte prévient et n'arrête
+  rien ; la borne qui refuse les appels est le quota du déploiement, 250 000 jetons par minute
+  (`docs/fiches-veille.md`, API4, « Plafonds de dépense »). — PR #665
+- **L'alerte porte sur toute la ressource `sabl-certif-resource`, sans filtre de déploiement.** Pourquoi (Sabine,
+  B4) : une clé de la ressource ouvre tous ses déploiements (« API keys provide full access to the resource and can't
+  be scoped to specific users or actions », Microsoft Learn, « Authentication and authorization in Microsoft
+  Foundry ») ; la lecture de Sabine du 2026-11-20 ne montre qu'un déploiement, gpt-6.1-sol, celui de K-B ; et
+  l'étiquette `project=k-b`, posée le 2026-11-18 et relue le 2026-11-20, fait déjà compter toute la ressource dans
+  `budget-kb` (la limite assumée de #632, ci-dessus au 2026-11-18, est levée). Revient sur le plan du 2026-11-13
+  (« toujours filtrée sur le déploiement de K-B ») et sur le critère de fin de #501 (commentaire du 2026-11-20).
+  Écarté : le filtre sur `ModelDeploymentName`, qui laisserait passer les jetons d'un autre déploiement appelé avec
+  la même clé. Condition de B4 : si un déploiement d'un autre projet entre dans la ressource, le filtre sur les
+  déploiements de K-B revient. — PR #665
+- **Le seuil : 400 000 jetons sur 24 h glissantes (`P1D`), évalués toutes les 15 minutes (`PT15M`).** Pourquoi
+  (Sabine) : 4 fois les 80 954 jetons du jeudi 2026-11-19, jour de collecte et de veille, arrondi au 100 000
+  au-dessus ; le 2026-11-18, jour d'essais (136 812 jetons), écarté. Au prix de gpt-6.1-sol, de 0,96 $ à 4,80 $ sur
+  24 h. `PT15M` plutôt que `PT1H` : même prix, la dépense vue quatre fois plus tôt ; Microsoft Learn ne décrit pas le
+  couple `P1D` et `PT15M`, qu'Azure a accepté le 2026-11-20 (repli `PT1H` écrit dans `infra/README.md`). — PR #665
+- **Le groupe d'actions s'appelle `ag-kb-operator`, du nom de son destinataire, à l'adresse du budget
+  (`budgetContactEmail`).** Pourquoi : les alertes à venir de K-B (#553, #282) écriront à la même personne, et
+  « Multiple alert rules can use the same action group » (Microsoft Learn, « Action groups ») ; une seule adresse,
+  jamais écrite dans le dépôt. Écarté : un groupe nommé d'après l'alerte, à recréer pour chaque règle. Limite assumée :
+  l'adresse est lisible par un lecteur du groupe de ressources, dans l'historique des déploiements et dans l'aperçu,
+  comme celle de `budget-kb` ; elle est caviardée dans toute sortie et toute capture recopiées (décision de Sabine du
+  2026-11-20). — PR #665
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
