@@ -247,8 +247,8 @@ visent le commit `36c1e02`.
     commande sort en 2, et rien n'est collecté (`etl/raw_store.py:188-216`, `commands/collect_command.py:54-56`).
 4. **Chaque source, l'une après l'autre** (`etl/extract.py:63-91`). Le nom de la source et l'extension de ses
     fichiers sont contrôlés, puis la source est interrogée, avec la date de sa dernière collecte si elle s'en sert
-    (`etl/extract.py:118-123`): Zotero et les deux classements GitHub sont lus en entier à chaque fois
-    (`etl/sources/zotero.py:205-206`, `etl/sources/github/most_starred.py:34`,
+    (`etl/extract.py:118-123`): Zotero et les deux classements GitHub ne s'en servent pas, et sont relus à chaque
+    collecte (`etl/sources/zotero.py:205-206`, `etl/sources/github/most_starred.py:34`,
     `etl/sources/github/most_forked.py:33`). Sans rien de
     nouveau, rien n'est écrit (`etl/extract.py:124-125`). Sinon, le brut est écrit sous `raw/`: un fichier nommé par
     l'instant de la collecte, ou un dossier de ce nom avec un fichier par page (`etl/extract.py:126-142`). Chaque
@@ -271,9 +271,9 @@ Le tableau suivant donne les codes de sortie de `kb collect`.
 |---|---|---|
 | 0 | chaque source lancée a réussi | `commands/collect_command.py:115-124`, `commands/exit_codes.py:88-93` |
 | 1 | aucune source n'a réussi; ou l'état n'est pas écrit, et la collecte suivante repart des mêmes dates. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/collect_command.py:115-124`, `cli.py:261-265` |
-| 2 | `KB_COLLECT_ONLY` refusée, ou état illisible: rien n'est collecté. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/collect_command.py:42-46`, `commands/collect_command.py:54-56`, `cli.py:113-117`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
+| 2 | `KB_COLLECT_ONLY` refusée, ou état illisible: rien n'est collecté. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/collect_command.py:42-46`, `commands/collect_command.py:54-56`, `cli.py:113-117`, `cli.py:126-134`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
 | 4 | collecte partielle: une source au moins a échoué, une autre au moins a réussi; l'état est écrit | `commands/exit_codes.py:48-57`, `commands/exit_codes.py:88-93` |
-| 143, 130 | SIGTERM, SIGINT (Ctrl-C): la collecte s'arrête; les fichiers bruts déjà écrits restent, mais l'état n'est pas écrit: chaque source garde sa date d'avant la commande, et la collecte suivante repart des mêmes dates | `cli.py:252-260`, `etl/extract.py:71`, `etl/extract.py:93-94`, `commands/exit_codes.py:63-85` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): la collecte s'arrête, et les fichiers bruts déjà écrits restent. Reçu avant l'écriture de l'état, l'état n'est pas écrit: chaque source garde sa date d'avant la commande, et la collecte suivante repart des mêmes dates; reçu après, l'état est écrit | `cli.py:252-260`, `etl/extract.py:71`, `etl/extract.py:93-94`, `commands/collect_command.py:57-59`, `commands/exit_codes.py:63-85` |
 
 ## Le script d'agrégation et d'import: `kb import`
 
@@ -401,9 +401,11 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
 8. **Le journal, puis la validation.** Si le journal de cette seconde existe déjà, l'import s'arrête et sa
     transaction est annulée: tout a été lu et écrit, rien n'est gardé, code 2, et `kb import` est à relancer
     (`etl/load.py:127-129`, `etl/load.py:163-166`, `etl/load.py:80-86`, `commands/import_command.py:48-50`). Sinon le
-    journal est écrit, puis la base valide (`COMMIT`) (`etl/load.py:130-138`). Si l'écriture du journal ou la
-    validation échoue, le journal est supprimé, rien n'est gardé, et la commande sort en 1 (`etl/load.py:139-146`,
-    `commands/import_command.py:54-59`).
+    journal est écrit, puis la base valide (`COMMIT`) (`etl/load.py:130-138`). Toute autre erreur (moteur,
+    disque) arrête l'import sans garder de journal, et la commande sort en 1 (`etl/load.py:139-146`,
+    `commands/import_command.py:54-59`). L'import tient en une seule transaction, l'inscription des fichiers au
+    registre comprise: le prochain import relit chaque fichier que la base n'a pas inscrit (`etl/load.py:76-79`,
+    `etl/raw_reading.py:107-113`).
 9. **Le bilan**, affiché entre deux lignes vides (`commands/import_command.py:64`,
     `commands/import_command.py:68-74`).
 
@@ -413,8 +415,10 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
     (`ROLLBACK TO SAVEPOINT entry`) et devient un rejet; l'import continue (`database/savepoint.py:20-40`,
     `etl/file_writing.py:105-118`). Un fichier de tendances dont la base refuse une ligne est rejeté entier, et pas
     inscrit (`etl/file_writing.py:75-86`).
-- **Toute autre erreur** (moteur, disque) annule toute la transaction: rien n'est écrit, et le journal est supprimé
-    (`etl/load.py:80-86`, `etl/load.py:139-146`). La commande sort en 1 (`commands/import_command.py:54-59`).
+- **Toute autre erreur** (moteur, disque) arrête l'import sans garder de journal, et la commande sort en 1
+    (`etl/load.py:80-86`, `etl/load.py:139-146`, `commands/import_command.py:54-59`). L'import tient en une seule
+    transaction, l'inscription des fichiers au registre comprise: le prochain import relit chaque fichier que la base
+    n'a pas inscrit (`etl/load.py:76-79`, `etl/raw_reading.py:107-113`).
 - **Une interruption** (Ctrl-C, SIGTERM) reçue avant la validation n'écrit rien; reçue après, elle garde l'import et
     son journal, et le journal de fonctionnement le dit (`import committed, journal kept`). Sur PostgreSQL, une
     interruption pendant la validation laisse son issue inconnue: le journal est gardé, avec la ligne
@@ -432,8 +436,8 @@ Le tableau suivant donne les codes de sortie de `kb import`.
 | Code | Sens | Où |
 |---|---|---|
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
-| 1 | l'import a échoué: rien n'est écrit, ni dans la base ni au journal; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
-| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
+| 1 | l'import a échoué: il s'arrête sans garder de journal, et le prochain import relit chaque fichier que la base n'a pas inscrit; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
+| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:126-134`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
 | 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
 
 ## Le nettoyage et l'homogénéisation des formats

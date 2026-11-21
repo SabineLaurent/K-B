@@ -57,17 +57,22 @@ et une note du dessin dit le code 1 de toute autre erreur, dont une base Postgre
 
 Les autres corrections viennent de la relecture de la PR, chacune vérifiée dans le code :
 - **l'écriture du journal et la validation peuvent échouer**, après la question « Journal de cette seconde déjà
-  là ? » : le journal est alors supprimé, et la commande sort en 1 (`src/k_b/etl/load.py:139-146`). Une question
-  « Journal écrit et transaction validée ? » les suit, avec sa fin « code 1 : rien en base, journal supprimé » ;
+  là ? » : aucun journal n'est gardé, et la commande sort en 1 (`src/k_b/etl/load.py:139-146`). Une question
+  « Journal écrit et transaction validée ? » les suit, avec sa fin « code 1 : aucun journal gardé ». La fin ne dit
+  pas « rien en base » : un COMMIT qui échoue lève une erreur du moteur, que la base ait gardé ou annulé la
+  transaction (commentaire de `src/k_b/etl/load.py:140-141`). Le texte dit ce qui reste vrai dans les deux cas :
+  l'import tient en une seule transaction, l'inscription des fichiers au registre comprise, et le prochain import
+  relit chaque fichier que la base n'a pas inscrit (`src/k_b/etl/load.py:76-79`, `src/k_b/etl/raw_reading.py:107-113`) ;
 - **les deux boucles posent leur question d'abord** : « Reste-t-il un fichier ? » et « Reste-t-il un item ? ». Un
   import sans fichier, ou un fichier sans item, est un cas normal : le bilan de la page en donne un, `0 raw read`.
   Le dessin à « prendre le suivant » d'abord l'envoyait à un fichier qui n'existe pas ;
 - **le verrou des écrivains** n'est pris à cette étape que sur PostgreSQL ; SQLite le prend à la première écriture
   (`src/k_b/database/engine.py:43-47`) ;
 - **un retrait** demande au moins une entrée et aucun rejet (`src/k_b/etl/withdrawals.py:24`, `:41`) ;
-- **une source est interrogée avec sa date si elle s'en sert** : Zotero et les classements GitHub sont lus en entier à
-  chaque collecte (`src/k_b/etl/sources/zotero.py:205-206`) ;
-- la légende violette dit « Journal et validation », la seule case qu'elle colore.
+- **une source est interrogée avec sa date si elle s'en sert** : Zotero et les deux classements GitHub ne s'en
+  servent pas, et sont relus à chaque collecte (`src/k_b/etl/sources/zotero.py:205-206`) ;
+- la légende violette dit « Journal et validation », la seule case qu'elle colore ; la note rouge pointillée de la
+  lecture a son entrée de légende, « Note ».
 
 ### Les sources `.drawio` à côté des PNG
 
