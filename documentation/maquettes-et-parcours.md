@@ -238,7 +238,7 @@ flowchart TD
     open("L'opératrice ouvre l'adresse du site")
     entra("Connexion Microsoft Entra<br>(plateforme Container Apps)")
     platform{"La plateforme admet-elle ce compte ?<br>(tenant du déploiement,<br>puis compte de Sabine seul)"}
-    platformRefused("Refus de la plateforme<br>(le 403 d'un autre compte du tenant<br>n'est pas constaté)")
+    platformRefused("Refus de la plateforme")
     check{"Le site: la personne connectée<br>est-elle l'opératrice ?"}
     refused["Accès réservé<br>(page 403 du site)"]
     feed["Fil de veille<br>/"]
@@ -277,12 +277,11 @@ flowchart TD
 ```
 
 **Description du schéma.** L'opératrice ouvre l'adresse du site. Sans session, la plateforme l'envoie à la connexion
-Microsoft Entra. La plateforme n'admet que les comptes du tenant du déploiement (`openIdIssuer`), et parmi eux le seul
-compte de Sabine (`allowedPrincipals`, `infra/modules/api-container-app.bicep:216-226`): elle refuse tout autre compte.
-Limite: le 403 que la plateforme rend à un autre compte du tenant n'est pas constaté, faute d'un second compte pour
-l'essayer (`infra/README.md:1530-1531`). Parade: le site vérifie lui-même, à chaque requête, que la personne connectée
-est l'opératrice (`web/operator_check.py`), le second verrou. Sinon, il répond la page « Accès réservé » (403), dont le
-seul bouton, « Se déconnecter », ferme la session. Sur cette page, « K-B », « Veille » et les liens du pied repassent
+Microsoft Entra. La plateforme est configurée pour ne laisser entrer que le compte de l'opératrice (`allowedPrincipals`,
+`infra/modules/api-container-app.bicep:216-226`). Le site vérifie ensuite lui-même, à chaque requête, que la personne
+connectée est l'opératrice (`web/operator_check.py`): c'est un second verrou, prouvé par ses tests (une requête sans
+l'en-tête, avec celui d'un autre compte, mal formé ou en double, est refusée). À une personne refusée, il répond la
+page « Accès réservé » (403), dont le seul bouton, « Se déconnecter », ferme la session. Sur cette page, « K-B », « Veille » et les liens du pied repassent
 par la même vérification, et rendent de nouveau la page 403. Si la personne est l'opératrice, elle arrive sur le fil
 de veille.
 
@@ -303,7 +302,3 @@ la plateforme); la page 403 le porte en bouton, et la page de repli ne le porte 
 coupé (`KB_WEB_AUTH=off`, sur le Mac seulement), aucune page ne le porte. Pour la lisibilité, le schéma ne trace les
 pages d'erreur, les pages « Sources » et « Accessibilité » et la déconnexion que depuis le fil: la page 500 n'y vient
 que du fil, et « Réessayer » y ramène donc au fil. « K-B » et « Veille », sur chaque page, ramènent au fil.
-
-Les écrans à venir ne sont pas dans ce schéma, qui ne montre que le site construit. Parmi eux, la planche
-« Arborescence de l'application » du canevas du 09/11/2026 montre le back office prévu; les comptes rendus de veille,
-le top 10 et le rapport de tendances n'ont pas encore de maquette.
