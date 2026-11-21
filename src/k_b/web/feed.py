@@ -269,9 +269,9 @@ def read_written_day(value: str) -> date | None:
 
 
 def write_day_refusal(field_in_messages: str, value: str) -> str:
-    """The message of a day refused, which names a value of the form of a day only, ASCII digits
-    and dashes: an input type=date cannot show it again (Opquast 2025, rule 81), and no other text
-    received reaches the page."""
+    """The message of a value WrittenDay refused, which names a value of the form of a day only,
+    ASCII digits and dashes: an input type=date cannot show it again (Opquast 2025, rule 81), and no
+    other text received reaches the page."""
     # No format: the field shows the day as its browser does (Opquast 2025, rule 80). Of the form
     # of a day and refused by WrittenDay, the value is a day that does not exist.
     if DAY_FORM.fullmatch(value):

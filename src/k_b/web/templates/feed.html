@@ -1,6 +1,7 @@
 {%- macro field_error(field) -%}
-{#- Erreur says the error without a colour, which forced colors replace (RGAA 11.10); the
-summary, under its own title, says the messages without it. -#}
+{#- Erreur says the error without a colour: the colour alone told the message from its label
+(RGAA 3.1, WCAG 1.4.1), and forced colors replace it (RGAA 11.10). The summary, under its own
+title, says the messages without it. -#}
 {%- if field in error_by_field %}
 <p id="{{ field }}-error" class="field-error">Erreur. {{ error_by_field[field] }}</p>
 {%- endif -%}

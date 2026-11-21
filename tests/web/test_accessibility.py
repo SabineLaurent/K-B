@@ -30,7 +30,7 @@ HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 LANDMARKS = ("header", "main", "footer")
 SKIP_TARGET = "contenu"
 # The feed refused on its three fields: a search too long, a kind out of the five, date without day.
-FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date"
+FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date&start=2026-02-30"
 FEED_PAGES = ("/", "/?page=2", "feed-empty", "feed-refused")
 # The detail of each kind and of each state of its banner, by name; the variants have an identifier
 # of their own, as each page has a title of its own.

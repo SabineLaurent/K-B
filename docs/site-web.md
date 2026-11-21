@@ -70,8 +70,9 @@ et « Élargir à 7 jours », une nouvelle recherche, s'ouvrent en haut de la pa
 
 **Les erreurs** : un champ refusé par le site, ou `q` refusé par l'API (422 `invalid_parameter` sur `q`
 seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ, ouvert par
-« Erreur. » : en couleurs forcées, le message prend la couleur du texte, comme le libellé au-dessus, et le mot
-dit l'erreur sans couleur (RGAA 11.10, #590). Le résumé, sous son titre « Filtre à corriger », dit chaque message
+« Erreur. » : le mot dit l'erreur sans couleur (#590). Sans lui, seule la couleur séparait le message du libellé
+au-dessus, `#7C2D12` et `#1C1E21`, 1,78:1 entre eux (RGAA 3.1, WCAG 1.4.1), et en couleurs forcées le message
+prend la couleur du texte, comme le libellé (RGAA 11.10). Le résumé, sous son titre « Filtre à corriger », dit chaque message
 sans ce mot. Le mot est écrit dans les gabarits, jamais dans les messages de `web/feed.py`. Tout autre
 échec de l'API (5xx, 429, 401, délai, réponse hors schéma, 422 sur un paramètre que le site construit) rend
 la page 500, et le journal écrit `data_api_failed: <état> http_status=<n|-> request_id=<id>`, jamais `q`.
@@ -168,7 +169,8 @@ ASCII et tirets seuls (`DAY_FORM` d'`items.py`, « Date invalide: 2026-02-30 n�
 existe. ») ; toute autre valeur n'atteint jamais la page, qu'un lien ferait sinon dire n'importe quel texte
 (« Date invalide: choisissez un jour dans le champ. »). Aucun message ne donne de format : le champ montre le jour
 à la façon du navigateur (`10/10/2026` dans Chrome en français), que le site ne connaît pas (Opquast 80, #617). La
-date de début du fil a les mêmes messages, par la même fonction (`write_day_refusal`, `web/feed.py`). Limite
+date de début du fil a les mêmes phrases, le champ nommé par chaque page (« Date de début », « Date »), par la
+même fonction (`write_day_refusal`, `web/feed.py`). Limite
 (Opquast 81) : la valeur refusée ne revient pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
 
 **Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
