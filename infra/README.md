@@ -19,7 +19,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420, #571 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
 | `budget.bicep` | budget `budget-kb` : 40 €/mois des coûts étiquetés `project=k-b`, hébergement et inférence (la ressource du modèle comptée si elle est dans ce groupe de ressources et porte l'étiquette), e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437, #632 |
-| `container-apps-policies.bicep` | deux politiques intégrées d'Azure Policy assignées au groupe, d'effet `Audit` : `audit-kb-ca-external-ingress` (« Container Apps should disable external network access »), sauf `ca-kb-web`, et `audit-kb-ca-https-only` (« Container Apps should only be accessible over HTTPS ») ; elles n'arrêtent rien, et auditent aussi les apps des autres projets du groupe (« La relecture de la configuration ») | 1 | #497 |
+| `container-apps-policies.bicep` | deux politiques intégrées d'Azure Policy assignées au groupe, d'effet `Audit` : `audit-kb-ca-external-ingress` (« Container Apps should disable external network access »), sauf `ca-kb-web`, et `audit-kb-ca-https-only` (« Container Apps should only be accessible over HTTPS ») ; elles n'arrêtent rien, et auditeraient aussi l'app d'un autre projet créée dans le groupe (« La relecture de la configuration ») | 1 | #497 |
 | `model-token-alert.bicep` | groupe d'actions `ag-kb-operator` (un e-mail, l'adresse du budget) ; règle `alert-kb-model-tokens` : plus de 400 000 jetons (`TotalTokens`) sur 24 h glissantes, sur toute la ressource du modèle, évaluée toutes les 15 minutes ; rien n'est coupé (« L'alerte sur les jetons du modèle ») | 1, si `modelAccountName` est donné | #501 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
@@ -379,8 +379,9 @@ az policy state list -g "$RG" \
 Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
 `ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
 référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
-`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`). Les
-apps des autres projets du groupe y figurent aussi. Une assignation nouvelle s'applique en cinq minutes environ ;
+`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`). Une
+app d'un autre projet du groupe y figurerait aussi ; le 2026-11-21, il n'y en a aucune (`audit-kb-ca-https-only` compte
+3 apps, celles de K-B). Une assignation nouvelle s'applique en cinq minutes environ ;
 la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
 triggers », lue le 2026-11-18).
 
@@ -1788,9 +1789,11 @@ la première passe l'applique, la seconde aussi.
 
 - **L'audit ne refuse rien** : une app déployée avec une entrée externe ou en HTTP est signalée, pas bloquée.
   Pour réduire le risque : l'effet `Deny` (paramètre `effect` des deux définitions) refuserait son déploiement, en
-  403 avant le fournisseur de ressources (page de l'effet `deny`, lue le 2026-11-18) ; faisable avec nos droits, propriétaire du groupe, mais non retenu : il refuserait aussi les apps des autres projets
-  du groupe.
-- **Les politiques auditent les apps des autres projets du groupe** : leurs constats s'ajoutent à ceux de K-B.
+  403 avant le fournisseur de ressources (page de l'effet `deny`, lue le 2026-11-18) ; faisable avec nos droits, propriétaire du groupe, mais non retenu : il refuserait aussi l'app d'un autre projet
+  créée dans le groupe.
+- **Les politiques visent tout le groupe** : assignées à `slaurentRG`, elles auditeraient aussi l'app d'un autre projet
+  qui y serait créée, et ses constats s'ajouteraient à ceux de K-B. Le 2026-11-21, `az policy state list` ne montre
+  que les trois apps de K-B.
   Pour réduire le risque : rien à refuser avec `Audit` ; la lecture de l'étape 6 nomme chaque app par son
   identifiant, ceux de K-B se lisent à part.
 - **Les requêtes ne tournent qu'à la main** : une version déployée sans leur relecture n'est relue que par les

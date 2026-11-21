@@ -4,7 +4,8 @@
 // definition would be created. The effect is written, Audit, which flags and refuses nothing: the template says what
 // it does without opening the definition, and a new version of a definition cannot change it (both allow Audit,
 // Deny and Disabled, default Audit; versions 1.1.0 and 1.0.1, read in Azure/azure-policy on 2026-11-20). No
-// identity, which only deployIfNotExists and modify need. They also audit the apps of the other projects of the group.
+// identity, which only deployIfNotExists and modify need. They would also audit the app of another project created in
+// the group.
 param webAppName string
 
 resource externalIngress 'Microsoft.Authorization/policyAssignments@2026-07-01' = {

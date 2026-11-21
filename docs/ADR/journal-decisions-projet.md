@@ -7555,9 +7555,10 @@ l'effet écrit, décision de Sabine du 2026-11-20.
   ouvrir la définition, et une nouvelle version d'une définition ne change pas l'effet en silence. Les deux
   définitions permettent `Audit`, `Deny` et `Disabled`, `Audit` par défaut (versions 1.1.0 et 1.0.1, lues dans
   `Azure/azure-policy` le 2026-11-20). **Inverse** le plan du 2026-11-13 (« pas de paramètre d'effet si le défaut est
-  `Audit` »). Écartés : l'effet `Deny`, qui refuserait aussi le déploiement des apps des autres projets du groupe ;
+  `Audit` »). Écartés : l'effet `Deny`, qui refuserait aussi le déploiement de l'app d'un autre projet créée dans le groupe ;
   une identité et une `location`, que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
-  bloquée ; les apps des autres projets du groupe sont auditées aussi. — PR de #497
+  bloquée ; l'app d'un autre projet créée dans le groupe serait auditée aussi (le 2026-11-21, il n'y en a
+  aucune). — PR de #497
 - **`ca-kb-web` est hors de la politique « Container Apps should disable external network access », par
   `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; dans
   `main.bicep`, son nom est une variable, `webAppName`, lue par le site, par son hôte et par le module ;
