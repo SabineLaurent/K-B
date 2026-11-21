@@ -201,8 +201,9 @@ jobs:
           done
           echo "not ready at the image of $GITHUB_REF_NAME after 40 reads, 15 s apart:$pending"
           exit 1
-      # The proof that the version deployed answers: both /health, and the exchange storage by the identity of
-      # the job. Its replicaTimeout is 900 s.
+      # The proof that the version deployed answers and refuses what it must: both /health, the probes without
+      # a key of both APIs (401, 404, 405), and the exchange storage by the identity of the job. Its
+      # replicaTimeout is 900 s.
       - name: Runs the smoke test
         run: |
           source "$RUNNER_TEMP/run-job.sh"

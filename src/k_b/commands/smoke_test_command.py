@@ -1,12 +1,14 @@
-"""kb smoke-test: GET /health of both APIs, then the listing of the container of the test of the
-exchange storage by the identity of the job, the proof that a job online reaches all three; only
-counts are written."""
+"""kb smoke-test: GET /health of both APIs and their probes without key, then the listing of the
+container of the test of the exchange storage by the identity of the job, the proof that a job
+online reaches all three and that both APIs refuse what they must; only counts are written."""
 
 import logging
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from time import monotonic
 from typing import NamedTuple
+
+import httpx2
 
 from k_b.ai_api.connectors.data_api_settings import (
     DATA_API_URL_VARIABLE,
@@ -18,6 +20,7 @@ from k_b.commands.batch_summary import (
 )
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
+from k_b.core.api_settings import is_sandbox
 from k_b.core.config import AI_API_URL, DATA_API_URL, SMOKE_TEST_CONTAINER
 from k_b.core.outbound import find_internal_api_url_refusal
 from k_b.exchange.storage import (
@@ -31,6 +34,15 @@ from k_b.exchange.storage import (
     read_exchange_storage_settings_or_refusal,
 )
 from k_b.jobs.api_health import HealthCheckError, build_health_client, check_health
+from k_b.jobs.api_probes import (
+    AI_API_ROUTE_WITH_KEY,
+    DATA_API_ROUTE_WITH_KEY,
+    Probe,
+    ProbeError,
+    build_probe_client,
+    list_probes,
+    send_probe,
+)
 from k_b.post.ai_api_client import AI_API_URL_VARIABLE
 
 logger = logging.getLogger(LOGGER_NAME)
@@ -46,10 +58,12 @@ SUMMARY_TITLE = "Smoke test"
 
 @dataclass(frozen=True)
 class SmokeTestSettings:
-    """The URLs of both APIs, and the exchange storage with the identity of the job."""
+    """The URLs of both APIs, whether they run in the sandbox, and the exchange storage with the
+    identity of the job."""
 
     data_api_url: str
     ai_api_url: str
+    is_sandbox: bool
     exchange_storage: ExchangeStorageSettings
 
 
@@ -72,13 +86,25 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
     if settings is None:
         return ExitCode.NOT_STARTED
     logger.info(
-        "smoke test started: /health of 2 APIs, then the listing of %s",
+        "smoke test started: /health and the probes without key of 2 APIs, then the listing"
+        " of %s",
         SMOKE_TEST_CONTAINER,
     )
     started = monotonic()
+    # The /health of an API first: it wakes the API before its probes.
     results = [
         check_api(DATA_API_NAME, settings.data_api_url),
+        *probe_api(
+            DATA_API_NAME,
+            settings.data_api_url,
+            list_probes(DATA_API_ROUTE_WITH_KEY, settings.is_sandbox),
+        ),
         check_api(AI_API_NAME, settings.ai_api_url),
+        *probe_api(
+            AI_API_NAME,
+            settings.ai_api_url,
+            list_probes(AI_API_ROUTE_WITH_KEY, settings.is_sandbox),
+        ),
         check_exchange_storage(settings.exchange_storage),
     ]
     # A count, at INFO: each failed check has its own line already.
@@ -111,7 +137,9 @@ def read_smoke_test_settings_or_refusal(
     exchange_storage = read_exchange_storage_settings_or_refusal(environ)
     if isinstance(exchange_storage, str):
         return exchange_storage
-    return SmokeTestSettings(data_api_url, ai_api_url, exchange_storage)
+    return SmokeTestSettings(
+        data_api_url, ai_api_url, is_sandbox(environ), exchange_storage
+    )
 
 
 def check_api(name: str, base_url: str) -> CheckResult:
@@ -124,6 +152,25 @@ def check_api(name: str, base_url: str) -> CheckResult:
         return CheckResult(name, CHECK_FAILED)
     logger.info("%s: /health answered", name)
     return CheckResult(name, CHECK_PASSED)
+
+
+def probe_api(name: str, base_url: str, probes: Sequence[Probe]) -> list[CheckResult]:
+    """Each probe without key of the API at base_url, a failed one not stopping the others."""
+    with build_probe_client(base_url) as http_client:
+        return [check_probe(name, http_client, probe) for probe in probes]
+
+
+def check_probe(name: str, http_client: httpx2.Client, probe: Probe) -> CheckResult:
+    """A probe of the API, as a row of the summary: data API GET /items, 401 as expected."""
+    request = f"{probe.method} {probe.path}"
+    check = f"{name} {request}"
+    try:
+        send_probe(http_client, probe)
+    except ProbeError as error:
+        logger.error("%s: %s without key failed: %s", name, request, error)
+        return CheckResult(check, CHECK_FAILED)
+    logger.info("%s: %s without key answered %d", name, request, probe.expected_status)
+    return CheckResult(check, f"{probe.expected_status} as expected")
 
 
 def check_exchange_storage(settings: ExchangeStorageSettings) -> CheckResult:

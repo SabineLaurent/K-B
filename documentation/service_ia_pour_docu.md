@@ -427,7 +427,10 @@ flowchart LR
     `kb trend-report`, par défaut le lundi et le jeudi à 10:00 UTC. Lancé à la main le 2026-11-11, ce job a donné les
     premiers points de la production dans Grafana Cloud, vers 16:00 UTC. Lancé par son horaire le 2026-11-12, de
     10:00:00 à 10:02:44 UTC, ce job a appelé le modèle. Les autres jobs n'appellent pas le modèle. Ainsi, le job de
-    vérification `caj-kb-smoke-test` n'appelle de l'API IA que `GET /health`, et l'API IA y répond sans le modèle.
+    vérification `caj-kb-smoke-test` appelle `GET /health` de l'API IA, et l'API IA y répond sans le modèle. Le
+    code de #499 ajoute à ce job des sondes sans clé, des requêtes que l'API doit refuser. L'API IA refuse ainsi
+    `POST /digests` en 401, avant tout appel au modèle. En ligne, les sondes partent au premier tag qui porte ce
+    code.
 - **Le coffre de secrets**, en ligne, porte la clé. L'identité managée de l'API IA la lit (« La clé de K-B »).
 - **Grafana Cloud** reçoit les mesures de chaque appel au modèle. Il les reçoit par OTLP, le protocole d'export
     d'OpenTelemetry, un standard ouvert de mesure des programmes. Sous un réglage, Grafana Cloud reçoit aussi le
@@ -627,6 +630,7 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Les dépendances | l'horaire du lundi et du jeudi à 10:00 UTC | `infra/main.bicep:31-32` |
 | Les dépendances | l'appel du modèle par le job, le 2026-11-12 | #522 |
 | Les dépendances | `GET /health` répond sans le modèle | `core/api_health.py:12-13` |
+| Les dépendances | les sondes sans clé de `caj-kb-smoke-test`, `POST /digests` refusé en 401 | #499 |
 | Les dépendances | le quota partagé | journal ADR, « Tendances: le choix du modèle et ses contrôles (#368) » |
 | Les dépendances | le contrat de Microsoft avec le titulaire de l'abonnement | registre, « Fondement de la sous-traitance » |
 | Ce qui part | une consigne constante et un message utilisateur | `.claude/rules/poc.md`, règle 8 |
