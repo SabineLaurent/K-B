@@ -1800,7 +1800,7 @@ aucune suppression. La création a rendu `Succeeded` (fin à 23:38:26 UTC) ; l'�
 assignations, `ca-kb-web` dans les `notScopes` d'`audit-kb-ca-external-ingress` ; `ca-kb-data-api` et `ca-kb-ai-api`
 `Compliant` aux deux, `ca-kb-web` `Compliant` à `audit-kb-ca-https-only` ; à 00:15 UTC, au `summarize`, aucune
 ressource non conforme aux deux assignations. La relecture de la configuration, à 00:09 UTC, rend les valeurs du
-2026-11-08.
+2026-11-08. Vers 00:58 UTC, `activeRevisionsMode` rend `Single` pour les deux API.
 
 ### Limites
 

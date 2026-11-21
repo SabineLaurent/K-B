@@ -1621,7 +1621,8 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   **Limite** : une entrée externe, un client hors de l'environnement, ou plusieurs révisions
   actives.
   **Pour réduire le risque** : relire à chaque version l'entrée, les routes de l'environnement et
-  `activeRevisionsMode` (#497) ; garder l'entrée interne (API2, TLS mutuel).
+  `activeRevisionsMode` (#497 ; constaté `Single` pour les deux API le 2026-11-21) ; garder l'entrée
+  interne (API2, TLS mutuel).
   **Pour la tenir**, si la limite est franchie, l'une de ces voies ; non chiffré, la taille dépend de
   la voie :
   - des restrictions d'adresses sur l'entrée d'ACA (`ipSecurityRestrictions`, toutes en `Allow` ou

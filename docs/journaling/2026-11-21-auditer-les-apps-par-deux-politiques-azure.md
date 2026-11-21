@@ -146,6 +146,7 @@ attendues (`:363-367`), le font à chaque version.
 | `az policy state list` : `ca-kb-data-api` et `ca-kb-ai-api` `Compliant` aux deux ; `ca-kb-web` `Compliant` à `audit-kb-ca-https-only`, absent de l'autre | Les deux API sont internes et en HTTPS ; le site est en HTTPS |
 | `az policy state summarize` : aucune ressource non conforme aux deux assignations de K-B | Le même constat, en comptes |
 | La relecture du même jour : `external` false, `allowInsecure` false, `transport` `Http`, `customDomains` null pour les deux API ; les deux URL internes ; chiffrement entre les apps actif, mTLS coupé, aucune route | Les valeurs du 2026-11-08, inchangées |
+| `activeRevisionsMode`, lu par Sabine le 2026-11-21 vers 00:58 UTC : `Single` pour les deux API | Une seule révision active par API : la parade d'API9 est en place |
 | `docs/fiches-veille.md:1035`, `:1039` | API8 passe en « Écart voulu, justifié » ; le compte : 6 entrées tenues sur 10, les 4 autres des écarts voulus et justifiés |
 
 ## Ce que tu dois pouvoir défendre
