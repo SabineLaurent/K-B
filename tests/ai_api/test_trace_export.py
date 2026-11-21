@@ -290,3 +290,20 @@ def test_a_stop_that_fails_is_logged_by_its_type_only(caplog):
     assert [record.getMessage() for record in caplog.records] == [
         "traces: stop failed, RuntimeError"
     ]
+
+
+def test_a_root_span_takes_the_trace_id_of_the_request_under_way():
+    """The trace id of the request (core/trace_context.py), in its log lines, is the one of its
+    spans; out of a request, a root span draws its own."""
+    from k_b.core.trace_context import following_trace
+
+    trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    tracing = TraceExport.from_settings(None, build_resource(None)).build_tracing()
+
+    with following_trace(trace_id), tracing.step("root", "server") as in_request:
+        pass
+    with tracing.step("root", "server") as out_of_request:
+        pass
+
+    assert format(in_request.ref.span_context.trace_id, "032x") == trace_id
+    assert format(out_of_request.ref.span_context.trace_id, "032x") != trace_id

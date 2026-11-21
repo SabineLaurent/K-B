@@ -32,6 +32,7 @@ from k_b.core.config import (
     MAX_AI_API_BODY_BYTES,
     DigestSubject,
 )
+from k_b.core.trace_context import follow_trace
 
 # The version of the contracts of docs/fiches-veille.md and docs/tendances.md: a change a client
 # can see changes both.
@@ -94,6 +95,9 @@ def create_app(
     bound_request_bodies(app, MAX_AI_API_BODY_BYTES)
     app.middleware("http")(respond_to_unexpected_error)
     app.middleware("http")(log_request)
+    # The outermost: the trace of the request is known to each of its lines, its own included, to
+    # its spans (connectors/trace_export.py) and to the data API (connectors/data_api_client.py).
+    app.middleware("http")(follow_trace)
     app.include_router(api_router)
     # add_route, as FastAPI adds /docs: a route of Starlette, which the key of the app does not
     # reach (fastapi/applications.py, 0.143).

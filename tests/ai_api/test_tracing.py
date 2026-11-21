@@ -2,6 +2,7 @@
 evaluation of a claim removed tied to the request to the model."""
 
 import json
+import re
 
 import pytest
 from opentelemetry._logs import SeverityNumber
@@ -11,12 +12,14 @@ from k_b.ai_api.tracing import (
     TRACING_OFF,
     AttemptContent,
     build_content_body,
+    build_traceparent,
     count_fitting,
     cut_ids,
     cut_text,
     encode_content_body,
 )
 from k_b.core.config import MAX_CONTENT_EVENT_BYTES, MAX_TRACE_ATTRIBUTE_BYTES
+from k_b.core.trace_context import following_trace
 
 CONTENT_EVENT = "gen_ai.client.inference.operation.details"
 
@@ -286,3 +289,19 @@ def test_the_repr_of_a_content_holds_no_text():
     )
 
     assert not any(text in repr(content) for text in ("consigne", "piégé", "sortie"))
+
+
+def test_a_request_sent_without_a_span_under_way_gets_a_drawn_parent():
+    """The traceparent of the data API: the trace id of the request, a parent id drawn when no
+    span records; nothing out of a request."""
+    trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+
+    with following_trace(trace_id):
+        first = build_traceparent()
+        second = build_traceparent()
+
+    assert first is not None
+    assert second is not None
+    assert re.fullmatch(rf"00-{trace_id}-[0-9a-f]{{16}}-01", first)
+    assert first != second
+    assert build_traceparent() is None

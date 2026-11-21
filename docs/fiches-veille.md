@@ -1923,7 +1923,9 @@ raison de chaque affirmation retirée. Elles servent à suivre une demande étap
 sable, et à comprendre une anomalie en production. Les spans et les évaluations ne portent aucun
 texte : ni consigne, ni item, ni réponse du modèle. Le contenu d'un appel au modèle part à côté,
 sous réglage, dans un enregistrement à part (#347, « Contenu d'un appel au modèle » ci-dessous ;
-exception de la règle 5 de `poc.md`).
+exception de la règle 5 de `poc.md`). L'identifiant de la trace est celui de la demande : chaque ligne de journal
+de la demande le porte (`trace_id=`), et l'API IA l'envoie à l'API de données dans l'en-tête `traceparent`, dont
+les lignes le portent aussi (#281, `connectors/trace_export.py`, `RequestTraceIdGenerator`).
 
 ```
 POST /digests            SERVER   http.request.method, http.route, http.response.status_code, error.type, k_b.request_id

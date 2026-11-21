@@ -5,6 +5,7 @@ import io
 import json
 import logging
 import os
+import re
 import secrets
 import sys
 import threading
@@ -45,6 +46,7 @@ from k_b.ai_api.observability.metric_instruments import ModelMetrics
 from k_b.ai_api.observability.metrics import write_llm_call_lines
 from k_b.ai_api.routers import digest_router
 from k_b.ai_api.tracing import TRACING_OFF
+from k_b.commands.run_log import logging_to
 from k_b.core.api_rate_limit import RateLimiter
 from k_b.core.api_settings import (
     DEPLOYMENT_ENVIRONMENT_VARIABLE,
@@ -1865,3 +1867,112 @@ def test_two_requests_at_once_write_whole_metric_lines_on_a_real_pipe(
     written_by_request = Counter(json.loads(line)["request_id"] for line in lines)
     expected_lines = repetitions * len(stage_calls)
     assert written_by_request == {"first": expected_lines, "second": expected_lines}
+
+
+# An example of the W3C Trace Context (https://www.w3.org/TR/trace-context/), version 00.
+TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+PARENT_ID = "00f067aa0ba902b7"
+REQUEST_LOGGER = "k_b.core.api_request_log"
+TRACE_FIELD = re.compile(r": trace_id=([0-9a-f]{32}) request ")
+SENT_TRACEPARENT = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-01")
+
+
+def read_logged_request_lines(text):
+    """The request lines of both APIs, in the format of kb serve-ai and kb serve-data."""
+    return [line for line in text.splitlines() if f" {REQUEST_LOGGER}:" in line]
+
+
+def read_root_trace_id(recorded_traces):
+    [root] = recorded_traces.find_spans(digest_router.ROOT_SPAN)
+    return format(root.context.trace_id, "032x")
+
+
+def test_a_request_and_its_reading_share_the_trace_id_of_the_root_span(
+    make_ai_api, recorded_traces, tmp_path, capsys
+):
+    """The AI API sends the trace of the request to the data API: the line of each API, and the
+    span of the request, carry one trace id."""
+    client, _ = make_ai_api(VALID_STEPS)
+
+    with logging_to(tmp_path, None):
+        response = post_digests(client)
+
+    assert response.status_code == 200
+    lines = read_logged_request_lines(capsys.readouterr().err)
+    assert any(" route=/digests " in line for line in lines)
+    assert any(" route=/items" in line for line in lines)
+    assert all(len(TRACE_FIELD.findall(line)) == 1 for line in lines)
+    assert {TRACE_FIELD.findall(line)[0] for line in lines} == {
+        read_root_trace_id(recorded_traces)
+    }
+
+
+def test_a_traceparent_received_by_the_ai_api_is_the_trace_of_its_request(
+    make_ai_api, recorded_traces, tmp_path, capsys
+):
+    client, _ = make_ai_api(VALID_STEPS)
+
+    with logging_to(tmp_path, None):
+        post_digests(
+            client,
+            headers={**AUTHORIZATION, "traceparent": f"00-{TRACE_ID}-{PARENT_ID}-01"},
+        )
+
+    lines = read_logged_request_lines(capsys.readouterr().err)
+    assert {TRACE_FIELD.findall(line)[0] for line in lines} == {TRACE_ID}
+    assert read_root_trace_id(recorded_traces) == TRACE_ID
+
+
+def test_a_refused_traceparent_is_neither_the_trace_nor_sent_back(
+    make_ai_api, recorded_traces, tmp_path, capsys
+):
+    """Uppercase, refused by the W3C Trace Context: the request starts its own trace, and the
+    value received is quoted nowhere."""
+    received = f"00-{TRACE_ID.upper()}-{PARENT_ID}-01"
+    client, _ = make_ai_api(VALID_STEPS)
+
+    with logging_to(tmp_path, None):
+        response = post_digests(
+            client, headers={**AUTHORIZATION, "traceparent": received}
+        )
+
+    log = capsys.readouterr().err
+    root_trace_id = read_root_trace_id(recorded_traces)
+    assert root_trace_id not in (TRACE_ID, TRACE_ID.upper())
+    assert {
+        TRACE_FIELD.findall(line)[0] for line in read_logged_request_lines(log)
+    } == {root_trace_id}
+    assert TRACE_ID.upper() not in log
+    assert all(TRACE_ID.upper() not in value for value in response.headers.values())
+
+
+def test_the_traceparent_sent_to_the_data_api_holds_identifiers_only(
+    make_ai_api, tmp_path, capsys
+):
+    """No personal data: the header sent is made of the trace id of the request and of a span
+    id, both drawn, never of a value of the request."""
+    sent = []
+
+    def record(request):
+        sent.append(request.headers.get_list("traceparent"))
+        return httpx2.Response(401)
+
+    client, _ = make_ai_api(
+        VALID_STEPS,
+        data_api_client=httpx2.Client(
+            base_url="http://localhost", transport=httpx2.MockTransport(record)
+        ),
+    )
+
+    with logging_to(tmp_path, None):
+        post_digests(client)
+
+    [line] = read_logged_request_lines(capsys.readouterr().err)
+    [trace_id] = TRACE_FIELD.findall(line)
+    assert sent
+    for values in sent:
+        [value] = values
+        match = SENT_TRACEPARENT.fullmatch(value)
+        assert match is not None
+        assert match.group(1) == trace_id
+        assert match.group(2) != "0" * 16

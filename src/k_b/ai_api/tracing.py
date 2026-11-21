@@ -28,6 +28,11 @@ from k_b.core.config import (
     MAX_TRACE_ATTRIBUTE_BYTES,
     TraceContent,
 )
+from k_b.core.trace_context import (
+    draw_span_id,
+    format_traceparent,
+    read_current_trace_id,
+)
 
 # The instrumentation scope of the spans and of the log records.
 SCOPE_NAME = "k_b.ai_api"
@@ -208,6 +213,21 @@ class Tracing:
 
 # Nothing recorded: the default of the functions that take tracing, for their tests.
 TRACING_OFF = Tracing(NoOpTracer(), NoOpLogger(SCOPE_NAME))
+
+
+def build_traceparent() -> str | None:
+    """The traceparent of a request sent during the request under way: its trace id, and the span
+    under way as parent, or a drawn id when no span records; None out of a request."""
+    trace_id = read_current_trace_id()
+    if trace_id is None:
+        return None
+    span_context = trace.get_current_span().get_span_context()
+    parent_id = (
+        format(span_context.span_id, "016x")
+        if span_context.is_valid
+        else draw_span_id()
+    )
+    return format_traceparent(trace_id, parent_id)
 
 
 def cut_text(text: str) -> str:
