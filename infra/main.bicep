@@ -74,6 +74,9 @@ var dataDir = '/var/lib/knowledge_base'
 var dataApiPort = 8000
 var aiApiPort = 8001
 var webPort = 8002
+// The site, open on purpose (#571): left out of the policy that audits an external ingress (#497).
+// Also written in deployment.json (apps), read by deploy.yml: rename both together.
+var webAppName = 'ca-kb-web'
 
 module logAnalytics 'modules/log-analytics.bicep' = {
   params: {
@@ -160,6 +163,13 @@ module budget 'modules/budget.bicep' = {
   }
 }
 
+// Both passes: the policies audit the apps of the group, whatever the image (#497).
+module containerAppsPolicies 'modules/container-apps-policies.bicep' = {
+  params: {
+    webAppName: webAppName
+  }
+}
+
 // Tokens of the model resource in 24 hours (#501), threshold of Sabine of 2026-11-20: 4 times the 80,954 of Thursday
 // 2026-11-19, a day of collection and watch, rounded up to the next 100,000. Outside deployWorkloads: it needs
 // neither the image nor the apps.
@@ -181,8 +191,8 @@ var dataApiHost = 'ca-kb-data-api.${internalDomain}'
 var aiApiHost = 'ca-kb-ai-api.${internalDomain}'
 // The site (#571): its internal name until exposeWeb opens it, then its name on the internet.
 var webHost = exposeWeb
-  ? 'ca-kb-web.${containerAppsEnvironment.outputs.defaultDomain}'
-  : 'ca-kb-web.${internalDomain}'
+  ? '${webAppName}.${containerAppsEnvironment.outputs.defaultDomain}'
+  : '${webAppName}.${internalDomain}'
 var image = '${registry.outputs.loginServer}/k-b:${imageTag}'
 // Variable to Key Vault secret, for each app. KB_DATA_API_KEY_AI_DIGEST is the key of the AI API to
 // the data API, KB_DATA_API_KEY_WEB the key of the site: each read by both apps.
@@ -338,7 +348,7 @@ module aiApi 'modules/api-container-app.bicep' = if (deployWorkloads) {
 // has no right in Azure; it reads the data API only, by its key.
 module web 'modules/api-container-app.bicep' = if (deployWorkloads) {
   params: {
-    name: 'ca-kb-web'
+    name: webAppName
     location: location
     tags: tags
     environmentId: containerAppsEnvironment.outputs.id

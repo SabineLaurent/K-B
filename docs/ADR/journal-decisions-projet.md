@@ -7539,6 +7539,43 @@ d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation d
   fusion de #630, faite le jour même. Tranché par time-knight. Par choix, la mesure reste « non tenue, en partie »
   jusqu'à ce constat : l'auto-évaluation ne s'écrit que sur un résultat observé. — PR de #499
 
+### Infra : la relecture de la configuration en ligne et deux politiques d'audit (#497)
+
+Plan validé par Sabine le 2026-11-13 (§ 6, points 12 et 13), sur sa décision du 08/11 de tenir la « revue périodique
+des configurations » d'API8 ; écarts tranchés par time-knight le 2026-11-18, sous la délégation de Sabine du 15/10 ;
+l'effet écrit, décision de Sabine du 2026-11-20. Posées en ligne le 2026-11-20 (`infra/README.md`, « Appliquer #497
+en ligne »).
+
+- **Deux définitions intégrées d'Azure Policy, assignées au groupe de ressources par `infra/`
+  (`container-apps-policies.bicep`, `policyAssignments@2026-07-01`), avec l'effet `Audit` écrit dans chaque
+  affectation (`parameters: { effect: { value: 'Audit' } }`), qui signale sans rien refuser.** Pourquoi :
+  Sabine est propriétaire du groupe et seulement lectrice de l'abonnement (ses lectures `az` du 2026-11-18, relayées
+  par time-knight) ; une définition personnalisée se crée dans un groupe d'administration ou un abonnement, une
+  assignation de définition intégrée au niveau du groupe. L'effet `Audit` est celui de l'issue. Il est écrit
+  (décision de Sabine du 2026-11-20, constat 4 du relecteur Azure du 2026-11-18) : le Bicep dit ce qu'il fait sans
+  ouvrir la définition, et une nouvelle version d'une définition ne change pas l'effet en silence. Les deux
+  définitions permettent `Audit`, `Deny` et `Disabled`, `Audit` par défaut (versions 1.1.0 et 1.0.1, lues dans
+  `Azure/azure-policy` le 2026-11-20). **Inverse** le plan du 2026-11-13 (« pas de paramètre d'effet si le défaut est
+  `Audit` »). Écartés : l'effet `Deny`, qui refuserait aussi le déploiement de l'app d'un autre projet créée dans le groupe ;
+  une identité et une `location`, que seuls `deployIfNotExists` et `modify` demandent. Limite assumée : une app mal configurée est signalée, pas
+  bloquée ; l'app d'un autre projet créée dans le groupe serait auditée aussi (le 2026-11-21, il n'y en a
+  aucune). — PR #662
+- **`ca-kb-web` est hors de la politique « Container Apps should disable external network access », par
+  `notScopes`.** Pourquoi : le site est ouvert exprès, derrière la connexion de Microsoft Entra (#571) ; dans
+  `main.bicep`, son nom est une variable, `webAppName`, lue par le site, par son hôte et par le module ;
+  `infra/deployment.json`, que lit `deploy.yml`, l'écrit aussi. Écartée : une exemption, visible
+  comme « Exempt », mais en API de préversion seulement. — PR #662
+- **Le module s'applique aux deux passes, hors de `deployWorkloads`.** Pourquoi : il ne dépend ni de l'image ni des
+  apps ; `notScopes` vise le site par son identifiant. Qu'une exclusion vise une ressource qui n'existe pas encore,
+  sur un groupe neuf à la première passe, n'est pas vérifié ; en ligne, le site existe depuis le 2026-11-11
+  (#571). — PR #662
+- **Les requêtes de la relecture du 2026-11-08 et leurs valeurs attendues vont dans `infra/README.md`, « 6. Vérifier
+  la mise en ligne », relancées par Sabine à chaque version déployée.** Pourquoi : c'est le texte de l'issue ; les
+  politiques ne voient ni le chiffrement entre les apps, ni les routes de l'environnement, ni les URL internes.
+  Écarté pour l'instant : les lancer dans un outil des passes (#455), qui pourrait les reprendre. Limite assumée : une
+  version déployée sans cette relecture n'est relue que par les politiques. Les gestes Azure de #497 attendent la
+  fusion de #630 (décision de Sabine du 2026-11-18). — PR #662
+
 ## 2026-11-20
 
 ### Coût du modèle : une alerte Azure Monitor sur les jetons de sa ressource (#501)

@@ -19,6 +19,7 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
 | `exchange-storage.bicep` | compte Blob `stkbexchange…`, clé partagée coupée ; conteneurs `smoke-test`, `clippings`, `zotero`, `watch`, un rôle par identité et par conteneur ; versions, suppression réversible, effacement des copies Zotero, verrou (« Le stockage ») | 1 | #414, #420, #571 |
 | `job-files-storage.bicep` | compte Files `stkbjobfiles…`, partage `job-data` des jobs, monté par l'identité de `cae-kb` ; verrou (« Le stockage ») | 1 | #420 |
 | `budget.bicep` | budget `budget-kb` : 40 €/mois des coûts étiquetés `project=k-b`, hébergement et inférence (la ressource du modèle comptée si elle est dans ce groupe de ressources et porte l'étiquette), e-mail à 50 % et 100 % du réel, à 100 % de la prévision ; rien n'est coupé au dépassement | 1 | #437, #632 |
+| `container-apps-policies.bicep` | deux politiques intégrées d'Azure Policy assignées au groupe, d'effet `Audit` : `audit-kb-ca-external-ingress` (« Container Apps should disable external network access »), sauf `ca-kb-web`, et `audit-kb-ca-https-only` (« Container Apps should only be accessible over HTTPS ») ; elles n'arrêtent rien, et auditeraient aussi l'app d'un autre projet créée dans le groupe (« La relecture de la configuration ») | 1 | #497 |
 | `model-token-alert.bicep` | groupe d'actions `ag-kb-operator` (un e-mail, l'adresse du budget) ; règle `alert-kb-model-tokens` : plus de 400 000 jetons (`TotalTokens`) sur 24 h glissantes, sur toute la ressource du modèle, évaluée toutes les 15 minutes ; rien n'est coupé (« L'alerte sur les jetons du modèle ») | 1, si `modelAccountName` est donné | #501 |
 | `postgresql-server.bicep` | serveur PostgreSQL 18 flexible `pgsql-kb-…` (`Standard_B1ms`), Entra seul, 32 Gio, sauvegardes 7 jours, règle de pare-feu « services Azure » (« La base PostgreSQL ») | 1 | #421 |
 | `key-vault-secret-access.bicep` | Key Vault Secrets User pour chaque identité, sur chacun de ses secrets seulement | 2 | #414 |
@@ -39,8 +40,9 @@ deux passes, l'image est poussée dans le registre et les secrets sont posés da
   - `ag` pour le groupe d'actions (#501).
 
   Le budget n'est pas dans cette liste, ni la règle d'alerte : `budget-kb` et `alert-kb-model-tokens` suivent le même
-  modèle. Après le préfixe viennent `kb`, puis le
-  rôle de la pièce (`ca-kb-data-api`).
+  modèle. Après le préfixe viennent `kb`, puis le rôle de la pièce (`ca-kb-data-api`). Une assignation de politique
+  n'a pas d'abréviation (le CAF ne donne qu'un nom « descriptif » pour une définition, lu le 2026-11-18) :
+  `audit-kb-ca-…`, l'effet, `kb`, puis ce qui est audité.
 - **Suffixe** : `take(uniqueString(resourceGroup().id), 8)` (`main.bicep`), pour les seuls noms qu'Azure veut uniques
   dans tout Azure, parce que la ressource a une adresse publique : le registre, le coffre et le stockage.
   - La graine est l'identifiant complet du groupe de ressources : le même groupe donne toujours le même suffixe. Il
@@ -125,13 +127,15 @@ dans l'historique des déploiements du groupe, côté Azure, et dans la sortie d
 Le rôle de Lecteur de l'abonnement suffit pour cette lecture :
 
 ```sh
-for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL; do
+for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft.OperationalInsights Microsoft.Insights Microsoft.ManagedIdentity Microsoft.Storage Microsoft.DBforPostgreSQL Microsoft.PolicyInsights; do
   printf '%s ' "$ns"; az provider show -n "$ns" --query registrationState -o tsv
 done
 ```
 
-Les huit doivent répondre `Registered`. Si l'un d'eux manque, seul un propriétaire de l'abonnement peut
-l'enregistrer.
+Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un Contributor ou un Owner de l'abonnement peut
+l'enregistrer (Learn, « Quickstart: Create a policy assignment to identify non-compliant resources by using a Bicep
+file », lu le 2026-11-18). `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
+« `Microsoft.PolicyInsights` must be registered in your Azure subscription ».
 
 ### 2. Première passe : le socle
 
@@ -158,6 +162,7 @@ L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà
   - `stkbexchange…`, son service Blob, ses 4 conteneurs, leurs 8 rôles, la règle de cycle de vie et le verrou ;
     `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle SMB MI Admin, le stockage `job-data`
     de `cae-kb` et le verrou (« Le stockage ») ;
+  - les deux politiques d'audit, `audit-kb-ca-external-ingress` et `audit-kb-ca-https-only` (#497) ;
 - **à modifier** : `cae-kb` (les journaux, le chiffrement entre les apps et l'identité système), et `budget-kb`.
   - Pour `budget-kb`, c'est du bruit : `endDate` disparaît, et le format de `startDate` change. Sans date de fin,
     Azure en remet une à 10 ans.
@@ -335,6 +340,57 @@ done
 Attendu : `external: false` pour les deux API, `true` pour `ca-kb-web` une fois ouvert, et `Healthy`. Pour
 `ca-kb-web`, `Healthy` ne prouve pas que le site répond (« Le site privé », « Les constats »). Pour l'API de données, une révision saine montre aussi que ses sondes
 portent le bon `Host` : sans lui, elle répond 400 à `/health`.
+
+**La relecture de la configuration, à chaque version déployée** (#497) : les requêtes de la relecture du
+2026-11-08 (`docs/fiches-veille.md`, API8, « TLS, même pour une API interne »), plus le mode des révisions
+(`docs/fiches-veille.md`, API9), en lecture seule.
+
+```sh
+DOMAIN=$(az containerapp env show -n cae-kb -g "$RG" --query properties.defaultDomain -o tsv)
+for app in ca-kb-data-api ca-kb-ai-api; do
+  az containerapp show -n "$app" -g "$RG" \
+    --query "properties.configuration.ingress.{external:external, allowInsecure:allowInsecure, transport:transport, customDomains:customDomains}"
+  az containerapp show -n "$app" -g "$RG" \
+    --query "properties.template.containers[0].env[?name=='KB_DATA_API_URL' || name=='KB_DATA_API_ALLOWED_HOSTS'].{name:name, value:value}"
+  az containerapp show -n "$app" -g "$RG" --query properties.configuration.activeRevisionsMode -o tsv
+done
+az containerapp env show -n cae-kb -g "$RG" \
+  --query "{encryption: properties.peerTrafficConfiguration.encryption.enabled, mtls: properties.peerAuthentication.mtls.enabled}"
+az containerapp env http-route-config list -n cae-kb -g "$RG"
+echo "$DOMAIN"
+```
+
+Attendu, comme le 2026-11-08 : pour les deux API, `external` false, `allowInsecure` false, `transport` `Http` et
+`customDomains` null ; sur `ca-kb-ai-api`, `KB_DATA_API_URL` = `https://ca-kb-data-api.internal.$DOMAIN` ; sur
+`ca-kb-data-api`, `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.$DOMAIN` ; `encryption` true, `mtls`
+false ; aucune route (`[]`). Et pour les deux API, `Single` : une seule révision active
+(`api-container-app.bicep:117`).
+
+**Les politiques d'audit** (`container-apps-policies.bicep`), après une passe qui les crée ou les change :
+
+```sh
+az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].{name:name, notScopes:notScopes}" -o json
+# Cinq minutes au moins après la passe, le temps qu'une assignation nouvelle s'applique ; puis l'évaluation à la
+# demande, attendue jusqu'à sa fin ; sans elle, Azure réévalue une fois toutes les 24 h. Une action, pas une
+# lecture : Sabine la lance ; Owner du groupe suffit.
+az policy state trigger-scan -g "$RG"
+# Par le nom des assignations seulement : les deux ne visent que les apps (Microsoft.App/containerApps).
+az policy state list -g "$RG" \
+  --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, state:complianceState}" -o table
+# En complément, des comptes seulement : les deux assignations de K-B.
+az policy state summarize -g "$RG" \
+  --query "policyAssignments[?contains(policyAssignmentId, 'audit-kb-')].{id:policyAssignmentId, results:results}"
+```
+
+Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
+`ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
+référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
+`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`) ; au `summarize`,
+`nonCompliantResources` 0 pour chacune des deux. Une
+app d'un autre projet du groupe y figurerait aussi ; le 2026-11-21, il n'y en a aucune (`audit-kb-ca-https-only` compte
+3 apps, celles de K-B). Une assignation nouvelle s'applique en cinq minutes environ ;
+la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
+triggers », lue le 2026-11-18).
 
 Le job d'essai (critère de #414) :
 
@@ -654,7 +710,7 @@ Dans l'ordre, sur le squelette déjà en ligne (#414). Les aperçus attendus, d�
 l'application du 06/11, avec le bruit des étapes 2 et 5 (valeurs par défaut qu'Azure renvoie, sondes permutées,
 `reference(…)` non résolus).
 
-1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les huit fournisseurs).
+1. Les étapes 0 et 1 d'« Appliquer » (`OPERATOR_UPN`, les fournisseurs).
 2. La première passe (étape 2). Aperçu attendu :
    - **à créer** : `pgsql-kb-<suffixe>`, son administratrice Entra, ses deux paramètres (`azure.extensions`,
      `log_error_verbosity`), sa règle de pare-feu `AllowAllAzureServicesAndResourcesWithinAzureIps`, l'identité
@@ -1710,3 +1766,54 @@ Sources (lues le 2026-11-11) :
   - [consentement de l'utilisateur](https://learn.microsoft.com/en-gb/entra/identity/enterprise-apps/configure-user-consent) ;
 - [sondes de Kubernetes](https://kubernetes.io/docs/concepts/workloads/pods/probes/) ;
 - [Azure Retail Prices](https://prices.azure.com/api/retail/prices), France Central, en USD et en EUR.
+
+## La relecture de la configuration (#497)
+
+La configuration en ligne des apps se relit de deux façons (API8 de l'auto-évaluation OWASP, « Revue périodique des
+configurations ») : les requêtes de « La relecture de la configuration » (étape 6), relancées par Sabine à chaque
+version déployée ; et deux politiques intégrées d'Azure Policy, d'effet `Audit`, assignées au groupe
+(`container-apps-policies.bicep`), qu'Azure réévalue une fois toutes les 24 h. Ce sont des définitions intégrées : une
+définition personnalisée se crée dans un groupe d'administration ou un abonnement (« The definition location must be a
+management group or a subscription. », page « Azure Policy definition structure basics », lue le 2026-11-18), où
+Sabine n'est que lectrice ; l'assignation se crée au niveau du groupe, dont elle est propriétaire. Azure Policy est gratuit pour les ressources Azure (« There are no charges for using Azure Policy on
+Azure resources. », page des prix d'Azure Policy, relue le 2026-11-21).
+
+### Appliquer #497 en ligne
+
+Après la fusion de #630 (décision de Sabine du 2026-11-18 : aucune passe avant). Le module ne dépend pas de l'image :
+la première passe l'applique, la seconde aussi.
+
+1. Le critère rouge, avant la passe, par le nom des assignations (le nom affiché est celui de la définition, qu'un
+   autre projet du groupe peut avoir assignée) :
+   `az policy assignment list -g "$RG" --query "[?starts_with(name, 'audit-kb-')].name" -o tsv` ne rend rien. Et
+   `az provider show -n Microsoft.PolicyInsights --query registrationState -o tsv` rend `Registered` : sinon, son
+   enregistrement, un geste d'un Contributor ou d'un Owner de l'abonnement, vient avant la passe.
+2. La première passe (étape 2). Aperçu attendu, déduit du Bicep : **à créer** `audit-kb-ca-external-ingress` et
+   `audit-kb-ca-https-only` ; **à modifier** le bruit de l'étape 2.
+3. Les constats : « La relecture de la configuration » et « Les politiques d'audit » (étape 6).
+
+Constaté le 2026-11-20, à la séance commune avec #501 : avant la passe, `az policy assignment list` ne rend rien et
+`Microsoft.PolicyInsights` est `Registered` ; à l'aperçu, 2 ressources à créer, les deux assignations ; 31 à modifier
+et 1 non analysable, les mêmes qu'à la passe de #501 (« L'alerte sur les jetons du modèle (#501) », « La poser ») ;
+aucune suppression. La création a rendu `Succeeded` (fin à 23:38:26 UTC) ; l'évaluation à la demande a fini à
+23:57 UTC. Le 2026-11-21 à 00:09 UTC, les lectures des politiques à l'étape 6 rendent l'attendu : les deux
+assignations, `ca-kb-web` dans les `notScopes` d'`audit-kb-ca-external-ingress` ; `ca-kb-data-api` et `ca-kb-ai-api`
+`Compliant` aux deux, `ca-kb-web` `Compliant` à `audit-kb-ca-https-only` ; à 00:15 UTC, au `summarize`, aucune
+ressource non conforme aux deux assignations. La relecture de la configuration, à 00:09 UTC, rend les valeurs du
+2026-11-08. Vers 00:58 UTC, `activeRevisionsMode` rend `Single` pour les deux API.
+
+### Limites
+
+- **L'audit ne refuse rien** : une app déployée avec une entrée externe ou en HTTP est signalée, pas bloquée.
+  Pour réduire le risque : l'effet `Deny` (paramètre `effect` des deux définitions) refuserait son déploiement, en
+  403 avant le fournisseur de ressources (page de l'effet `deny`, lue le 2026-11-18) ; faisable avec nos droits, propriétaire du groupe, mais non retenu : il refuserait aussi l'app d'un autre projet
+  créée dans le groupe.
+- **Les politiques visent tout le groupe** : assignées à `slaurentRG`, elles auditeraient aussi l'app d'un autre projet
+  qui y serait créée, et ses constats s'ajouteraient à ceux de K-B. Le 2026-11-21, `az policy state list` ne montre
+  que les trois apps de K-B.
+  Pour réduire le risque : rien à refuser avec `Audit` ; la lecture de l'étape 6 nomme chaque app par son
+  identifiant, ceux de K-B se lisent à part.
+- **Les requêtes ne tournent qu'à la main** : une version déployée sans leur relecture n'est relue que par les
+  politiques, qui ne voient ni le chiffrement entre les apps, ni les routes de l'environnement, ni les URL internes.
+  Pour réduire le risque : un outil des passes (#455) pourrait les lancer ; faisable avec nos droits, ce sont des
+  lectures.
