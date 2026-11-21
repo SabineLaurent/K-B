@@ -20,9 +20,10 @@
     — C5
 
 Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment installer la base sur le Mac et en ligne,
-ce que fait le script d'agrégation et d'import (`kb import`) pas à pas, comment il nettoie et homogénéise les
-données, la commande qui le suit (`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le
-code de `main` au commit `94e3f4e` (2026-11-11). Les chemins du code de K-B (`etl/…`, `database/…`) partent de
+ce que font la collecte qui précède l'import (`kb collect`) et le script d'agrégation et d'import (`kb import`), pas à
+pas, chacun avec son logigramme, comment l'import nettoie et homogénéise les données, la commande qui le suit
+(`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`
+(2026-11-11); la collecte et les logigrammes, d'après le commit `36c1e02` (2026-11-21). Les chemins du code de K-B (`etl/…`, `database/…`) partent de
 `src/k_b/`, les autres de la racine du dépôt. Le README garde sa section « Installer et lancer », que cette fiche
 reprend et détaille.
 
@@ -208,6 +209,66 @@ Source du tableau: `infra/README.md`, « La base PostgreSQL (#421) »; les rôle
 `infra/postgresql/grant-roles.sql:7-8` et `infra/postgresql/create-daily-routine-principal.sql:8`; leurs droits dans
 `database/grants_postgresql.sql:6-7`.
 
+## La commande qui précède l'import: `kb collect`
+
+### La lancer
+
+Sur le Mac:
+
+```sh
+KB_DATA_DIR=~/.knowledge_base uv run kb collect
+```
+
+`KB_COLLECT_ONLY` choisit les sources d'une collecte; Zotero, les clips et GH Archive ne tournent que si leur variable
+est posée (README, « Installer et lancer »). En ligne, `kb collect` est une étape de `kb daily-routine`, et `kb import`
+ne la suit pas si elle sort en 1 ou en 2 (`commands/daily_routine_command.py:52-59`).
+
+### La collecte, pas à pas
+
+Le logigramme de `kb collect` en donne la vue d'ensemble: la préparation, puis chaque source, l'une après l'autre. La
+liste numérotée et le tableau des codes de sortie de cette section en donnent le détail, case par case. Les renvois
+visent le commit `36c1e02`.
+
+![Logigramme de kb collect, la préparation puis la collecte de chaque source, décrit en texte dans la section « La collecte, pas à pas »](images/logigramme-collecte_20261121.png)
+
+[Le logigramme de `kb collect` en taille réelle (image de 2 673 × 1 075 pixels)](images/logigramme-collecte_20261121.png)
+
+1. **Le choix des sources.** `KB_COLLECT_ONLY` est lue d'abord (`commands/collect_command.py:42-46`). Une valeur ou
+    une entrée vide, un nom qui n'est pas un dossier de source, ou une source choisie sans sa variable: la commande
+    sort en 2, et rien n'est collecté (`etl/collected_sources.py:64-86`).
+2. **La liste des sources.** Les sources choisies, dans l'ordre de `SOURCE_KINDS`, puis Zotero, les clips et
+    GH Archive, chacun si sa variable est posée: `KB_ZOTERO_DIR`, `KB_VAULT_DIR`, `GOOGLE_APPLICATION_CREDENTIALS`
+    (`etl/collected_sources.py:110-131`). Sans `KB_GITHUB_TOKEN`, le journal de fonctionnement dit que l'API GitHub
+    accorde 60 requêtes par heure au lieu de 5 000 (`commands/collect_command.py:81-94`).
+3. **L'état.** `collection_state.json` donne la date de la dernière collecte réussie de chaque source. Absent, chaque
+    source collecte depuis le début; illisible, la commande sort en 2, et rien n'est collecté
+    (`etl/raw_store.py:188-216`, `commands/collect_command.py:54-56`).
+4. **Chaque source, l'une après l'autre** (`etl/extract.py:63-91`). Le nom de la source et l'extension de ses
+    fichiers sont contrôlés, puis la source est interrogée depuis sa date (`etl/extract.py:118-123`). Sans rien de
+    nouveau, rien n'est écrit (`etl/extract.py:124-125`). Sinon, le brut est écrit sous `raw/`: un fichier nommé par
+    l'instant de la collecte, ou un dossier de ce nom avec un fichier par page (`etl/extract.py:126-142`). Chaque
+    nom de page est contrôlé avant la première écriture: un nom refusé n'écrit rien (`etl/extract.py:133-137`).
+    Aucun fichier n'est écrasé: un fichier déjà là, ou le temporaire d'une autre écriture en cours, fait échouer la
+    source (`etl/raw_store.py:182-185`, `core/atomic_write.py:83-87`).
+5. **L'échec d'une source.** Une erreur de la source ou de l'écriture est notée au journal de fonctionnement, avec
+    sa trace si elle n'est pas prévue. La source garde sa date, les pages déjà écrites restent, et les autres sources
+    continuent (`etl/extract.py:71-81`).
+6. **La date.** Une source réussie, même sans rien de nouveau, reçoit la date de cette collecte: l'instant du début
+    de la commande, le même pour toutes (`etl/extract.py:90`, `commands/collect_command.py:53`).
+7. **L'état écrit, puis le résultat.** L'état est écrit après la dernière source (`etl/extract.py:93-99`,
+    `etl/raw_store.py:219-230`). La commande affiche une ligne par source lancée, une par source sautée, et une pour
+    l'état s'il n'est pas écrit (`commands/collect_command.py:62-78`).
+
+Le tableau suivant donne les codes de sortie de `kb collect`.
+
+| Code | Sens | Où |
+|---|---|---|
+| 0 | chaque source lancée a réussi | `commands/collect_command.py:115-124`, `commands/exit_codes.py:88-93` |
+| 1 | aucune source n'a réussi; ou l'état n'est pas écrit, et la collecte suivante repart des mêmes dates. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/collect_command.py:115-124`, `cli.py:261-265` |
+| 2 | `KB_COLLECT_ONLY` refusée, ou état illisible: rien n'est collecté. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, ou le fichier du journal de fonctionnement qui ne s'ouvre pas: rien n'est lancé | `commands/collect_command.py:42-46`, `commands/collect_command.py:54-56`, `cli.py:113-117`, `cli.py:232-240` |
+| 4 | collecte partielle: une source au moins a échoué, une autre au moins a réussi; l'état est écrit | `commands/exit_codes.py:48-57`, `commands/exit_codes.py:88-93` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): la collecte s'arrête; ce qui était écrit avant reste | `cli.py:252-260`, `commands/exit_codes.py:63-85` |
+
 ## Le script d'agrégation et d'import: `kb import`
 
 ### Le lancer
@@ -243,6 +304,20 @@ Le tableau suivant dit ce que compte chaque nombre du bilan.
 
 ### L'enchaînement, pas à pas
 
+Les deux logigrammes de `kb import` en donnent la vue d'ensemble: lire et transformer, puis écrire en base, en une
+seule transaction. La liste numérotée de cette section, « Ce que l'import refuse, et ce qu'il garde » et le tableau
+des codes de sortie en donnent le détail, dont trois cas propres au texte: la page illisible, relue au prochain import
+(étape 3), les classements GitHub, jamais importés (étape 2), et la fenêtre de tendances déjà en base, écartée
+(étape 7). Les logigrammes suivent le commit `36c1e02`.
+
+![Logigramme de kb import, partie 1, lire et transformer, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-lire_20261121.png)
+
+[La partie 1 du logigramme de `kb import` en taille réelle (image de 1 873 × 843 pixels)](images/logigramme-import-lire_20261121.png)
+
+![Logigramme de kb import, partie 2, écrire en base en une seule transaction, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-ecrire_20261121.png)
+
+[La partie 2 du logigramme de `kb import` en taille réelle (image de 2 701 × 1 111 pixels)](images/logigramme-import-ecrire_20261121.png)
+
 Le schéma suivant montre les étapes de `kb import`. Le paragraphe et la liste numérotée qui le suivent le décrivent
 en texte, étape par étape.
 
@@ -277,8 +352,9 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
 
 1. **Le registre.** `read_imported_paths` vérifie que la base existe, puis lit les chemins des fichiers bruts déjà
     importés, la table `raw_data` (`etl/load.py:50-57`, `database/schema.sql:28-35`). Un fichier SQLite absent sort
-    en 2 (`database/location.py:167-171`, `commands/import_command.py:45-47`); une base PostgreSQL sans ses tables
-    répond par une erreur à la première requête, et la commande sort en 1 (`commands/import_command.py:54-56`).
+    en 2 (`database/location.py:167-171`, `commands/import_command.py:45-47`). Une base PostgreSQL répond d'elle-même
+    à la première requête: absente, injoignable ou sans ses tables, elle répond par une erreur, et la commande sort
+    en 1 (`database/location.py:167-169`, `commands/import_command.py:54-56`).
 2. **Le parcours de `raw/`.** `list_collections` parcourt `raw/automated_watch/` puis `raw/selected_library/`
     (`etl/raw_store.py:16-21`), chaque dossier de source dans l'ordre des noms (`etl/raw_reading.py:45-81`). La sorte
     d'un dossier se retrouve par son nom, égal au préfixe de la sorte ou qui commence par ce préfixe suivi de `_`
@@ -308,9 +384,12 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
     propre verrou d'écriture (`database/engine.py:43-47`). Deux imports écrivent donc l'un après l'autre. Puis la
     liste des dépôts suivis (`etl/load.py:77`), puis les fichiers dans l'ordre des collectes, items et tendances
     mêlés (`etl/load.py:99-114`, `etl/load.py:169-181`). Un fichier d'items est inscrit au registre, puis chacun de
-    ses items est écrit dans son `SAVEPOINT`, puis son catalogue marque retiré ce qu'il ne liste plus
-    (`etl/file_writing.py:46-68`, `etl/file_writing.py:94-102`). Un fichier de tendances est inscrit et écrit dans
-    un seul `SAVEPOINT` (`etl/file_writing.py:71-91`).
+    ses items est écrit dans son `SAVEPOINT`: un item déjà vu, ou pas plus récent que celui de la base, est écarté
+    et écrit au journal d'import (`database/writers/discard.py:8-10`, `etl/import_journal.py:47-78`). Puis son
+    catalogue (CISA KEV, Zotero) marque retiré ce qu'il ne liste plus, si le fichier a au moins une entrée et aucun
+    rejet (`etl/file_writing.py:46-68`, `etl/file_writing.py:94-102`, `etl/withdrawals.py:24`,
+    `etl/withdrawals.py:41`). Un fichier de tendances est inscrit et écrit dans un seul `SAVEPOINT`; une fenêtre
+    déjà en base est écartée et écrite au journal d'import (`etl/file_writing.py:71-91`).
 8. **Le journal, puis la validation.** Si le journal de cette seconde existe déjà, l'import s'arrête et sa
     transaction est annulée: tout a été lu et écrit, rien n'est gardé, code 2 (`etl/load.py:127-129`,
     `etl/load.py:163-166`, `etl/load.py:80-86`, `commands/import_command.py:48-50`). Sinon le journal est écrit,
@@ -343,9 +422,9 @@ Le tableau suivant donne les codes de sortie de `kb import`.
 | Code | Sens | Où |
 |---|---|---|
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
-| 1 | l'import a échoué: rien n'est écrit, ni dans la base ni au journal | `commands/import_command.py:54-59` |
-| 2 | réglage refusé ou base absente: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53` |
-| 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-84` |
+| 1 | l'import a échoué: rien n'est écrit, ni dans la base ni au journal; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
+| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, ou le fichier du journal de fonctionnement qui ne s'ouvre pas: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:232-240` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
 
 ## Le nettoyage et l'homogénéisation des formats
 
