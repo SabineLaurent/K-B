@@ -17,7 +17,8 @@
 
 Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
 commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
-production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour. Le monitorage du modèle tient
+production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour; l'étape
+[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d` (#620). Le monitorage du modèle tient
 dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq
 règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en
 OpenTelemetry depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de
@@ -83,9 +84,93 @@ tableau: menu du panneau, <span lang="en">**Inspect**, **Data**</span>. Un panne
 Une alerte déclenchée arrive par e-mail. L'état y est écrit (« <span lang="en">Firing</span> »), avec le nom de
 l'alerte, son environnement, sa valeur et son seuil.
 
+## Brancher l'export
+
+L'API IA envoie ses mesures et ses traces à Grafana Cloud par OTLP (le protocole d'export d'OpenTelemetry) sur HTTP
+quand ses variables d'export sont posées; sans elles, rien n'est exporté (`docs/fiches-veille.md:1882-1886`). Les
+chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2026-11-21 ([Sources](#sources)).
+
+1. **La pile**: dans le portail Grafana Cloud, <span lang="en">**Add Stack**</span>, un nom, puis une région de
+    l'Union européenne. Celle de K-B est `prod-eu-west-2`, chez AWS (<span lang="en">Amazon Web Services</span>), en
+    Allemagne, lue sur l'hôte de son adresse OTLP (`docs/registre-traitements.md:128`). Grafana ne change pas la
+    région d'une pile existante: une autre région demande une pile neuve, et l'offre gratuite n'a qu'une pile
+    ([Limites](#limites)).
+2. **L'adresse et l'identifiant**: dans le portail, la pile choisie, <span lang="en">**Configure**</span> sur la
+    tuile <span lang="en">**OpenTelemetry**</span>. Y relever l'adresse OTLP, de la forme
+    `https://otlp-gateway-<région>.grafana.net/otlp`, et l'identifiant d'instance, le nombre affiché sur la tuile. Ne
+    pas y générer de jeton: celui de l'étape 3 a ses droits choisis.
+3. **Le jeton**: dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**, **Cloud access
+    policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
+    - <span lang="en">**Display name**</span> et <span lang="en">**Name**</span>: le nom de la politique.
+    - <span lang="en">**Scopes**</span>: <span lang="en">**Write**</span> sur les seules lignes
+        <span lang="en">**Metrics**, **Logs**</span> et <span lang="en">**Traces**</span> (`metrics:write`,
+        `logs:write`, `traces:write`), puis <span lang="en">**Create**</span>.
+    - Sous la politique, <span lang="en">**Add token**</span>: un nom, une date d'expiration, puis
+        <span lang="en">**Create**</span>. Le jeton ne s'affiche qu'une fois. Il ne fait qu'écrire: K-B ne relit rien
+        de ce qu'il envoie.
+4. **L'en-tête**: `Authorization=Basic%20` suivi du base64 de `<identifiant d'instance>:<jeton>`, sans espace ni
+    chevron (`.env.example:161-163`): `%20` tient la place de l'espace. Sur le Mac, dans un terminal interactif, car
+    la saisie sans écho (`read -s`) demande un clavier. `read` attend le jeton: le coller, puis Entrée. Le jeton ne
+    passe ni par l'écran ni par l'historique du shell, et l'en-tête va dans le presse-papiers:
+
+    ```sh
+    read -rs TOKEN
+    printf 'Authorization=Basic%%20%s' "$(printf '%s:%s' '<instance>' "$TOKEN" | base64 | tr -d '\n')" | pbcopy
+    unset TOKEN
+    ```
+
+    L'en-tête porte le jeton en base64, donc lisible. Une fois l'en-tête collé à l'étape 5, vider le presse-papiers:
+    `pbcopy < /dev/null`. Si l'historique du presse-papiers de Spotlight est activé (Commande-Espace, puis
+    Commande-4), l'en-tête y reste: l'effacer là aussi, par le bouton <span lang="en">**More**</span> à droite du
+    champ de recherche, puis <span lang="en">**Clear History**</span> ([Sources](#sources)).
+
+5. **Les variables**, sur la même pile, un jeton par environnement: pour chacun, l'étape 3 (ou seulement
+    <span lang="en">**Add token**</span>) et l'étape 4. La production a sa politique, `kb-production` (#522), le bac à
+    sable la sienne, `kb-sandbox` (`docs/registre-traitements.md:131`).
+    - En local, pour le bac à sable, dans `.env.e2e_test` (modèle: `.env.e2e_test.example:25-30`):
+        `KB_OTLP_ENDPOINT` (l'adresse de base, sans `/v1/metrics`), `KB_OTLP_HEADERS` (l'en-tête) et
+        `KB_DEPLOYMENT_ENVIRONMENT=sandbox`. Un `kb serve-ai` lancé sur le Mac lit les mêmes variables dans le
+        `.env` qu'on lui passe (modèle: `.env.example:155-172`).
+    - En ligne, pour la production: l'en-tête dans le secret `kb-otlp-headers` du coffre (`infra/README.md`,
+        « 4. Poser les secrets »; `infra/main.bicep:209`), l'adresse dans le paramètre `otlpEndpoint` de la seconde
+        passe (`infra/README.md`, « 5. Seconde passe: les API, le site et les jobs »; `infra/main.bicep:28-29`,
+        `:333`). `KB_DEPLOYMENT_ENVIRONMENT` y vaut `production`, écrit dans le gabarit (`infra/main.bicep:323`).
+
+    `kb serve-ai` ne démarre pas sur un réglage refusé, et nomme sa variable
+    (`src/k_b/ai_api/connectors/metrics_export.py:99-151`, `:169-188`, `:198-213`; `src/k_b/core/outbound.py:19-39`;
+    `src/k_b/commands/serve_ai_command.py:48-59`). Les réglages refusés:
+
+    - l'adresse ou l'en-tête posé sans l'autre;
+    - une adresse qui n'est pas en `https`, qui porte un utilisateur, une requête ou un fragment, ou qui finit par
+        `/v1/metrics`, `/v1/traces` ou `/v1/logs`;
+    - un en-tête qui n'est pas fait de paires `nom=valeur`;
+    - avec l'export, `KB_DEPLOYMENT_ENVIRONMENT` absente, ou ni `sandbox` ni `production`;
+    - une variable `OTEL_*`, même sans export.
+
+6. **Vérifier**: le test de l'export envoie à la pile les mesures d'une demande sur le rejeu, depuis un terminal où le
+    `.env` n'est pas chargé:
+
+    ```sh
+    uv run --env-file .env.e2e_test pytest -m e2e -k real_export -rs
+    ```
+
+    Un jeton refusé fait échouer le test (`tests/e2e/test_real_export.py:119`). Le test vérifie que chaque envoi est
+    accepté; l'arrivée des séries se vérifie dans Explore, car le SDK d'OpenTelemetry
+    (<span lang="en">Software Development Kit</span>, la bibliothèque qui exporte) compte aussi une réponse 3xx, une
+    redirection, comme un succès (`tests/e2e/test_real_export.py:7-8`). Dans Grafana, donc,
+    <span lang="en">**Explore**</span>, la source Prometheus de la pile, la requête
+    `k_b_llm_calls_total{deployment_environment_name="sandbox"}`, <span lang="en">**Run query**</span>: la série de
+    la demande y paraît. Le test n'envoie que les mesures (`tests/e2e/test_real_export.py:96-97`): les traces se
+    vérifient après une demande à `kb serve-ai`, dans <span lang="en">**Explore**</span>, la source Tempo, par la
+    requête `{resource.service.name="k-b-ai-api"}` (`docs/fiches-veille.md:1991`). En ligne, les séries arrivent
+    avec la première demande à l'API IA: la durée de lecture des données se mesure à chaque `POST /digests` lu, que
+    le modèle soit appelé ou non (`src/k_b/ai_api/routers/digest_router.py:177-178`;
+    [Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
+
 ## Installer
 
-Sur une pile Grafana Cloud qui reçoit déjà les mesures (#162), par l'interface, sans jeton ni outil à installer.
+Sur la pile qui reçoit les mesures ([Brancher l'export](#brancher-lexport)), par l'interface, sans jeton ni outil à
+installer.
 Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
 
 1. **Le tableau**: <span lang="en">**Dashboards**, **New**, **Import**, **Upload dashboard JSON file**</span>, le
@@ -128,7 +213,12 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
     `ModelMetrics` crée, convertis comme Grafana Cloud le fait; il échoue sur un nom qui n'existe plus.
 - **Le jeton d'envoi**: un par environnement (`.env.e2e_test` pour le bac à sable; le secret `kb-otlp-headers` du
     coffre pour la production, refait par la procédure « Pour refaire un seul secret » d'`infra/README.md`). Un refus
-    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`.
+    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`. Le jeton de la
+    production, de la politique `kb-production`, vaut 90 jours depuis sa création, le 2026-11-11: jusqu'au
+    2027-02-09 (#522). Avant l'expiration d'un jeton, Grafana écrit aux administratrices de la pile de sa politique:
+    <q lang="en">Warning emails are sent to the admins of the corresponding stack</q>. Ces e-mails partent par
+    défaut; le réglage <span lang="en">**Enable token expiration emails**</span>, dans les
+    <span lang="en">**Org Settings**</span> du portail, les coupe pour toute l'organisation ([Sources](#sources)).
 
 ## Le bac à sable
 
@@ -470,3 +560,27 @@ Lues le 2026-11-08.
 - Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08; les trois noms de
     la durée d'une demande et l'environnement de la production, le 2026-11-21, sur les séries du 2026-11-19
     ([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
+
+Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport) et l'expiration d'un jeton.
+
+- Création d'une pile, <span lang="en">**Add Stack**</span>:
+    [page de Grafana Cloud sur la création d'une pile](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/account-management/cloud-stacks/create-update-stacks/).
+- Région d'une pile, que Grafana ne change pas:
+    [page de Grafana Cloud sur les régions](https://grafana.com/docs/grafana-cloud/account-management/regional-availability/);
+    `prod-eu-west-2`, chez AWS, en Allemagne:
+    [page de Grafana Cloud sur les adresses des régions](https://grafana.com/docs/grafana-cloud/security-and-account-management/region-url-formats/).
+- Tuile <span lang="en">**OpenTelemetry**</span>, <span lang="en">**Configure**</span>, et forme de l'adresse OTLP:
+    [page de Grafana Cloud sur l'envoi en OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
+- Identifiant d'instance affiché sur la tuile, sans y générer de jeton:
+    [page de Grafana Cloud sur l'observabilité des agents](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
+- <span lang="en">**Create access policy**</span>, <span lang="en">**Write**</span> par signal,
+    <span lang="en">**Add token**</span>, jeton affiché une fois:
+    [parcours de Grafana sur la politique et son jeton](https://grafana.com/docs/learning-paths/connect-agent-to-agent-observability/create-access-policy-and-token/)
+    et
+    [page de Grafana Cloud sur la création d'une politique](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/create-access-policies/).
+- Une ligne par signal dans <span lang="en">**Scopes**</span>:
+    [page de Grafana Cloud sur la politique des traces](https://grafana.com/docs/grafana-cloud/send-data/traces/set-up/add-access-policy/).
+- E-mails avant l'expiration d'un jeton, leurs destinataires et leur réglage:
+    [page de Grafana Cloud sur les politiques d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/).
+- Historique du presse-papiers de Spotlight, son ouverture et son effacement:
+    [aide d'Apple, « <span lang="en">Search your Clipboard history in Spotlight on Mac</span> »](https://support.apple.com/guide/mac-help/mchl40d5b86b/mac).
