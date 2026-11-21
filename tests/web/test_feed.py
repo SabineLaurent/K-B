@@ -152,20 +152,32 @@ def test_a_start_date_without_date_checked_is_ignored():
     assert build_query(form, NOW, page=1).since_day == date(2026, 11, 8)
 
 
+START_MISSING = "Indiquez la date de début, ou choisissez 1, 3 ou 7 jours."
+START_NOT_A_DAY = "Date de début invalide: choisissez un jour dans le champ."
+
+
 @pytest.mark.parametrize(
-    "query",
+    ("query", "message"),
     [
-        "period=date",
-        "period=date&start=",
-        "period=date&start=07/10/2026",
-        "period=date&start=2026-02-30",
-        "period=date&start=2026-1-7",
+        ("period=date", START_MISSING),
+        ("period=date&start=", START_MISSING),
+        ("period=date&start=07/10/2026", START_NOT_A_DAY),
+        (
+            "period=date&start=2026-02-30",
+            (
+                "Date de début invalide: 2026-02-30 n’existe pas. Choisissez un jour"
+                " qui existe."
+            ),
+        ),
+        ("period=date&start=2026-1-7", START_NOT_A_DAY),
+        # A year of 5 digits, which a browser lets type in an input type=date.
+        ("period=date&start=20266-01-01", START_NOT_A_DAY),
     ],
 )
-def test_date_checked_without_a_valid_day_is_refused_on_the_start_field(query):
-    [error] = read(query).errors
-
-    assert error.field == "start"
+def test_date_checked_without_a_valid_day_is_refused_on_the_start_field(query, message):
+    """Opquast 2025, rule 80: the message helps without a format, which the field shows as its
+    browser does; it names a value of the form of a day only, as the trends do (#617)."""
+    assert read(query).errors == (FieldError("start", message),)
 
 
 @pytest.mark.parametrize("period", ["2", "date ", "30", "jour"])

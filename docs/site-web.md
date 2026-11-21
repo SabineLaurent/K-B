@@ -34,7 +34,7 @@ Chaque page fait un seul `GET /items` (`web/data_api_client.py`), avec `kind` to
 | Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus (la règle de `q` de l'API) ; un caractère de contrôle (catégorie Unicode `Cc`) est refusé, et la saisie réaffichée sans lui |
 | Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq, ce que dit l'aide du groupe ; une autre valeur est refusée, sans appel à l'API |
 | Depuis | `period` : `1`, `3`, `7` ou `date` | `1` par défaut (D3, Sabine, 2026-11-11) ; N jours donne minuit UTC du jour J−N : « 1 jour » prend hier et aujourd'hui |
-| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; un jour qui existe, lu par `WrittenDay` (`items.py`), le type des routes de l'API ; réaffichée seulement si c'est un jour (pas `2026-02-30`, #596), jamais brute |
+| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; un jour qui existe, lu par `WrittenDay` (`items.py`), le type des routes de l'API ; réaffichée seulement si c'est un jour (pas `2026-02-30`, #596), jamais brute ; refusée, le message des tendances (`write_day_refusal`, #617) |
 | page | `page` | `[1-9][0-9]{0,2}`, 501 au plus (l'`offset` 10 000 de l'API) ; absente, la page 1 |
 
 La route lit `request.query_params` brut, jamais des paramètres typés par FastAPI : un `page=abc` partirait
@@ -69,7 +69,10 @@ et « Élargir à 7 jours », une nouvelle recherche, s'ouvrent en haut de la pa
 à 7 jours ».
 
 **Les erreurs** : un champ refusé par le site, ou `q` refusé par l'API (422 `invalid_parameter` sur `q`
-seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ. Tout autre
+seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ, ouvert par
+« Erreur. » : en couleurs forcées, le message prend la couleur du texte, comme le libellé au-dessus, et le mot
+dit l'erreur sans couleur (RGAA 11.10, #590). Le résumé, sous son titre « Filtre à corriger », dit chaque message
+sans ce mot. Le mot est écrit dans les gabarits, jamais dans les messages de `web/feed.py`. Tout autre
 échec de l'API (5xx, 429, 401, délai, réponse hors schéma, 422 sur un paramètre que le site construit) rend
 la page 500, et le journal écrit `data_api_failed: <état> http_status=<n|-> request_id=<id>`, jamais `q`.
 
@@ -161,9 +164,12 @@ du 09/11 : `Maquette-tendances`. `web/trends.py` lit le jour et bâtit la page, 
 absent, la fenêtre la plus récente ; répété, sa dernière valeur. Le champ montre le dernier jour de la fenêtre
 affichée, ou le jour demandé d'une fenêtre absente ; jamais une valeur refusée (la valeur d'un `type=date` est un
 jour valide ou rien : WHATWG, RGAA 8.2). Le message nomme donc une valeur refusée qui a la forme d'un jour, chiffres
-ASCII et tirets seuls (`DAY_SHAPE`, « Date invalide: 2026-02-30 n’existe pas. ») ; toute autre valeur n'atteint
-jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Limite (Opquast 81) : la valeur refusée ne revient
-pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
+ASCII et tirets seuls (`DAY_FORM` d'`items.py`, « Date invalide: 2026-02-30 n’existe pas. Choisissez un jour qui
+existe. ») ; toute autre valeur n'atteint jamais la page, qu'un lien ferait sinon dire n'importe quel texte
+(« Date invalide: choisissez un jour dans le champ. »). Aucun message ne donne de format : le champ montre le jour
+à la façon du navigateur (`10/10/2026` dans Chrome en français), que le site ne connaît pas (Opquast 80, #617). La
+date de début du fil a les mêmes messages, par la même fonction (`write_day_refusal`, `web/feed.py`). Limite
+(Opquast 81) : la valeur refusée ne revient pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
 
 **Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
 le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
@@ -342,13 +348,14 @@ qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 - aucune espace avant « : » ni « ; » dans le texte (règle de Sabine).
 
 Sur le fil (normal, page 2, vide et refusé), il vérifie aussi : un `label` pour chaque champ, un `fieldset` et
-sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément de la page, le message et
-`aria-invalid` d'un champ refusé, le résumé qui mène à chaque champ, les cartes en liste et leurs titres en
+sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément de la page, le message d'un
+champ refusé, ouvert par « Erreur. », et son `aria-invalid`, le résumé qui mène à chaque champ et dit chaque
+message sans ce mot, les cartes en liste et leurs titres en
 `h2`, les titres en anglais marqués (`lang="en"`), la date de chaque carte en `<time>`, la pastille écrite en
 mots, et la pagination nommée.
 
 Sur les tendances (une fenêtre, un jour refusé, une fenêtre absente, la base vide), il vérifie : le `label` et
-l'aide du champ, le message et `aria-invalid` d'un jour refusé, la légende du tableau, un `th scope="col"`
+l'aide du champ, le message d'un jour refusé, ouvert par « Erreur. », et son `aria-invalid`, la légende du tableau, un `th scope="col"`
 par colonne et un `th scope="row"` par ligne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
 l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une région nommée par sa légende. Sur
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.

@@ -17,7 +17,7 @@ from k_b.core.config import (
     DATA_API_MAX_SEARCH_LENGTH,
     FEED_PAGE_SIZE,
 )
-from k_b.items import NonEmptyText, WrittenDay
+from k_b.items import DAY_FORM, NonEmptyText, WrittenDay
 from k_b.web.data_api_client import (
     FEED_KINDS,
     DataApiError,
@@ -90,7 +90,8 @@ SEARCH_REFUSED_BY_API = "La base de K-B refuse cette recherche: modifiez-la."
 KIND_REFUSED = "Sorte inconnue: cochez une ou plusieurs des cinq sortes."
 PERIOD_REFUSED = "Période inconnue: choisissez 1, 3 ou 7 jours, ou une date."
 START_MISSING = "Indiquez la date de début, ou choisissez 1, 3 ou 7 jours."
-START_REFUSED = "Date de début invalide: un jour attendu, sous la forme AAAA-MM-JJ."
+# The start field, as a message of a day refused names it.
+START_IN_MESSAGES = "Date de début"
 SEARCH_CONTROL_REFUSED = "La recherche contient un caractère de contrôle refusé."
 
 
@@ -254,7 +255,7 @@ def find_start_error(start: str) -> FieldError | None:
     if not start:
         return FieldError(START_ID, START_MISSING)
     if read_written_day(start) is None:
-        return FieldError(START_ID, START_REFUSED)
+        return FieldError(START_ID, write_day_refusal(START_IN_MESSAGES, start))
     return None
 
 
@@ -265,6 +266,20 @@ def read_written_day(value: str) -> date | None:
         return WRITTEN_DAY.validate_python(value)
     except ValidationError:
         return None
+
+
+def write_day_refusal(field_in_messages: str, value: str) -> str:
+    """The message of a day refused, which names a value of the form of a day only, ASCII digits
+    and dashes: an input type=date cannot show it again (Opquast 2025, rule 81), and no other text
+    received reaches the page."""
+    # No format: the field shows the day as its browser does (Opquast 2025, rule 80). Of the form
+    # of a day and refused by WrittenDay, the value is a day that does not exist.
+    if DAY_FORM.fullmatch(value):
+        return (
+            f"{field_in_messages} invalide: {value} n’existe pas."
+            " Choisissez un jour qui existe."
+        )
+    return f"{field_in_messages} invalide: choisissez un jour dans le champ."
 
 
 def is_control_character(character: str) -> bool:
