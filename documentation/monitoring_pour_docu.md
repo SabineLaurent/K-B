@@ -191,9 +191,9 @@ son e-mail est arrivé.
 
 Le 2026-11-19, un jeudi, le tableau a été exporté en PDF, sur la fenêtre de 05:18:26 à 17:18:26 UTC. L'export ne
 montre pas l'environnement choisi dans la liste **Environnement**: la lecture d'Explore du 2026-11-21, sur la même
-journée, le dit. Ce jour-là, `k_b_llm_calls_total` n'a que des séries de la production, toutes à 10:00 UTC, l'heure du job des fiches de
-veille, `caj-kb-digest-watch`. Le tableau suivant donne, pour chaque alerte, son seuil, la valeur de l'export et son
-état.
+journée, le dit. Ce jour-là, `k_b_llm_calls_total` n'a que des séries de la production, toutes à 10:00 UTC, l'heure
+du job des fiches de veille, `caj-kb-digest-watch`. Le tableau suivant donne, pour chaque alerte, son seuil, la
+valeur de l'export et son état.
 
 | Alerte | Seuil | Valeur dans l'export | État |
 |---|---|---|---|
@@ -467,4 +467,6 @@ Lues le 2026-11-08.
     `docs/sources/shared/alerts/modify-error-state.md` du dépôt grafana/grafana, version v13.3.0.
 - Repères des règles de champ d'un tableau (`byFrameRefID`):
     `packages/grafana-data/src/transformations/matchers/ids.ts` du dépôt grafana/grafana, version v13.3.0.
-- Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08.
+- Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08; les trois noms de
+    la durée d'une demande et l'environnement de la production, le 2026-11-21, sur les séries du 2026-11-19
+    ([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
