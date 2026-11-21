@@ -1768,8 +1768,8 @@ version déployée ; et deux politiques intégrées d'Azure Policy, d'effet `Aud
 (`container-apps-policies.bicep`), qu'Azure réévalue une fois toutes les 24 h. Ce sont des définitions intégrées : une
 définition personnalisée se crée dans un groupe d'administration ou un abonnement (« The definition location must be a
 management group or a subscription. », page « Azure Policy definition structure basics », lue le 2026-11-18), où
-Sabine n'est que lectrice ; l'assignation se crée au niveau du groupe, dont elle est propriétaire. Azure Policy est gratuit pour les ressources Azure (page des prix d'Azure Policy,
-lue le 2026-11-13).
+Sabine n'est que lectrice ; l'assignation se crée au niveau du groupe, dont elle est propriétaire. Azure Policy est gratuit pour les ressources Azure (« There are no charges for using Azure Policy on
+Azure resources. », page des prix d'Azure Policy, relue le 2026-11-21).
 
 ### Appliquer #497 en ligne
 
@@ -1784,6 +1784,15 @@ la première passe l'applique, la seconde aussi.
 2. La première passe (étape 2). Aperçu attendu, déduit du Bicep : **à créer** `audit-kb-ca-external-ingress` et
    `audit-kb-ca-https-only` ; **à modifier** le bruit de l'étape 2.
 3. Les constats : « La relecture de la configuration » et « Les politiques d'audit » (étape 6).
+
+Constaté le 2026-11-20, à la séance commune avec #501 : avant la passe, `az policy assignment list` ne rend rien et
+`Microsoft.PolicyInsights` est `Registered` ; à l'aperçu, 2 ressources à créer, les deux assignations ; 31 à modifier
+et 1 non analysable, les mêmes qu'à la passe de #501 (« L'alerte sur les jetons du modèle (#501) », « La poser ») ;
+aucune suppression. La création a rendu `Succeeded` (fin à 23:38:26 UTC) ; l'évaluation à la demande a fini à
+23:57 UTC. Le 2026-11-21 à 00:09 UTC, les lectures de l'étape 6 rendent l'attendu : les deux assignations, `ca-kb-web`
+dans les `notScopes` d'`audit-kb-ca-external-ingress` ; `ca-kb-data-api` et `ca-kb-ai-api` `Compliant` aux deux,
+`ca-kb-web` `Compliant` à `audit-kb-ca-https-only` ; aucune ressource non conforme aux deux assignations
+(`az policy state summarize`) ; et, à la relecture de la configuration, les valeurs du 2026-11-08.
 
 ### Limites
 
