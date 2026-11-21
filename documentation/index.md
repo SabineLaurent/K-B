@@ -18,6 +18,7 @@ fiches de documentation, une par sujet. Chacune dit, sous son titre, la compéte
 - [Les tests](tests_pour_docu.md)
 - [L'intégration continue](integration_continue_pour_docu.md)
 - [La livraison continue](livraison_continue_pour_docu.md)
+- [La conduite du projet](conduite-du-projet.md)
 
 ## Lire une fiche
 

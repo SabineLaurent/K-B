@@ -150,10 +150,10 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les onze pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
+Les douze pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
 sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche du monitorage le
-2026-11-21, après sa mise en forme (#669). Le tableau suivant donne chaque règle de la notice, son résultat sur les
-onze pages, et comment il a été vérifié.
+2026-11-21, après sa mise en forme (#669), et la fiche de la conduite du projet le 2026-11-21, à son écriture (#512).
+Le tableau suivant donne chaque règle de la notice, son résultat sur les douze pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|

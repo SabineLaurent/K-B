@@ -23,6 +23,8 @@ nav:
           - tests_pour_docu.md
           - integration_continue_pour_docu.md
           - livraison_continue_pour_docu.md
+      - 5. Conduite du projet:
+          - conduite-du-projet.md
       # Without a number, and in the footer too, so the page keeps its table of contents (Sabine's choice, issue 654).
       - Accessibilité: accessibilite_pour_docu.md
   - Le dépôt GitHub: https://github.com/SabineLaurent/K-B
