@@ -1038,9 +1038,9 @@ production refait par #522.
 
 Le compte : 6 entrées tenues sur 10 (API1, API3, API5, API6, API7, API10). Les 4 autres sont des écarts
 voulus et justifiés : API2 (anti-force brute, TLS mutuel), API4 (redémarrages, descripteurs et
-processus), API8 (trois écarts du durcissement, chaîne Envoy → uvicorn) et API9 (documentation en
-`sandbox`, protections externes), dont chaque justification démontre que la mesure n'est pas
-nécessaire à K-B et nomme sa limite. Aucune entrée n'est non tenue.
+processus), API8 (chaîne Envoy → uvicorn) et API9 (documentation en `sandbox`, protections
+externes), dont chaque justification démontre que la mesure n'est pas nécessaire à K-B et nomme sa
+limite. Aucune entrée n'est non tenue.
 
 ### API1:2023 Broken Object Level Authorization
 

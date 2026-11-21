@@ -342,7 +342,8 @@ Attendu : `external: false` pour les deux API, `true` pour `ca-kb-web` une fois 
 portent le bon `Host` : sans lui, elle répond 400 à `/health`.
 
 **La relecture de la configuration, à chaque version déployée** (#497) : les requêtes de la relecture du
-2026-11-08 (`docs/fiches-veille.md`, API8, « TLS, même pour une API interne »), en lecture seule.
+2026-11-08 (`docs/fiches-veille.md`, API8, « TLS, même pour une API interne »), plus le mode des révisions
+(`docs/fiches-veille.md`, API9), en lecture seule.
 
 ```sh
 DOMAIN=$(az containerapp env show -n cae-kb -g "$RG" --query properties.defaultDomain -o tsv)
@@ -351,6 +352,7 @@ for app in ca-kb-data-api ca-kb-ai-api; do
     --query "properties.configuration.ingress.{external:external, allowInsecure:allowInsecure, transport:transport, customDomains:customDomains}"
   az containerapp show -n "$app" -g "$RG" \
     --query "properties.template.containers[0].env[?name=='KB_DATA_API_URL' || name=='KB_DATA_API_ALLOWED_HOSTS'].{name:name, value:value}"
+  az containerapp show -n "$app" -g "$RG" --query properties.configuration.activeRevisionsMode -o tsv
 done
 az containerapp env show -n cae-kb -g "$RG" \
   --query "{encryption: properties.peerTrafficConfiguration.encryption.enabled, mtls: properties.peerAuthentication.mtls.enabled}"
@@ -361,7 +363,8 @@ echo "$DOMAIN"
 Attendu, comme le 2026-11-08 : pour les deux API, `external` false, `allowInsecure` false, `transport` `Http` et
 `customDomains` null ; sur `ca-kb-ai-api`, `KB_DATA_API_URL` = `https://ca-kb-data-api.internal.$DOMAIN` ; sur
 `ca-kb-data-api`, `KB_DATA_API_ALLOWED_HOSTS` = `ca-kb-data-api.internal.$DOMAIN` ; `encryption` true, `mtls`
-false ; aucune route (`[]`).
+false ; aucune route (`[]`). Et pour les deux API, `Single` : une seule révision active
+(`api-container-app.bicep:117`).
 
 **Les politiques d'audit** (`container-apps-policies.bicep`), après une passe qui les crée ou les change :
 
@@ -374,12 +377,16 @@ az policy state trigger-scan -g "$RG"
 # Par le nom des assignations seulement : les deux ne visent que les apps (Microsoft.App/containerApps).
 az policy state list -g "$RG" \
   --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, state:complianceState}" -o table
+# En complément, des comptes seulement : les deux assignations de K-B.
+az policy state summarize -g "$RG" \
+  --query "policyAssignments[?contains(policyAssignmentId, 'audit-kb-')].{id:policyAssignmentId, results:results}"
 ```
 
 Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
 `ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
 référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
-`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`). Une
+`Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`) ; au `summarize`,
+`nonCompliantResources` 0 pour chacune des deux. Une
 app d'un autre projet du groupe y figurerait aussi ; le 2026-11-21, il n'y en a aucune (`audit-kb-ca-https-only` compte
 3 apps, celles de K-B). Une assignation nouvelle s'applique en cinq minutes environ ;
 la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
@@ -1789,10 +1796,11 @@ Constaté le 2026-11-20, à la séance commune avec #501 : avant la passe, `az p
 `Microsoft.PolicyInsights` est `Registered` ; à l'aperçu, 2 ressources à créer, les deux assignations ; 31 à modifier
 et 1 non analysable, les mêmes qu'à la passe de #501 (« L'alerte sur les jetons du modèle (#501) », « La poser ») ;
 aucune suppression. La création a rendu `Succeeded` (fin à 23:38:26 UTC) ; l'évaluation à la demande a fini à
-23:57 UTC. Le 2026-11-21 à 00:09 UTC, les lectures de l'étape 6 rendent l'attendu : les deux assignations, `ca-kb-web`
-dans les `notScopes` d'`audit-kb-ca-external-ingress` ; `ca-kb-data-api` et `ca-kb-ai-api` `Compliant` aux deux,
-`ca-kb-web` `Compliant` à `audit-kb-ca-https-only` ; aucune ressource non conforme aux deux assignations
-(`az policy state summarize`) ; et, à la relecture de la configuration, les valeurs du 2026-11-08.
+23:57 UTC. Le 2026-11-21 à 00:09 UTC, les lectures des politiques à l'étape 6 rendent l'attendu : les deux
+assignations, `ca-kb-web` dans les `notScopes` d'`audit-kb-ca-external-ingress` ; `ca-kb-data-api` et `ca-kb-ai-api`
+`Compliant` aux deux, `ca-kb-web` `Compliant` à `audit-kb-ca-https-only` ; à 00:15 UTC, au `summarize`, aucune
+ressource non conforme aux deux assignations. La relecture de la configuration, à 00:09 UTC, rend les valeurs du
+2026-11-08.
 
 ### Limites
 

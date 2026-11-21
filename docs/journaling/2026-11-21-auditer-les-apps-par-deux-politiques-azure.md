@@ -100,11 +100,13 @@ az policy state list -g "$RG" \
   --query "[?starts_with(policyAssignmentName, 'audit-kb-')].{app:resourceId, policy:policyAssignmentName, state:complianceState}" -o table
 ```
 
-(`infra/README.md:373-376`). Trois choix dans ces lignes. Le filtre porte sur le **nom** de l'assignation (`audit-kb-`),
-pas sur son nom affiché, qui est celui de la définition : un autre projet du groupe pourrait avoir assigné la même.
-Le champ lu est `complianceState` : `isCompliant` est déprécié. Et `trigger-scan` est une **action** (il lance une
-évaluation), pas une lecture : Sabine la lance, cinq minutes au moins après la passe, le temps qu'une assignation
-nouvelle s'applique ; sans elle, il faudrait attendre la réévaluation des 24 h.
+(`infra/README.md:376-379`). Trois choix dans ces lignes. Le filtre porte sur le **nom** de l'assignation
+(`audit-kb-`), pas sur son nom affiché, qui est celui de la définition : un autre projet du groupe pourrait avoir
+assigné la même. Le champ lu est `complianceState` : `isCompliant` est déprécié. Et `trigger-scan` est une **action**
+(il lance une évaluation), pas une lecture : Sabine la lance, cinq minutes au moins après la passe, le temps qu'une
+assignation nouvelle s'applique ; sans elle, il faudrait attendre la réévaluation des 24 h. En complément, `summarize`
+rend des comptes, filtrés sur les deux assignations de K-B (`:380-382`) : à la racine de sa sortie, pas sous
+`value[0]`, que la CLI ne rend pas.
 
 ### La relecture, ce que les politiques ne voient pas
 
@@ -114,10 +116,11 @@ az containerapp env show -n cae-kb -g "$RG" \
 az containerapp env http-route-config list -n cae-kb -g "$RG"
 ```
 
-(`infra/README.md:355-357`). Les politiques regardent l'entrée de chaque app ; elles ne voient ni le chiffrement
+(`infra/README.md:357-359`). Les politiques regardent l'entrée de chaque app ; elles ne voient ni le chiffrement
 entre les apps de l'environnement, ni ses routes, ni les URL internes que les apps se donnent
-(`KB_DATA_API_URL`, `KB_DATA_API_ALLOWED_HOSTS`, `:352-353`). Ces requêtes, avec leurs valeurs attendues (`:361-364`),
-le font à chaque version.
+(`KB_DATA_API_URL`, `KB_DATA_API_ALLOWED_HOSTS`, `:353-354`), ni le mode des révisions (`activeRevisionsMode`,
+`:355`), dont dépend la parade d'API9 : une seule révision active, `Single`. Ces requêtes, avec leurs valeurs
+attendues (`:363-367`), le font à chaque version.
 
 ## Choix faits et options écartées
 
@@ -158,7 +161,8 @@ le font à chaque version.
    est conforme (`container-apps-policies.bicep:25-28`).
 4. **Que voient les politiques que la relecture ne voit pas, et l'inverse ?** Les politiques voient chaque app du
    groupe, toutes les 24 h, sans geste. La relecture voit ce que les politiques ignorent : le chiffrement entre les
-   apps, les routes et les URL internes ; elle tourne à chaque version (`infra/README.md:344-364`).
+   apps, les routes, les URL internes et le mode des révisions ; elle tourne à chaque version
+   (`infra/README.md:344-367`).
 5. **Où est la sécurité de la PR elle-même ?** Aucune identité, aucun rôle, aucune `location` créés ; `notScopes`
    ne nomme qu'une app ; aucune requête du README n'affiche une clé (revue de sécurité du 2026-11-20, sans constat).
 
