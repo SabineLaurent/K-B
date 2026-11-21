@@ -238,23 +238,29 @@ visent le commit `36c1e02`.
     sort en 2, et rien n'est collecté (`etl/collected_sources.py:64-86`).
 2. **La liste des sources.** Les sources choisies, dans l'ordre de `SOURCE_KINDS`, puis Zotero, les clips et
     GH Archive, chacun si sa variable est posée: `KB_ZOTERO_DIR`, `KB_VAULT_DIR`, `GOOGLE_APPLICATION_CREDENTIALS`
-    (`etl/collected_sources.py:110-131`). Sans `KB_GITHUB_TOKEN`, le journal de fonctionnement dit que l'API GitHub
-    accorde 60 requêtes par heure au lieu de 5 000 (`commands/collect_command.py:81-94`).
-3. **L'état.** `collection_state.json` donne la date de la dernière collecte réussie de chaque source. Absent, chaque
-    source collecte depuis le début; illisible, la commande sort en 2, et rien n'est collecté
-    (`etl/raw_store.py:188-216`, `commands/collect_command.py:54-56`).
+    (`etl/collected_sources.py:110-131`). Sans `KB_GITHUB_TOKEN`, si les releases ou les alertes GitHub sont
+    collectées, le journal de fonctionnement dit que l'API GitHub accorde 60 requêtes par heure au lieu de 5 000
+    (`commands/collect_command.py:29-34`, `commands/collect_command.py:81-94`).
+3. **L'état.** `collection_state.json` donne la date de la dernière collecte réussie de chaque source. Absent, ou sans
+    la source, la source fait sa première collecte, d'une étendue propre à chacune: sept jours pour tldr.tech, depuis
+    le 2026-05-01 pour arXiv (`etl/extract.py:69`, `core/config.py:29`, `core/config.py:37`). Illisible, la
+    commande sort en 2, et rien n'est collecté (`etl/raw_store.py:188-216`, `commands/collect_command.py:54-56`).
 4. **Chaque source, l'une après l'autre** (`etl/extract.py:63-91`). Le nom de la source et l'extension de ses
-    fichiers sont contrôlés, puis la source est interrogée depuis sa date (`etl/extract.py:118-123`). Sans rien de
+    fichiers sont contrôlés, puis la source est interrogée, avec la date de sa dernière collecte si elle s'en sert
+    (`etl/extract.py:118-123`): Zotero et les deux classements GitHub sont lus en entier à chaque fois
+    (`etl/sources/zotero.py:205-206`, `etl/sources/github/most_starred.py:34`,
+    `etl/sources/github/most_forked.py:33`). Sans rien de
     nouveau, rien n'est écrit (`etl/extract.py:124-125`). Sinon, le brut est écrit sous `raw/`: un fichier nommé par
     l'instant de la collecte, ou un dossier de ce nom avec un fichier par page (`etl/extract.py:126-142`). Chaque
     nom de page est contrôlé avant la première écriture: un nom refusé n'écrit rien (`etl/extract.py:133-137`).
-    Aucun fichier n'est écrasé: un fichier déjà là, ou le temporaire d'une autre écriture en cours, fait échouer la
-    source (`etl/raw_store.py:182-185`, `core/atomic_write.py:83-87`).
+    Aucun fichier n'est écrasé: un fichier déjà là, ou le temporaire d'une autre écriture, en cours ou interrompue,
+    fait échouer la source (`etl/raw_store.py:182-185`, `core/atomic_write.py:20-22`, `core/atomic_write.py:50-51`,
+    `core/atomic_write.py:83-87`, `core/atomic_write.py:95-100`).
 5. **L'échec d'une source.** Une erreur de la source ou de l'écriture est notée au journal de fonctionnement, avec
     sa trace si elle n'est pas prévue. La source garde sa date, les pages déjà écrites restent, et les autres sources
     continuent (`etl/extract.py:71-81`).
 6. **La date.** Une source réussie, même sans rien de nouveau, reçoit la date de cette collecte: l'instant du début
-    de la commande, le même pour toutes (`etl/extract.py:90`, `commands/collect_command.py:53`).
+    de la collecte, le même pour toutes (`etl/extract.py:90`, `commands/collect_command.py:53`).
 7. **L'état écrit, puis le résultat.** L'état est écrit après la dernière source (`etl/extract.py:93-99`,
     `etl/raw_store.py:219-230`). La commande affiche une ligne par source lancée, une par source sautée, et une pour
     l'état s'il n'est pas écrit (`commands/collect_command.py:62-78`).
@@ -265,9 +271,9 @@ Le tableau suivant donne les codes de sortie de `kb collect`.
 |---|---|---|
 | 0 | chaque source lancée a réussi | `commands/collect_command.py:115-124`, `commands/exit_codes.py:88-93` |
 | 1 | aucune source n'a réussi; ou l'état n'est pas écrit, et la collecte suivante repart des mêmes dates. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/collect_command.py:115-124`, `cli.py:261-265` |
-| 2 | `KB_COLLECT_ONLY` refusée, ou état illisible: rien n'est collecté. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, ou le fichier du journal de fonctionnement qui ne s'ouvre pas: rien n'est lancé | `commands/collect_command.py:42-46`, `commands/collect_command.py:54-56`, `cli.py:113-117`, `cli.py:232-240` |
+| 2 | `KB_COLLECT_ONLY` refusée, ou état illisible: rien n'est collecté. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/collect_command.py:42-46`, `commands/collect_command.py:54-56`, `cli.py:113-117`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
 | 4 | collecte partielle: une source au moins a échoué, une autre au moins a réussi; l'état est écrit | `commands/exit_codes.py:48-57`, `commands/exit_codes.py:88-93` |
-| 143, 130 | SIGTERM, SIGINT (Ctrl-C): la collecte s'arrête; ce qui était écrit avant reste | `cli.py:252-260`, `commands/exit_codes.py:63-85` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): la collecte s'arrête; les fichiers bruts déjà écrits restent, mais l'état n'est pas écrit: chaque source garde sa date d'avant la commande, et la collecte suivante repart des mêmes dates | `cli.py:252-260`, `etl/extract.py:71`, `etl/extract.py:93-94`, `commands/exit_codes.py:63-85` |
 
 ## Le script d'agrégation et d'import: `kb import`
 
@@ -306,9 +312,9 @@ Le tableau suivant dit ce que compte chaque nombre du bilan.
 
 Les deux logigrammes de `kb import` en donnent la vue d'ensemble: lire et transformer, puis écrire en base, en une
 seule transaction. La liste numérotée de cette section, « Ce que l'import refuse, et ce qu'il garde » et le tableau
-des codes de sortie en donnent le détail, dont trois cas propres au texte: la page illisible, relue au prochain import
-(étape 3), les classements GitHub, jamais importés (étape 2), et la fenêtre de tendances déjà en base, écartée
-(étape 7). Les logigrammes suivent le commit `36c1e02`.
+des codes de sortie en donnent le détail, dont des cas propres au texte, par exemple la page illisible, relue au
+prochain import (étape 3), les classements GitHub, jamais importés (étape 2), et la fenêtre de tendances déjà en base,
+écartée (étape 7). Les logigrammes suivent le commit `36c1e02`.
 
 ![Logigramme de kb import, partie 1, lire et transformer, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-lire_20261121.png)
 
@@ -316,7 +322,7 @@ des codes de sortie en donnent le détail, dont trois cas propres au texte: la p
 
 ![Logigramme de kb import, partie 2, écrire en base en une seule transaction, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-ecrire_20261121.png)
 
-[La partie 2 du logigramme de `kb import` en taille réelle (image de 2 701 × 1 111 pixels)](images/logigramme-import-ecrire_20261121.png)
+[La partie 2 du logigramme de `kb import` en taille réelle (image de 2 701 × 1 119 pixels)](images/logigramme-import-ecrire_20261121.png)
 
 Le schéma suivant montre les étapes de `kb import`. Le paragraphe et la liste numérotée qui le suivent le décrivent
 en texte, étape par étape.
@@ -366,7 +372,9 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
 3. **La lecture.** Une collection est un fichier, ou un dossier de pages, nommé par sa date de collecte; un nom qui
     n'est pas une date fait rejeter la collection (`etl/raw_reading.py:92-106`). Chaque page absente du registre est
     lue entière (`etl/raw_reading.py:107-113`): le lecteur de la sorte en tire les entrées, puis convertit chaque
-    entrée en item (`etl/raw_reading.py:116-152`). Une page illisible est rejetée et pas inscrite: le prochain
+    entrée en item, ses dates mises en UTC
+    ([Les règles de nettoyage, écrites une fois dans le modèle](#les-regles-de-nettoyage-ecrites-une-fois-dans-le-modele))
+    (`etl/raw_reading.py:116-152`). Une page illisible est rejetée et pas inscrite: le prochain
     import la relit (`etl/raw_reading.py:125-132`). Une entrée que le lecteur refuse est rejetée seule, avec le motif
     qu'il écrit (`etl/raw_reading.py:134-136`); une entrée que la conversion en item refuse est rejetée seule, son
     motif sans aucune valeur (`without_values`, `etl/raw_reading.py:139-148`). Un fichier de tendances est lu
@@ -391,9 +399,11 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
     `etl/withdrawals.py:41`). Un fichier de tendances est inscrit et écrit dans un seul `SAVEPOINT`; une fenêtre
     déjà en base est écartée et écrite au journal d'import (`etl/file_writing.py:71-91`).
 8. **Le journal, puis la validation.** Si le journal de cette seconde existe déjà, l'import s'arrête et sa
-    transaction est annulée: tout a été lu et écrit, rien n'est gardé, code 2 (`etl/load.py:127-129`,
-    `etl/load.py:163-166`, `etl/load.py:80-86`, `commands/import_command.py:48-50`). Sinon le journal est écrit,
-    puis la base valide (`COMMIT`) (`etl/load.py:130-138`).
+    transaction est annulée: tout a été lu et écrit, rien n'est gardé, code 2, et `kb import` est à relancer
+    (`etl/load.py:127-129`, `etl/load.py:163-166`, `etl/load.py:80-86`, `commands/import_command.py:48-50`). Sinon le
+    journal est écrit, puis la base valide (`COMMIT`) (`etl/load.py:130-138`). Si l'écriture du journal ou la
+    validation échoue, le journal est supprimé, rien n'est gardé, et la commande sort en 1 (`etl/load.py:139-146`,
+    `commands/import_command.py:54-59`).
 9. **Le bilan**, affiché entre deux lignes vides (`commands/import_command.py:64`,
     `commands/import_command.py:68-74`).
 
@@ -423,7 +433,7 @@ Le tableau suivant donne les codes de sortie de `kb import`.
 |---|---|---|
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
 | 1 | l'import a échoué: rien n'est écrit, ni dans la base ni au journal; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
-| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, ou le fichier du journal de fonctionnement qui ne s'ouvre pas: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:232-240` |
+| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
 | 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
 
 ## Le nettoyage et l'homogénéisation des formats
