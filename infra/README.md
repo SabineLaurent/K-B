@@ -572,10 +572,13 @@ Puis un e-mail d'essai, que la commande envoie à l'adresse donnée en ligne de 
 l'essai prouve l'adresse) :
 
 ```sh
-kb_check "$RG" "$EMAIL" && az monitor action-group test-notifications create --action-group ag-kb-operator -g "$RG" \
+kb_check "$RG" "$EMAIL" && { az monitor action-group test-notifications create --action-group ag-kb-operator -g "$RG" \
   -a email operator "$EMAIL" usecommonalertschema --alert-type metricstaticthreshold \
-  --query "{state:state,actions:actionDetails[].{type:MechanismType,name:Name,status:Status}}"
+  --query "{state:state,actions:actionDetails}"; } 2>&1 \
+  | sed -E -e 's#/subscriptions/[0-9A-Fa-f-]{36}#/subscriptions/<abonnement>#g' -e 's/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+/<adresse>/g'
 ```
+
+Le `sed` masque toute adresse et l'ID d'abonnement de la sortie, rendue entière.
 
 La commande attend la fin de l'essai, qui vient plusieurs minutes après l'e-mail : l'e-mail reçu fait la preuve.
 
