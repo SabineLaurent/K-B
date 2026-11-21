@@ -59,11 +59,17 @@
     outline-offset: 2px;
   }
 
+  /* The canvas in the paper of the pages: the body, a container, no longer gives it its background. */
+  html {
+    background: var(--color-paper);
+  }
+
   body {
     min-block-size: 100dvb;
     /* The container of the queries of a strong zoom, at the end of the components: the page has no
-       other wrapper, and main cannot query itself, its margin changing. */
-    container-type: inline-size;
+       other wrapper, and main cannot query itself, its margin changing. Named: the frame of the table
+       is a container too, nearer to what it holds. */
+    container: page / inline-size;
     display: flex;
     flex-direction: column;
     background: var(--color-paper);
@@ -330,7 +336,8 @@
     align-items: center;
     /* Its label and its announcement wrap with large text on a phone (WCAG 1.4.10). */
     flex-wrap: wrap;
-    /* The space between the arrow and its text, which a flex container drops. */
+    /* The space between the label of a link to another site and its announcement, which a flex
+       container drops. */
     gap: 0.5rem;
     /* Transparent, but drawn when Windows forces its colours: the button keeps its frame. */
     border: 1px solid transparent;
@@ -351,6 +358,22 @@
 
   .button-secondary {
     border-color: var(--color-teal);
+  }
+
+  /* The arrow of a button, one item with its words so as never to go alone on its line: its margin
+     gives back, with its no-break space, the gap it had as an item of its own. */
+  :where(.button, .button-secondary) {
+    & .arrow-start {
+      margin-inline-end: 0.25rem;
+    }
+
+    & .arrow-end {
+      margin-inline-start: 0.25rem;
+    }
+
+    & .external-arrow {
+      margin-inline-start: 0.5rem;
+    }
   }
 
   /* The card of the page 500: the time and the id of the request, then the note. */
@@ -996,12 +1019,13 @@
     font-size: 0.875rem;
   }
 
-  /* A strong zoom on a narrow screen: under 18em of the font of the body, 288 px at 100 % text,
-     never reached from 320 px, and 576 px at 200 % (the em of a container query is the font size
-     of its container, CSS Conditional 5, 5.1). One column, a smaller title that still follows the
-     text, and margins that no longer double with it: no page scrolls sideways at 200 % text from
-     320 px (WCAG 1.4.4 and 1.4.10). */
-  @container (inline-size < 18em) {
+  /* A strong zoom on a narrow screen: under 15em of the font of the body, 240 px at 100 % text,
+     never reached from 320 px, and 480 px at 200 % (the em of a container query is the font size
+     of its container, CSS Conditional 5, 5.1). Without it, no page overflowed from 14.5em on
+     (measured on 2026-11-21). One column, a smaller title that still follows the text, and margins
+     that no longer double with it: no page scrolls sideways at 200 % text from 320 px (WCAG 1.4.4
+     and 1.4.10). */
+  @container page (inline-size < 15em) {
     .site-header,
     main,
     .site-footer {
@@ -1050,7 +1074,7 @@
     }
 
     /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */
-    .trends-table a > span[aria-hidden="true"],
+    .trends-table .external-arrow,
     .trends-table .link-note {
       display: none;
     }

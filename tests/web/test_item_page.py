@@ -96,7 +96,7 @@ def test_the_link_to_the_source_is_a_button_that_opens_a_new_tab_it_announces():
 
     assert (
         '<a class="button" href="https://arxiv.org/abs/2609.31282" hreflang="en"'
-        ' target="_blank" rel="noopener noreferrer">Lire sur arxiv.org' in text
+        ' target="_blank" rel="noopener noreferrer"><span>Lire sur arxiv.org' in text
     )
     assert "(en anglais, site externe, nouvel onglet)" in text
 

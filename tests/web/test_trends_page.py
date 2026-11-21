@@ -77,9 +77,9 @@ def test_each_repository_links_to_github_in_a_new_tab_it_announces():
 
     assert (
         '<a href="https://github.com/morluto/rea" hreflang="en" target="_blank"'
-        ' rel="noopener noreferrer">morluto/rea<span aria-hidden="true">&nbsp;↗</span>'
-        ' <span class="link-note">(en anglais, site externe, nouvel onglet)</span></a>'
-        in response.text
+        ' rel="noopener noreferrer"><span>morluto/rea<span class="external-arrow"'
+        ' aria-hidden="true">&nbsp;↗</span></span> <span class="link-note">(en anglais,'
+        " site externe, nouvel onglet)</span></a>" in response.text
     )
 
 

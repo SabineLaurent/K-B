@@ -324,16 +324,17 @@ ligne, et le champ de date après son libellé, sur la ligne des boutons radio. 
 libellé. Mesuré dans Chrome le 2026-11-11, il passe de 585 à 409 px de haut à 1280 px (334 px pour la
 maquette, sans les trois aides). Une page s'imprime sans en-tête, pied de page ni boutons (`@media print`).
 
-À fort zoom sur un petit écran, la mise en page s'adapte (#599) : sous 18em de la police du corps, soit 288 px à
-texte 100 %, jamais atteints dès 320 px, et 576 px à texte 200 %. Le corps est le conteneur de cette requête
-(`@container (inline-size < 18em)`) : l'`em` d'une requête de conteneur est la taille de police de son conteneur
-(CSS Conditional 5, 5.1), il suit donc le texte agrandi. Les choix du fil passent en une colonne (Sabine,
-2026-11-21), le titre des pages d'erreur prend la taille des autres titres sur un téléphone, en rem, et les
-marges ne doublent plus avec le texte : un champ de date, qui ne peut être plus étroit que son jour et son
-calendrier sans les cacher, tient dans 320 px. La flèche d'un bouton est liée à son mot par une espace
-insécable, le libellé restant un seul élément du bouton. Mesuré dans Chrome 157 le 2026-11-21, avec la police
-système de macOS : aucune page ne défile en largeur, de 320 à 1280 px, à texte 100 et 200 % (404, 500, page
-d'erreur commune, 403, fil, fil refusé, tendances, tendances refusées).
+À fort zoom sur un petit écran, la mise en page s'adapte (#599) : sous 15em de la police du corps, soit 240 px à
+texte 100 %, jamais atteints dès 320 px, et 480 px à texte 200 %. Le corps est le conteneur de cette requête,
+nommé `page` (`@container page (inline-size < 15em)`) : l'`em` d'une requête de conteneur est la taille de police
+de son conteneur (CSS Conditional 5, 5.1), il suit donc le texte agrandi. Sans elle, aucune page ne débordait à
+14,5em et au-delà (mesuré le 2026-11-21). Les choix du fil passent en une colonne (Sabine, 2026-11-21), le titre
+des pages d'erreur prend la taille des autres titres sur un téléphone, en rem, et les marges ne doublent plus
+avec le texte : un champ de date, qui ne peut être plus étroit que son jour et son calendrier sans les cacher,
+tient dans 320 px. La flèche d'un bouton (←, → et ↗) est liée à son mot par une espace insécable, dans un seul
+élément du bouton avec son libellé ; une marge lui rend l'espace qu'elle avait. Mesuré dans Chrome 157 le
+2026-11-21, avec la police système de macOS : aucune des 24 pages de `tests/web/test_accessibility.py` ne défile
+en largeur, de 320 à 1280 px, à texte de 100 à 200 %.
 
 ## Accessibilité
 
