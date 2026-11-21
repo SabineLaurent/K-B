@@ -541,9 +541,15 @@ La passe de l'étape 2, avec `modelAccountName`. Aperçu attendu :
 
 L'aperçu montre l'adresse du groupe : elle est caviardée dans toute sortie recopiée et dans toute capture.
 
-Si la création échoue sur `alert-kb-model-tokens` avec une erreur qui nomme `evaluationFrequency` ou `windowSize`,
-Azure refuse le couple `P1D` et `PT15M`, que Microsoft Learn ne décrit pas : la ligne `evaluationFrequency: 'PT15M'`
-de `infra/modules/model-token-alert.bicep` devient `evaluationFrequency: 'PT1H'`, puis la même passe se relance.
+Constaté le 2026-11-20 : 2 ressources à créer, ces deux-là ; 31 à modifier, du bruit (les `reference(…)` non résolus
+des rôles, les valeurs par défaut qu'Azure renvoie, le diagnostic de `cae-kb` et `budget-kb`) ; 1 non analysable, le
+rôle SMB de `cae-kb` sur `stkbjobfiles…`, dont l'identifiant se calcule au déploiement ; aucune suppression. La
+création a rendu `Succeeded`.
+
+Azure a accepté le couple `P1D` et `PT15M`, que Microsoft Learn ne décrit pas. Si une création échoue sur
+`alert-kb-model-tokens` avec une erreur qui nomme `evaluationFrequency` ou `windowSize`, la ligne
+`evaluationFrequency: 'PT15M'` de `infra/modules/model-token-alert.bicep` devient `evaluationFrequency: 'PT1H'`, puis
+la même passe se relance.
 
 À la création du groupe, Azure écrit à cette adresse un code à usage unique, à saisir dans les 30 minutes qui suivent
 l'enregistrement du groupe ; s'il a expiré, le portail le renvoie (« Resend »).
@@ -570,6 +576,13 @@ kb_check "$RG" "$EMAIL" && az monitor action-group test-notifications create --a
   -a email operator "$EMAIL" usecommonalertschema --alert-type metricstaticthreshold \
   --query "{state:state,actions:actionDetails[].{type:MechanismType,name:Name,status:Status}}"
 ```
+
+La commande attend la fin de l'essai, qui vient plusieurs minutes après l'e-mail : l'e-mail reçu fait la preuve.
+
+Constaté le 2026-11-20, après la passe : la règle active, `P1D`, `PT15M`, `TotalTokens` au-dessus de 400 000,
+reliée à `ag-kb-operator` ; le groupe actif, un destinataire, `operator`, vérifié par le code à usage unique, à
+l'état `Enabled` ; `k-b`. L'e-mail d'essai est arrivé, déclenché à 23:23 UTC ; la commande attendait encore la fin
+de l'essai plus de 3 minutes après lui.
 
 ### Si elle sonne
 
