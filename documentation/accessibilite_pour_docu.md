@@ -9,8 +9,8 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
-arrivent avec cette fiche.
+visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+`mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
@@ -54,14 +54,14 @@ Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-1
     AcceDe Web en version 4.1.2). Elle s'adresse aux <q>contributrices et contributeurs éditoriaux</q> d'un outil de
     publication: ici, l'outil est MkDocs, et ses règles portent sur le texte des fiches. Elle dit d'elle-même: <q>Cette
     version en ligne couvre actuellement les WCAG 2.2 et le RGAA 4.1.2</q>; sa section 9 dit que ses règles
-    supplémentaires sont <q>nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1</q>. Les fiches mises en forme
-    sont vérifiées selon elle, règle par règle
+    supplémentaires sont <q>nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1</q>. Les fiches sont
+    vérifiées selon elle, règle par règle
     ([La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web)).
 
 ## Les règles appliquées aux fiches
 
-Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue dans les fiches mises en forme
-(toutes, sauf celle du monitorage), et comment elle se vérifie. La fiche du monitorage suit (« Limites »).
+Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue dans les fiches, et comment elle se
+vérifie.
 
 | Règle | Source | Comment elle est tenue | Vérifiée par |
 |---|---|---|---|
@@ -150,10 +150,10 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les onze pages mises en forme, toutes sauf la fiche du monitorage, ont été vérifiées selon chaque règle de la notice
-d'accessibilité éditoriale d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le
-2026-11-18, la fiche des maquettes le 2026-11-19. Le tableau suivant donne chaque
-règle de la notice, son résultat, et comment il a été vérifié.
+Les douze pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
+sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
+2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669). Le tableau suivant donne chaque
+règle de la notice, son résultat sur les douze pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -162,7 +162,7 @@ règle de la notice, son résultat, et comment il a été vérifié.
 | 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
 | 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Les deux liens du logo du thème, dans l'en-tête et dans le menu, en portent un, le nom du site (« Limites »). | Le HTML construit |
 | 4.1 à 4.3. Images décoratives, informatives, images-liens | Tenue: deux images informatives, les planches de la fiche des maquettes, chacune avec son texte de remplacement; aucune image décorative ni image-lien. | Le HTML construit |
-| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les neuf schémas des fiches mises en forme (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base, un dans les maquettes): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Les neuf schémas ont été rendus le 2026-11-19 par le Mermaid du site, dans Chrome sans interface: leur `title` et leur `desc` y sont. Tenue pour les deux planches de la fiche des maquettes: chacune a un texte de remplacement court, qui nomme la section de sa description détaillée. | La relecture; le rendu des neuf schémas dans Chrome sans interface |
+| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les neuf schémas des fiches (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base, un dans les maquettes): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Les neuf schémas ont été rendus le 2026-11-19 par le Mermaid du site, dans Chrome sans interface: leur `title` et leur `desc` y sont. Tenue pour les deux planches de la fiche des maquettes: chacune a un texte de remplacement court, qui nomme la section de sa description détaillée. | La relecture; le rendu des neuf schémas dans Chrome sans interface |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
 | 6.1. Déclarer les citations en ligne et les blocs de citations | Tenue: une citation en ligne est un `q`, un bloc de citation un `blockquote` (règle « Des citations déclarées » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). Chaque paire de guillemets tapés a été triée: celles qui restent entourent un titre, un mot dont on parle ou un libellé. | Le HTML construit; la relecture |
 | 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais du texte des fiches est balisé `<span lang="en">`; le pied de page anglais du thème est retiré. | Le HTML construit |
@@ -243,9 +243,6 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
     navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
     `quotes`, valeur `auto`). Ce rendu n'a pas été vu. Le format de remise est le site.
-- **La fiche du monitorage n'est pas encore mise en forme.** Elle garde, le 2026-11-18, des listes en retrait de deux
-    ou trois espaces, trois renvois de position (deux « ci-dessus », un « plus bas »), et ses citations entre guillemets,
-    sans `q`. Elle est mise en forme après les PR de #620 et #621, qui la changent.
 - **Les schémas larges sont réduits à la largeur du texte.** Dans l'architecture, le flux en bref et le déploiement
     sur Azure sont dessinés sur 688 pixels de large, et leurs libellés ne se lisent qu'avec le zoom du navigateur
     (relevé le 2026-11-18 dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.

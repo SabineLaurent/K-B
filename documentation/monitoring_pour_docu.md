@@ -1,35 +1,47 @@
 # Monitorage du modèle et de l'application: tableau de bord, alertes, journaux
 
-« Rédaction de la documentation technique des procédures d'installation, de maintenance du monitorage du modèle. » — C11
+!!! note "Compétences de la certification"
 
-« Rédaction de la documentation utilisateur, pour l'utilisation du monitorage. » — C11
+    > Rédaction de la documentation technique des procédures d'installation, de maintenance du monitorage du modèle.
 
-« La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du monitorage de l'application. » — C20
+    — C11
 
-Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au commit `1bef80f2`
-(#623). Le monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe
-tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq règles d'alerte,
-`observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en OpenTelemetry
-depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est écrit dans
-`docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section « Journaux de
-l'application » (#165).
+    > Rédaction de la documentation utilisateur, pour l'utilisation du monitorage.
+
+    — C11
+
+    > La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du
+    > monitorage de l'application.
+
+    — C20
+
+Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
+commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
+production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour. Le monitorage du modèle tient
+dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq
+règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en
+OpenTelemetry depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de
+l'outil est écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
+[Journaux de l'application](#journaux-de-lapplication) (#165).
 
 ## Ce que le monitorage suit
 
-L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 17 instruments OpenTelemetry, dans
-`src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 22 noms de séries, relevés dans
-Explore le 2026-11-08 (`tests/test_grafana_files.py:28-51`), par exemple `k_b_llm_calls_total` (les appels), `k_b_llm_cost_total` (le coût estimé),
-`k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total` (la fidélité). Chaque série porte son
-environnement, `deployment_environment_name`: `production` pour l'API en ligne, `sandbox` pour le bac à sable. Les trois
-noms de la durée d'une demande, `k_b_request_duration_seconds_*` (#634, 2026-11-18), ne sont pas encore relevés dans
-Grafana.
+L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 17 instruments OpenTelemetry,
+dans `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 25 noms de séries, relevés
+dans Explore (`NAMES_SEEN_IN_GRAFANA`, `tests/test_grafana_files.py`), par exemple `k_b_llm_calls_total` (les
+appels), `k_b_llm_cost_total` (le coût estimé), `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total`
+(la fidélité). Chaque série porte son environnement, `deployment_environment_name`: `production` pour l'API en
+ligne, `sandbox` pour le bac à sable. 22 noms ont été relevés le 2026-11-08. Les trois noms de la durée d'une
+demande, `k_b_request_duration_seconds_bucket`, `_count` et `_sum` (#634, 2026-11-18), l'ont été le 2026-11-21, sur
+les séries de la production du 2026-11-19
+([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
 
-Cinq alertes:
+Le tableau suivant donne les cinq alertes: ce que chacune mesure, sa fenêtre, son seuil et la source de ce seuil.
 
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source du seuil |
 |---|---|---|---|---|
-| `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | grille de Sabine du 2026-10-15: « 100 % de schémas valides après une nouvelle tentative » (`docs/ADR/journal-decisions-projet.md`) |
-| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | même grille: « au moins 95 % de fidélité »; provisoire jusqu'au benchmark des modèles et à l'optimisation de la consigne (Sabine, 2026-11-08) |
+| `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | grille de Sabine du 2026-10-15: <q>100 % de schémas valides après une nouvelle tentative</q> (`docs/ADR/journal-decisions-projet.md`) |
+| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | même grille: <q>au moins 95 % de fidélité</q>; provisoire jusqu'au <span lang="en">benchmark</span> des modèles et à l'optimisation de la consigne (Sabine, 2026-11-08) |
 | `KbModelCostOverBudget` | le coût estimé des appels, aux prix de gpt-6.1-sol de `src/k_b/core/config.py` | 7 jours | au-dessus de 2 USD | seuil de Sabine du 2026-11-18 pour gpt-6.1-sol: au-dessus de son maximum normal, 1,55 USD par semaine, l'alerte signale une dépense anormale (`docs/ADR/journal-decisions-projet.md`) |
 | `KbModelCallFailures` | la part des appels en échec après leur nouvelle tentative: délai dépassé (`llm_timeout`), service indisponible (`llm_unavailable`), trop de requêtes (`llm_rate_limited`), filtre de contenu (`llm_content_filtered`), sortie coupée au plafond de jetons (`llm_truncated`) | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: un appel en échec est un sujet ou un compte rendu qui manque; `llm_truncated` ajouté par Sabine le même jour, sur la revue de code |
 | `KbRequestOverDuration` | la part des demandes de compte rendu (`POST /digests`, `POST /trend-reports`) de plus de 180 s, de l'entrée dans leur route à leur réponse, comme l'échéance de 200 s | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: 180 s, sous l'échéance de 200 s d'une demande (le 2026-11-17, `POST /digests` sur gpt-6.1-sol l'a atteinte) |
@@ -41,80 +53,88 @@ affichée saine.
 
 ## Qui lit le tableau et l'alerte
 
+Le tableau suivant donne les deux lecteurs du tableau de bord et des alertes, ce que chacun en fait, et ses outils
+d'assistance.
+
 | Lecteur | Ce qu'il en fait | Outil d'assistance |
 |---|---|---|
 | Sabine, qui exploite K-B | lit le tableau, reçoit seule les alertes par e-mail, corrige | aucun |
-| Le jury, pendant la démonstration | lit le tableau et une alerte déclenchée dans le bac à sable | non connus: l'essai d'accessibilité couvre le clavier seul, le lecteur d'écran et le zoom (`docs/accessibilité_pour_docu.md`) |
+| Le jury, pendant la démonstration | lit le tableau et une alerte déclenchée dans le bac à sable | non connus: l'essai d'accessibilité couvre le clavier seul, le lecteur d'écran et le zoom ([l'essai d'accessibilité de Grafana Cloud](https://github.com/SabineLaurent/K-B/blob/main/docs/accessibilit%C3%A9_pour_docu.md)) |
 
 ## Lire le tableau
 
-Le tableau s'appelle « K-B, modèle: qualité, coût, alertes », dans le dossier K-B de la pile. En haut, deux listes:
-**Source de données** (la source Prometheus de la pile, `grafanacloud-<pile>-prom`, choisie d'office) et
-**Environnement** (`production` par défaut, ou `sandbox`).
+Le tableau s'appelle « K-B, modèle: qualité, coût, alertes », dans le dossier K-B de la pile. Il s'ouvre sur deux
+listes: **Source de données** (la source Prometheus de la pile, `grafanacloud-<pile>-prom`, choisie d'office) et
+**Environnement** (`production` par défaut, ou `sandbox`). Le tableau a trois rangées de panneaux.
 
 - **Alertes**: pour chaque alerte, un panneau donne la valeur sur sa fenêtre et son état, écrit en toutes lettres,
-  « NORMAL » ou « ALERTE: seuil dépassé ». Dessous, une courbe montre la même valeur dans le temps, et son seuil en
-  ligne de tirets, nommé dans la légende (« Seuil: 95 % »).
-- **Appels et contenu des fiches**: un tableau des appels sur 24 h par étape et par résultat, les jetons, les items du
-  classement, et ce que les contrôles ont retiré des fiches.
-- **Durées**: la durée d'un appel au modèle (médiane et 95e centile), celle des contrôles et celle de la lecture
-  des données.
+    « NORMAL » ou « ALERTE: seuil dépassé ». Dessous, une courbe montre la même valeur dans le temps, et son seuil en ligne
+    de tirets, nommé dans la légende (« Seuil: 95 % »).
+- **Appels et contenu des fiches**: un tableau des appels sur 24 h par étape et par résultat, les jetons, les items
+    du classement, et ce que les contrôles ont retiré des fiches.
+- **Durées**: la durée d'un appel au modèle (médiane et 95e centile), celle des contrôles et celle de la lecture des
+    données.
 
 Aucune information n'y passe par la seule couleur: les valeurs sont écrites sans couleur, un état est un texte, un
-seuil est une ligne nommée (tenu par `tests/test_grafana_files.py`). Les valeurs de chaque panneau se lisent aussi
-en tableau: menu du panneau, **Inspect**, **Data**. Un panneau sans appel sur sa fenêtre affiche « Aucun appel sur
-la période », et celui des demandes de plus de 180 s, « Aucune demande sur la période ».
+seuil est une ligne nommée (tenu par `tests/test_grafana_files.py`). Les valeurs de chaque panneau se lisent aussi en
+tableau: menu du panneau, <span lang="en">**Inspect**, **Data**</span>. Un panneau sans appel sur sa fenêtre affiche
+« Aucun appel sur la période », et celui des demandes de plus de 180 s, « Aucune demande sur la période ».
 
-Une alerte déclenchée arrive par e-mail. L'état y est écrit (« Firing »), avec le nom de l'alerte, son environnement,
-sa valeur et son seuil.
+Une alerte déclenchée arrive par e-mail. L'état y est écrit (« <span lang="en">Firing</span> »), avec le nom de
+l'alerte, son environnement, sa valeur et son seuil.
 
 ## Installer
 
 Sur une pile Grafana Cloud qui reçoit déjà les mesures (#162), par l'interface, sans jeton ni outil à installer.
 Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
 
-1. **Le tableau**: **Dashboards**, **New**, **Import**, **Upload dashboard JSON file**, le fichier
-   `observability/grafana/dashboard.json`. Dossier: K-B (créé au besoin par **Dashboards**, **New**, **New folder**).
-   Garder l'identifiant `k-b-model`: il permet de réimporter par-dessus.
-2. **Les règles**: **Alerts & IRM**, **Alerting**, **Alert rules**, **More**, **Import**.
-   - **Import source**: **Prometheus YAML file**, puis **Upload file**, le fichier
-     `observability/grafana/alert-rules.yaml`.
-   - **Target data source**: la source Prometheus de la pile.
-   - **Target folder**: K-B.
-   - **Pause imported alerting rules**: désactivé, sinon aucune alerte ne part.
-   - **Recording rules, Target data source**: la même source (champ obligatoire; le fichier n'a pas de règle
-     d'enregistrement).
-   - **Import**, puis confirmer. Les règles arrivent dans le groupe `k-b-model`, évalué toutes les 5 minutes.
-3. **L'état en cas d'erreur**: l'import règle « Alert state if execution error or timeout » sur « OK », et une
-   requête en échec laisserait l'alerte au repos. Pour chacune des cinq règles: **Edit**, section **Configure no
-   data and error handling**, **Alert state if execution error or timeout** sur **Error**, puis **Save rule**. Une
-   requête en échec déclenche alors une alerte à part, `DatasourceError`. Le fichier des règles ne porte pas ce
-   réglage: il est à refaire après chaque import des règles. Une règle enregistrée repart sans instance jusqu'à son
-   évaluation suivante, au plus 5 minutes après: une alerte en cours y repasse un moment par « Normal » (vu le
-   2026-11-08).
-4. **Le point de contact**: **Alerts & IRM**, **Alerting**, **Notification configuration**, **Contact points**.
-   Modifier le point de contact de la politique par défaut: **Add contact point integration**, **Email**, l'adresse
-   d'une utilisatrice de la pile, **Test**, puis **Save contact point**. L'adresse n'est pas versionnée: c'est une
-   donnée personnelle.
+1. **Le tableau**: <span lang="en">**Dashboards**, **New**, **Import**, **Upload dashboard JSON file**</span>, le
+    fichier `observability/grafana/dashboard.json`. Dossier: K-B (créé au besoin par
+    <span lang="en">**Dashboards**, **New**, **New folder**</span>). Garder l'identifiant `k-b-model`: il permet de
+    réimporter par-dessus.
+2. **Les règles**: <span lang="en">**Alerts & IRM**, **Alerting**, **Alert rules**, **More**, **Import**</span>.
+    - <span lang="en">**Import source**</span>: <span lang="en">**Prometheus YAML file**</span>, puis
+        <span lang="en">**Upload file**</span>, le fichier `observability/grafana/alert-rules.yaml`.
+    - <span lang="en">**Target data source**</span>: la source Prometheus de la pile.
+    - <span lang="en">**Target folder**</span>: K-B.
+    - <span lang="en">**Pause imported alerting rules**</span>: désactivé, sinon aucune alerte ne part.
+    - <span lang="en">**Recording rules, Target data source**</span>: la même source (champ obligatoire; le fichier
+        n'a pas de règle d'enregistrement).
+    - <span lang="en">**Import**</span>, puis confirmer. Les règles arrivent dans le groupe `k-b-model`, évalué
+        toutes les 5 minutes.
+3. **L'état en cas d'erreur**: l'import règle « <span lang="en">Alert state if execution error or timeout</span> »
+    sur « OK », et une requête en échec laisserait l'alerte au repos. Pour chacune des cinq règles:
+    <span lang="en">**Edit**</span>, section <span lang="en">**Configure no data and error handling**</span>,
+    <span lang="en">**Alert state if execution error or timeout**</span> sur <span lang="en">**Error**</span>, puis
+    <span lang="en">**Save rule**</span>. Une requête en échec déclenche alors une alerte à part, `DatasourceError`.
+    Le fichier des règles ne porte pas ce réglage: il est à refaire après chaque import des règles. Une règle
+    enregistrée repart sans instance jusqu'à son évaluation suivante, au plus 5 minutes après: une alerte en cours y
+    repasse un moment par « <span lang="en">Normal</span> » (vu le 2026-11-08).
+4. **Le point de contact**: <span lang="en">**Alerts & IRM**, **Alerting**, **Notification configuration**,
+    **Contact points**</span>. Modifier le point de contact de la politique par défaut:
+    <span lang="en">**Add contact point integration**, **Email**</span>, l'adresse d'une utilisatrice de la pile,
+    <span lang="en">**Test**</span>, puis <span lang="en">**Save contact point**</span>. L'adresse n'est pas
+    versionnée: c'est une donnée personnelle.
 
 ## Maintenir
 
 - **Changer un seuil**: changer le nombre qui termine l'expression de la règle dans `alert-rules.yaml`, et le même
-  nombre dans le tableau (la valeur d'état `> bool …` et la ligne `vector(…)`). `uv run pytest tests/test_grafana_files.py`
-  échoue tant que les deux ne sont pas égaux. Puis réimporter les deux fichiers.
+    nombre dans le tableau (la valeur d'état `> bool …` et la ligne `vector(…)`).
+    `uv run pytest tests/test_grafana_files.py` échoue tant que les deux ne sont pas égaux. Puis réimporter les deux
+    fichiers.
 - **Une règle changée dans l'interface**: les règles importées restent modifiables dans Grafana. Un changement fait
-  là se reporte dans `alert-rules.yaml`, sinon la réinstallation suivante l'efface.
+    là se reporte dans `alert-rules.yaml`, sinon la réinstallation suivante l'efface.
 - **Renommer ou ajouter une mesure**: le test compare chaque nom du tableau et des règles aux instruments que
-  `ModelMetrics` crée, convertis comme Grafana Cloud le fait; il échoue sur un nom qui n'existe plus.
+    `ModelMetrics` crée, convertis comme Grafana Cloud le fait; il échoue sur un nom qui n'existe plus.
 - **Le jeton d'envoi**: un par environnement (`.env.e2e_test` pour le bac à sable; le secret `kb-otlp-headers` du
-  coffre pour la production, refait par la procédure « Pour refaire un seul secret » d'`infra/README.md`). Un refus
-  de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`.
+    coffre pour la production, refait par la procédure « Pour refaire un seul secret » d'`infra/README.md`). Un refus
+    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`.
 
 ## Le bac à sable
 
 Le bac à sable déclenche chaque alerte sans modèle réel ni production: il sert les deux API sur la base de test, à
 l'heure des tests, avec le rejeu du modèle, et envoie ses mesures à la même pile avec l'environnement `sandbox`
-(`tests/e2e/test_sandbox_alerts.py`). Il ne tourne pas en CI.
+(`tests/e2e/test_sandbox_alerts.py`). Il ne tourne pas dans l'intégration continue.
 
 Depuis un terminal où le `.env` n'est pas chargé, avec `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS` dans `.env.e2e_test`:
 
@@ -122,7 +142,8 @@ Depuis un terminal où le `.env` n'est pas chargé, avec `KB_OTLP_ENDPOINT` et `
 make sandbox-alerts
 ```
 
-Environ 2 min 15. Quatre scénarios, un processus de l'API IA chacun, comme après un réveil en ligne:
+Environ 2 min 15. Quatre scénarios, un processus de l'API IA chacun, comme après un réveil en ligne. Le tableau
+suivant donne ce que chacun envoie.
 
 | Scénario | Ce qu'il envoie |
 |---|---|
@@ -138,7 +159,8 @@ de 180 s.
 ## Relevé des alertes du bac à sable
 
 Bac à sable lancé par Sabine le 2026-11-08, fin vers 17:45 UTC: 4 tests réussis, chaque envoi accepté. Son scénario
-de coût envoyait alors 10 millions de jetons, soit 1,20084 USD.
+de coût envoyait alors 10 millions de jetons, soit 1,20084 USD. Le tableau suivant donne, pour chacune des trois
+alertes, son seuil, la valeur lue dans le tableau de bord, l'heure de son déclenchement et celle de son e-mail.
 
 | Alerte | Seuil | Valeur observée dans le tableau (19:03 UTC) | Déclenchée | E-mail reçu |
 |---|---|---|---|---|
@@ -147,97 +169,146 @@ de coût envoyait alors 10 millions de jetons, soit 1,20084 USD.
 | `KbModelCostOverBudget` | > 1 USD (seuil d'alors) | 1,2641 USD | oui, 19:15:20 UTC | oui, 19:27 UTC |
 
 Le coût observé dépasse les 1,20516 USD du bac à sable: le reste vient de mesures `sandbox` plus anciennes de la
-fenêtre de 7 jours (essais locaux du 2 au 6 novembre). L'e-mail de test du point de contact est arrivé à 19:25:12 UTC.
-Les trois e-mails sont arrivés 12 min 26 s après le déclenchement, une fois le point de contact enregistré, un par
-alerte. Le sujet donne l'alerte et son environnement (« [FIRING:1] KbModelCostOverBudget K-B/alert-rules.yaml
-(sandbox warning) »), le corps son résumé, sa valeur et ses étiquettes (`deployment_environment_name` vaut `sandbox`).
+fenêtre de 7 jours (essais locaux du 2 au 6 novembre). L'e-mail de test du point de contact est arrivé à 19:25:12
+UTC. Les trois e-mails sont arrivés 12 min 26 s après le déclenchement, une fois le point de contact enregistré, un
+par alerte. Le sujet donne l'alerte et son environnement
+(<q lang="en">[FIRING:1] KbModelCostOverBudget K-B/alert-rules.yaml (sandbox warning)</q>), le corps son résumé, sa
+valeur et ses étiquettes (`deployment_environment_name` vaut `sandbox`).
 
-**À réimporter**: après ce relevé, le tableau et la règle de fidélité ont changé dans le dépôt (la fidélité sans fait
-vérifié ne donne plus de donnée). La pile garde la version importée le 2026-11-08: réimporter les deux fichiers, puis
-refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
+## Réimport du 2026-11-18
+
+Après le relevé du bac à sable, le tableau et la règle de fidélité ont changé dans le dépôt (la fidélité sans fait
+vérifié ne donne plus de donnée), et deux alertes se sont ajoutées le 2026-11-18. Le même jour, vers 11:45 UTC,
+Sabine a réimporté les deux fichiers de `main` de ce jour-là, dont le dernier changement est le commit `d2332d0e`:
+ils n'ont pas changé depuis. Elle a ensuite refait l'étape 3 d'[Installer](#installer) pour les cinq règles,
+« <span lang="en">Alert state if execution error or timeout</span> » sur « <span lang="en">Error</span> ». La pile a
+alors les cinq règles dans le groupe `k-b-model`, sans doublon. Le tableau a ses panneaux
+« Appels en échec sur 24 h » et « Demandes de plus de 180 s sur 24 h », et le budget de 2 USD. Au même moment,
+`KbModelCallFailures` s'est déclenchée dans le bac à sable, à 4,878 %, sur les échecs des essais du 2026-11-17, et
+son e-mail est arrivé.
+
+## Relevé de la production du 2026-11-19
+
+Le 2026-11-19, un jeudi, le tableau a été exporté en PDF, sur la fenêtre de 05:18:26 à 17:18:26 UTC. L'export ne
+montre pas l'environnement choisi dans la liste **Environnement**: la lecture d'Explore du 2026-11-21, sur la même
+journée, le dit. Ce jour-là, `k_b_llm_calls_total` n'a que des séries de la production, toutes à 10:00 UTC, l'heure
+du job des fiches de veille, `caj-kb-digest-watch`. Le tableau suivant donne, pour chaque alerte, son seuil, la
+valeur de l'export et son état.
+
+| Alerte | Seuil | Valeur dans l'export | État |
+|---|---|---|---|
+| `KbModelInvalidOutputs` | > 0 % | 0,0 % | NORMAL |
+| `KbModelLowFidelity` | < 95 % (provisoire) | 99,4 % | NORMAL |
+| `KbModelCostOverBudget` | > 2 USD | 0,3358 USD | NORMAL |
+| `KbModelCallFailures` | > 0 % | 0,0 % | NORMAL |
+| `KbRequestOverDuration` | > 0 % | 0,0 % | NORMAL |
+
+La courbe du coût monte d'une marche vers 10:00 UTC. Le panneau des demandes de plus de 180 s affiche 0,0 %, et non
+« Aucune demande sur la période », le texte d'un panneau sans demande.
+
+Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 2026-11-19 00:00 au 2026-11-20
+00:00 UTC.
+
+- Les noms `k_b_llm_calls_total`, `k_b_request_duration_seconds_bucket`, `_count` et `_sum` ont chacun une série,
+    à 10:00 UTC, toutes du même environnement.
+- En légende <span lang="en">Verbose</span>, `k_b_llm_calls_total` a quatre séries, toutes
+    `deployment_environment_name="production"`, `gen_ai_request_model="gpt-6.1-sol"`, `job="k-b-ai-api"`,
+    `k_b_outcome="ok"` et `k_b_schema_valid="true"`. Leur étape, `k_b_stage`, vaut `classify`, `select`, `write` et
+    `write_trends`, pour 4, 1, 9 et 5 appels: les nombres du tableau « Appels sur 24 h, par étape et par résultat »
+    de l'export.
 
 ## Limites
 
 - **Le décompte par `max_over_time`**. Chaque processus de l'API IA est une série neuve, dont `increase()` ne voit
-  pas le premier incrément: dans le bac à sable, `increase` comptait 12 appels sur 21, `max_over_time` les 21. Le
-  tableau et les règles somment donc le maximum de chaque série sur la fenêtre, depuis le début de son processus. Un
-  processus encore vivant au début de la fenêtre y compte aussi ses appels d'avant; en ligne, un processus ne vit que
-  quelques minutes (l'API tombe à zéro réplique). Deux cas faussent donc le décompte: un `kb serve-ai` local laissé
-  ouvert plus longtemps que la fenêtre (une sortie invalide de la veille garde l'alerte déclenchée), et un
-  `minReplicas` de l'API IA au-dessus de 0.
+    pas le premier incrément: dans le bac à sable, `increase` comptait 12 appels sur 21, `max_over_time` les 21. Le
+    tableau et les règles somment donc le maximum de chaque série sur la fenêtre, depuis le début de son processus. Un
+    processus encore vivant au début de la fenêtre y compte aussi ses appels d'avant; en ligne, un processus ne vit
+    que quelques minutes (l'API tombe à zéro réplique). Deux cas faussent donc le décompte: un `kb serve-ai` local
+    laissé ouvert plus longtemps que la fenêtre (une sortie invalide de la veille garde l'alerte déclenchée), et un
+    `minReplicas` de l'API IA au-dessus de 0.
 - **Une série s'éteint 5 minutes après son processus**: aucun panneau ne lit une valeur instantanée.
 - **Une seule pile**: l'offre gratuite n'en a qu'une; le bac à sable est un environnement de la même pile.
 - **E-mail aux seules utilisatrices de la pile**: depuis le 2026-04-20, un compte gratuit nouveau n'envoie d'e-mail
-  qu'aux utilisatrices de son instance (incident `xg2h8ht1d44n` de status.grafana.com, clos le 2026-04-24); les
-  webhooks marchent toujours.
+    qu'aux utilisatrices de son instance (incident `xg2h8ht1d44n` de status.grafana.com, clos le 2026-04-24); les
+    <span lang="en">webhooks</span> marchent toujours.
 - **Un changement d'offre supprime les jetons sans prévenir**: le 2026-11-08, le passage de la pile de l'essai Pro à
-  l'offre gratuite a supprimé ses access policies; le bac à sable a reçu `401 Unauthorized` jusqu'au jeton neuf.
-  Le jeton de la production est à refaire de même.
+    l'offre gratuite a supprimé ses <span lang="en">access policies</span>; le bac à sable a reçu `401 Unauthorized`
+    jusqu'au jeton neuf. Le jeton de la production a été refait de même (#522, close le 2026-11-12).
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
-- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué par
-  les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits « non
-  trouvés » manquent seulement dans le texte français de la fiche (CVE non écrites, faits traduits). La fidélité
-  mesure donc surtout l'écart entre la consigne, qui demande un texte en français, et le contrôle, qui ne compte un
-  fait trouvé que s'il est, mot pour mot après normalisation (un CVE ou un GHSA sous sa forme canonique), à la fois
-  dans le texte français de son affirmation et dans l'anglais de l'item qu'il désigne. Son seuil de 95 % est provisoire.
-- **L'état en cas d'erreur n'est pas dans le fichier**: l'import des règles au format Prometheus règle « Alert state if
-  execution error or timeout » sur « OK », comme l'absence de données (vu dans la règle importée le 2026-11-08). Le
-  passer sur « Error » est l'étape 3 d'« Installer », faite à la main: une réinstallation qui l'oublie laisse une
-  requête en échec sans alerte.
+- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué
+    par les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits
+    « non trouvés » manquent seulement dans le texte français de la fiche: des CVE
+    (<span lang="en">Common Vulnerabilities and Exposures</span>, les identifiants publics des vulnérabilités) non
+    écrites, des faits traduits. La fidélité mesure donc surtout l'écart entre la consigne, qui demande un texte en
+    français, et le contrôle, qui ne compte un fait trouvé que s'il est, mot pour mot après normalisation, un CVE ou
+    un GHSA (<span lang="en">GitHub Security Advisory</span>) sous sa forme canonique, à la fois dans le texte
+    français de son affirmation et dans l'anglais de l'item qu'il désigne. Son seuil de 95 % est provisoire.
+- **L'état en cas d'erreur n'est pas dans le fichier**: l'import des règles au format Prometheus règle
+    « <span lang="en">Alert state if execution error or timeout</span> » sur « OK », comme l'absence de données (vu
+    dans la règle importée le 2026-11-08). Le passer sur « <span lang="en">Error</span> » est l'étape 3
+    d'[Installer](#installer), faite à la main: une réinstallation qui l'oublie laisse une requête en échec sans
+    alerte.
 - **Le coût est une estimation**: tout appel est compté aux prix de `src/k_b/core/config.py`, le rejeu compris.
-- **L'installation est manuelle**: deux imports et un point de contact, sans jeton. L'API de provisioning des
-  alertes de Grafana, qui l'automatiserait, est marquée « deprecated » et demanderait un secret.
+- **L'installation est manuelle**: deux imports et un point de contact, sans jeton. L'API de <span lang="en">provisioning</span> des
+    alertes de Grafana, qui l'automatiserait, est marquée « <span lang="en">deprecated</span> » et demanderait un
+    secret.
 
 ## Journaux de l'application
 
 Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`, et le commentaire
-du plafond, par #566, d'après le code de sa PR. Le tableau et les alertes ci-dessus
-suivent le modèle; l'application se suit par ses journaux: ceux de `kb`, de `kb serve-data` (l'API de données) et de
-`kb serve-ai` (l'API IA). En local, ils ne demandent rien à installer: `kb` les écrit par le module `logging` de
-Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`, qu'`infra/main.bicep` crée. Aucune alerte ne les lit
-(« Limites des journaux », plus bas).
+du plafond, par #566, d'après le code de sa demande de fusion (PR, <span lang="en">pull request</span>); mis en forme
+le 2026-11-21 (#669), et le site et le job des fiches de veille ajoutés le même jour d'après `main` au commit
+`54ba488c`. Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
+`kb`, de `kb serve-data` (l'API de données), de `kb serve-ai` (l'API IA) et de `kb serve-web` (le site). En local, ils ne demandent rien à
+installer: `kb` les écrit par le module `logging` de Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`,
+qu'`infra/main.bicep` crée. Aucune alerte ne les lit ([Limites des journaux](#limites-des-journaux)).
 
 ### Ce que l'application écrit
+
+Le tableau suivant donne six sorties de l'application: ce que chacune contient, où elle va en local et en ligne, et
+son renvoi au code ou aux règles.
 
 | Journal | Ce qu'il contient | En local | En ligne | Code |
 |---|---|---|---|---|
 | journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
 | journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
 | journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-93`, `src/k_b/ai_api/app.py:96` |
+| journal de `kb serve-web` | son démarrage, le réveil de l'API de données, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-web.log` | sortie d'erreur de `ca-kb-web`, dans `log-kb` | au commit `54ba488c`: `src/k_b/cli.py:72-76`, `src/k_b/core/config.py:172`, `src/k_b/commands/serve_web_command.py:27-33`, `:49-50`, `:64-66`, `src/k_b/web/app.py:64` |
 | ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
 | résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
 
 Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
-`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`, `src/k_b/etl/pipeline.py:35`), dit ce qu'un
-import a décidé des données (`README.md:286-292`). Les traces et les enregistrements de l'API IA partent vers Grafana
-Cloud avec ses mesures, sous le même réglage (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
+`<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`,
+`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données (`README.md:286-292`). Les traces et les
+enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le même réglage
+(`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
 
 ### Lire une ligne
 
 Une ligne s'écrit `<date> <niveau> <module>: <message>` (`src/k_b/commands/run_log.py:30`), la date en ISO 8601, en
-UTC, à la seconde, avec son `Z` (`:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent qu'à
-partir d'un niveau plus haut, car en dessous elles citent ce que `kb` ne journalise pas: `httpx2` dès WARNING (l'URL
-du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un clip); `psycopg`
-et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:31-55`, `:96-97`). uvicorn écrit par les mêmes
-sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
+UTC, à la seconde, avec son `Z` (`:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent
+qu'à partir d'un niveau supérieur, car aux niveaux inférieurs elles citent ce que `kb` ne journalise pas: `httpx2` dès
+WARNING (l'URL du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un
+clip); `psycopg` et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:31-55`, `:96-97`). uvicorn écrit
+par les mêmes sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
 `src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:113-114`).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
-statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans
-l'en-tête `X-Request-ID` de la réponse (`src/k_b/core/api_request_log.py:27-33`, `:56-81`). Jamais la clé, une
-valeur de paramètre ni un chemin brut (`:1-2`). Un champ vaut `-` quand rien n'a été vu: aucune route reconnue,
-aucun client nommé par une clé valide, aucune réponse envoyée (`:18-19`; la liste des cas: `docs/specs-api.md`,
-« Journal »). Un `/health` qui répond 200 n'est pas écrit; une sonde en échec l'est
-(`:36-38`). Une erreur de la base reprend le même identifiant (`src/k_b/data_api/errors.py:46-56`), et la ligne de
-mesure de l'API IA aussi, en JSON (`"request_id": "…"`, `src/k_b/ai_api/observability/metrics.py:65`): il relie une
-demande à ses erreurs et à ses appels au modèle, dans une même API. Chaque API tire le sien
-(`src/k_b/core/api_request_log.py:27`): une demande de `kb digest` a un identifiant dans l'API IA, et chacune des
-requêtes que l'API IA fait alors à l'API de données (une liste par sorte, un détail par item) a le sien, sans lien
-avec le premier (`src/k_b/ai_api/connectors/data_api_client.py:209-210`, `:260-290`; « Limites des journaux »).
+statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête `X-Request-ID`
+de la réponse (`src/k_b/core/api_request_log.py:27-33`, `:56-81`). Jamais la clé, une valeur de paramètre ni un
+chemin brut (`:1-2`). Un champ vaut `-` quand rien n'a été vu: aucune route reconnue, aucun client nommé par une clé
+valide, aucune réponse envoyée (`:18-19`; la liste des cas: `docs/specs-api.md`, « Journal »). Un `/health` qui
+répond 200 n'est pas écrit; une sonde en échec l'est (`:36-38`). Une erreur de la base reprend le même identifiant
+(`src/k_b/data_api/errors.py:46-56`), et la ligne de mesure de l'API IA aussi, en JSON (`"request_id": "…"`,
+`src/k_b/ai_api/observability/metrics.py:65`): il relie une demande à ses erreurs et à ses appels au modèle, dans
+une même API. Chaque API tire le sien (`src/k_b/core/api_request_log.py:27`): une demande de `kb digest` a un
+identifiant dans l'API IA, et chacune des requêtes que l'API IA fait alors à l'API de données (une liste par sorte,
+un détail par item) a le sien, sans lien avec le premier (`src/k_b/ai_api/connectors/data_api_client.py:209-210`,
+`:260-290`; [Limites des journaux](#limites-des-journaux)).
 
 Relevé sur un `KB_DATA_DIR` neuf. Les deux premières lignes viennent de `logs/kb.log`, le 2026-11-11: `kb create-db`,
-`kb import`, puis `kb purge`. Les deux suivantes viennent de `logs/kb-serve-data.log`, le 2026-11-09: `kb serve-data` et
-quatre requêtes (`/health`, puis trois `/items`, dont une sans clé); le `/health` n'a pas de ligne.
+`kb import`, puis `kb purge`. Les deux suivantes viennent de `logs/kb-serve-data.log`, le 2026-11-09: `kb serve-data`
+et quatre requêtes (`/health`, puis trois `/items`, dont une sans clé); le `/health` n'a pas de ligne.
 
 ```text
 2026-11-11T14:37:27Z INFO k_b.cli: import started
@@ -252,30 +323,30 @@ Rien à installer. Deux variables règlent les journaux. `kb` ne lit jamais un f
 de l'environnement, ou d'un fichier passé par `uv run --env-file .env kb …` (`src/k_b/commands/environment.py:21-22`).
 
 - `KB_DATA_DIR`, obligatoire et sans défaut, un dossier qui existe déjà. Absente, la commande s'arrête sur
-  `error: KB_DATA_DIR must point to the data directory` (`src/k_b/commands/environment.py:32-37`); un chemin qui n'est
-  pas un dossier, sur `error: KB_DATA_DIR is not an existing directory` (`:38-42`); les deux en code 2, sans rien
-  lancer (`src/k_b/cli.py:110-111`). Les
-  journaux vont dans son dossier `logs/` (`src/k_b/core/config.py:164-171`), créé au premier lancement
-  (`src/k_b/commands/run_log.py:71-72`).
+    `error: KB_DATA_DIR must point to the data directory` (`src/k_b/commands/environment.py:32-37`); un chemin qui
+    n'est pas un dossier, sur `error: KB_DATA_DIR is not an existing directory` (`:38-42`); les deux en code 2, sans
+    rien lancer (`src/k_b/cli.py:110-111`). Les journaux vont dans son dossier `logs/`
+    (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:71-72`).
 - `KB_LOG_TO_FILE`, `true` par défaut (`src/k_b/core/config.py:223-225`), lue par
-  `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre valeur
-  arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false` (relevé le
-  2026-11-09). Son modèle commenté est dans `.env.example:59-61`.
+    `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre
+    valeur arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false`
+    (relevé le 2026-11-09). Son modèle commenté est dans `.env.example:59-61`.
 
 Une commande dont le fichier de journal ne s'ouvre pas ne se lance pas: `error: log file not opened: …`, code 2
 (`src/k_b/cli.py:213-229`). `kb openapi` et le `--dry-run` des routines n'écrivent aucun journal
-(`src/k_b/cli.py:103-116`). Chaque API a son fichier: une rotation faite par une autre commande laisserait un
-processus long écrire dans le fichier de la veille (`src/k_b/cli.py:66-67`; `docs/specs-api.md`, « Journal »).
+(`src/k_b/cli.py:103-116`). Chaque API et le site ont leur fichier: une rotation faite par une autre commande
+laisserait un processus long écrire dans le fichier de la veille (`src/k_b/cli.py:66-67`; `docs/specs-api.md`, « Journal »).
 
 **Rotation et durée.** Chaque fichier tourne à la première ligne écrite après minuit UTC: ses lignes passent dans
-`kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les deux autres), et les nouvelles vont dans un `kb.log`
+`kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les trois autres), et les nouvelles vont dans un `kb.log`
 neuf (`src/k_b/commands/run_log.py:74-81`; nom daté: `src/k_b/purge/run_records.py:20-30`). La rotation ne supprime
-rien. Le fichier courant, sans date dans son nom, n'est jamais purgé (`src/k_b/purge/run_records.py:60-65`). `kb purge`, dernière de ses purges, supprime les
-journaux et les journaux d'import dont le jour du nom a plus de 6 mois (`src/k_b/purge/run_records.py:36-50`, appelée
-par `src/k_b/purge/all_purges.py:63`; durée: `src/k_b/core/config.py:174-178`). En local, elle se lance à la main.
-En ligne, le job `caj-kb-daily-routine` la lance: `kb daily-routine` l'enchaîne après `kb import`
-(`src/k_b/commands/daily_routine_command.py:63`), et ne démarre pas sans les réglages du job, dont `AZURE_CLIENT_ID`
-(`src/k_b/commands/daily_routine_command.py:80-84`, `src/k_b/exchange/storage.py:106-110`).
+rien. Le fichier courant, sans date dans son nom, n'est jamais purgé (`src/k_b/purge/run_records.py:60-65`).
+`kb purge`, dernière de ses purges, supprime les journaux et les journaux d'import dont le jour du nom a plus de
+6 mois (`src/k_b/purge/run_records.py:36-50`, appelée par `src/k_b/purge/all_purges.py:63`; durée:
+`src/k_b/core/config.py:174-178`). En local, elle se lance à la main. En ligne, le job `caj-kb-daily-routine` la
+lance: `kb daily-routine` l'enchaîne après `kb import` (`src/k_b/commands/daily_routine_command.py:63`), et ne
+démarre pas sans les réglages du job, dont `AZURE_CLIENT_ID` (`src/k_b/commands/daily_routine_command.py:80-84`,
+`src/k_b/exchange/storage.py:106-110`).
 
 ### En local: lire
 
@@ -287,49 +358,54 @@ grep "request_id=<id>" "$KB_DATA_DIR"/logs/kb-serve-*.log    # les lignes d'une 
 
 Un avertissement nomme un état, un délai de la base dépassé par exemple (`query_timeout`,
 `src/k_b/data_api/errors.py:55`). La trace d'une erreur imprévue suit sa ligne datée, sur des lignes sans date
-(`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` trouve la
-ligne de la requête et les autres lignes de la même requête (`database_error`, `query_timeout`, `internal_error`:
-`docs/specs-api.md:140-142`; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`); une ligne de mesure porte `"request_id"`, sur la sortie
-standard.
+(`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` trouve la ligne
+de la requête et les autres lignes de la même requête (`database_error`, `query_timeout`, `internal_error`:
+`docs/specs-api.md:140-142`; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
+une ligne de mesure porte `"request_id"`, sur la sortie standard.
 
 Les lignes de mesure ne vont que sur la sortie standard de `kb serve-ai`: aucun fichier ne les garde
 (`src/k_b/ai_api/observability/metrics.py:50-51`). Les mêmes mesures partent vers Grafana Cloud quand l'export est
-réglé (sections ci-dessus).
+réglé (les sections du monitorage du modèle, de [Ce que le monitorage suit](#ce-que-le-monitorage-suit) à
+[Limites](#limites)).
 
 ### En ligne: installer et configurer
 
 Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/README.md`, « Appliquer »):
 
 - l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-23`): 30 jours de rétention, et un plafond de 0,2 Go par
-  jour (`:13-22`): atteint, la collecte s'arrête jusqu'à l'heure de remise à zéro, propre à chaque espace et non
-  réglable (Microsoft Learn, « Set daily cap on Log Analytics workspace », lu le
-  2026-11-11);
-- l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le paramètre
-  de diagnostic `logs-to-log-kb`, en deux tables: `ContainerAppConsoleLogs` (sortie standard et sortie d'erreur des
-  conteneurs) et `ContainerAppSystemLogs` (démarrage, tirage de l'image, réveil d'une app à 0 réplique)
-  (`infra/modules/container-apps-environment.bicep:25-29`, `:49-69`; `infra/README.md:322-323`);
+    jour (`:13-22`): atteint, la collecte s'arrête jusqu'à l'heure de remise à zéro, propre à chaque espace et non
+    réglable (Microsoft Learn, « <span lang="en">Set daily cap on Log Analytics workspace</span> », lu le
+    2026-11-11);
+- l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le
+    paramètre de diagnostic `logs-to-log-kb`, en deux tables: `ContainerAppConsoleLogs` (sortie standard et sortie
+    d'erreur des conteneurs) et `ContainerAppSystemLogs` (démarrage, tirage de l'image, réveil d'une app à 0
+    réplique) (`infra/modules/container-apps-environment.bicep:25-29`, `:49-69`; `infra/README.md:322-323`);
 - l'image règle `KB_LOG_TO_FILE=false` et `PYTHONUNBUFFERED=1` (`Dockerfile:42-47`): en conteneur, pas de fichier
-  de journal, la sortie d'erreur est le journal, et une ligne de la sortie standard part aussitôt. Aucune pièce
-  d'`infra/` ne change `KB_LOG_TO_FILE`. Le `KB_DATA_DIR` en ligne est un dossier de l'image, vidé à chaque
-  démarrage, sauf pour `caj-kb-daily-routine`, qui y monte le partage `job-data` (`infra/main.bicep:55-58`): ses
-  journaux d'import y restent, pas son journal de fonctionnement.
+    de journal, la sortie d'erreur est le journal, et une ligne de la sortie standard part aussitôt. Aucune pièce
+    d'`infra/` ne change `KB_LOG_TO_FILE`. Le `KB_DATA_DIR` en ligne est un dossier de l'image, vidé à chaque
+    démarrage, sauf pour `caj-kb-daily-routine` et `caj-kb-digest-watch`, qui y montent le partage `job-data`
+    (`infra/main.bicep:69-71` au commit `54ba488c`): les journaux d'import de la routine y restent, pas le journal de
+    fonctionnement d'un job.
 
-Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:203`, `:238`), et les trois jobs:
+Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:203`, `:238`), le site, `ca-kb-web`
+(au commit `54ba488c`: `infra/main.bicep:79`, `:349-354`), et les quatre jobs:
 `caj-kb-smoke-test` (`infra/modules/smoke-test-job.bicep:30`), `caj-kb-migrate-database`
-(`infra/modules/migrate-database-job.bicep:59`) et `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour à
-08:00 UTC (`infra/modules/daily-routine-job.bicep:59`, `:77-78`).
+(`infra/modules/migrate-database-job.bicep:59`), `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour
+à 08:00 UTC (`infra/modules/daily-routine-job.bicep:59`, `:77-78`), et `caj-kb-digest-watch`, qui lance
+`kb digest-watch` le lundi et le jeudi à 10:00 UTC par défaut (au commit `54ba488c`:
+`infra/modules/digest-watch-job.bicep:48`, `:58`, `:65`; `infra/main.bicep:32`, `:437`).
 
 Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
-`az monitor log-analytics query` (`az extension add --name log-analytics`; message « This command is from the
-following extension: log-analytics », relevé le 2026-11-09 avec azure-cli 2.92.0 et l'extension 1.0.0b3, encore les
-dernières le 2026-11-11). Le rôle Lecteur (`*/read`) suffit à lire `log-kb` (`docs/registre-traitements.md:199`, source
-Microsoft Learn: `:293`). `RG` se règle comme pour l'application de l'infrastructure (`infra/README.md`,
-« 0. Les variables du shell »); `az account show` doit être l'abonnement du groupe de ressources
-(`infra/README.md:415`).
+`az monitor log-analytics query` (`az extension add --name log-analytics`; message
+<q lang="en">This command is from the following extension: log-analytics</q>, relevé le 2026-11-09 avec azure-cli
+2.92.0 et l'extension 1.0.0b3, encore les dernières le 2026-11-11). Le rôle Lecteur (`*/read`) suffit à lire
+`log-kb` (`docs/registre-traitements.md:199`, source Microsoft Learn: `:293`). `RG` se règle comme pour
+l'application de l'infrastructure (`infra/README.md`, « 0. Les variables du shell »); `az account show` doit être
+l'abonnement du groupe de ressources (`infra/README.md:415`).
 
 ### En ligne: lire
 
-Ce qu'a écrit un job se lit dans `log-kb` « quelques minutes après sa fin » (`infra/README.md:310`); le délai
+Ce qu'a écrit un job se lit dans `log-kb` <q>quelques minutes après sa fin</q> (`infra/README.md:310`); le délai
 d'arrivée des lignes d'une API n'est pas relevé. Les journaux d'une API:
 
 ```sh
@@ -340,11 +416,10 @@ az monitor log-analytics query -w "$WS" -o tsv \
   --query "[].[TimeGenerated, Stream, Log]"
 ```
 
-`ca-kb-data-api` à la place pour l'API de données; `isnotempty(JobName)` pour les jobs (`infra/README.md:314-317`), `JobName == 'caj-kb-daily-routine'` pour la
-routine (`:1064-1065`);
-`ContainerAppSystemLogs` pour le démarrage et le réveil. La colonne `Stream` vaut `stdout` ou `stderr`: les lignes de
-mesure de l'API IA sont sur `stdout`. `az containerapp job logs show` ne lit qu'une exécution en cours
-(`infra/README.md:310-311`).
+`ca-kb-data-api` à la place pour l'API de données; `isnotempty(JobName)` pour les jobs (`infra/README.md:314-317`),
+`JobName == 'caj-kb-daily-routine'` pour la routine (`:1064-1065`); `ContainerAppSystemLogs` pour le démarrage et le
+réveil. La colonne `Stream` vaut `stdout` ou `stderr`: les lignes de mesure de l'API IA sont sur `stdout`.
+`az containerapp job logs show` ne lit qu'une exécution en cours (`infra/README.md:310-311`).
 
 Relevé le 2026-11-11 à 14:38 UTC, en lecture seule, sur les 30 derniers jours: `ca-kb-data-api`, 100 lignes, et
 `ca-kb-ai-api`, 130, toutes sur `stderr`; `caj-kb-daily-routine`, 310 lignes sur `stderr` et 150 sur `stdout`, la
@@ -354,44 +429,44 @@ période.
 
 ### Limites des journaux
 
-- **Aucune alerte ne lit les journaux**: ni l'échec d'un job, ni une source muette, ni des réponses 5xx, ni `/health`
-  en ligne. Elles sont portées par #282, ouverte. Un échec ne se voit qu'en lisant le journal.
+- **Aucune alerte ne lit les journaux**: ni l'échec d'un job, ni une source muette, ni des réponses 5xx, ni
+    `/health` en ligne. Elles sont portées par #282, ouverte. Un échec ne se voit qu'en lisant le journal.
 - **En local, rien ne lance `kb purge` de lui-même**: une machine qui ne lance que les API, ou `kb import` sans
-  `kb purge`, ne purge jamais `logs/`.
+    `kb purge`, ne purge jamais `logs/`.
 - **La purge des journaux passe en dernier, et la première purge qui échoue arrête les suivantes**, par choix
-  (`src/k_b/purge/all_purges.py:1-3`, `:63`): sans base, `kb purge` ne lance aucune purge (`:49`, `:69-71`), et une purge
-  qui échoue avant celle des journaux laisse `logs/` et `journals/` tels quels. Pour réduire le risque: la purge
-  suivante relance toutes les purges (`:3`); en ligne, l'échec d'une étape donne son code à la routine
-  (`src/k_b/commands/job_routine.py:2`), et l'exécution du job se lit `Failed` (`infra/README.md:1059`).
+    (`src/k_b/purge/all_purges.py:1-3`, `:63`): sans base, `kb purge` ne lance aucune purge (`:49`, `:69-71`), et une
+    purge qui échoue avant celle des journaux laisse `logs/` et `journals/` tels quels. Pour réduire le risque: la
+    purge suivante relance toutes les purges (`:3`); en ligne, l'échec d'une étape donne son code à la routine
+    (`src/k_b/commands/job_routine.py:2`), et l'exécution du job se lit `Failed` (`infra/README.md:1059`).
 - **En ligne, `log-kb` est la seule copie**: aucun fichier dans le conteneur, et la purge à 6 mois ne s'y applique
-  pas. Log Analytics efface après 30 jours; au-delà de 0,2 Go, la collecte s'arrête jusqu'à l'heure de remise
-  à zéro du plafond; les lignes envoyées entre-temps ne sont pas reçues.
+    pas. Log Analytics efface après 30 jours; au-delà de 0,2 Go, la collecte s'arrête jusqu'à l'heure de remise à
+    zéro du plafond; les lignes envoyées entre-temps ne sont pas reçues.
 - **Les lignes de mesure ne sont gardées nulle part en local**: la sortie standard de `kb serve-ai` va au terminal.
 - **Une demande ne se suit pas d'une API à l'autre**: l'API IA n'envoie pas son identifiant à l'API de données, où
-  chacune de ses requêtes (listes, détails) tire le sien (`src/k_b/core/api_request_log.py:27`). Les lignes des deux API se rapprochent par l'heure et par le nom du client que l'API de données journalise.
+    chacune de ses requêtes (listes, détails) tire le sien (`src/k_b/core/api_request_log.py:27`). Les lignes des
+    deux API se rapprochent par l'heure et par le nom du client que l'API de données journalise.
 - **Un seul `kb serve-data` et un seul `kb serve-ai` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même
-  fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
-- **L'export vers Grafana Cloud en ligne**: son jeton de production est l'objet de #522; aucune mesure de la
-  production n'est relevée ici, faute d'appel au modèle en ligne sur la période.
-- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas déclaré dans `infra/` au commit `33fa59c`;
-  son identité, `id-kb-digest-watch`, y est déjà (`infra/main.bicep:46`). Ses journaux, quand il y sera, se liront
-  comme ceux des autres jobs.
+    fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
 
 ## Sources
 
 Lues le 2026-11-08.
 
-- Grafana Cloud, conversion OTLP et promotion des attributs de ressource:
-  https://grafana.com/docs/grafana-cloud/send-data/otlp/otlp-format-considerations/ et
-  https://grafana.com/docs/grafana-cloud/send-data/otlp/promote-resource-attributes/
-- Restrictions des alertes d'un compte gratuit: https://status.grafana.com/incidents/xg2h8ht1d44n
+- Grafana Cloud, conversion OTLP (le protocole d'export d'OpenTelemetry) et promotion des attributs de ressource:
+    [page de Grafana Cloud sur le format OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/otlp-format-considerations/)
+    et
+    [page de Grafana Cloud sur la promotion des attributs de ressource](https://grafana.com/docs/grafana-cloud/send-data/otlp/promote-resource-attributes/).
+- Restrictions des alertes d'un compte gratuit:
+    [incident `xg2h8ht1d44n` de la page d'état de Grafana](https://status.grafana.com/incidents/xg2h8ht1d44n).
 - Import de règles Prometheus dans des règles gérées par Grafana:
-  https://grafana.com/docs/grafana/latest/alerting/alerting-rules/alerting-migration/
-- API de provisioning des alertes, « deprecated »:
-  https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/http-api-provisioning/
-- État d'une règle en cas d'erreur de requête (« Error » par défaut pour une règle créée dans Grafana, `DatasourceError`):
-  `docs/sources/alerting/guides/connectivity-errors.md` et `docs/sources/shared/alerts/modify-error-state.md` du dépôt
-  grafana/grafana, version v13.3.0.
-- Repères des règles de champ d'un tableau (`byFrameRefID`): `packages/grafana-data/src/transformations/matchers/ids.ts`
-  du dépôt grafana/grafana, version v13.3.0.
-- Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08.
+    [page de Grafana sur la migration des règles d'alerte](https://grafana.com/docs/grafana/latest/alerting/alerting-rules/alerting-migration/).
+- API de <span lang="en">provisioning</span> des alertes, « <span lang="en">deprecated</span> »:
+    [page de Grafana sur l'API HTTP de <span lang="en">provisioning</span>](https://grafana.com/docs/grafana/latest/alerting/set-up/provision-alerting-resources/http-api-provisioning/).
+- État d'une règle en cas d'erreur de requête (« <span lang="en">Error</span> » par défaut pour une règle créée dans
+    Grafana, `DatasourceError`): `docs/sources/alerting/guides/connectivity-errors.md` et
+    `docs/sources/shared/alerts/modify-error-state.md` du dépôt grafana/grafana, version v13.3.0.
+- Repères des règles de champ d'un tableau (`byFrameRefID`):
+    `packages/grafana-data/src/transformations/matchers/ids.ts` du dépôt grafana/grafana, version v13.3.0.
+- Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08; les trois noms de
+    la durée d'une demande et l'environnement de la production, le 2026-11-21, sur les séries du 2026-11-19
+    ([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).

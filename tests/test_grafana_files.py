@@ -23,8 +23,9 @@ LABELS_BEYOND_THE_ATTRIBUTES = {ENVIRONMENT_LABEL, "le"}
 # the OpenTelemetry specification: s is seconds); a unit in braces is dropped.
 UNIT_WORDS = {"s": "seconds"}
 HISTOGRAM_SUFFIXES = ("_bucket", "_count", "_sum")
-# The names Grafana Cloud gave the measures of the sandbox, in Explore, on 2026-11-08 (count by
-# (__name__) of the series labelled sandbox).
+# The names Grafana Cloud gave the measures, in Explore: those of the sandbox on 2026-11-08 (count by
+# (__name__) of the series labelled sandbox), and the three of the duration of a request (#634) on
+# 2026-11-21, on the series of the production of 2026-11-19.
 NAMES_SEEN_IN_GRAFANA = {
     "gen_ai_client_inference_duration_seconds_bucket",
     "gen_ai_client_inference_duration_seconds_count",
@@ -48,10 +49,6 @@ NAMES_SEEN_IN_GRAFANA = {
     "k_b_llm_check_duration_seconds_count",
     "k_b_llm_check_duration_seconds_sum",
     "k_b_llm_cost_total",
-}
-# The names of the measures added since, as the rules of Grafana Cloud above give them: not seen in
-# Grafana yet (#634, 2026-11-18).
-NAMES_NOT_SEEN_IN_GRAFANA_YET = {
     "k_b_request_duration_seconds_bucket",
     "k_b_request_duration_seconds_count",
     "k_b_request_duration_seconds_sum",
@@ -202,7 +199,7 @@ def read_measure_names(expression):
 
 
 def test_the_names_k_b_gives_its_measures_are_those_grafana_cloud_showed():
-    assert read_emitted_names() == NAMES_SEEN_IN_GRAFANA | NAMES_NOT_SEEN_IN_GRAFANA_YET
+    assert read_emitted_names() == NAMES_SEEN_IN_GRAFANA
 
 
 def test_each_expression_reads_only_measures_k_b_emits():
