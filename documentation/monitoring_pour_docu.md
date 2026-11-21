@@ -18,9 +18,10 @@
 Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
 commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
 production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour; l'étape
-[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d` (#620). Le monitorage du modèle tient
-dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq
-règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en
+[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d` (#620). Le
+monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord,
+`observability/grafana/dashboard.json`, et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les
+mesures viennent de l'API IA, qui les envoie en
 OpenTelemetry depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de
 l'outil est écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
 [Journaux de l'application](#journaux-de-lapplication) (#165).
@@ -95,10 +96,12 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
     Allemagne, lue sur l'hôte de son adresse OTLP (`docs/registre-traitements.md:128`). Grafana ne change pas la
     région d'une pile existante: une autre région demande une pile neuve, et l'offre gratuite n'a qu'une pile
     ([Limites](#limites)).
+
 2. **L'adresse et l'identifiant**: dans le portail, la pile choisie, <span lang="en">**Configure**</span> sur la
     tuile <span lang="en">**OpenTelemetry**</span>. Y relever l'adresse OTLP, de la forme
     `https://otlp-gateway-<région>.grafana.net/otlp`, et l'identifiant d'instance, le nombre affiché sur la tuile. Ne
     pas y générer de jeton: celui de l'étape 3 a ses droits choisis.
+
 3. **Le jeton**: dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**, **Cloud access
     policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
     - <span lang="en">**Display name**</span> et <span lang="en">**Name**</span>: le nom de la politique.
@@ -108,37 +111,41 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
     - Sous la politique, <span lang="en">**Add token**</span>: un nom, une date d'expiration, puis
         <span lang="en">**Create**</span>. Le jeton ne s'affiche qu'une fois. Il ne fait qu'écrire: K-B ne relit rien
         de ce qu'il envoie.
+
 4. **L'en-tête**: `Authorization=Basic%20` suivi du base64 de `<identifiant d'instance>:<jeton>`, sans espace ni
     chevron (`.env.example:161-163`): `%20` tient la place de l'espace. Sur le Mac, dans un terminal interactif, car
-    la saisie sans écho (`read -s`) demande un clavier. `read` attend le jeton: le coller, puis Entrée. Le jeton ne
-    passe ni par l'écran ni par l'historique du shell, et l'en-tête va dans le presse-papiers:
+    la saisie sans écho (`read -s`) demande un clavier. Les accolades font lire tout le bloc au shell avant de lancer
+    `read`: collé d'un coup, le bloc laisse `read` attendre le jeton. Coller le jeton, puis Entrée. Le jeton ne passe
+    ni par l'écran ni par l'historique du shell, et l'en-tête va dans le presse-papiers:
 
     ```sh
-    read -rs TOKEN
-    printf 'Authorization=Basic%%20%s' "$(printf '%s:%s' '<instance>' "$TOKEN" | base64 | tr -d '\n')" | pbcopy
-    unset TOKEN
+    {
+        read -rs TOKEN; echo
+        printf 'Authorization=Basic%%20%s' "$(printf '%s:%s' '<instance>' "$TOKEN" | base64 | tr -d '\n')" | pbcopy
+        unset TOKEN
+    }
     ```
 
     L'en-tête porte le jeton en base64, donc lisible. Une fois l'en-tête collé à l'étape 5, vider le presse-papiers:
-    `pbcopy < /dev/null`. Si l'historique du presse-papiers de Spotlight est activé (Commande-Espace, puis
-    Commande-4), l'en-tête y reste: l'effacer là aussi, par le bouton <span lang="en">**More**</span> à droite du
-    champ de recherche, puis <span lang="en">**Clear History**</span> ([Sources](#sources)).
+    `pbcopy < /dev/null`. Si l'historique du presse-papiers de Spotlight est activé (Commande + Barre d'espace, puis
+    Commande + 4), l'en-tête y reste: l'effacer là aussi, par le bouton **Plus** à droite du champ de recherche, puis
+    **Effacer l'historique** ([Sources](#sources)).
 
 5. **Les variables**, sur la même pile, un jeton par environnement: pour chacun, l'étape 3 (ou seulement
-    <span lang="en">**Add token**</span>) et l'étape 4. La production a sa politique, `kb-production` (#522), le bac à
-    sable la sienne, `kb-sandbox` (`docs/registre-traitements.md:131`).
+    <span lang="en">**Add token**</span>, sur une politique qui existe déjà) et l'étape 4. La production a sa
+    politique, `kb-production` (#522), le bac à sable la sienne, `kb-sandbox` (`docs/registre-traitements.md:131`).
     - En local, pour le bac à sable, dans `.env.e2e_test` (modèle: `.env.e2e_test.example:25-30`):
         `KB_OTLP_ENDPOINT` (l'adresse de base, sans `/v1/metrics`), `KB_OTLP_HEADERS` (l'en-tête) et
         `KB_DEPLOYMENT_ENVIRONMENT=sandbox`. Un `kb serve-ai` lancé sur le Mac lit les mêmes variables dans le
         `.env` qu'on lui passe (modèle: `.env.example:155-172`).
     - En ligne, pour la production: l'en-tête dans le secret `kb-otlp-headers` du coffre (`infra/README.md`,
-        « 4. Poser les secrets »; `infra/main.bicep:209`), l'adresse dans le paramètre `otlpEndpoint` de la seconde
-        passe (`infra/README.md`, « 5. Seconde passe: les API, le site et les jobs »; `infra/main.bicep:28-29`,
-        `:333`). `KB_DEPLOYMENT_ENVIRONMENT` y vaut `production`, écrit dans le gabarit (`infra/main.bicep:323`).
+        étape 4; `infra/main.bicep:209`), l'adresse dans le paramètre `otlpEndpoint` de la seconde passe
+        (`infra/README.md`, étape 5; `infra/main.bicep:28-29`, `:333`). `KB_DEPLOYMENT_ENVIRONMENT` y vaut
+        `production`, écrit dans le gabarit (`infra/main.bicep:323`).
 
     `kb serve-ai` ne démarre pas sur un réglage refusé, et nomme sa variable
     (`src/k_b/ai_api/connectors/metrics_export.py:99-151`, `:169-188`, `:198-213`; `src/k_b/core/outbound.py:19-39`;
-    `src/k_b/commands/serve_ai_command.py:48-59`). Les réglages refusés:
+    `src/k_b/commands/serve_ai_command.py:48-59`). Par exemple:
 
     - l'adresse ou l'en-tête posé sans l'autre;
     - une adresse qui n'est pas en `https`, qui porte un utilisateur, une requête ou un fragment, ou qui finit par
@@ -217,8 +224,9 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
     production, de la politique `kb-production`, vaut 90 jours depuis sa création, le 2026-11-11: jusqu'au
     2027-02-09 (#522). Avant l'expiration d'un jeton, Grafana écrit aux administratrices de la pile de sa politique:
     <q lang="en">Warning emails are sent to the admins of the corresponding stack</q>. Ces e-mails partent par
-    défaut; le réglage <span lang="en">**Enable token expiration emails**</span>, dans les
-    <span lang="en">**Org Settings**</span> du portail, les coupe pour toute l'organisation ([Sources](#sources)).
+    défaut, et la case <span lang="en">**Enable token expiration emails**</span> des
+    <span lang="en">**Org Settings**</span> du portail est cochée (lue par Sabine le 2026-11-20,
+    `docs/fiches-veille.md:1690-1691`; [Sources](#sources)).
 
 ## Le bac à sable
 
@@ -572,7 +580,7 @@ Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport
 - Tuile <span lang="en">**OpenTelemetry**</span>, <span lang="en">**Configure**</span>, et forme de l'adresse OTLP:
     [page de Grafana Cloud sur l'envoi en OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
 - Identifiant d'instance affiché sur la tuile, sans y générer de jeton:
-    [page de Grafana Cloud sur l'observabilité des agents](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
+    [page de Grafana Cloud sur la tuile <span lang="en">OpenTelemetry</span> et son identifiant d'instance](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
 - <span lang="en">**Create access policy**</span>, <span lang="en">**Write**</span> par signal,
     <span lang="en">**Add token**</span>, jeton affiché une fois:
     [parcours de Grafana sur la politique et son jeton](https://grafana.com/docs/learning-paths/connect-agent-to-agent-observability/create-access-policy-and-token/)
@@ -580,7 +588,8 @@ Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport
     [page de Grafana Cloud sur la création d'une politique](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/create-access-policies/).
 - Une ligne par signal dans <span lang="en">**Scopes**</span>:
     [page de Grafana Cloud sur la politique des traces](https://grafana.com/docs/grafana-cloud/send-data/traces/set-up/add-access-policy/).
-- E-mails avant l'expiration d'un jeton, leurs destinataires et leur réglage:
+- Politique d'une pile, dont les jetons ne valent que pour elle; e-mails avant l'expiration d'un jeton, leurs
+    destinataires et leur réglage:
     [page de Grafana Cloud sur les politiques d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/).
 - Historique du presse-papiers de Spotlight, son ouverture et son effacement:
-    [aide d'Apple, « <span lang="en">Search your Clipboard history in Spotlight on Mac</span> »](https://support.apple.com/guide/mac-help/mchl40d5b86b/mac).
+    [aide d'Apple, « Effectuer une recherche dans l'historique du presse-papiers à l'aide de Spotlight sur Mac »](https://support.apple.com/fr-fr/guide/mac-help/mchl40d5b86b/mac).
