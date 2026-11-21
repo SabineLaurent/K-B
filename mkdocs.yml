@@ -63,10 +63,10 @@ theme:
 # The colours of the back office of K-B, the tabs, and a link underlined (documentation/accessibilite_pour_docu.md).
 extra_css:
   - stylesheets/extra.css
-
-# The list of the search results out of the Tab key, where it would get the focus folded (issue 654).
+# The search results out of the Tab key (issue 654); « K-B », and a date and a word of code in a table, on one line.
 extra_javascript:
   - javascripts/search-list.js
+  - javascripts/nowrap.js
 
 plugins:
   - search

@@ -9,7 +9,7 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
@@ -24,7 +24,11 @@ de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
 n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:26-27`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-62`). Le site a un mode clair et un mode sombre. À la première visite, il
+(`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
+(`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
+une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
+(`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
+visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:45-61`). Le site se publie sur
 GitHub Pages, à la main (section [Publier](#publier)).
@@ -217,7 +221,11 @@ peut y paraître avant le texte qui le développe.
     critère 1.4.3 des WCAG 2.1 n'impose aucun contraste à un texte que personne ne voit, et s'applique au texte qui
     paraît au focus: le lien passe le seuil de 4,5:1 dès qu'il paraît. Le parcours à la touche Tab suivait l'ordre de
     la page, le menu de gauche titre par titre. Le thème donne le focus à un bloc de code qui défile, pour le faire
-    défiler au clavier (WCAG 2.1, critère 2.1.1).
+    défiler au clavier (WCAG 2.1, critère 2.1.1). Depuis, le lien d'évitement est placé hors de l'écran tant qu'il n'a
+    pas le focus, comme le recommande WebAIM, et non plus transparent: son texte garde ses couleurs
+    (`documentation/stylesheets/extra.css:227-235`). Au premier appui sur la touche Tab, il paraît en haut à gauche de
+    la page, avec son anneau blanc, en mode clair comme en mode sombre (relevé le 2026-11-19 dans Chrome sans interface,
+    à 1 512 et à 390 pixels).
 
 ## Publier
 
@@ -319,8 +327,11 @@ Lues le 2026-11-18:
     (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
     une recherche web du même jour.
 
-Lue le 2026-11-19:
+Lues le 2026-11-19:
 
 - W3C, <span lang="en">« Understanding SC 1.4.3: Contrast (Minimum) »</span>,
     [page du W3C](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum), après une recherche web du même jour:
     un texte que personne ne voit n'a pas d'exigence de contraste; le texte qui paraît au focus en a une.
+- WebAIM, <span lang="en">« Skip Navigation Links »</span>,
+    [page de WebAIM](https://webaim.org/techniques/skipnav/), après une recherche web du même jour: un lien
+    d'évitement caché hors de l'écran, qui y revient au focus, plutôt que transparent ou de la couleur du fond.
