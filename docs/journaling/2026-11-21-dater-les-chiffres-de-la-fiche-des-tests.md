@@ -34,15 +34,15 @@ push du commit `cf7b8983` (tag `v0.1.8`) le 2026-11-20 à 16:08 UTC. Le tampon d
 cette exécution :
 
 ```markdown
-(2026-11-18). Les comptes de tests et la couverture sont ceux du commit `cf7b8983` (tag `v0.1.8`, 2026-11-20): lus
-dans le journal de
-[l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956) pour la suite et
+(2026-11-18). Les comptes de tests, la couverture et ce que lance l'intégration continue (CI) sont ceux du commit
+`cf7b8983` (tag `v0.1.8`, 2026-11-20): les comptes de la suite et de `tests-postgresql` et la couverture lus dans le
+journal de [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), les
 ```
 
-(`documentation/tests_pour_docu.md:16-18`). Les chiffres ont été lus par `gh run view --job <id> --log`, pas
+(`documentation/tests_pour_docu.md:16-21`, qui développe aussi le sigle CI à son premier emploi). Les chiffres ont été lus par `gh run view --job <id> --log`, pas
 recopiés d'un message. Dans le job `tests` : `5664 passed, 365 deselected` et `Total coverage: 98.54%`. Dans le job
 `tests-postgresql` : `350 passed`. Ils remplacent les mêmes chiffres partout où la fiche les donnait : la table
-« Lancer les tests » (`:106`, `:108`) et le paragraphe de la mesure de couverture (`:240-242`). Les chiffres que
+« Lancer les tests » (`:107`, `:109`) et le paragraphe de la mesure de couverture (`:241-243`). Les chiffres que
 tn-orchestrateur avançait (98,54 %, 5 664, 350) sont confirmés par ce journal.
 
 ### Compter sans lancer : `--collect-only`
@@ -52,7 +52,7 @@ réels. `pytest -m e2e --collect-only -q` collecte les tests et s'arrête, sans 
 `cf7b8983` exact (un `checkout` détaché du worktree propre, puis retour à `36c1e02d`), et dans un environnement vidé
 (`env -i`), il compte `15/6029 tests collected (6014 deselected)` : 1 test de l'export, 10 de sources, 4 du bac à
 sable. Le total de 6029 est celui que la CI collecte au même commit, ce qui recoupe les deux mesures. Le compte
-remplace « 11 au commit `852dad4` » (`:109`) et le commit de « 15 tests de bout en bout » (`:195-196`), qui valait déjà
+remplace « 11 au commit `852dad4` » (`:110`) et le commit de « 15 tests de bout en bout » (`:196-197`), qui valait déjà
 15 au commit `1d2f554`.
 
 ### Nommer ce que lance le test, pas sa distance
@@ -65,22 +65,25 @@ avec les tests `e2e`. Elle prend le nom de ce qu'elle lance :
 | API servies, dans la CI | `kb digest`, puis les deux API servies par uvicorn sur `127.0.0.1`, puis la base de test, sur le modèle rejoué et sans réseau hors de la machine (`tests/commands/test_live_apis.py`, lancé par le job `tests`) |
 ```
 
-(`documentation/tests_pour_docu.md:261`). « Sur le modèle rejoué et sans réseau hors de la machine » vient de la
+(`documentation/tests_pour_docu.md:262`). « Sur le modèle rejoué et sans réseau hors de la machine » vient de la
 docstring du module (`tests/commands/test_live_apis.py:1-4`). La ligne `e2e` dit en plus qu'ils sont lancés à la
-main, avec un lien vers leur section (`:263`).
+main, avec un lien vers leur section (`:264`). Le même nom remplace « Bout en bout, dans la CI » dans la section « 6. Routes »
+(`:378-379`), et « le transport réseau hors du bout en bout » devient « hors des API servies et des tests de bout en
+bout » (`:440-441`) : deux restes relevés par la relecture neuve.
 
 ### Le job `digests-reference` dans la table de la CI
 
-Le job rejoue le jeu de référence de `POST /digests` et échoue sous un seuil : `digests_evaluation.py` sort avec
-`EXIT_BELOW_THRESHOLD` si un seuil n'est pas tenu (`tests/ai_api/digests_evaluation.py:5`, `:190`). La ligne ajoutée
-(`documentation/tests_pour_docu.md:213`) reprend les faits que la fiche de la CI donne déjà
+Le job rejoue le jeu de référence de `POST /digests` et échoue sous un seuil, si le rejeu n'envoie pas tous les
+appels enregistrés dans leur ordre, ou si la route ne répond pas 200 : `digests_evaluation.py` sort alors avec
+`EXIT_BELOW_THRESHOLD` (seuils `tests/ai_api/digests_evaluation.py:28-34`, rejeu `:80-90`, sortie `:189-190`). La
+ligne ajoutée (`documentation/tests_pour_docu.md:214`) reprend les faits que la fiche de la CI donne déjà
 (`documentation/integration_continue_pour_docu.md:101`), en plus court, avec ses renvois. La phrase qui suit la table
-dit que les sept jobs ont réussi dans cette exécution (`:215-216`), ce que montre `gh run view 44770275956 --json jobs`.
+dit que les sept jobs ont réussi dans cette exécution (`:216-217`), ce que montre `gh run view 44770275956 --json jobs`.
 
 ### Le commentaire au-dessus de la commande
 
 La ligne de `make test-cov` et de son commentaire faisait 134 caractères : le bloc de code défilait à la
-largeur du site. Chaque commentaire passe sur sa propre ligne, au-dessus de sa commande (`:222-225`) ; la plus longue
+largeur du site. Chaque commentaire passe sur sa propre ligne, au-dessus de sa commande (`:223-226`) ; la plus longue
 ligne fait 86 caractères, et la capture de la section, à 1 240 pixels de large, montre le bloc en entier.
 
 ## Choix faits et options écartées
@@ -107,17 +110,18 @@ ligne fait 86 caractères, et la capture de la section, à 1 240 pixels de large
 | `uv run pytest -m e2e --collect-only -q` à `cf7b8983` : `15/6029 tests collected` | le compte des tests de bout en bout, sans en lancer un |
 | journal du job `tests` : `tests/commands/test_live_apis.py ...` | le test des API servies tourne dans la CI |
 | `mkdocs build --strict` vert ; capture de « Calculer la couverture » à 1 240 pixels | la fiche se construit, et le bloc de code se lit en entier |
-| `grep -c "98,42 %\|4061 réussis"` → 0 ; `grep -c "bout en bout, dans la CI"` → 0 | les anciens chiffres et l'ancien nom ont disparu |
+| `grep -c "98,42 %\|4061 réussis"` → 0 ; « bout en bout, dans la CI » cherché sans casse et à travers les sauts de ligne → 0 | les anciens chiffres et l'ancien nom ont disparu |
+| relecture neuve en lecture seule (sous-agent) : aucun chiffre faux ; cinq constats corrigés sur le tri du Second | les faits et les renvois sont vérifiés par un second lecteur |
 
 ## Ce que tu dois pouvoir défendre
 
 1. **D'où viennent 5664 et 98,54 % ?** Du journal du job `tests` de l'exécution 44770275956 de la CI, au commit
-   `cf7b8983` (`v0.1.8`) ; le lien est dans le tampon de la fiche (`tests_pour_docu.md:16-18`).
+   `cf7b8983` (`v0.1.8`) ; le lien est dans le tampon de la fiche (`tests_pour_docu.md:16-21`).
 2. **Pourquoi ne pas avoir lancé les tests `e2e` pour les compter ?** Ils appellent de vraies sources, Grafana Cloud et
    BigQuery ; `--collect-only` les compte sans les exécuter.
 3. **Le test des API servies est-il un test de bout en bout ?** Il enchaîne `kb digest`, les deux API sur des sockets
    réelles et la base de test, mais sur un modèle rejoué et sans réseau hors de la machine : c'est pour cela qu'il tourne
-   dans la CI, et que la fiche ne l'appelle plus « bout en bout » (`:261`).
+   dans la CI, et que la fiche ne l'appelle plus « bout en bout » (`:262`, `:378-379`).
 4. **Que vérifie `digests-reference` que `tests` ne vérifie pas ?** Les seuils du 2026-10-15 sur les sorties
    enregistrées du modèle : 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun
    item oublié (`ci.yml:111-114`).

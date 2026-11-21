@@ -13,11 +13,12 @@
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de
 `main` au commit `852dad4` (2026-11-08), et le test de l'export des mesures d'après `main` au commit `fd956430`
-(2026-11-18). Les comptes de tests et la couverture sont ceux du commit `cf7b8983` (tag `v0.1.8`, 2026-11-20): lus
-dans le journal de
-[l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956) pour la suite et
-`tests-postgresql`, comptés par `pytest -m e2e --collect-only -q` pour les tests de bout en bout. Les chemins du code
-de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
+(2026-11-18). Les comptes de tests, la couverture et ce que lance l'intégration continue (CI) sont ceux du commit
+`cf7b8983` (tag `v0.1.8`, 2026-11-20): les comptes de la suite et de `tests-postgresql` et la couverture lus dans le
+journal de [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), les
+tests de bout en bout comptés par `uv run pytest -m e2e --collect-only -q`, et ce que lance la CI lu dans
+`.github/workflows/ci.yml`. Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de
+la racine du dépôt.
 
 ## Installer l'environnement de test
 
@@ -210,7 +211,7 @@ Chaque job installe l'environnement par `uv sync --locked`, puis lance la comman
 | `lint` | `uv run ruff check`, puis `uv run ruff format --check` |
 | `types` | `uv run mypy --strict` |
 | `audit` | `uvx pip-audit@2.10.1` sur les versions de `uv.lock`, avec leurs empreintes |
-| `digests-reference` | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests`, sans appel au modèle, et échoue sous un seuil du 2026-10-15 (100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié); le rapport est un artefact de l'exécution (`.github/workflows/ci.yml:111-131`, `tests/ai_api/digests_evaluation.py:1-6`) |
+| `digests-reference` | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests`, sans appel au modèle, et échoue sous un seuil du 2026-10-15 (100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), si le rejeu n'envoie pas tous les appels enregistrés dans leur ordre, ou si la route ne répond pas 200; le rapport est un artefact de l'exécution (`.github/workflows/ci.yml:111-131`, `tests/ai_api/digests_evaluation.py:28-34`, `:80-90`, `:189-190`) |
 
 Dans [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), au commit
 `cf7b8983`, les sept jobs ont réussi, `digests-reference` compris. Les tests `e2e` ne tournent jamais dans la CI: ils
@@ -374,8 +375,8 @@ tableau suivant donne chaque cas, ses tests et leur fichier.
 
 Intégration: la vraie application de l'API IA (`create_app`), le `TestClient`, la vraie API de données sur la base
 de test et le modèle rejoué, `tests/ai_api/test_digest_router.py`; les étapes (`build_digests`, sans route, modèle
-rejoué, base de test), `tests/ai_api/test_digests.py`; l'OpenAPI, `tests/ai_api/test_ai_api_openapi.py`. Bout en
-bout, dans la CI: `tests/commands/test_live_apis.py`. Le tableau suivant donne chaque cas, ses tests et leur
+rejoué, base de test), `tests/ai_api/test_digests.py`; l'OpenAPI, `tests/ai_api/test_ai_api_openapi.py`. API
+servies, dans la CI: `tests/commands/test_live_apis.py`. Le tableau suivant donne chaque cas, ses tests et leur
 fichier.
 
 | Cas | Test | Fichier |
@@ -436,6 +437,6 @@ Le tableau suivant donne chaque cas, ses tests et leur fichier.
 | les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main ([Les tests de bout en bout](#les-tests-de-bout-en-bout)); celui de l'export a passé le 2026-11-09, et n'a pas été relancé sur `fd956430` ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)) |
 | le déclenchement des alertes du monitorage du modèle | le bac à sable, `make sandbox-alerts`, lancé à la main ([Le bac à sable des alertes](#le-bac-a-sable-des-alertes)) |
 
-Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors du bout en bout, les dépendances de
-production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
+Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors des API servies et des tests de bout
+en bout, les dépendances de production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
 [le compte rendu des tests de l'API IA du 2026-11-08, relancé le 2026-11-18](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
