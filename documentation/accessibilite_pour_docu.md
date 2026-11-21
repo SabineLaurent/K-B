@@ -54,8 +54,8 @@ Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-1
     AcceDe Web en version 4.1.2). Elle s'adresse aux <q>contributrices et contributeurs éditoriaux</q> d'un outil de
     publication: ici, l'outil est MkDocs, et ses règles portent sur le texte des fiches. Elle dit d'elle-même: <q>Cette
     version en ligne couvre actuellement les WCAG 2.2 et le RGAA 4.1.2</q>; sa section 9 dit que ses règles
-    supplémentaires sont <q>nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1</q>. Les fiches mises en forme
-    sont vérifiées selon elle, règle par règle
+    supplémentaires sont <q>nécessaire[s] pour garantir la conformité RGAA 4.1 et WCAG 2.1</q>. Les fiches sont
+    vérifiées selon elle, règle par règle
     ([La vérification selon la notice d'AcceDe Web](#la-verification-selon-la-notice-daccede-web)).
 
 ## Les règles appliquées aux fiches
@@ -162,7 +162,7 @@ onze pages, et comment il a été vérifié.
 | 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
 | 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Les deux liens du logo du thème, dans l'en-tête et dans le menu, en portent un, le nom du site (« Limites »). | Le HTML construit |
 | 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
-| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les huit schémas des fiches mises en forme (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
+| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les huit schémas des fiches (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
 | 6.1. Déclarer les citations en ligne et les blocs de citations | Tenue: une citation en ligne est un `q`, un bloc de citation un `blockquote` (règle « Des citations déclarées » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). Chaque paire de guillemets tapés a été triée: celles qui restent entourent un titre, un mot dont on parle ou un libellé. | Le HTML construit; la relecture |
 | 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais du texte des fiches est balisé `<span lang="en">`; le pied de page anglais du thème est retiré. | Le HTML construit |

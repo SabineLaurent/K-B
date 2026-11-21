@@ -16,8 +16,9 @@
     — C20
 
 Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
-commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669). Le monitorage du modèle tient dans deux fichiers du
-dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq
+commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
+production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour. Le monitorage du modèle tient
+dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`, et les cinq
 règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie en
 OpenTelemetry depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de
 l'outil est écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
@@ -26,12 +27,14 @@ l'outil est écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'applicatio
 ## Ce que le monitorage suit
 
 L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte rendu: 17 instruments OpenTelemetry,
-dans `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 22 noms de séries, relevés
-dans Explore le 2026-11-08 (`tests/test_grafana_files.py:28-51`), par exemple `k_b_llm_calls_total` (les appels),
-`k_b_llm_cost_total` (le coût estimé), `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total` (la
-fidélité). Chaque série porte son environnement, `deployment_environment_name`: `production` pour l'API en ligne,
-`sandbox` pour le bac à sable. Les trois noms de la durée d'une demande, `k_b_request_duration_seconds_*` (#634,
-2026-11-18), ne sont pas encore relevés dans Grafana.
+dans `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 25 noms de séries, relevés
+dans Explore (`NAMES_SEEN_IN_GRAFANA`, `tests/test_grafana_files.py`), par exemple `k_b_llm_calls_total` (les
+appels), `k_b_llm_cost_total` (le coût estimé), `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total`
+(la fidélité). Chaque série porte son environnement, `deployment_environment_name`: `production` pour l'API en
+ligne, `sandbox` pour le bac à sable. 22 noms ont été relevés le 2026-11-08. Les trois noms de la durée d'une
+demande, `k_b_request_duration_seconds_bucket`, `_count` et `_sum` (#634, 2026-11-18), l'ont été le 2026-11-21, sur
+les séries de la production du 2026-11-19
+([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
 
 Le tableau suivant donne les cinq alertes: ce que chacune mesure, sa fenêtre, son seuil et la source de ce seuil.
 
@@ -65,7 +68,7 @@ listes: **Source de données** (la source Prometheus de la pile, `grafanacloud-<
 **Environnement** (`production` par défaut, ou `sandbox`). Le tableau a trois rangées de panneaux.
 
 - **Alertes**: pour chaque alerte, un panneau donne la valeur sur sa fenêtre et son état, écrit en toutes lettres,
-    « NORMAL » ou « ALERTE: seuil dépassé ». Puis une courbe montre la même valeur dans le temps, et son seuil en ligne
+    « NORMAL » ou « ALERTE: seuil dépassé ». Dessous, une courbe montre la même valeur dans le temps, et son seuil en ligne
     de tirets, nommé dans la légende (« Seuil: 95 % »).
 - **Appels et contenu des fiches**: un tableau des appels sur 24 h par étape et par résultat, les jetons, les items
     du classement, et ce que les contrôles ont retiré des fiches.
@@ -172,9 +175,47 @@ par alerte. Le sujet donne l'alerte et son environnement
 (<q lang="en">[FIRING:1] KbModelCostOverBudget K-B/alert-rules.yaml (sandbox warning)</q>), le corps son résumé, sa
 valeur et ses étiquettes (`deployment_environment_name` vaut `sandbox`).
 
-**À réimporter**: après ce relevé, le tableau et la règle de fidélité ont changé dans le dépôt (la fidélité sans fait
-vérifié ne donne plus de donnée). La pile garde la version importée le 2026-11-08: réimporter les deux fichiers, puis
-refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
+## Réimport du 2026-11-18
+
+Après le relevé du bac à sable, le tableau et la règle de fidélité ont changé dans le dépôt (la fidélité sans fait
+vérifié ne donne plus de donnée), et deux alertes se sont ajoutées le 2026-11-18. Le même jour, vers 11:45 UTC,
+Sabine a réimporté les deux fichiers de `main` de ce jour-là, dont le dernier changement est le commit `d2332d0e`:
+ils n'ont pas changé depuis. Elle a ensuite refait l'étape 3 d'[Installer](#installer) pour les cinq règles,
+« <span lang="en">Alert state if execution error or timeout</span> » sur « <span lang="en">Error</span> ». La pile a
+alors les cinq règles dans le groupe `k-b-model`, sans doublon. Le tableau a ses panneaux
+« Appels en échec sur 24 h » et « Demandes de plus de 180 s sur 24 h », et le budget de 2 USD. Au même moment,
+`KbModelCallFailures` s'est déclenchée dans le bac à sable, à 4,878 %, sur les échecs des essais du 2026-11-17, et
+son e-mail est arrivé.
+
+## Relevé de la production du 2026-11-19
+
+Le 2026-11-19, un jeudi, le tableau a été exporté en PDF, sur la fenêtre de 05:18:26 à 17:18:26 UTC. L'export ne
+montre pas l'environnement choisi dans la liste **Environnement**: la lecture d'Explore du 2026-11-21, sur la même
+journée, le dit. Ce jour-là, `k_b_llm_calls_total` n'a que des séries de la production, toutes à 10:00 UTC, l'heure du job des fiches de
+veille, `caj-kb-digest-watch`. Le tableau suivant donne, pour chaque alerte, son seuil, la valeur de l'export et son
+état.
+
+| Alerte | Seuil | Valeur dans l'export | État |
+|---|---|---|---|
+| `KbModelInvalidOutputs` | > 0 % | 0,0 % | NORMAL |
+| `KbModelLowFidelity` | < 95 % (provisoire) | 99,4 % | NORMAL |
+| `KbModelCostOverBudget` | > 2 USD | 0,3358 USD | NORMAL |
+| `KbModelCallFailures` | > 0 % | 0,0 % | NORMAL |
+| `KbRequestOverDuration` | > 0 % | 0,0 % | NORMAL |
+
+La courbe du coût monte d'une marche vers 10:00 UTC. Le panneau des demandes de plus de 180 s affiche 0,0 %, et non
+« Aucune demande sur la période », le texte d'un panneau sans demande.
+
+Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 2026-11-19 00:00 au 2026-11-20
+00:00 UTC.
+
+- Les noms `k_b_llm_calls_total`, `k_b_request_duration_seconds_bucket`, `_count` et `_sum` ont chacun une série,
+    à 10:00 UTC, toutes du même environnement.
+- En légende <span lang="en">Verbose</span>, `k_b_llm_calls_total` a quatre séries, toutes
+    `deployment_environment_name="production"`, `gen_ai_request_model="gpt-6.1-sol"`, `job="k-b-ai-api"`,
+    `k_b_outcome="ok"` et `k_b_schema_valid="true"`. Leur étape, `k_b_stage`, vaut `classify`, `select`, `write` et
+    `write_trends`, pour 4, 1, 9 et 5 appels: les nombres du tableau « Appels sur 24 h, par étape et par résultat »
+    de l'export.
 
 ## Limites
 
@@ -192,16 +233,16 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
     <span lang="en">webhooks</span> marchent toujours.
 - **Un changement d'offre supprime les jetons sans prévenir**: le 2026-11-08, le passage de la pile de l'essai Pro à
     l'offre gratuite a supprimé ses <span lang="en">access policies</span>; le bac à sable a reçu `401 Unauthorized`
-    jusqu'au jeton neuf. Le jeton de la production est à refaire de même.
+    jusqu'au jeton neuf. Le jeton de la production a été refait de même (#522, close le 2026-11-12).
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
 - **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué
     par les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits
-    « non trouvés » manquent seulement dans le texte français de la fiche (CVE,
-    <span lang="en">Common Vulnerabilities and Exposures</span>, non écrites, faits traduits). La fidélité mesure
-    donc surtout l'écart entre la consigne, qui demande un texte en français, et le contrôle, qui ne compte un fait
-    trouvé que s'il est, mot pour mot après normalisation (un CVE ou un GHSA,
-    <span lang="en">GitHub Security Advisory</span>, sous sa forme canonique), à la fois dans le texte français de
-    son affirmation et dans l'anglais de l'item qu'il désigne. Son seuil de 95 % est provisoire.
+    « non trouvés » manquent seulement dans le texte français de la fiche: des CVE
+    (<span lang="en">Common Vulnerabilities and Exposures</span>, les identifiants publics des vulnérabilités) non
+    écrites, des faits traduits. La fidélité mesure donc surtout l'écart entre la consigne, qui demande un texte en
+    français, et le contrôle, qui ne compte un fait trouvé que s'il est, mot pour mot après normalisation, un CVE ou
+    un GHSA (<span lang="en">GitHub Security Advisory</span>) sous sa forme canonique, à la fois dans le texte
+    français de son affirmation et dans l'anglais de l'item qu'il désigne. Son seuil de 95 % est provisoire.
 - **L'état en cas d'erreur n'est pas dans le fichier**: l'import des règles au format Prometheus règle
     « <span lang="en">Alert state if execution error or timeout</span> » sur « OK », comme l'absence de données (vu
     dans la règle importée le 2026-11-08). Le passer sur « <span lang="en">Error</span> » est l'étape 3
@@ -216,21 +257,23 @@ refaire l'étape 3 d'« Installer », avant l'essai d'accessibilité.
 
 Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`, et le commentaire
 du plafond, par #566, d'après le code de sa demande de fusion (PR, <span lang="en">pull request</span>); mis en forme
-le 2026-11-21 (#669). Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux:
-ceux de `kb`, de `kb serve-data` (l'API de données) et de `kb serve-ai` (l'API IA). En local, ils ne demandent rien à
+le 2026-11-21 (#669), et le site et le job des fiches de veille ajoutés le même jour d'après `main` au commit
+`54ba488c`. Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
+`kb`, de `kb serve-data` (l'API de données), de `kb serve-ai` (l'API IA) et de `kb serve-web` (le site). En local, ils ne demandent rien à
 installer: `kb` les écrit par le module `logging` de Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`,
 qu'`infra/main.bicep` crée. Aucune alerte ne les lit ([Limites des journaux](#limites-des-journaux)).
 
 ### Ce que l'application écrit
 
-Le tableau suivant donne chaque sortie de l'application: ce qu'elle contient, où elle va en local et en ligne, et le
-code qui l'écrit.
+Le tableau suivant donne six sorties de l'application: ce que chacune contient, où elle va en local et en ligne, et
+son renvoi au code ou aux règles.
 
 | Journal | Ce qu'il contient | En local | En ligne | Code |
 |---|---|---|---|---|
 | journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
 | journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
 | journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-93`, `src/k_b/ai_api/app.py:96` |
+| journal de `kb serve-web` | son démarrage, le réveil de l'API de données, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-web.log` | sortie d'erreur de `ca-kb-web`, dans `log-kb` | au commit `54ba488c`: `src/k_b/cli.py:72-76`, `src/k_b/core/config.py:172`, `src/k_b/commands/serve_web_command.py:27-33`, `:49-50`, `:64-66`, `src/k_b/web/app.py:64` |
 | ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
 | résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
 
@@ -291,11 +334,11 @@ de l'environnement, ou d'un fichier passé par `uv run --env-file .env kb …` (
 
 Une commande dont le fichier de journal ne s'ouvre pas ne se lance pas: `error: log file not opened: …`, code 2
 (`src/k_b/cli.py:213-229`). `kb openapi` et le `--dry-run` des routines n'écrivent aucun journal
-(`src/k_b/cli.py:103-116`). Chaque API a son fichier: une rotation faite par une autre commande laisserait un
-processus long écrire dans le fichier de la veille (`src/k_b/cli.py:66-67`; `docs/specs-api.md`, « Journal »).
+(`src/k_b/cli.py:103-116`). Chaque API et le site ont leur fichier: une rotation faite par une autre commande
+laisserait un processus long écrire dans le fichier de la veille (`src/k_b/cli.py:66-67`; `docs/specs-api.md`, « Journal »).
 
 **Rotation et durée.** Chaque fichier tourne à la première ligne écrite après minuit UTC: ses lignes passent dans
-`kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les deux autres), et les nouvelles vont dans un `kb.log`
+`kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les trois autres), et les nouvelles vont dans un `kb.log`
 neuf (`src/k_b/commands/run_log.py:74-81`; nom daté: `src/k_b/purge/run_records.py:20-30`). La rotation ne supprime
 rien. Le fichier courant, sans date dans son nom, n'est jamais purgé (`src/k_b/purge/run_records.py:60-65`).
 `kb purge`, dernière de ses purges, supprime les journaux et les journaux d'import dont le jour du nom a plus de
@@ -340,13 +383,17 @@ Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/RE
 - l'image règle `KB_LOG_TO_FILE=false` et `PYTHONUNBUFFERED=1` (`Dockerfile:42-47`): en conteneur, pas de fichier
     de journal, la sortie d'erreur est le journal, et une ligne de la sortie standard part aussitôt. Aucune pièce
     d'`infra/` ne change `KB_LOG_TO_FILE`. Le `KB_DATA_DIR` en ligne est un dossier de l'image, vidé à chaque
-    démarrage, sauf pour `caj-kb-daily-routine`, qui y monte le partage `job-data` (`infra/main.bicep:55-58`): ses
-    journaux d'import y restent, pas son journal de fonctionnement.
+    démarrage, sauf pour `caj-kb-daily-routine` et `caj-kb-digest-watch`, qui y montent le partage `job-data`
+    (`infra/main.bicep:69-71` au commit `54ba488c`): les journaux d'import de la routine y restent, pas le journal de
+    fonctionnement d'un job.
 
-Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:203`, `:238`), et les trois jobs:
+Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:203`, `:238`), le site, `ca-kb-web`
+(au commit `54ba488c`: `infra/main.bicep:79`, `:349-354`), et les quatre jobs:
 `caj-kb-smoke-test` (`infra/modules/smoke-test-job.bicep:30`), `caj-kb-migrate-database`
-(`infra/modules/migrate-database-job.bicep:59`) et `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour
-à 08:00 UTC (`infra/modules/daily-routine-job.bicep:59`, `:77-78`).
+(`infra/modules/migrate-database-job.bicep:59`), `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour
+à 08:00 UTC (`infra/modules/daily-routine-job.bicep:59`, `:77-78`), et `caj-kb-digest-watch`, qui lance
+`kb digest-watch` le lundi et le jeudi à 10:00 UTC par défaut (au commit `54ba488c`:
+`infra/modules/digest-watch-job.bicep:48`, `:58`, `:65`; `infra/main.bicep:32`, `:437`).
 
 Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
 `az monitor log-analytics query` (`az extension add --name log-analytics`; message
@@ -400,11 +447,6 @@ période.
     deux API se rapprochent par l'heure et par le nom du client que l'API de données journalise.
 - **Un seul `kb serve-data` et un seul `kb serve-ai` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même
     fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
-- **L'export vers Grafana Cloud en ligne**: son jeton de production est l'objet de #522; aucune mesure de la
-    production n'est relevée ici, faute d'appel au modèle en ligne sur la période.
-- **[WIP #423] Le job des fiches de veille, `caj-kb-digest-watch`**, n'est pas déclaré dans `infra/` au commit
-    `33fa59c`; son identité, `id-kb-digest-watch`, y est déjà (`infra/main.bicep:46`). Ses journaux, quand il y
-    sera, se liront comme ceux des autres jobs.
 
 ## Sources
 
