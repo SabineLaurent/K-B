@@ -1869,7 +1869,10 @@ def test_two_requests_at_once_write_whole_metric_lines_on_a_real_pipe(
     assert written_by_request == {"first": expected_lines, "second": expected_lines}
 
 
-# An example of the W3C Trace Context (https://www.w3.org/TR/trace-context/), version 00.
+# An example of the W3C Trace Context (https://www.w3.org/TR/trace-context/), version 00. The data
+# API of these tests answers in memory, by a TestClient, the header going as in HTTP: its reading
+# alone is tested by tests/data_api/test_request_log.py, its sending alone by the MockTransport
+# test below.
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
 PARENT_ID = "00f067aa0ba902b7"
 REQUEST_LOGGER = "k_b.core.api_request_log"
@@ -1907,20 +1910,26 @@ def test_a_request_and_its_reading_share_the_trace_id_of_the_root_span(
     }
 
 
-def test_a_traceparent_received_by_the_ai_api_is_the_trace_of_its_request(
+def test_a_traceparent_received_by_the_ai_api_is_ignored(
     make_ai_api, recorded_traces, tmp_path, capsys
 ):
+    """A valid traceparent too: no caller chooses the trace of the spans of the AI API."""
     client, _ = make_ai_api(VALID_STEPS)
 
     with logging_to(tmp_path, None):
-        post_digests(
+        response = post_digests(
             client,
             headers={**AUTHORIZATION, "traceparent": f"00-{TRACE_ID}-{PARENT_ID}-01"},
         )
 
-    lines = read_logged_request_lines(capsys.readouterr().err)
-    assert {TRACE_FIELD.findall(line)[0] for line in lines} == {TRACE_ID}
-    assert read_root_trace_id(recorded_traces) == TRACE_ID
+    log = capsys.readouterr().err
+    root_trace_id = read_root_trace_id(recorded_traces)
+    assert root_trace_id != TRACE_ID
+    assert {
+        TRACE_FIELD.findall(line)[0] for line in read_logged_request_lines(log)
+    } == {root_trace_id}
+    assert TRACE_ID not in log
+    assert all(TRACE_ID not in value for value in response.headers.values())
 
 
 def test_a_refused_traceparent_is_neither_the_trace_nor_sent_back(
@@ -1947,10 +1956,11 @@ def test_a_refused_traceparent_is_neither_the_trace_nor_sent_back(
 
 
 def test_the_traceparent_sent_to_the_data_api_holds_identifiers_only(
-    make_ai_api, tmp_path, capsys
+    make_ai_api, recorded_traces, tmp_path, capsys
 ):
-    """No personal data: the header sent is made of the trace id of the request and of a span
-    id, both drawn, never of a value of the request."""
+    """No personal data: the header sent is made of the trace id of the request and of the id of
+    the span that reads the watch, both drawn, never of a value of the request; the failure of
+    the reading is logged in the same trace."""
     sent = []
 
     def record(request):
@@ -1967,12 +1977,16 @@ def test_the_traceparent_sent_to_the_data_api_holds_identifiers_only(
     with logging_to(tmp_path, None):
         post_digests(client)
 
-    [line] = read_logged_request_lines(capsys.readouterr().err)
+    log = capsys.readouterr().err
+    [line] = read_logged_request_lines(log)
     [trace_id] = TRACE_FIELD.findall(line)
+    [reading] = recorded_traces.find_spans("read_watch")
+    [failure] = [entry for entry in log.splitlines() if " ERROR k_b.ai_api." in entry]
     assert sent
     for values in sent:
         [value] = values
         match = SENT_TRACEPARENT.fullmatch(value)
         assert match is not None
         assert match.group(1) == trace_id
-        assert match.group(2) != "0" * 16
+        assert match.group(2) == format(reading.context.span_id, "016x")
+    assert f": trace_id={trace_id} reading of the watch failed: " in failure

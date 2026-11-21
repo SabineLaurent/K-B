@@ -13,7 +13,7 @@ from fastapi import Request, Response
 
 TRACEPARENT_HEADER = "traceparent"
 # Version 00, ids in lowercase hex: any other value, a later version included, starts a new trace.
-TRACEPARENT = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}")
+TRACEPARENT_PATTERN = re.compile(r"00-([0-9a-f]{32})-([0-9a-f]{16})-[0-9a-f]{2}")
 INVALID_TRACE_ID = "0" * 32
 INVALID_PARENT_ID = "0" * 16
 # Sampled: the AI API keeps every span (connectors/trace_export.py, ALWAYS_ON).
@@ -27,10 +27,20 @@ CURRENT_TRACE_ID: ContextVar[str | None] = ContextVar("current_trace_id", defaul
 async def follow_trace(
     request: Request, call_next: Callable[[Request], Awaitable[Response]]
 ) -> Response:
-    """The trace id of the request: the one of its traceparent, or a new one; never the value
-    received when it is refused. The outermost middleware, so that the request line carries it."""
+    """The data API: the trace id of the request is the one of its traceparent, sent by the AI API,
+    or a new one; never the value received when it is refused. The outermost middleware, so that
+    the request line carries it."""
     received = read_trace_id(request.headers.getlist(TRACEPARENT_HEADER))
     with following_trace(received or draw_trace_id()):
+        return await call_next(request)
+
+
+async def start_trace(
+    request: Request, call_next: Callable[[Request], Awaitable[Response]]
+) -> Response:
+    """The AI API: a new trace id for each request, a traceparent received ignored, so that no
+    caller chooses the trace of its spans. The outermost middleware, as follow_trace."""
+    with following_trace(draw_trace_id()):
         return await call_next(request)
 
 
@@ -48,7 +58,7 @@ def read_trace_id(values: list[str]) -> str | None:
     """The trace id of the one traceparent received, or None: absent, repeated, or not valid."""
     if len(values) != 1:
         return None
-    match = TRACEPARENT.fullmatch(values[0])
+    match = TRACEPARENT_PATTERN.fullmatch(values[0])
     if match is None:
         return None
     trace_id, parent_id = match.groups()

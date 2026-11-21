@@ -1913,8 +1913,8 @@ mesures non envoyées d'un arrêt pendant une demande seraient perdues ; le dél
 conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP, journaux) est
 coupée dans les deux API (`core/api_telemetry.py`) : avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, elle
 poserait ses propres fournisseurs, et une trace de l'API de données porterait la requête brute d'un
-client. Les traces de `POST /digests` sont décrites ci-dessous ; le `traceparent` envoyé à l'API de
-données, et le `trace_id` dans les lignes de journal, restent l'objet de #281.
+client. Les traces de `POST /digests` sont décrites ci-dessous, avec le `traceparent` envoyé à l'API de
+données et le `trace_id` des lignes de journal (#281).
 
 ### Traces de `POST /digests` (#345)
 
@@ -1923,9 +1923,10 @@ raison de chaque affirmation retirée. Elles servent à suivre une demande étap
 sable, et à comprendre une anomalie en production. Les spans et les évaluations ne portent aucun
 texte : ni consigne, ni item, ni réponse du modèle. Le contenu d'un appel au modèle part à côté,
 sous réglage, dans un enregistrement à part (#347, « Contenu d'un appel au modèle » ci-dessous ;
-exception de la règle 5 de `poc.md`). L'identifiant de la trace est celui de la demande : chaque ligne de journal
-de la demande le porte (`trace_id=`), et l'API IA l'envoie à l'API de données dans l'en-tête `traceparent`, dont
-les lignes le portent aussi (#281, `connectors/trace_export.py`, `RequestTraceIdGenerator`).
+exception de la règle 5 de `poc.md`). L'identifiant de la trace est celui de la demande, que l'API IA tire pour
+chacune, un `traceparent` reçu ignoré : chaque ligne de journal de la demande le porte (`trace_id=`), et l'API IA
+l'envoie à l'API de données dans l'en-tête `traceparent`, dont les lignes le portent aussi (#281,
+`core/trace_context.py`, `connectors/trace_export.py`, `RequestTraceIdGenerator`).
 
 ```
 POST /digests            SERVER   http.request.method, http.route, http.response.status_code, error.type, k_b.request_id

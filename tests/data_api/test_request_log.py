@@ -193,7 +193,7 @@ def test_a_refused_traceparent_starts_a_new_trace_and_is_never_quoted(
     log = capsys.readouterr().err
     [line] = read_logged_request_lines(log)
     [trace_id] = TRACE_FIELD.findall(line)
-    assert trace_id != TRACE_ID
+    assert trace_id not in received.lower()
     assert received not in log
     assert all(received not in value for value in response.headers.values())
 
@@ -211,7 +211,8 @@ def test_two_traceparents_start_a_new_trace(client, authorization, tmp_path, cap
         )
 
     [line] = read_logged_request_lines(capsys.readouterr().err)
-    assert TRACE_FIELD.findall(line) != [TRACE_ID]
+    [trace_id] = TRACE_FIELD.findall(line)
+    assert trace_id != TRACE_ID
 
 
 def test_without_traceparent_each_request_has_its_own_trace(
@@ -222,5 +223,6 @@ def test_without_traceparent_each_request_has_its_own_trace(
         client.get("/items", headers=authorization)
 
     first, second = read_logged_request_lines(capsys.readouterr().err)
-    assert TRACE_FIELD.findall(first) != TRACE_FIELD.findall(second)
-    assert len(TRACE_FIELD.findall(first)) == 1
+    [first_trace_id] = TRACE_FIELD.findall(first)
+    [second_trace_id] = TRACE_FIELD.findall(second)
+    assert first_trace_id != second_trace_id

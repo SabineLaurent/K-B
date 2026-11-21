@@ -217,15 +217,16 @@ TRACING_OFF = Tracing(NoOpTracer(), NoOpLogger(SCOPE_NAME))
 
 def build_traceparent() -> str | None:
     """The traceparent of a request sent during the request under way: its trace id, and the span
-    under way as parent, or a drawn id when no span records; None out of a request."""
+    under way as parent when it is of this trace, or a drawn id; None out of a request."""
     trace_id = read_current_trace_id()
     if trace_id is None:
         return None
     span_context = trace.get_current_span().get_span_context()
+    is_of_the_trace = (
+        span_context.is_valid and format(span_context.trace_id, "032x") == trace_id
+    )
     parent_id = (
-        format(span_context.span_id, "016x")
-        if span_context.is_valid
-        else draw_span_id()
+        format(span_context.span_id, "016x") if is_of_the_trace else draw_span_id()
     )
     return format_traceparent(trace_id, parent_id)
 
