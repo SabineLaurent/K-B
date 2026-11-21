@@ -324,9 +324,9 @@ def test_every_link_to_another_site_has_the_same_form_its_arrow_held_to_its_text
 
     assert links
     assert all(
-        re.search(
-            r'<span class="external-arrow" aria-hidden="true">&nbsp;↗</span></span>'
-            r' <span class="link-note">\(.*nouvel onglet\)</span>$',
+        re.fullmatch(
+            r'<span>[^<]+<span class="external-arrow" aria-hidden="true">&nbsp;↗</span>'
+            r'</span> <span class="link-note">\([^<]*nouvel onglet\)</span>',
             link,
         )
         for link in links
@@ -701,7 +701,9 @@ def test_the_arrow_of_a_button_stays_on_the_line_of_its_word():
         name: [
             label
             for label in re.findall(
-                r'<a class="button(?:-secondary)?"[^>]*>(.*?)</a>', page
+                r'<a\b[^>]*\bclass="button(?:-secondary)?"[^>]*>(.*?)</a>',
+                page,
+                flags=re.DOTALL,
             )
             if re.search("[←→↗]", label)
         ]

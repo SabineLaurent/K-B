@@ -59,7 +59,8 @@
     outline-offset: 2px;
   }
 
-  /* The canvas in the paper of the pages: the body, a container, no longer gives it its background. */
+  /* The paper of the pages, on the canvas: the body, a container, would no longer give it its
+     background. */
   html {
     background: var(--color-paper);
   }
@@ -69,10 +70,9 @@
     /* The container of the queries of a strong zoom, at the end of the components: the page has no
        other wrapper, and main cannot query itself, its margin changing. Named: the frame of the table
        is a container too, nearer to what it holds. */
-    container: page / inline-size;
+    container: body / inline-size;
     display: flex;
     flex-direction: column;
-    background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-text);
     font-size: 1rem;
@@ -1025,7 +1025,7 @@
      (measured on 2026-11-21). One column, a smaller title that still follows the text, and margins
      that no longer double with it: no page scrolls sideways at 200 % text from 320 px (WCAG 1.4.4
      and 1.4.10). */
-  @container page (inline-size < 15em) {
+  @container body (inline-size < 15em) {
     .site-header,
     main,
     .site-footer {
@@ -1046,6 +1046,11 @@
 
     .card {
       padding-inline: 0.5rem;
+    }
+
+    .button,
+    .button-secondary {
+      padding-inline: 0.75rem;
     }
 
     /* A date field cannot be narrower than its day and its calendar without hiding them. */

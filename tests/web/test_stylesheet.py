@@ -336,15 +336,14 @@ def test_the_card_of_an_incident_never_has_a_column_wider_than_itself():
 
 
 def test_the_body_is_the_container_of_the_queries_of_a_strong_zoom():
-    """The page has no other wrapper, and main cannot query itself: the margin it gives changes.
-    Named: the frame of the table is a container too, nearer to what it holds."""
-    assert "container: page / inline-size;" in strip_nested_rules(read_rule("body"))
+    """Named: the frame of the table is a container too, nearer to what it holds."""
+    assert "container: body / inline-size;" in strip_nested_rules(read_rule("body"))
 
 
 def test_the_canvas_takes_the_paper_of_the_pages():
-    """A container, the body no longer gives its background to the canvas, seen when a page
-    bounces at the end of its scroll."""
+    """A container, the body no longer gives its background to the canvas: html gives it alone."""
     assert "background: var(--color-paper);" in strip_nested_rules(read_rule("html"))
+    assert "background" not in strip_nested_rules(read_rule("body"))
 
 
 @pytest.mark.parametrize(
@@ -358,6 +357,7 @@ def test_the_canvas_takes_the_paper_of_the_pages():
         ((".site-header", "main", ".site-footer"), "--gutter: 0.25rem;"),
         ((".feed-filters",), "padding: 0.25rem;"),
         ((".card",), "padding-inline: 0.5rem;"),
+        ((".button", ".button-secondary"), "padding-inline: 0.75rem;"),
         (
             (':where(input[type="search"], input[type="date"])',),
             "padding-inline: 0.25rem;",
@@ -367,11 +367,8 @@ def test_the_canvas_takes_the_paper_of_the_pages():
 def test_a_narrow_screen_for_the_size_of_its_text_takes_one_column_and_thin_margins(
     selectors, declaration
 ):
-    """WCAG 1.4.4 and 1.4.10: no page scrolls sideways at 200 % text from 320 px. 15em of the font
-    of the body: 240 px at 100 %, never reached from 320 px; 480 px at 200 % (CSS Conditional 5,
-    5.1: the em of a container query is the font size of its container). Measured on 2026-11-21:
-    no page overflows from 14.5em on, without the query."""
-    strong_zoom = read_block(STYLESHEET, r"@container page \(inline-size < 15em\)\s*\{")
+    """WCAG 1.4.4 and 1.4.10: no page scrolls sideways at 200 % text from 320 px (docs/site-web.md)."""
+    strong_zoom = read_block(STYLESHEET, r"@container body \(inline-size < 15em\)\s*\{")
     opening = r"^\s*" + r",\s*".join(map(re.escape, selectors)) + r"\s*\{"
 
     assert declaration in strip_nested_rules(read_block(strong_zoom, opening))
