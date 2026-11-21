@@ -114,13 +114,14 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
 
 4. **L'en-tête**: `Authorization=Basic%20` suivi du base64 de `<identifiant d'instance>:<jeton>`, sans espace ni
     chevron (`.env.example:161-163`): `%20` tient la place de l'espace. Sur le Mac, dans un terminal interactif, car
-    la saisie sans écho (`read -s`) demande un clavier. Les accolades font lire tout le bloc au shell avant de lancer
-    `read`: collé d'un coup, le bloc laisse `read` attendre le jeton. Coller le jeton, puis Entrée. Le jeton ne passe
-    ni par l'écran ni par l'historique du shell, et l'en-tête va dans le presse-papiers:
+    la saisie sans écho (`read -s`) demande un clavier. Remplacer `<instance>` par l'identifiant de l'étape 2, puis
+    coller le bloc; s'il reste sur la ligne de commande, Entrée. Quand `Jeton:` s'affiche, coller le jeton, puis
+    Entrée. Les accolades font lire tout le bloc au shell avant de lancer `read`, qui attend alors le jeton. Le jeton
+    ne passe ni par l'écran ni par l'historique du shell, et l'en-tête va dans le presse-papiers:
 
     ```sh
     {
-        read -rs TOKEN; echo
+        printf 'Jeton: '; read -rs TOKEN; echo
         printf 'Authorization=Basic%%20%s' "$(printf '%s:%s' '<instance>' "$TOKEN" | base64 | tr -d '\n')" | pbcopy
         unset TOKEN
     }
@@ -138,10 +139,10 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
         `KB_OTLP_ENDPOINT` (l'adresse de base, sans `/v1/metrics`), `KB_OTLP_HEADERS` (l'en-tête) et
         `KB_DEPLOYMENT_ENVIRONMENT=sandbox`. Un `kb serve-ai` lancé sur le Mac lit les mêmes variables dans le
         `.env` qu'on lui passe (modèle: `.env.example:155-172`).
-    - En ligne, pour la production: l'en-tête dans le secret `kb-otlp-headers` du coffre (`infra/README.md`,
-        étape 4; `infra/main.bicep:209`), l'adresse dans le paramètre `otlpEndpoint` de la seconde passe
-        (`infra/README.md`, étape 5; `infra/main.bicep:28-29`, `:333`). `KB_DEPLOYMENT_ENVIRONMENT` y vaut
-        `production`, écrit dans le gabarit (`infra/main.bicep:323`).
+    - En ligne, pour la production: l'en-tête dans le secret `kb-otlp-headers` du coffre (étape 4
+        d'« Appliquer » d'`infra/README.md`; `infra/main.bicep:209`), l'adresse dans le paramètre `otlpEndpoint` de
+        la seconde passe (étape 5 d'« Appliquer »; `infra/main.bicep:28-29`, `:333`). `KB_DEPLOYMENT_ENVIRONMENT`
+        y vaut `production`, écrit dans le gabarit (`infra/main.bicep:323`).
 
     `kb serve-ai` ne démarre pas sur un réglage refusé, et nomme sa variable
     (`src/k_b/ai_api/connectors/metrics_export.py:99-151`, `:169-188`, `:198-213`; `src/k_b/core/outbound.py:19-39`;
@@ -580,7 +581,7 @@ Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport
 - Tuile <span lang="en">**OpenTelemetry**</span>, <span lang="en">**Configure**</span>, et forme de l'adresse OTLP:
     [page de Grafana Cloud sur l'envoi en OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
 - Identifiant d'instance affiché sur la tuile, sans y générer de jeton:
-    [page de Grafana Cloud sur la tuile <span lang="en">OpenTelemetry</span> et son identifiant d'instance](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
+    [page de Grafana Cloud qui décrit la tuile <span lang="en">OpenTelemetry</span> et son identifiant d'instance](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
 - <span lang="en">**Create access policy**</span>, <span lang="en">**Write**</span> par signal,
     <span lang="en">**Add token**</span>, jeton affiché une fois:
     [parcours de Grafana sur la politique et son jeton](https://grafana.com/docs/learning-paths/connect-agent-to-agent-observability/create-access-policy-and-token/)
