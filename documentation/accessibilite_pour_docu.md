@@ -9,8 +9,8 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18: `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml`
-arrivent avec cette fiche.
+visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+`mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
@@ -60,8 +60,8 @@ Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-1
 
 ## Les règles appliquées aux fiches
 
-Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue dans les fiches mises en forme
-(toutes, sauf celle du monitorage), et comment elle se vérifie. La fiche du monitorage suit (« Limites »).
+Le tableau suivant donne, pour chaque règle, sa source, comment elle est tenue dans les fiches, et comment elle se
+vérifie.
 
 | Règle | Source | Comment elle est tenue | Vérifiée par |
 |---|---|---|---|
@@ -150,9 +150,10 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Le 2026-11-18, les dix pages mises en forme, toutes sauf la fiche du monitorage, ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale
-d'AcceDe Web, sur le HTML construit par `mkdocs build --strict` et à la relecture. Le tableau suivant donne chaque
-règle de la notice, son résultat, et comment il a été vérifié.
+Les onze pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
+sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche du monitorage le
+2026-11-21, après sa mise en forme (#669). Le tableau suivant donne chaque règle de la notice, son résultat sur les
+onze pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -242,9 +243,6 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
     navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
     `quotes`, valeur `auto`). Ce rendu n'a pas été vu. Le format de remise est le site.
-- **La fiche du monitorage n'est pas encore mise en forme.** Elle garde, le 2026-11-18, des listes en retrait de deux
-    ou trois espaces, trois renvois de position (deux « ci-dessus », un « plus bas »), et ses citations entre guillemets,
-    sans `q`. Elle est mise en forme après les PR de #620 et #621, qui la changent.
 - **Les schémas larges sont réduits à la largeur du texte.** Dans l'architecture, le flux en bref et le déploiement
     sur Azure sont dessinés sur 688 pixels de large, et leurs libellés ne se lisent qu'avec le zoom du navigateur
     (relevé le 2026-11-18 dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.
