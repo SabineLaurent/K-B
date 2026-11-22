@@ -28,7 +28,8 @@ du 2026-09-23. Son constat principal: aucun ne fait de veille datée.
     - L'API GitHub: les releases des dépôts suivis, les alertes de sécurité, les dépôts les plus étoilés et les
         plus forkés.
     - L'API arXiv: les papiers sur la sécurité de l'IA, leurs métadonnées et leur résumé.
-    - Le catalogue CISA KEV des vulnérabilités activement exploitées, un fichier CSV.
+    - Le catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>) de la CISA, l'agence américaine de
+        cybersécurité: les vulnérabilités activement exploitées, un fichier CSV.
     - Le Markdown que produit Obsidian Web Clipper, dans un coffre Obsidian dédié.
     - Les newsletters tldr.tech, lues par <span lang="en">scraping</span>.
     - Les papiers lus dans Zotero et leurs surlignages, dans sa base SQLite.
@@ -104,9 +105,9 @@ Un modèle lit la veille, à travers l'API de données, et ce qui en sort est ra
 
 ## Les moyens et leurs coûts
 
-Les coûts ci-dessous ont été relevés le 2026-10-25, avant le choix de PostgreSQL pour la base en ligne, le
+Les coûts du tableau suivant ont été relevés le 2026-10-25, avant le choix de PostgreSQL pour la base en ligne, le
 2026-11-06 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-« Base: PostgreSQL en ligne, par un adaptateur maison (#417) »). Le tableau suivant donne chaque poste et son coût.
+« Base: PostgreSQL en ligne, par un adaptateur maison (#417) »). Il donne chaque poste et son coût.
 
 | Poste | Coût |
 |---|---|

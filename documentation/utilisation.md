@@ -44,7 +44,8 @@ uv run --env-file .env kb create-db
 
 `kb create-db` crée le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`, ou, avec `KB_DATABASE_URL`, les tables de la base
 PostgreSQL de l'URL, qui doit déjà exister. Une base qui existe n'est jamais touchée: pour repartir de zéro, supprimer
-le fichier SQLite. Ses étapes et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md), « Installer le système de gestion de base de données ».
+le fichier SQLite. Ses étapes et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md), « Installer le
+système de gestion de base de données ».
 
 ### Collecter: `kb collect`
 
@@ -106,13 +107,13 @@ d'import: `kb import` ». Pour reconstruire une base SQLite depuis tout le brut:
 uv run --env-file .env kb purge
 ```
 
-`kb purge` supprime ce qui a passé sa durée de conservation, à compter de l'heure de son lancement: les bruts
-remplacés des catalogues d'état (Zotero, CISA KEV), la veille de la base (items et tendances, 3 ans), le brut de plus
-de 6 mois, les lignes du registre dont le fichier n'est plus là et que rien ne cite, puis les journaux de
-fonctionnement et les journaux d'import de plus de 6 mois
-([le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
-« Procédure de tri »). `kb import` ne purge rien. Chaque purge journalise ce qu'elle a supprimé, en nombres, jamais
-un nom, puis `kb purge` affiche son bilan sur une ligne:
+`kb purge` supprime ce qui a passé sa durée de conservation, à compter de l'heure de son lancement: les bruts remplacés
+des catalogues d'état (Zotero, le catalogue KEV de la CISA, l'agence américaine de cybersécurité), la veille de la base
+(items et tendances, 3 ans), le brut de plus de 6 mois, les lignes du registre dont le fichier n'est plus là et que rien
+ne cite, puis les journaux de fonctionnement et les journaux d'import de plus de 6 mois ([le registre des
+traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md), « Procédure de tri »).
+`kb import` ne purge rien. Chaque purge journalise ce qu'elle a supprimé, en nombres, jamais un nom, puis `kb purge`
+affiche son bilan sur une ligne:
 
 ```text
 purge: 2 superseded raw files, 40 items, 0 trend rows, 12 references, 0 tracked repositories, 3 raw collections, 3 registry rows, 5 logs and journals deleted
@@ -141,12 +142,14 @@ sont dans [la fiche des données](import_et_base_pour_docu.md), « La commande q
 
 - Une fiche qui existe n'est jamais réécrite, même par deux lancements qui se chevauchent: deux collectes le même
     jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut.
-- Un temporaire caché qu'un arrêt brutal laisse à côté d'une fiche (un SIGKILL, une session SMB perdue, ou un
-    SIGTERM reçu entre sa création et le bloc qui le retire), `.AAAA-MM-JJ.md.tmp`, arrête ce top à chaque lancement
-    (`temporary_file_found`), son relevé gardé, jusqu'à ce que le temporaire soit retiré à la main.
+- Un temporaire caché qu'un arrêt brutal laisse à côté d'une fiche (un SIGKILL, une session SMB (<span lang="en">Server
+    Message Block</span>) perdue, ou un SIGTERM reçu entre sa création et le bloc qui le retire), `.AAAA-MM-JJ.md.tmp`,
+    arrête ce top à chaque lancement (`temporary_file_found`), son relevé gardé, jusqu'à ce que le temporaire soit
+    retiré à la main.
 - Au premier lancement, tout l'historique des relevés devient des fiches, puis ces relevés sont supprimés du brut.
 
-Il journalise son début et sa fin avec la durée, puis affiche une ligne par top (`commands/write_tops_command.py:52-75`, `:87-98`):
+Il journalise son début et sa fin avec la durée, puis affiche une ligne par top (`commands/write_tops_command.py:52-75`,
+`:87-98`):
 
 - `ok, 1 sheet and 1 twin written`;
 - `ok, 0 sheets written, the sheet of the day already exists`;
@@ -381,15 +384,15 @@ uv run --env-file .env kb trend-report
 `kb trend-report` lit le registre des comptes rendus, `<KB_DATA_DIR>/trend_reports.json`, puis demande à l'API IA les
 fenêtres de GH Archive postérieures à la dernière du compte rendu précédent (les 4 dernières au premier), avec la clé
 `KB_AI_API_KEY_KB_TREND_REPORT`, à l'adresse `KB_AI_API_URL`. Il écrit `<KB_VAULT_DIR>/veille/tendances/AAAA-MM-JJ.md`,
-au jour UTC du lancement: un <span lang="en">frontmatter</span> (`generated`, la première et la dernière fenêtre,
-leur nombre, celui des manquantes, `windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`,
+au jour UTC du lancement: un <span lang="en">frontmatter</span> (`generated`, la première et la dernière fenêtre, leur
+nombre, celui des manquantes, `windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`,
 `choice_failure`, l'état d'un choix du modèle qui a échoué, ou `null`, puis `request_id`;
-`post/trend_report_sheets.py:190-205`), la période et ses limites, la limite de GH Archive (un échantillon d'environ 1 % des
-étoiles), le tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération), puis les
+`post/trend_report_sheets.py:190-205`), la période et ses limites, la limite de GH Archive (un échantillon d'environ 1 %
+des étoiles), le tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération), puis les
 dépôts que le modèle a choisis, chacun avec ses quatre textes. Il ajoute enfin une entrée au registre, qui donne sa
-période au compte rendu suivant: le coffre n'est jamais relu. Un compte rendu n'est jamais réécrit: s'il en existe
-un du jour, aucune demande n'est faite. Un choix du modèle qui échoue laisse un compte rendu des seuls faits, et un
-texte qui échoue laisse les textes de son dépôt de côté; chacun est journalisé avec son état et le `request_id`
+période au compte rendu suivant: le coffre n'est jamais relu. Un compte rendu n'est jamais réécrit: s'il en existe un du
+jour, aucune demande n'est faite. Un choix du modèle qui échoue laisse un compte rendu des seuls faits, et un texte qui
+échoue laisse les textes de son dépôt de côté; chacun est journalisé avec son état et le `request_id`
 (`commands/trend_report_command.py:82-98`).
 
 Il montre qu'il attend comme `kb digest`, puis affiche un bilan en comptes, sans nom de dépôt: la période, les dépôts
@@ -420,11 +423,11 @@ uv run --env-file .env kb serve-web
 
 Le site montre le fil des items, leur détail et les tendances, sans JavaScript. Il écoute par défaut sur
 `http://127.0.0.1:8002` et lit l'API de données avec la clé de son client, `KB_DATA_API_KEY_WEB`. Il est privé: chaque
-requête, sauf `/health`, doit porter dans l'en-tête `X-MS-CLIENT-PRINCIPAL-ID` l'identifiant d'objet Microsoft Entra
-de `KB_WEB_OPERATOR_ID`, un GUID, que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
+requête, sauf `/health`, doit porter dans l'en-tête `X-MS-CLIENT-PRINCIPAL-ID` l'identifiant d'objet Microsoft Entra de
+`KB_WEB_OPERATOR_ID`, un GUID, que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
 journalisé ni cité. En local, `KB_WEB_AUTH=off` n'en lit aucun, sur `127.0.0.1` et hors d'Azure seulement.
-`KB_WEB_HOST`, `KB_WEB_PORT` et `KB_WEB_ALLOWED_HOSTS` changent l'hôte, le port et les noms servis
-([le site](https://github.com/SabineLaurent/K-B/blob/main/docs/site-web.md)).
+`KB_WEB_HOST`, `KB_WEB_PORT` et `KB_WEB_ALLOWED_HOSTS` changent l'hôte, le port et les noms servis ([le
+site](https://github.com/SabineLaurent/K-B/blob/main/docs/site-web.md)).
 
 ## Les fiches publiées en ligne, dans le coffre local: `kb download-watch-sheets`
 
@@ -483,13 +486,13 @@ Ce que la commande laisse à l'opératrice:
     2026-11-10), un rôle temporaire qu'un <span lang="en">Owner</span> peut se donner
     ([le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
     « Procédure de tri », étape 9); l'opératrice n'a que Reader sur `watch`.
-- **Une fiche est du Markdown qu'Obsidian affiche**, écrit par l'identité d'un job. Le téléchargement refuse le
-    Markdown actif; les modules qui agissent sur un fichier neuf, comme Templater avec
-    <span lang="en">« Trigger Templater on new file creation »</span>, qui remplace alors chaque commande trouvée
-    dans le fichier ([les réglages de Templater](https://silentvoid13.github.io/Templater/settings.html), lus le
-    2026-11-10), se règlent dans le coffre. Les gestes: vérifier que
-    <span lang="en">« Enable JavaScript Queries »</span> et <span lang="en">« Enable Inline JavaScript Queries »</span>
-    de Dataview sont désactivés, comme par défaut depuis sa version 0.4.13 (CVE-2021-42057), et que le déclencheur de
+- **Une fiche est du Markdown qu'Obsidian affiche**, écrit par l'identité d'un job. Le téléchargement refuse le Markdown
+    actif; les modules qui agissent sur un fichier neuf, comme Templater avec <span lang="en">« Trigger Templater on new
+    file creation »</span>, qui remplace alors chaque commande trouvée dans le fichier ([les réglages de
+    Templater](https://silentvoid13.github.io/Templater/settings.html), lus le 2026-11-10), se règlent dans le coffre.
+    Les gestes: vérifier que <span lang="en">« Enable JavaScript Queries »</span> et <span lang="en">« Enable Inline
+    JavaScript Queries »</span> de Dataview sont désactivés, comme par défaut depuis sa version 0.4.13 (la vulnérabilité
+    CVE-2021-42057; CVE, <span lang="en">Common Vulnerabilities and Exposures</span>), et que le déclencheur de
     Templater est inactif ou que `veille/` est dans ses <span lang="en">« Excluded folders »</span>.
 - **`az` reçoit tout l'environnement** que `uv run --env-file` charge, secrets du `.env` compris (azure-identity le
     passe au processus d'`az`). Un fichier d'environnement réduit aux trois variables de la commande ne lui donne que
