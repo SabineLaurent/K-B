@@ -5,8 +5,8 @@
 - **Issue** : #685 (issues ouvertes en marge : #686, #687)
 - **Fichiers principaux** : `documentation/collecte.md`, `documentation/requetes.md`,
   `documentation/modele-de-donnees.md`, `documentation/donnees-personnelles.md`, `documentation/api-donnees.md`,
-  `documentation/images/m*d-k-b_20261020*.png`, `docs/merise/mcd-k-b_20261020.drawio`,
-  `docs/merise/mld-k-b_20261020.drawio`, `mkdocs.yml`, `documentation/accessibilite_pour_docu.md`
+  `documentation/images/m*d-k-b_20261107*.png`, `docs/merise/*_20261107.drawio`,
+  `mkdocs.yml`, `documentation/accessibilite_pour_docu.md`
 - **Note précédente de la série** :
   [Placer les logigrammes dans la page des données](2026-11-21-placer-les-logigrammes-dans-la-page-des-donnees.md)
 
@@ -93,31 +93,31 @@ montre en les disant tirés d'un échantillon.
 `documentation/modele-de-donnees.md:85-87` :
 
 ```markdown
-![MCD de K-B, vue d'ensemble, décrit en texte dans la section « La vue d'ensemble »](images/mcd-k-b_20261020_vue-ensemble.png)
+![MCD de K-B, vue d'ensemble, décrit en texte dans la section « La vue d'ensemble »](images/mcd-k-b_20261107_vue-ensemble.png)
 
-[Le MCD de K-B, vue d'ensemble, en taille réelle (image de 3 474 × 2 271 pixels)](images/mcd-k-b_20261020_vue-ensemble.png)
+[Le MCD de K-B, vue d'ensemble, en taille réelle (image de 2 012 × 647 pixels)](images/mcd-k-b_20261107_vue-ensemble.png)
 ```
 
 Un texte de remplacement court qui nomme la section de sa description détaillée, puis un lien vers l'image en
 taille réelle : c'est la forme des logigrammes de #679 (règle 4.4 de la notice d'AcceDe Web). Le texte qui suit
-l'image en donne tout le contenu : les 18 entités, les 15 associations avec leurs cardinalités, les 19 relations du
-MLD.
+l'image en donne le contenu : les 18 entités, les 15 associations avec leurs cardinalités, les 19 relations du MLD et
+leurs colonnes.
 
-Avant l'export, les schémas ont été comparés aux deux scripts de la base, colonne par colonne : le modèle concorde.
-Leurs renvois « l. » visaient `schema.sql` au commit `d540499`, décalés d'une ou deux lignes à `main` (seuls des
-commentaires avaient bougé), et le cartouche du MCD disait la purge « non codée ». Le texte de 56 cellules du MCD et
-de 68 du MLD a été retouché, sans toucher à aucune géométrie : les renvois recalés sur `39cb5eb9`, « la purge,
-codée (database/purge.py, purge/) », le chemin `etl/sources/github/advisories.py`, et l'`ON DELETE CASCADE` de
-`item_has_tag.item_id` marqué comme celui de `highlight.item_id`. La ligne du cartouche « RÉSUMER : … aucune
-écriture ne la remplit à ce jour » a été retirée ; le fait est porté par #686.
+Les images sont celles des schémas du 2026-11-07, dont les flèches et la disposition ont été revues, et le MLD repris
+le 2026-11-12 : `docs/merise/*_20261107.drawio`, copiés tels quels, sans retouche. Avant l'export, ils ont été
+comparés aux schémas du 2026-10-20 et aux deux scripts de la base : même modèle, mêmes 19 relations, mêmes colonnes,
+mêmes 21 clés étrangères, et aucun écart avec la base. Ils ne portent ni renvoi au code ni cartouche : la page donne
+elle-même les lignes de `database/schema.sql`, et les règles que le code tient, dans « Ce que le code tient ». Les
+schémas du 2026-10-20 restent dans `docs/merise/`, tels qu'ils étaient, comme historique.
 
 ### 5. La déclaration d'accessibilité compte ce qui a été vérifié
 
-`documentation/accessibilite_pour_docu.md:157` ouvre la vérification selon la notice d'AcceDe Web : seize pages
+`documentation/accessibilite_pour_docu.md:159` ouvre la vérification selon la notice d'AcceDe Web : dix-sept pages
 désormais, dont les cinq nouvelles vérifiées le 2026-11-22. Le contrôle a lu le HTML construit par
 `mkdocs build --strict` : un seul titre de niveau 1 par page, aucun saut de niveau, aucun `br` hors des schémas,
 aucun lien à `title` ni à `target`, un texte de remplacement sur chaque image, des en-têtes à chaque tableau. Les
-comptes de la déclaration suivent : six images, dix schémas Mermaid.
+comptes de la déclaration suivent, après la fusion de `main` (#678) : huit images, onze schémas Mermaid sur sept
+fiches.
 
 ## Choix faits et options écartées
 
@@ -126,9 +126,9 @@ comptes de la déclaration suivent : six images, dix schémas Mermaid.
 | Où écrire | Cinq pages dans `documentation/`, qui renvoient à `docs/` pour le détail | Publier `docs/` tel quel : ce sont des notes de travail, avec des décisions orales, des passages « à vérifier » et des renvois périmés |
 | Le fond | Repris de `docs/`, contrôlé contre le code ; le code fait foi en cas d'écart | Recopier `docs/` : trois documents avaient des renvois ou des faits périmés (`docs/specs-api.md`, `docs/stockage.md`, `docs/registre-traitements.md`) |
 | L'OpenAPI | Cité et décrit dans la page de l'API, jamais recopié | Le recopier : deux copies d'un contrat qui dériveraient ; la version du dépôt est tenue égale au code par un test |
-| L'échelle des PNG | 1 : le texte des schémas à sa taille d'origine, 340 à 910 Ko | 2, comme #679 : 6 945 pixels de large et jusqu'à 1,7 Mo, sans information de plus (RGESN, poids des pages) |
+| L'échelle des PNG | 1 : le texte des schémas à sa taille d'origine, 131 à 294 Ko | 2, comme #679 : deux fois plus de pixels et de poids, sans information de plus (RGESN, poids des pages) |
 | La source des images | Le `.drawio` reste dans `docs/merise/`, le PNG seul entre dans `documentation/images/` | Copier le `.drawio` à côté du PNG, comme #679 : deux sources du même schéma |
-| Les schémas périmés | Retouchés (choix (a) du tri) : le site décrit K-B aujourd'hui | Les laisser et dire dans la page que leurs renvois visent `d540499` : l'image aurait montré « la purge, non codée », faux aujourd'hui |
+| Les schémas montrés | Ceux du 2026-11-07, aux flèches et à la disposition revues, copiés tels quels ; ceux du 2026-10-20 restent comme historique | Retoucher ceux du 2026-10-20 (renvois recalés, purge dite codée), essayé puis écarté : ils sont moins récents, et leur disposition n'a pas été revue |
 | Les traitements terminés du registre | Une ligne datée chacun, avec un renvoi au registre | Les omettre : le critère veut l'ensemble des traitements ; les détailler : leur trace contient des décisions orales |
 | La rédaction | Cinq rédacteurs en parallèle, puis une relecture de chaque page contre le code, puis une relecture neuve | Une seule rédaction en série : plus de six heures pour cinq pages |
 
@@ -159,8 +159,8 @@ une limite nouvelle passe au tri avant d'être écrite.
     par les commandes qui reprouvent ses faits.
 3. **Ton MLD a 19 relations, ta base 15 tables : lequel est faux ?** Aucun. Quatre relations du MLD, `ranking`,
     `author`, `tracked_package` et `affected_package`, sont écrites autrement dans le MPD par une décision du
-    2026-10-20 : trois listes JSON (hors 1FN) et deux colonnes de `trend` (hors 2FN). Chaque écart est écrit dans le
-    MLD même (`documentation/modele-de-donnees.md`, « Ce que le MPD écrit autrement que le MLD »).
+    2026-10-20 : trois listes JSON (hors 1FN) et deux colonnes de `trend` (hors 2FN). La note du MLD le dit, et
+    la page détaille chaque écart (`documentation/modele-de-donnees.md`, « Ce que le MPD écrit autrement que le MLD »).
 4. **Où sont les procédures de tri, et lesquelles sont automatiques ?** Le tableau des 11 étapes de
     `documentation/donnees-personnelles.md`, « Les procédures de tri » : la colonne « Automatisée », la fréquence et
     le code de chaque étape ; `kb purge` les enchaîne chaque jour en ligne, dans `kb daily-routine`.

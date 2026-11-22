@@ -21,8 +21,8 @@ et le fichier qui le porte dans K-B.
 
 | Niveau | Ce qu'il décrit | Fichier |
 |---|---|---|
-| MCD | les entités, leurs propriétés et leurs identifiants, les associations et leurs cardinalités, sans rien qui dépende d'un SGBD | `docs/merise/mcd-k-b_20261020.drawio`, et sa vue d'ensemble, `docs/merise/mcd-k-b_20261020_vue-ensemble.drawio` |
-| MLD | les relations (les tables), leurs colonnes, leurs clés primaires et étrangères, déduites du MCD par les règles de passage | `docs/merise/mld-k-b_20261020.drawio` |
+| MCD | les entités, leurs propriétés et leurs identifiants, les associations et leurs cardinalités, sans rien qui dépende d'un SGBD | `docs/merise/mcd-k-b_20261107.drawio`, et sa vue d'ensemble, `docs/merise/mcd-k-b_20261107_vue-ensemble.drawio` |
+| MLD | les relations (les tables), leurs colonnes, leurs clés primaires et étrangères, déduites du MCD par les règles de passage | `docs/merise/mld-k-b_20261107.drawio` |
 | MPD | les tables d'un SGBD donné, leurs types, leurs contraintes et leurs index, en SQL | `database/schema.sql` pour SQLite, en local; `database/schema_postgresql.sql` pour PostgreSQL, en ligne |
 
 Le MCD et le MLD sont dessinés avec draw.io depuis la décision du 2026-10-08, qui remplace des schémas Mermaid:
@@ -34,28 +34,28 @@ draw.io dessine la notation de Merise, qu'un `flowchart` Mermaid ne faisait qu'i
 ### Concevoir, puis corriger
 
 Le MCD et le MLD ont été conçus d'abord, puis corrigés quand ils n'étaient plus en phase avec le besoin. Le modèle a été
-corrigé pour la dernière fois le 2026-10-20 (#211), comme le disent le cartouche du MCD et
-[la spécification de stockage](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « MCD et MLD ». Le
-2026-11-22 (#685), les schémas ont été mis à jour sans changer le modèle: la cascade de `item_has_tag.item_id` marquée
-au MLD, la purge dite codée, et les renvois recalés sur `main`. Le
-dossier `docs/merise/` garde aussi la version du 2026-10-12 (`mcd-k-b_20261012.drawio`, `mld-k-b_20261012.drawio`):
+corrigé pour la dernière fois le 2026-10-20 (#211)
+([la spécification de stockage](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « MCD et MLD »). Les
+schémas du 2026-11-07, que montre cette fiche, portent ce modèle, avec des flèches et une disposition revues; le MLD a
+été repris le 2026-11-12. Le dossier `docs/merise/` garde aussi les versions du 2026-10-20 et du 2026-10-12
+(`mcd-k-b_20261012.drawio`, `mld-k-b_20261012.drawio`); celle du 2026-10-12
 elle portait déjà, marquées « prévu », des entités que le code n'avait pas encore, l'article de newsletter (#57) et la
 tendance (#142, #143).
 
 ### Les fichiers des schémas
 
-Le tableau suivant donne les fichiers de `docs/merise/` qui portent le modèle du 2026-10-20. Chaque fichier draw.io a
+Le tableau suivant donne les fichiers de `docs/merise/` qui portent les schémas de cette fiche. Chaque fichier draw.io a
 son image SVG (<span lang="en">Scalable Vector Graphics</span>), du même nom.
 
 | Fichier | Ce qu'il contient |
 |---|---|
-| [`mcd-k-b_20261020.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mcd-k-b_20261020.drawio) | le MCD complet: entités, propriétés, identifiants, associations, cardinalités, renvois à `database/schema.sql` et règles |
-| [`mcd-k-b_20261020_vue-ensemble.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mcd-k-b_20261020_vue-ensemble.drawio) | la vue d'ensemble du MCD: les mêmes entités, associations, cardinalités et disposition, sans les propriétés |
-| [`mld-k-b_20261020.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mld-k-b_20261020.drawio) | le MLD: les relations, leurs colonnes, leurs clés, et l'écart de chacune au MPD |
-| [`positions-mcd.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/positions-mcd.md) | la règle de disposition du MCD, et la lecture de chaque association depuis son sujet et depuis son complément |
+| [`mcd-k-b_20261107.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mcd-k-b_20261107.drawio) | le MCD complet: entités, propriétés, identifiants, associations, cardinalités, spécialisation et son discriminant |
+| [`mcd-k-b_20261107_vue-ensemble.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mcd-k-b_20261107_vue-ensemble.drawio) | la vue d'ensemble du MCD: les mêmes entités, associations, cardinalités et disposition, sans les propriétés |
+| [`mld-k-b_20261107.drawio`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/mld-k-b_20261107.drawio) | le MLD: les relations, leurs colonnes, leurs clés primaires et étrangères, et une note sur ce que le MPD écrit autrement |
+| [`positions-mcd.md`](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/positions-mcd.md) | la lecture de chaque association depuis son sujet et depuis son complément |
 
-Chaque entité, propriété et association du MCD, et chaque relation et colonne du MLD, porte le renvoi « l. » à ses
-lignes de `database/schema.sql` au commit `39cb5eb9`, que nomment leurs cartouches.
+Les schémas ne portent pas de renvoi au code: les tableaux de cette fiche donnent, pour chaque entité et chaque relation,
+ses lignes de `database/schema.sql`.
 
 ### Le formalisme
 
@@ -64,18 +64,16 @@ Le tableau suivant donne chaque élément de la notation Merise et la façon don
 | Élément | Notation dans les schémas de K-B |
 |---|---|
 | Entité | un rectangle, titré de son nom, puis une propriété par ligne |
-| Identifiant | la première propriété, soulignée, « code » suivi du nom de l'entité (« code source »); une sous-entité porte l'identifiant hérité d'Item |
-| Clé naturelle | la mention « (unique) » après la propriété, ou après le groupe de propriétés qui la forme |
+| Identifiant | la première propriété, soulignée et en gras, « code » suivi du nom de l'entité (« code source »); une sous-entité porte « code item », l'identifiant hérité d'Item |
+| Clé naturelle | pour un groupe de propriétés, une ligne qui le nomme, suivie de « unique » (« (édition, date de l'édition, rang) unique »); une clé naturelle d'une seule propriété est écrite au MPD, par `UNIQUE` |
 | Association | une ellipse nommée par un verbe à l'infinitif, en capitales (FOURNIR, CONTENIR); aucune association ne porte de propriété |
 | Cardinalité | un couple minimum, maximum sur chaque patte (0,1 ou 1,1 ou 0,N ou 1,N), lu depuis l'entité voisine |
 | Spécialisation | un triangle marqué X (exclusion), relié à l'entité générique et à ses sous-entités, avec son discriminant |
 | Relation du MLD | un rectangle titré du nom de la table, une colonne par ligne |
-| Clé primaire du MLD | soulignée, marquée PK (<span lang="en">primary key</span>) |
-| Clé étrangère du MLD | marquée FK (<span lang="en">foreign key</span>), avec la table et la colonne visées, et une flèche de la clé étrangère à la clé primaire qu'elle vise |
+| Clé primaire du MLD | soulignée |
+| Clé étrangère du MLD | une flèche de la clé étrangère à la clé primaire qu'elle vise |
 
-Aucune propriété du MCD n'est une liste: une liste y devient une entité (Auteur, Paquet suivi, Paquet touché). La
-disposition suit une règle écrite: le sujet de chaque verbe précède son complément dans le sens de lecture, et Item
-précède ses sous-entités ([les positions du MCD](https://github.com/SabineLaurent/K-B/blob/main/docs/merise/positions-mcd.md)).
+Aucune propriété du MCD n'est une liste: une liste y devient une entité (Auteur, Paquet suivi, Paquet touché).
 
 ## Le MCD
 
@@ -84,9 +82,9 @@ précède ses sous-entités ([les positions du MCD](https://github.com/SabineLau
 Le schéma suivant est la vue d'ensemble du MCD. La liste et le tableau qui le suivent le décrivent en texte, entité par
 entité et association par association.
 
-![MCD de K-B, vue d'ensemble, décrit en texte dans la section « La vue d'ensemble »](images/mcd-k-b_20261020_vue-ensemble.png)
+![MCD de K-B, vue d'ensemble, décrit en texte dans la section « La vue d'ensemble »](images/mcd-k-b_20261107_vue-ensemble.png)
 
-[Le MCD de K-B, vue d'ensemble, en taille réelle (image de 3 474 × 2 271 pixels)](images/mcd-k-b_20261020_vue-ensemble.png)
+[Le MCD de K-B, vue d'ensemble, en taille réelle (image de 2 012 × 647 pixels)](images/mcd-k-b_20261107_vue-ensemble.png)
 
 La vue d'ensemble montre les 18 entités par leur seul nom, les 15 associations, leurs cardinalités, et la
 spécialisation d'Item. Les entités sont:
@@ -129,12 +127,12 @@ propriétés. Ses associations et leurs cardinalités sont celles de [La vue d'e
 sont décrites dans [L'héritage de l'item et de ses sous-types](#lheritage-de-litem-et-de-ses-sous-types) et
 [Les règles que la base tient](#les-regles-que-la-base-tient).
 
-![MCD complet de K-B, décrit en texte dans la section « Les entités, leurs identifiants et leurs propriétés »](images/mcd-k-b_20261020.png)
+![MCD complet de K-B, décrit en texte dans la section « Les entités, leurs identifiants et leurs propriétés »](images/mcd-k-b_20261107.png)
 
-[Le MCD complet de K-B en taille réelle (image de 3 474 × 3 131 pixels)](images/mcd-k-b_20261020.png)
+[Le MCD complet de K-B en taille réelle (image de 2 254 × 1 229 pixels)](images/mcd-k-b_20261107.png)
 
-Le tableau suivant donne les 18 entités du MCD, leur identifiant, leurs autres propriétés, et ce qui les porte dans le
-MPD, avec ses lignes de `database/schema.sql`.
+Le tableau suivant donne les 18 entités du MCD, leur identifiant, leurs autres propriétés, avec entre parenthèses la clé
+naturelle que tient le MPD, et ce qui les porte dans le MPD, avec ses lignes de `database/schema.sql`.
 
 | Entité | Identifiant | Autres propriétés | Dans le MPD (lignes de `database/schema.sql`) |
 |---|---|---|---|
@@ -157,17 +155,15 @@ MPD, avec ses lignes de `database/schema.sql`.
 | Classement | code classement | fin de la fenêtre (unique) | les colonnes `raw_data_id` et `window_end` de `trend`, 110-113 |
 | Tendance | code tendance | référence GitHub du dépôt, nom du dépôt, étoiles gagnées, <span lang="en">forks</span> gagnés; le classement et la référence du dépôt sont uniques ensemble | la table `trend`, 108-122 |
 
-Les cinq sous-entités ne portent que leurs propriétés propres: leur identifiant est celui d'Item. Chaque association
-porte, sous son nom, le renvoi aux lignes de `database/schema.sql` qui la tiennent: une clé étrangère, ou la colonne qui
-remplace une entité absente du MPD. Les identifiants de Classement, Paquet suivi, Paquet touché et Auteur sont marqués
-« absent du MPD »
+Les cinq sous-entités ne portent que leurs propriétés propres: leur identifiant est celui d'Item. Classement, Paquet
+suivi, Paquet touché et Auteur n'ont pas de table au MPD
 ([Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld)).
 
 ### L'héritage de l'item et de ses sous-types
 
 Merise écrit l'héritage par une spécialisation. Dans le MCD de K-B, Item est l'entité générique; Version publiée, Clip
 de page web, Alerte GitHub, Article de newsletter et Entrée Zotero sont ses sous-entités. Elles sont reliées à Item par
-un triangle marqué X, et le cartouche du MCD en donne les règles:
+un triangle marqué X, que le schéma accompagne de son discriminant, le type d'item. Les règles en sont:
 
 - **l'exclusion (X)**: un item est au plus l'une des cinq sous-entités;
 - **pas de totalité (T)**: un item peut n'être aucune d'elles. Un item d'arXiv ou de CISA KEV (le catalogue
@@ -195,7 +191,7 @@ d'une autre sorte, ou qui porterait une autre sorte que la sienne, ou aucune, es
 
 ### Les règles que la base tient
 
-Le cartouche du MCD écrit les règles que la base tient en plus des cardinalités:
+La base tient aussi des règles que les cardinalités ne disent pas:
 
 - **DÉCRIRE et RECENSER sont 0,1 du côté de Publication et de Vulnérabilité**: une publication existe dès qu'une source
     la cite, avant qu'arXiv la donne, et un numéro CVE dès qu'une alerte GitHub le cite. Leurs autres propriétés ne sont
@@ -215,7 +211,7 @@ n'apparaît qu'une fois par publication, comme un rang de paquet suivi par dép�
 
 ### Les règles de passage
 
-Le MLD est déduit du MCD par les règles de passage, que son cartouche écrit:
+Le MLD est déduit du MCD par les règles de passage de Merise:
 
 1. une entité donne une relation, et son identifiant la clé primaire `id`;
 2. une association (0,N) ou (1,N) d'un côté et (1,1) de l'autre donne une clé étrangère obligatoire du côté (1,1):
@@ -239,15 +235,15 @@ relations absentes du MPD. Les clés naturelles du MCD deviennent des contrainte
 
 Le schéma suivant est le MLD. Le tableau qui le suit en donne chaque relation, sa clé primaire et ses clés étrangères.
 
-![MLD de K-B, décrit en texte dans la section « Les relations »](images/mld-k-b_20261020.png)
+![MLD de K-B, décrit en texte dans la section « Les relations »](images/mld-k-b_20261107.png)
 
-[Le MLD de K-B en taille réelle (image de 3 384 × 2 357 pixels)](images/mld-k-b_20261020.png)
+[Le MLD de K-B en taille réelle (image de 1 587 × 1 365 pixels)](images/mld-k-b_20261107.png)
 
 Le MLD compte 19 relations et 21 clés étrangères. Quinze relations sont des tables du MPD. Quatre, `ranking`,
-`author`, `tracked_package` et `affected_package`, sont marquées « absente du MPD »: le MPD les écrit autrement, par une
-décision du 2026-10-20
-([Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld)). Chaque écart d'une relation
-au MPD est écrit dans la relation, sur une ligne qui commence par « MPD ».
+`author`, `tracked_package` et `affected_package`, n'ont pas de table au MPD, qui les écrit autrement, par une décision
+du 2026-10-20 ([Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld)). La note du
+schéma le dit, avec l'identifiant et la colonne `kind` que le MPD donne à chaque sous-type, et la clé étrangère de
+`highlight`; elle dit aussi que les contraintes et les index sont au MPD.
 
 Le tableau suivant donne chaque relation du MLD, sa clé primaire, ses clés étrangères avec l'association qu'elles
 traduisent, et ce qui la porte dans le MPD, avec ses lignes de `database/schema.sql`.
@@ -276,16 +272,16 @@ traduisent, et ce qui la porte dans le MPD, avec ses lignes de `database/schema.
 
 ### Les colonnes de chaque relation
 
-Le tableau suivant donne les colonnes de chaque relation du MLD, telles que le schéma les écrit, avec leurs
-contraintes: PK, la clé primaire; FK, une clé étrangère, avec la relation et la colonne qu'elle vise; `NOT NULL`;
-`UNIQUE`. Les lignes « MPD » de chaque relation sont décrites dans
-[Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld).
+Le schéma montre les colonnes de chaque relation, souligne ses clés primaires et relie chaque clé étrangère à la clé
+qu'elle vise. Le tableau suivant donne ces colonnes avec les contraintes que leur donne le MPD
+(`database/schema.sql`): PK (<span lang="en">primary key</span>), la clé primaire; FK (<span lang="en">foreign
+key</span>), une clé étrangère, avec la relation et la colonne qu'elle vise; `NOT NULL`; `UNIQUE`.
 
 | Relation | Colonnes et contraintes |
 |---|---|
 | `source` | `id` (PK); `source_code` (UNIQUE, NOT NULL); `label` (NOT NULL); `source_type` (NOT NULL); `acquisition_mode` (NOT NULL) |
 | `raw_data` | `id` (PK); `source_id` (FK → source (id), NOT NULL); `raw_file_path` (UNIQUE, NOT NULL); `stream` (NOT NULL); `collected_at` (NOT NULL) |
-| `item` | `id` (PK); `raw_data_id` (FK → raw_data (id), NOT NULL) |
+| `item` | `id` (PK); `kind` (NOT NULL); `raw_data_id` (FK → raw_data (id), NOT NULL) |
 | `release` | `item_id` (PK, FK → item (id)); `tracked_repository_id` (FK → tracked_repository (id), NOT NULL); `release_id` (UNIQUE, NOT NULL); `tag_name` (NOT NULL); `name`; `body`; `published_at` (NOT NULL); `url` (NOT NULL) |
 | `clip` | `item_id` (PK, FK → item (id)); `url` (UNIQUE, NOT NULL); `title` (NOT NULL); `body` (NOT NULL); `saved_at` (NOT NULL); `published_at`; `revised_at` |
 | `advisory` | `item_id` (PK, FK → item (id)); `ghsa_id` (UNIQUE, NOT NULL); `vulnerability_id` (FK → vulnerability (id)); `summary` (NOT NULL); `published_at` (NOT NULL); `url` (NOT NULL) |
@@ -305,7 +301,7 @@ contraintes: PK, la clé primaire; FK, une clé étrangère, avec la relation et
 
 ### Ce que le code tient
 
-Le cartouche du MCD dit aussi les règles que le code d'écriture tient, et non une contrainte de la base. C'est un
+Certaines règles du modèle sont tenues par le code d'écriture, et non par une contrainte de la base. C'est un
 choix de conception: chaque sorte d'item a un seul écrivain, qui écrit ensemble l'item et ce qui en dépend
 (`WRITER_BY_KIND`, `database/writing.py:53-61`). Le tableau suivant donne chaque règle et le code qui la tient.
 
@@ -457,20 +453,20 @@ section « Installer le système de gestion de base de données ».
 Depuis la racine du dépôt:
 
 ```bash
-# Le MCD: 18 entités, 15 associations, une spécialisation; sa vue d'ensemble: 18 entités, 15 associations.
-# Attendu: 18, 15, 1, puis 18, 15.
-grep -o 'style="swimlane' docs/merise/mcd-k-b_20261020.drawio | wc -l
-grep -o 'style="ellipse' docs/merise/mcd-k-b_20261020.drawio | wc -l
-grep -o 'style="triangle' docs/merise/mcd-k-b_20261020.drawio | wc -l
-grep -o 'style="rounded=0' docs/merise/mcd-k-b_20261020_vue-ensemble.drawio | wc -l
-grep -o 'style="ellipse' docs/merise/mcd-k-b_20261020_vue-ensemble.drawio | wc -l
-# Le MLD: 19 relations, 21 clés étrangères, 4 relations absentes du MPD.
-# Attendu: 19, 21, puis ranking, tracked_package, affected_package et author.
-grep -o 'style="swimlane' docs/merise/mld-k-b_20261020.drawio | wc -l
-grep -o 'edge="1"' docs/merise/mld-k-b_20261020.drawio | wc -l
-grep -oE '[a-z_]+ — absente du MPD' docs/merise/mld-k-b_20261020.drawio
-# Les renvois des deux schémas visent schema.sql au commit 39cb5eb9. Attendu: 1 pour chaque fichier.
-grep -c "origin/main 39cb5eb9" docs/merise/mcd-k-b_20261020.drawio docs/merise/mld-k-b_20261020.drawio
+# Le MCD: 18 entités, 15 associations, une spécialisation; sa vue d'ensemble: 18 entités, 15 associations, une
+# spécialisation. Attendu: 18, 15, 1, puis 18, 15, 1.
+grep -o 'style="swimlane' docs/merise/mcd-k-b_20261107.drawio | wc -l
+grep -o 'style="ellipse' docs/merise/mcd-k-b_20261107.drawio | wc -l
+grep -o 'style="triangle' docs/merise/mcd-k-b_20261107.drawio | wc -l
+grep -o 'style="swimlane' docs/merise/mcd-k-b_20261107_vue-ensemble.drawio | wc -l
+grep -o 'style="ellipse' docs/merise/mcd-k-b_20261107_vue-ensemble.drawio | wc -l
+grep -o 'style="triangle' docs/merise/mcd-k-b_20261107_vue-ensemble.drawio | wc -l
+# Le MLD: 19 relations, 21 clés étrangères, 20 clés primaires soulignées (deux pour item_has_tag), et la note des
+# 4 relations absentes du MPD. Attendu: 19, 21, 20, puis la note.
+grep -o 'style="swimlane' docs/merise/mld-k-b_20261107.drawio | wc -l
+grep -o 'edge="1"' docs/merise/mld-k-b_20261107.drawio | wc -l
+grep -o 'fontStyle=4' docs/merise/mld-k-b_20261107.drawio | wc -l
+grep -o 'ranking, author, tracked_package et affected_package sont absentes du MPD' docs/merise/mld-k-b_20261107.drawio
 # Les deux MPD ont les mêmes 15 tables, dans le même ordre. Attendu: 15 et 15, puis aucune ligne de diff.
 grep -c "^CREATE TABLE" src/k_b/database/schema.sql src/k_b/database/schema_postgresql.sql
 diff <(grep -oE "^CREATE TABLE [a-z_]+" src/k_b/database/schema.sql) <(grep -oE "^CREATE TABLE [a-z_]+" src/k_b/database/schema_postgresql.sql)
