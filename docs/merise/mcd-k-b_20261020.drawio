@@ -7,7 +7,7 @@
                 <mxCell id="heading" parent="1" style="text;html=1;align=center;verticalAlign=middle;fontStyle=1;fontSize=20;" value="&quot;K-B&quot; - Modèle Conceptuel de Données" vertex="1">
                     <mxGeometry height="40" width="3400" y="-760" as="geometry"/>
                 </mxCell>
-                <mxCell id="title" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=8;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;Le MCD et le MLD ont été conçus d&#39;abord, puis corrigés quand ils n&#39;étaient plus en phase avec le besoin ; dernière correction le 2026-10-20 (#211).&lt;/b&gt; Chaque entité, propriété et association renvoie à ses lignes (« l. ») de &lt;code&gt;src/k_b/database/schema.sql&lt;/code&gt; (le MPD) à origin/main d540499 ; « absent du MPD » : l&#39;élément n&#39;a pas de colonne dans &lt;code&gt;schema.sql&lt;/code&gt; (voir le bas du schéma). &lt;b&gt;Identifiant&lt;/b&gt; : la première propriété, soulignée, « code &amp;lt;entité&amp;gt; » ; une sous-entité d&#39;Item hérite du sien. Le &lt;b&gt;discriminant&lt;/b&gt; de la spécialisation d&#39;Item est le type d&#39;item. « (unique) » : la clé naturelle. Aucune propriété n&#39;est une liste. La correspondance avec les noms du code est dans le MLD (&lt;code&gt;mld-k-b_20261020.drawio&lt;/code&gt;)." vertex="1">
+                <mxCell id="title" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=8;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;Le MCD et le MLD ont été conçus d&#39;abord, puis corrigés quand ils n&#39;étaient plus en phase avec le besoin ; dernière correction le 2026-10-20 (#211).&lt;/b&gt; Chaque entité, propriété et association renvoie à ses lignes (« l. ») de &lt;code&gt;src/k_b/database/schema.sql&lt;/code&gt; (le MPD) à origin/main 39cb5eb9 ; « absent du MPD » : l&#39;élément n&#39;a pas de colonne dans &lt;code&gt;schema.sql&lt;/code&gt; (voir le bas du schéma). &lt;b&gt;Identifiant&lt;/b&gt; : la première propriété, soulignée, « code &amp;lt;entité&amp;gt; » ; une sous-entité d&#39;Item hérite du sien. Le &lt;b&gt;discriminant&lt;/b&gt; de la spécialisation d&#39;Item est le type d&#39;item. « (unique) » : la clé naturelle. Aucune propriété n&#39;est une liste. La correspondance avec les noms du code est dans le MLD (&lt;code&gt;mld-k-b_20261020.drawio&lt;/code&gt;)." vertex="1">
                     <mxGeometry height="190" width="1500" y="-690" as="geometry"/>
                 </mxCell>
                 <mxCell id="source" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Source&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:16-24&lt;/font&gt;" vertex="1">
@@ -82,13 +82,13 @@
                 <mxCell id="vulnerability_r9" parent="vulnerability" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de retrait &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 146-147&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="272" as="geometry"/>
                 </mxCell>
-                <mxCell id="tag" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Étiquette&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:324-329&lt;/font&gt;" vertex="1">
+                <mxCell id="tag" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Étiquette&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:325-330&lt;/font&gt;" vertex="1">
                     <mxGeometry height="90" width="330" x="2080" y="-440" as="geometry"/>
                 </mxCell>
-                <mxCell id="tag_r0" parent="tag" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code étiquette &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 325&lt;/font&gt;" vertex="1">
+                <mxCell id="tag_r0" parent="tag" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code étiquette &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 326&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="tag_r1" parent="tag" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 326-328&lt;/font&gt;" vertex="1">
+                <mxCell id="tag_r1" parent="tag" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 327-329&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
                 <mxCell id="ranking" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Classement&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:103-106&lt;/font&gt;" vertex="1">
@@ -145,157 +145,157 @@
                 <mxCell id="highlight_r6" parent="highlight" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de retrait &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 95-96&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="194" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Dépôt suivi&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:160-169&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Dépôt suivi&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:161-170&lt;/font&gt;" vertex="1">
                     <mxGeometry height="116" width="330" y="900" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_r0" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code dépôt suivi &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 161&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_r0" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code dépôt suivi &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 162&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_r1" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du dépôt (unique, casse ignorée) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 162&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_r1" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du dépôt (unique, casse ignorée) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 163&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_r2" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="écosystème &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 164&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_r2" parent="tracked" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="écosystème &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 165&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="release" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Version publiée&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:173-192&lt;/font&gt;" vertex="1">
+                <mxCell id="release" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Version publiée&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:174-193&lt;/font&gt;" vertex="1">
                     <mxGeometry height="220" width="330" x="520" y="900" as="geometry"/>
                 </mxCell>
                 <mxCell id="release_r0" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code item (hérité d&amp;#x27;Item) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 43&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r1" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="référence GitHub de la version (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 178&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r1" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="référence GitHub de la version (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 179&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r2" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom de version &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 179-181&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r2" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom de version &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 180-182&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r3" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 183&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r3" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 184&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="116" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r4" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="notes &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 184&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r4" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="notes &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 185&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="142" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r5" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 185-186&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r5" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 186-187&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="168" as="geometry"/>
                 </mxCell>
-                <mxCell id="release_r6" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 188-190&lt;/font&gt;" vertex="1">
+                <mxCell id="release_r6" parent="release" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 189-191&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="194" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Clip de page web&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:292-319&lt;/font&gt;" vertex="1">
+                <mxCell id="clip" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Clip de page web&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:293-320&lt;/font&gt;" vertex="1">
                     <mxGeometry height="220" width="330" x="1040" y="900" as="geometry"/>
                 </mxCell>
                 <mxCell id="clip_r0" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code item (hérité d&amp;#x27;Item) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 43&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r1" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 298-300&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r1" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 299-301&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r2" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 301-303&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r2" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 302-304&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r3" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="texte gardé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 305&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r3" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="texte gardé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 306&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="116" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r4" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date d&amp;#x27;enregistrement &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 308-310&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r4" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date d&amp;#x27;enregistrement &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 309-311&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="142" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r5" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 311-313&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r5" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 312-314&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="168" as="geometry"/>
                 </mxCell>
-                <mxCell id="clip_r6" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de révision &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 315-317&lt;/font&gt;" vertex="1">
+                <mxCell id="clip_r6" parent="clip" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de révision &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 316-318&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="194" as="geometry"/>
                 </mxCell>
-                <mxCell id="advisory" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Alerte GitHub&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:198-219&lt;/font&gt;" vertex="1">
+                <mxCell id="advisory" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Alerte GitHub&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:199-220&lt;/font&gt;" vertex="1">
                     <mxGeometry height="168" width="330" x="1560" y="900" as="geometry"/>
                 </mxCell>
                 <mxCell id="advisory_r0" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code item (hérité d&amp;#x27;Item) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 43&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="advisory_r1" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="référence GHSA (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 202-204&lt;/font&gt;" vertex="1">
+                <mxCell id="advisory_r1" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="référence GHSA (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 203-205&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="advisory_r2" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="résumé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 206&lt;/font&gt;" vertex="1">
+                <mxCell id="advisory_r2" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="résumé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 207&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="advisory_r3" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 207-208&lt;/font&gt;" vertex="1">
+                <mxCell id="advisory_r3" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de publication &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 208-209&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="116" as="geometry"/>
                 </mxCell>
-                <mxCell id="advisory_r4" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 210-212&lt;/font&gt;" vertex="1">
+                <mxCell id="advisory_r4" parent="advisory" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 211-213&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="142" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Article de newsletter&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:226-250&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Article de newsletter&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:227-251&lt;/font&gt;" vertex="1">
                     <mxGeometry height="246" width="330" x="2080" y="900" as="geometry"/>
                 </mxCell>
                 <mxCell id="newsletter_r0" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code item (hérité d&amp;#x27;Item) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 43&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r1" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 231-233&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r1" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 232-234&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r2" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de l&amp;#x27;édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 235-236&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r2" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de l&amp;#x27;édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 236-237&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r3" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="rang dans l&amp;#x27;édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 239&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r3" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="rang dans l&amp;#x27;édition &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 240&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="116" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r4" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 240&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r4" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 241&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="142" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r5" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="résumé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 241&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r5" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="résumé &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 242&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="168" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r6" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL de l&amp;#x27;article &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 243-245&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r6" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL de l&amp;#x27;article &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 244-246&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="194" as="geometry"/>
                 </mxCell>
-                <mxCell id="newsletter_r7" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="(édition, date de l&amp;#x27;édition, rang) unique &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 248&lt;/font&gt;" vertex="1">
+                <mxCell id="newsletter_r7" parent="newsletter" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="(édition, date de l&amp;#x27;édition, rang) unique &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 249&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="220" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Entrée Zotero&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:259-284&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Entrée Zotero&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:260-285&lt;/font&gt;" vertex="1">
                     <mxGeometry height="246" width="330" x="2600" y="900" as="geometry"/>
                 </mxCell>
                 <mxCell id="zotero_r0" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code item (hérité d&amp;#x27;Item) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 43&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r1" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="clé Zotero (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 264-265&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r1" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="clé Zotero (unique) &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 265-266&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r2" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="type de document &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 267&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r2" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="type de document &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 268&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r3" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 268&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r3" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="titre &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 269&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="116" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r4" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 271-273&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r4" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="URL &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 272-274&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="142" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r5" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date d&amp;#x27;ajout dans Zotero &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 274-275&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r5" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date d&amp;#x27;ajout dans Zotero &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 275-276&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="168" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r6" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de révision &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 279-280&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r6" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de révision &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 280-281&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="194" as="geometry"/>
                 </mxCell>
-                <mxCell id="zotero_r7" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de retrait &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 281-282&lt;/font&gt;" vertex="1">
+                <mxCell id="zotero_r7" parent="zotero" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="date de retrait &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 282-283&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="220" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_package" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Paquet suivi&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:165-168&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_package" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Paquet suivi&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:166-169&lt;/font&gt;" vertex="1">
                     <mxGeometry height="116" width="330" y="1350" as="geometry"/>
                 </mxCell>
                 <mxCell id="tracked_package_r0" parent="tracked_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code paquet suivi &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;absent du MPD&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_package_r1" parent="tracked_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="rang dans le dépôt &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 165&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_package_r1" parent="tracked_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="rang dans le dépôt &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 166&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
-                <mxCell id="tracked_package_r2" parent="tracked_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du paquet &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 166&lt;/font&gt;" vertex="1">
+                <mxCell id="tracked_package_r2" parent="tracked_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du paquet &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 167&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="90" as="geometry"/>
                 </mxCell>
-                <mxCell id="affected_package" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Paquet touché&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:213-217&lt;/font&gt;" vertex="1">
+                <mxCell id="affected_package" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Paquet touché&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:214-218&lt;/font&gt;" vertex="1">
                     <mxGeometry height="90" width="330" x="1560" y="1350" as="geometry"/>
                 </mxCell>
                 <mxCell id="affected_package_r0" parent="affected_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;fontStyle=4;" value="code paquet touché &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;absent du MPD&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="38" as="geometry"/>
                 </mxCell>
-                <mxCell id="affected_package_r1" parent="affected_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du paquet &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 213-214&lt;/font&gt;" vertex="1">
+                <mxCell id="affected_package_r1" parent="affected_package" style="text;html=1;align=left;verticalAlign=middle;spacingLeft=6;whiteSpace=wrap;" value="nom du paquet &lt;font color=&quot;#777777&quot; style=&quot;font-size:10px&quot;&gt;l. 214-215&lt;/font&gt;" vertex="1">
                     <mxGeometry height="26" width="330" y="64" as="geometry"/>
                 </mxCell>
                 <mxCell id="author" parent="1" style="swimlane;fontStyle=1;childLayout=stackLayout;horizontal=1;startSize=38;horizontalStack=0;resizeParent=1;collapsible=0;html=1;whiteSpace=wrap;fillColor=#f5f5f5;strokeColor=#666666;" value="Auteur&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;schema.sql:62-66&lt;/font&gt;" vertex="1">
@@ -407,7 +407,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="porter" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="PORTER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 334-338&lt;/font&gt;" vertex="1">
+                <mxCell id="porter" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="PORTER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 336-340&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="130" x="1835" y="-278" as="geometry"/>
                 </mxCell>
                 <mxCell id="e9" edge="1" parent="1" source="item" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=0.85;exitY=0;exitDx=0;exitDy=0;" target="porter">
@@ -495,7 +495,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="designer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="DÉSIGNER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 278&lt;/font&gt;" vertex="1">
+                <mxCell id="designer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="DÉSIGNER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 279&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="120" x="2765" y="1220" as="geometry"/>
                 </mxCell>
                 <mxCell id="e17" edge="1" parent="1" source="zotero" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=0.68;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="designer">
@@ -514,7 +514,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="resumer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="RÉSUMER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 247&lt;/font&gt;" vertex="1">
+                <mxCell id="resumer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="RÉSUMER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 248&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="130" x="2440" y="1193" as="geometry"/>
                 </mxCell>
                 <mxCell id="e19" edge="1" parent="1" source="newsletter" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=1;exitY=1;exitDx=0;exitDy=0;" target="resumer">
@@ -552,7 +552,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="publier" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="PUBLIER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 177&lt;/font&gt;" vertex="1">
+                <mxCell id="publier" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="PUBLIER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 178&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="120" x="365" y="942" as="geometry"/>
                 </mxCell>
                 <mxCell id="e23" edge="1" parent="1" source="tracked" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=1;exitY=0.6;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="publier">
@@ -571,7 +571,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="comprendre" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="COMPRENDRE&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 166-168&lt;/font&gt;" vertex="1">
+                <mxCell id="comprendre" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="COMPRENDRE&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 167-169&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="150" x="90" y="1155" as="geometry"/>
                 </mxCell>
                 <mxCell id="e25" edge="1" parent="1" source="tracked" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" target="comprendre">
@@ -590,7 +590,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="toucher" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="TOUCHER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 214-217&lt;/font&gt;" vertex="1">
+                <mxCell id="toucher" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="TOUCHER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 215-218&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="120" x="1605" y="1181" as="geometry"/>
                 </mxCell>
                 <mxCell id="e27" edge="1" parent="1" source="advisory" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=0.32;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="toucher">
@@ -609,7 +609,7 @@
                         <mxPoint as="offset"/>
                     </mxGeometry>
                 </mxCell>
-                <mxCell id="citer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="CITER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 205&lt;/font&gt;" vertex="1">
+                <mxCell id="citer" parent="1" style="ellipse;whiteSpace=wrap;html=1;fontStyle=1;fillColor=#ffffff;strokeColor=#666666;strokeWidth=1.5;" value="CITER&lt;br&gt;&lt;font style=&quot;font-size:10px;font-weight:normal&quot; color=&quot;#555555&quot;&gt;l. 206&lt;/font&gt;" vertex="1">
                     <mxGeometry height="56" width="130" x="2635" y="1680" as="geometry"/>
                 </mxCell>
                 <mxCell id="e29" edge="1" parent="1" source="advisory" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=1;exitY=0.8;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="citer">
@@ -661,7 +661,7 @@
                 <mxCell id="e36" edge="1" parent="1" source="zotero" style="endArrow=none;html=1;strokeColor=#444444;strokeWidth=1.5;rounded=0;exitX=0.35;exitY=0;exitDx=0;exitDy=0;entryX=0.5;entryY=1;entryDx=0;entryDy=0;" target="xt">
                     <mxGeometry relative="1" as="geometry"/>
                 </mxCell>
-                <mxCell id="rules" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=8;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;Règles : qui les tient&lt;/b&gt;&lt;br&gt;&amp;#8226; &lt;b&gt;Spécialisation X (exclusion) d&#39;Item, tenue par la base&lt;/b&gt; : chaque sous-entité a une clé étrangère &lt;code&gt;(item_id, kind) → item (id, kind)&lt;/code&gt; (l. 191, 218, 249, 283, 318) vers &lt;code&gt;UNIQUE (id, kind)&lt;/code&gt; (l. 49), et un &lt;code&gt;CHECK kind = &#39;…&#39;&lt;/code&gt; (l. 176, 201, 229, 262, 295) : un item n&#39;a qu&#39;un type, donc au plus une sous-entité. Pas de T (totalité) : un item arXiv ou CISA KEV (&lt;code&gt;paper&lt;/code&gt;, &lt;code&gt;vulnerability&lt;/code&gt;, l. 45) n&#39;a pas de sous-entité, il passe par DÉCRIRE ou RECENSER. Un item est donc dans exactement un des sept cas. Le discriminant de la spécialisation est le type d&#39;item, la colonne &lt;code&gt;kind&lt;/code&gt; du MPD (l. 44-46) : il est noté sur la spécialisation, pas comme propriété d&#39;Item.&lt;br&gt;&amp;#8226; &lt;b&gt;Tenu par le code, pas par la base&lt;/b&gt; (fichiers sous &lt;code&gt;src/k_b/&lt;/code&gt;) :&lt;br&gt;&amp;#8195;– l&#39;item de DÉCRIRE est de type &lt;code&gt;paper&lt;/code&gt; (&lt;code&gt;database/writers/paper_writer.py:37-41&lt;/code&gt;), celui de RECENSER de type &lt;code&gt;vulnerability&lt;/code&gt; (&lt;code&gt;vulnerability_writer.py:68-72&lt;/code&gt;) ; la base ne contrôle pas le type de l&#39;item visé (l. 59, 134) ;&lt;br&gt;&amp;#8195;– un item a sa sous-entité, ou sa publication, ou sa vulnérabilité : un seul écrivain par type écrit les deux ensemble (&lt;code&gt;WRITER_BY_KIND&lt;/code&gt;, &lt;code&gt;database/writing.py:58-66&lt;/code&gt;) ; la base l&#39;accepte seul (&lt;code&gt;shared_rows.py:44-51&lt;/code&gt;) ;&lt;br&gt;&amp;#8195;– ANNOTER : la clé étrangère du surlignage vise &lt;code&gt;item (id)&lt;/code&gt; (l. 97) ; seule l&#39;écriture d&#39;une entrée Zotero écrit un surlignage, avec l&#39;item de l&#39;entrée (&lt;code&gt;zotero_entry_writer.py:92-103, 139&lt;/code&gt;) ;&lt;br&gt;&amp;#8195;– PORTER : seul un clip de page web porte des étiquettes à ce jour (&lt;code&gt;clip_writer.py:206-209&lt;/code&gt;) ; Étiquette 1,N : une étiquette dont le dernier lien est retiré est supprimée (&lt;code&gt;clip_writer.py:60-64, 188-191&lt;/code&gt;). Un item n&#39;est supprimé que par la purge, non codée (#83) ; ses liens partiraient avec lui (l. 335) ;&lt;br&gt;&amp;#8195;– Paquet touché : chaque nom une fois dans l&#39;alerte (&lt;code&gt;etl/sources/github_advisories.py:166-180&lt;/code&gt;) ; un &lt;code&gt;CHECK&lt;/code&gt; ne lit pas les éléments d&#39;une liste JSON (l. 12-14) ;&lt;br&gt;&amp;#8195;– Classement : toutes les tendances d&#39;une fenêtre viennent de la même donnée brute (l. 105-106, &lt;code&gt;trend_writer.py:18-26&lt;/code&gt;).&lt;br&gt;&amp;#8226; &lt;b&gt;Tenu par la base&lt;/b&gt; : DÉCRIRE et RECENSER sont 0,1 côté Publication et Vulnérabilité (publication citée avant qu&#39;arXiv la donne, CVE créé par une alerte) ; leurs autres propriétés ne sont remplies que si l&#39;association existe (l. 71-75, 148-154) ; ÉCRIRE : 1 à 1 000 auteurs si DÉCRIRE, aucun sinon (l. 64-66, 73) ; TOUCHER : 1 à 100 paquets (l. 216-217) ; COMPRENDRE : au moins 1 (l. 168) ; Surlignage : texte ou commentaire, l&#39;un au moins (l. 98).&lt;br&gt;&amp;#8226; Un auteur est une place dans la liste des auteurs d&#39;une publication, dans l&#39;ordre d&#39;arXiv (l. 62), pas une personne : K-B n&#39;identifie pas les personnes et ne relie pas deux publications par un nom. Un rang n&#39;apparaît qu&#39;une fois par publication, comme par dépôt suivi pour un paquet suivi (l&#39;ordre d&#39;une liste, l. 62, 165).&lt;br&gt;&amp;#8226; RÉSUMER : la colonne existe, aucune écriture ne la remplit à ce jour (l. 246).&lt;br&gt;&amp;#8226; &lt;b&gt;Le MLD&lt;/b&gt; (&lt;code&gt;mld-k-b_20261020.drawio&lt;/code&gt;) se déduit de ce MCD par les règles de passage. &lt;b&gt;Le MPD&lt;/b&gt; (&lt;code&gt;schema.sql&lt;/code&gt;) s&#39;en écarte par deux dénormalisations voulues (raisons : &lt;code&gt;docs/stockage.md&lt;/code&gt;, « MCD et MLD ») : Auteur, Paquet suivi et Paquet touché y sont une liste JSON (1FN ; l. 63-66, 166-168, 214-217) ; Classement n&#39;y a pas de table, &lt;code&gt;trend&lt;/code&gt; porte &lt;code&gt;window_end&lt;/code&gt; et &lt;code&gt;raw_data_id&lt;/code&gt; (2FN ; l. 110-113).&lt;br&gt;&amp;#8226; &lt;b&gt;Disposition&lt;/b&gt; : le sujet du verbe à gauche du complément, ou au-dessus dans la même colonne ; Item au-dessus de ses sous-entités (&lt;code&gt;docs/merise/positions-mcd.md&lt;/code&gt;, qui donne le sujet de chaque association)." vertex="1">
+                <mxCell id="rules" parent="1" style="text;html=1;whiteSpace=wrap;align=left;verticalAlign=top;spacing=8;fillColor=#ffffff;strokeColor=#666666;" value="&lt;b&gt;Règles : qui les tient&lt;/b&gt;&lt;br&gt;&amp;#8226; &lt;b&gt;Spécialisation X (exclusion) d&#39;Item, tenue par la base&lt;/b&gt; : chaque sous-entité a une clé étrangère &lt;code&gt;(item_id, kind) → item (id, kind)&lt;/code&gt; (l. 192, 219, 250, 284, 319) vers &lt;code&gt;UNIQUE (id, kind)&lt;/code&gt; (l. 49), et un &lt;code&gt;CHECK kind = &#39;…&#39;&lt;/code&gt; (l. 177, 202, 230, 263, 296) : un item n&#39;a qu&#39;un type, donc au plus une sous-entité. Pas de T (totalité) : un item arXiv ou CISA KEV (&lt;code&gt;paper&lt;/code&gt;, &lt;code&gt;vulnerability&lt;/code&gt;, l. 45) n&#39;a pas de sous-entité, il passe par DÉCRIRE ou RECENSER. Un item est donc dans exactement un des sept cas. Le discriminant de la spécialisation est le type d&#39;item, la colonne &lt;code&gt;kind&lt;/code&gt; du MPD (l. 44-46) : il est noté sur la spécialisation, pas comme propriété d&#39;Item.&lt;br&gt;&amp;#8226; &lt;b&gt;Tenu par le code, pas par la base&lt;/b&gt; (fichiers sous &lt;code&gt;src/k_b/&lt;/code&gt;) :&lt;br&gt;&amp;#8195;– l&#39;item de DÉCRIRE est de type &lt;code&gt;paper&lt;/code&gt; (&lt;code&gt;database/writers/paper_writer.py:35-39&lt;/code&gt;), celui de RECENSER de type &lt;code&gt;vulnerability&lt;/code&gt; (&lt;code&gt;vulnerability_writer.py:70-74&lt;/code&gt;) ; la base ne contrôle pas le type de l&#39;item visé (l. 59, 134) ;&lt;br&gt;&amp;#8195;– un item a sa sous-entité, ou sa publication, ou sa vulnérabilité : un seul écrivain par type écrit les deux ensemble (&lt;code&gt;WRITER_BY_KIND&lt;/code&gt;, &lt;code&gt;database/writing.py:53-61&lt;/code&gt;) ; la base l&#39;accepte seul (&lt;code&gt;shared_rows.py:44-50&lt;/code&gt;) ;&lt;br&gt;&amp;#8195;– ANNOTER : la clé étrangère du surlignage vise &lt;code&gt;item (id)&lt;/code&gt; (l. 97) ; seule l&#39;écriture d&#39;une entrée Zotero écrit un surlignage, avec l&#39;item de l&#39;entrée (&lt;code&gt;zotero_entry_writer.py:92-103, 139&lt;/code&gt;) ;&lt;br&gt;&amp;#8195;– PORTER : seul un clip de page web porte des étiquettes à ce jour (&lt;code&gt;clip_writer.py:194-197&lt;/code&gt;) ; Étiquette 1,N : une étiquette dont le dernier lien est retiré est supprimée (&lt;code&gt;clip_writer.py:60-64, 179-182&lt;/code&gt;). Un item n&#39;est supprimé que par la purge, codée (&lt;code&gt;database/purge.py&lt;/code&gt;, &lt;code&gt;purge/&lt;/code&gt;) ; ses liens partiraient avec lui (l. 337) ;&lt;br&gt;&amp;#8195;– Paquet touché : chaque nom une fois dans l&#39;alerte (&lt;code&gt;etl/sources/github/advisories.py:177-191&lt;/code&gt;) ; un &lt;code&gt;CHECK&lt;/code&gt; ne lit pas les éléments d&#39;une liste JSON (l. 12-14) ;&lt;br&gt;&amp;#8195;– Classement : toutes les tendances d&#39;une fenêtre viennent de la même donnée brute (l. 105-106, &lt;code&gt;trend_writer.py:20-29&lt;/code&gt;).&lt;br&gt;&amp;#8226; &lt;b&gt;Tenu par la base&lt;/b&gt; : DÉCRIRE et RECENSER sont 0,1 côté Publication et Vulnérabilité (publication citée avant qu&#39;arXiv la donne, CVE créé par une alerte) ; leurs autres propriétés ne sont remplies que si l&#39;association existe (l. 71-75, 148-154) ; ÉCRIRE : 1 à 1 000 auteurs si DÉCRIRE, aucun sinon (l. 64-66, 73) ; TOUCHER : 1 à 100 paquets (l. 217-218) ; COMPRENDRE : au moins 1 (l. 169) ; Surlignage : texte ou commentaire, l&#39;un au moins (l. 98).&lt;br&gt;&amp;#8226; Un auteur est une place dans la liste des auteurs d&#39;une publication, dans l&#39;ordre d&#39;arXiv (l. 62), pas une personne : K-B n&#39;identifie pas les personnes et ne relie pas deux publications par un nom. Un rang n&#39;apparaît qu&#39;une fois par publication, comme par dépôt suivi pour un paquet suivi (l&#39;ordre d&#39;une liste, l. 62, 166).&lt;br&gt;&amp;#8226; &lt;b&gt;Le MLD&lt;/b&gt; (&lt;code&gt;mld-k-b_20261020.drawio&lt;/code&gt;) se déduit de ce MCD par les règles de passage. &lt;b&gt;Le MPD&lt;/b&gt; (&lt;code&gt;schema.sql&lt;/code&gt;) s&#39;en écarte par deux dénormalisations voulues (raisons : &lt;code&gt;docs/stockage.md&lt;/code&gt;, « MCD et MLD ») : Auteur, Paquet suivi et Paquet touché y sont une liste JSON (1FN ; l. 63-66, 167-169, 215-218) ; Classement n&#39;y a pas de table, &lt;code&gt;trend&lt;/code&gt; porte &lt;code&gt;window_end&lt;/code&gt; et &lt;code&gt;raw_data_id&lt;/code&gt; (2FN ; l. 110-113).&lt;br&gt;&amp;#8226; &lt;b&gt;Disposition&lt;/b&gt; : le sujet du verbe à gauche du complément, ou au-dessus dans la même colonne ; Item au-dessus de ses sous-entités (&lt;code&gt;docs/merise/positions-mcd.md&lt;/code&gt;, qui donne le sujet de chaque association)." vertex="1">
                     <mxGeometry height="520" width="2600" y="1828" as="geometry"/>
                 </mxCell>
             </root>
