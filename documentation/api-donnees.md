@@ -387,7 +387,7 @@ routes qui leur sont permises.
 |---|---|---|---|
 | `AI_DIGEST` | l'API IA, `kb serve-ai` | `KB_DATA_API_KEY_AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`) | les items et les tendances |
 | `WEB` | le site, `kb serve-web` | `KB_DATA_API_KEY_WEB` (`web/settings.py:40`) | toutes les routes de données |
-| tout autre nom, `TERMINAL` par exemple | en local, un terminal, un script ou un agent ([Utiliser K-B](utilisation.md), « La lancer et l'appeler ») | `KB_DATA_API_KEY_<CLIENT>` | les items et les tendances |
+| tout autre nom, `TERMINAL` par exemple | en local, le terminal, un script ([Utiliser K-B](utilisation.md), « La lancer et l'appeler ») | `KB_DATA_API_KEY_<CLIENT>` | les items et les tendances |
 
 **L'authentification.** La clé reçue est comparée à chaque clé connue, en temps constant (`hmac.compare_digest`) et
 en octets (`core/api_access.py:52-62`): la comparaison est conçue pour que le temps de la réponse ne dise ni la clé ni

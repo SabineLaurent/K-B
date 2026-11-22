@@ -240,22 +240,15 @@ la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la m
 pas activé, il échouerait. Un seul déploiement tourne à la fois, jamais interrompu, et un seul attend: quand une fusion arrive
 pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
 ([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
-annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`). Le 2026-11-22, Pages
-n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la première publication, trois
-gestes de l'administratrice du dépôt:
+annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`).
 
-1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14). Pages ne sert un dépôt privé qu'avec une offre
-    payante de GitHub (Pro, Team ou Enterprise), et **un site publié depuis un dépôt privé est public**: activer Pages
-    sur le dépôt encore privé publierait toutes les fiches.
-2. Dans les réglages du dépôt, <span lang="en">Settings > Pages > Build and deployment > Source</span>, choisir
-    <span lang="en">« GitHub Actions »</span>.
-3. Créer la variable de dépôt `PAGES_PUBLISH`, de valeur `true`: dans les réglages,
-    <span lang="en">Settings > Secrets and variables > Actions > Variables</span>, ou par
-    `gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`.
-
-Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, sur `main`, pour la première
-publication; ensuite, chaque fusion publie le site. La procédure se vérifie à la première publication: le job `deploy` de `Docs` finit
-vert, et l'adresse du site, `https://sabinelaurent.github.io/K-B/` (`mkdocs.yml:6`), sert la page d'accueil.
+Pages est activé depuis le 2026-11-22, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
+`"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). La première publication a été lancée à
+la main le même jour: l'exécution de `Docs` sur `main`, à 02:54 UTC, a réussi. La publication à chaque fusion demande
+un geste de l'administratrice du dépôt: créer la variable de dépôt `PAGES_PUBLISH`, de valeur `true`, dans les
+réglages (<span lang="en">Settings > Secrets and variables > Actions > Variables</span>) ou par
+`gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`. Elle se vérifie à la fusion suivante: le job
+`deploy` de `Docs` tourne et finit vert.
 
 ## Limites
 
@@ -300,9 +293,9 @@ vert, et l'adresse du site, `https://sabinelaurent.github.io/K-B/` (`mkdocs.yml:
     Il vient du thème, hors du texte des fiches.
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
-    rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:6`): tant que Pages n'est
-    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les sept fiches qui en ont, l'erreur de ce
-    chargement arrête aussi, dans l'aperçu seulement, le bouton du mode et la recherche.
+    rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:6`): un aperçu local de
+    `site/` le charge depuis le site en ligne, qui le sert (relevé le 2026-11-22: réponse 200 à
+    `https://sabinelaurent.github.io/K-B/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js`).
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version

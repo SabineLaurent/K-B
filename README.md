@@ -119,8 +119,8 @@ continue](documentation/integration-continue.md).
 
 ## Documentation
 
-- `documentation/` : la documentation du produit, construite en site par MkDocs
-  (`uv run --only-group docs mkdocs serve`), de l'installation à la livraison ;
+- `documentation/` : la documentation du produit, de l'installation à la livraison, publiée à l'adresse
+  https://sabinelaurent.github.io/K-B/ et construite par MkDocs (`uv run --only-group docs mkdocs serve` en local) ;
 - `docs/` : les spécifications (collecte, stockage, API, fiches de veille), le registre des traitements et les
   contrats OpenAPI des deux API, dans `docs/api/` ;
 - [le journal des décisions](docs/ADR/journal-decisions-projet.md) : chaque décision, son pourquoi et les options
