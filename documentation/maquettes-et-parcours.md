@@ -33,7 +33,7 @@ et « Se déconnecter » est à la fin de l'en-tête (#587).
 
 ## La charte graphique
 
-![Planche « Charte graphique » des maquettes du 09/11/2026: couleurs, polices, icônes et contrastes, décrits en texte dans la section « La charte graphique »](images/charte-graphique_20261109.png)
+![Planche de la charte graphique, décrite dans la section « La charte graphique »](images/charte-graphique_20261109.png)
 
 **Description de la planche.** En tête, « Charte graphique », puis « Interface web de K-B: front office (veille) et
 back office (suivi) », et à droite « Maquettes du 09/11/2026, avant intégration ». La planche range la charte en six
@@ -158,7 +158,7 @@ Les couleurs du site suivent cette charte: `web/static/site.css` les déclare, e
 
 ## Les maquettes du fil de veille
 
-![Planche « Maquettage - 3) Les maquettes graphiques »: le fil de veille en version mobile, tablette et desktop, décrit en texte dans la section « Les maquettes du fil de veille »](images/maquettes-fil-de-veille_20261109.png)
+![Planche des maquettes du fil de veille, décrite dans la section « Les maquettes du fil de veille »](images/maquettes-fil-de-veille_20261109.png)
 
 **Description de la planche.** En tête, « Maquettage - 3) Les maquettes graphiques », puis « Réalisées dans l'outil
 Design de claude.ai, à partir des wireframes et de la charte graphique. » et « - Le fil de veille, page d'accueil du
