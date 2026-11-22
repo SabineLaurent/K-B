@@ -63,3 +63,21 @@ def test_a_link_to_another_site_is_written_by_its_macro_only():
     ]
 
     assert writers == ["links.html"]
+
+
+def test_the_button_back_to_the_feed_is_written_by_its_macro_only():
+    """links.html holds the button back to the feed (code.md, third occurrence): each page of an
+    error calls it, and no other template writes its label."""
+    writers = [
+        name
+        for name in TEMPLATE_NAMES
+        if "Retour au fil de veille" in read_template(name)
+    ]
+    callers = [
+        name
+        for name in TEMPLATE_NAMES
+        if "{{ back_to_feed_button() }}" in read_template(name)
+    ]
+
+    assert writers == ["links.html"]
+    assert callers == ["404.html", "500.html", "error.html"]

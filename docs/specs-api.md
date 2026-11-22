@@ -143,7 +143,13 @@ l'ordre des résultats, change la version.
   sans clé valide), puis l'identifiant de la requête (`request_id`, un UUID), rendu aussi dans
   l'en-tête `X-Request-ID` de chaque réponse et repris par chaque autre ligne de la requête
   (`database_error`, `query_timeout`, `internal_error`) ; jamais la clé, une valeur de paramètre ni un chemin brut.
-  Le journal est commun aux deux API (`core/api_request_log.py`). Elle va dans
+  Le journal est commun aux deux API (`core/api_request_log.py`). Chaque ligne écrite pendant une requête, la
+  sienne comprise, porte après le nom du journal l'identifiant de sa trace (`trace_id=`, 32 chiffres
+  hexadécimaux, `core/trace_context.py`, `commands/run_log.py`, #281). L'API IA tire celui de chaque demande, un
+  `traceparent` reçu ignoré, le donne à ses spans et l'envoie à l'API de données dans l'en-tête `traceparent`
+  (W3C Trace Context, version 00). L'API de données reprend celui du `traceparent` reçu, sinon en tire un ; une
+  valeur refusée n'est jamais citée. Une demande se suit ainsi d'une API à l'autre par cet identifiant. La ligne va
+  dans
   `<KB_DATA_DIR>/logs/kb-serve-data.log`, à part de `kb.log` : `kb serve-data` tourne longtemps, et la rotation
   de minuit faite par `kb collect` ou `kb import` dans un fichier partagé le laisserait écrire dans
   le fichier de la veille (constat sur `TimedRotatingFileHandler`, Python 3.13). Limite : un seul

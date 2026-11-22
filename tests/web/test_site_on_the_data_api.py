@@ -36,8 +36,8 @@ def test_a_start_date_that_does_not_exist_is_refused_on_its_field_without_asking
 
     assert response.status_code == 422
     assert (
-        '<p id="start-error" class="field-error">Date de début invalide: un jour attendu,'
-        " sous la forme AAAA-MM-JJ.</p>" in response.text
+        '<p id="start-error" class="field-error">Erreur. Date de début invalide:'
+        " 2026-02-30 n’existe pas. Choisissez un jour qui existe.</p>" in response.text
     )
     start = re.search(r'<input id="start"[^>]*>', response.text)
     assert start is not None

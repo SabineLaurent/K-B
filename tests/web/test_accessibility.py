@@ -30,7 +30,7 @@ HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 LANDMARKS = ("header", "main", "footer")
 SKIP_TARGET = "contenu"
 # The feed refused on its three fields: a search too long, a kind out of the five, date without day.
-FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date"
+FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date&start=2026-02-30"
 FEED_PAGES = ("/", "/?page=2", "feed-empty", "feed-refused")
 # The detail of each kind and of each state of its banner, by name; the variants have an identifier
 # of their own, as each page has a title of its own.
@@ -324,9 +324,9 @@ def test_every_link_to_another_site_has_the_same_form_its_arrow_held_to_its_text
 
     assert links
     assert all(
-        re.search(
-            r'<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">\(.*nouvel'
-            r" onglet\)</span>$",
+        re.fullmatch(
+            r'<span>[^<]+<span class="external-arrow" aria-hidden="true">&nbsp;↗</span>'
+            r'</span> <span class="link-note">\([^<]*nouvel onglet\)</span>',
             link,
         )
         for link in links
@@ -519,6 +519,35 @@ def test_each_field_refused_says_why_under_it_and_in_the_summary():
     assert invalid == ["q", "start"]
 
 
+@pytest.mark.parametrize("name", ["feed-refused", "trends-refused"])
+def test_the_message_of_each_field_refused_opens_with_a_word_that_says_an_error(name):
+    """RGAA 11.10; WCAG 3.3.1: in forced colors, the message takes the colour of the text, as the
+    label above it; its first word says the error without a colour (#590)."""
+    messages = re.findall(
+        r'<p id="[a-z-]+-error" class="field-error">([^<]*)</p>', PAGES[name]
+    )
+
+    assert messages
+    assert all(message.startswith("Erreur. ") for message in messages)
+
+
+def test_the_summary_says_the_message_of_each_field_without_its_word():
+    """The summary is under its own title, Filtre à corriger: each link says the message of its
+    field, without Erreur."""
+    page = PAGES["feed-refused"]
+    message_by_field = dict(
+        re.findall(
+            r'<p id="([a-z]+)-error" class="field-error">Erreur\. ([^<]*)</p>', page
+        )
+    )
+    summary_by_field = dict(
+        re.findall(r'<li><a href="#([a-z]+)">([^<]*)</a></li>', page)
+    )
+
+    assert summary_by_field.keys() == {"q", "kinds", "start"}
+    assert summary_by_field == message_by_field
+
+
 def test_the_feed_refused_shows_no_card():
     assert '<li class="card">' not in PAGES["feed-refused"]
 
@@ -682,6 +711,43 @@ def test_the_page_not_found_leads_to_the_feed_and_to_the_trends():
         (link.attributes["href"], " ".join(link.text.split()))
         for link in outline(actions.group(1)).links
     ] == [("/", "← Retour au fil de veille"), ("/tendances", "Voir les tendances")]
+
+
+# The label of a button with an arrow: the arrow and its words in one span, tied by a no-break space
+# in the hidden arrow; the announcement of a link to another site after it.
+ARROW_LABEL = re.compile(
+    r'<span>(?:<span class="arrow-start" aria-hidden="true">←&nbsp;</span>[^<]+'
+    r'|[^<]+<span class="arrow-end" aria-hidden="true">&nbsp;→</span>'
+    r'|[^<]+<span class="external-arrow" aria-hidden="true">&nbsp;↗</span>)</span>'
+    r'(?: <span class="link-note">\([^<]*\)</span>)?'
+)
+
+
+def test_the_arrow_of_a_button_stays_on_the_line_of_its_word():
+    """WCAG 1.4.4 and 1.4.10: at 200 % text on a phone, the arrow went alone on its line. The label
+    is one item of the flex button, its name free of the no-break space."""
+    labels = {
+        name: [
+            label
+            for label in re.findall(
+                r'<a\b[^>]*\bclass="button(?:-secondary)?"[^>]*>(.*?)</a>',
+                page,
+                flags=re.DOTALL,
+            )
+            if re.search("[←→↗]", label)
+        ]
+        for name, page in PAGES.items()
+    }
+
+    assert {"404", "405", "500", "/?page=2", "item-paper"} <= {
+        name for name, found in labels.items() if found
+    }
+    assert [
+        label
+        for found in labels.values()
+        for label in found
+        if not ARROW_LABEL.fullmatch(label)
+    ] == []
 
 
 def test_the_sources_name_gh_archive_for_the_trends():

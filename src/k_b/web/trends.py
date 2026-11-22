@@ -1,7 +1,6 @@
 """The page of the trends, without input nor output: the day read from the address, the start of a
 window, the rows of its table and the page of each state (docs/site-web.md, "Tendances")."""
 
-import re
 from dataclasses import dataclass
 from datetime import date, timedelta
 
@@ -10,8 +9,13 @@ from starlette.datastructures import QueryParams
 from k_b.core.config import GH_ARCHIVE_WINDOW_DAYS
 from k_b.items import is_repository_name
 from k_b.web.data_api_client import DataApiError, TrendWindow
-from k_b.web.feed import NEW_TAB_NOTE, FieldError, read_written_day
-from k_b.web.french_dates import write_day
+from k_b.web.feed import (
+    NEW_TAB_NOTE,
+    FieldError,
+    read_written_day,
+    write_day_refusal,
+)
+from k_b.web.french_dates import write_count, write_day
 
 TRENDS_PATH = "/tendances"
 # The name of the field in the address, as GET /trends of the data API names it.
@@ -20,15 +24,9 @@ WINDOW_END_ID = "window-end"
 GITHUB_URL = "https://github.com"
 # The announcement of each link to GitHub (C13 of #564; Opquast 2025, rules 131, 142 and 146).
 GITHUB_LINK_NOTE = f"en anglais, {NEW_TAB_NOTE}"
-# Groups the thousands of a count, as French writes them: 1 500 (chr, never an escape in the
-# source, which a tool can turn into the character itself).
-THOUSANDS_SEPARATOR = chr(0x202F)
 
-WINDOW_END_REFUSED = "Date invalide: un jour attendu, sous la forme AAAA-MM-JJ."
-# A value refused of the form of a day, ASCII digits and dashes only, which its message names: an
-# input type=date cannot show it again (Opquast 2025, rule 81), and no other text received reaches
-# the page.
-DAY_SHAPE = re.compile(r"[0-9]{4}-[0-9]{2}-[0-9]{2}")
+# The field of the window, as a message of a day refused names it.
+WINDOW_END_IN_MESSAGES = "Date"
 WINDOW_END_REFUSED_BY_API = "La base de K-B refuse cette date: choisissez-en une autre."
 # The title of the page in each state (RGAA 8.6).
 REFUSED_TITLE = "Tendances, date à corriger"
@@ -86,15 +84,11 @@ def read_trends_form(params: QueryParams) -> TrendsForm:
         return TrendsForm(None, None)
     window_end = read_written_day(value)
     if window_end is None:
-        return TrendsForm(None, FieldError(WINDOW_END_ID, write_refusal(value)))
+        return TrendsForm(
+            None,
+            FieldError(WINDOW_END_ID, write_day_refusal(WINDOW_END_IN_MESSAGES, value)),
+        )
     return TrendsForm(window_end, None)
-
-
-def write_refusal(value: str) -> str:
-    """The message of a day refused, which names a value of the form of a day only."""
-    if not DAY_SHAPE.fullmatch(value):
-        return WINDOW_END_REFUSED
-    return f"Date invalide: {value} n’existe pas. Un jour attendu, sous la forme AAAA-MM-JJ."
 
 
 def find_api_window_end_error(error: DataApiError) -> FieldError | None:
@@ -110,10 +104,6 @@ def find_api_window_end_error(error: DataApiError) -> FieldError | None:
 def find_window_start(window_end: date) -> date:
     """The first day of a window of GH_ARCHIVE_WINDOW_DAYS full days, which ends on window_end."""
     return window_end - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)
-
-
-def write_count(count: int) -> str:
-    return f"{count:,}".replace(",", THOUSANDS_SEPARATOR)
 
 
 def build_trends_page(window: TrendWindow) -> TrendsPage:

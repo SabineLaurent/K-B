@@ -2,13 +2,20 @@
 its id given back in X-Request-ID."""
 
 import logging
+import re
 import uuid
 
 import pytest
 
+from k_b.commands.run_log import logging_to
 from k_b.core.api_request_log import format_request_line
 
 REQUEST_LOGGER = "k_b.core.api_request_log"
+# An example of the W3C Trace Context (https://www.w3.org/TR/trace-context/), version 00.
+TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
+PARENT_ID = "00f067aa0ba902b7"
+TRACEPARENT = f"00-{TRACE_ID}-{PARENT_ID}-01"
+TRACE_FIELD = re.compile(r": trace_id=([0-9a-f]{32}) request ")
 
 
 @pytest.fixture
@@ -144,3 +151,78 @@ def test_a_detail_is_logged_by_its_route_template_never_its_id(
     [line] = request_lines()
     assert " route=/items/{item_id} status=200 " in line
     assert "14" not in line.split(" duration_ms=")[0]
+
+
+def read_logged_request_lines(text):
+    """The request lines of a log written in the format of kb serve-data."""
+    return [line for line in text.splitlines() if f" {REQUEST_LOGGER}:" in line]
+
+
+def test_a_traceparent_received_gives_its_trace_id_to_the_line_of_its_request(
+    client, authorization, tmp_path, capsys
+):
+    with logging_to(tmp_path, None):
+        client.get("/items", headers={**authorization, "traceparent": TRACEPARENT})
+
+    [line] = read_logged_request_lines(capsys.readouterr().err)
+    assert (
+        f"{REQUEST_LOGGER}: trace_id={TRACE_ID} request method='GET' route=/items"
+        in line
+    )
+
+
+@pytest.mark.parametrize(
+    "received",
+    [
+        f"00-{TRACE_ID.upper()}-{PARENT_ID}-01",
+        f"01-{TRACE_ID}-{PARENT_ID}-01",
+        f"00-{'0' * 32}-{PARENT_ID}-01",
+        f"00-{TRACE_ID}-{'0' * 16}-01",
+        f"00-{TRACE_ID}-{PARENT_ID}-01-extra",
+        "not-a-traceparent-of-the-test",
+    ],
+)
+def test_a_refused_traceparent_starts_a_new_trace_and_is_never_quoted(
+    client, authorization, tmp_path, capsys, received
+):
+    with logging_to(tmp_path, None):
+        response = client.get(
+            "/items", headers={**authorization, "traceparent": received}
+        )
+
+    log = capsys.readouterr().err
+    [line] = read_logged_request_lines(log)
+    [trace_id] = TRACE_FIELD.findall(line)
+    assert trace_id not in received.lower()
+    assert received not in log
+    assert all(received not in value for value in response.headers.values())
+
+
+def test_two_traceparents_start_a_new_trace(client, authorization, tmp_path, capsys):
+    """The W3C Trace Context reads one traceparent: two are refused, as one that is not valid."""
+    with logging_to(tmp_path, None):
+        client.get(
+            "/items",
+            headers=[
+                *authorization.items(),
+                ("traceparent", TRACEPARENT),
+                ("traceparent", TRACEPARENT),
+            ],
+        )
+
+    [line] = read_logged_request_lines(capsys.readouterr().err)
+    [trace_id] = TRACE_FIELD.findall(line)
+    assert trace_id != TRACE_ID
+
+
+def test_without_traceparent_each_request_has_its_own_trace(
+    client, authorization, tmp_path, capsys
+):
+    with logging_to(tmp_path, None):
+        client.get("/items", headers=authorization)
+        client.get("/items", headers=authorization)
+
+    first, second = read_logged_request_lines(capsys.readouterr().err)
+    [first_trace_id] = TRACE_FIELD.findall(first)
+    [second_trace_id] = TRACE_FIELD.findall(second)
+    assert first_trace_id != second_trace_id
