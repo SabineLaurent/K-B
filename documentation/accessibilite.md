@@ -273,8 +273,9 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
 - **WAVE relève des libellés vides ou multiples sur les cases cachées du thème et sur les radios du mode.** Material ouvre son menu, sa
     recherche et la table des matières d'une page par des cases à cocher cachées, liées à des `label` sans texte ou à
-    plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, et 7 et 8
-    depuis: le menu numéroté ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les
+    plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, 7 et 8
+    après lui, et 7 et 9 depuis la rubrique « 5. Conduite du projet » (#512; relevé du 2026-11-22): le menu numéroté
+    ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les
     cases sont en `display: none`: elles ne sont ni dans
     l'ordre de la touche Tab ni dans l'arbre d'accessibilité de Chrome (relevé le 2026-11-18). Seuls y sont le
     champ de recherche et les deux radios du mode, chacun avec son nom (« Rechercher », « Passer au mode sombre »,
