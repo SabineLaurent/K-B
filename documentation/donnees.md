@@ -257,7 +257,7 @@ Le logigramme de `kb collect` en donne la vue d'ensemble: la préparation, puis 
 liste numérotée et le tableau des codes de sortie de cette section en donnent le détail, case par case. Les renvois
 visent le commit `36c1e02`.
 
-![Logigramme de kb collect, la préparation puis la collecte de chaque source, décrit en texte dans la section « La collecte, pas à pas »](images/logigramme-collecte_20261121.png)
+![Logigramme de kb collect, décrit dans la section « La collecte, pas à pas »](images/logigramme-collecte_20261121.png)
 
 [Le logigramme de `kb collect` en taille réelle (image de 2 673 × 1 075 pixels)](images/logigramme-collecte_20261121.png)
 
@@ -344,11 +344,11 @@ des codes de sortie en donnent le détail, dont des cas propres au texte, par ex
 prochain import (étape 3), les classements GitHub, jamais importés (étape 2), et la fenêtre de tendances déjà en base,
 écartée (étape 7). Les logigrammes suivent le commit `36c1e02`.
 
-![Logigramme de kb import, partie 1, lire et transformer, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-lire_20261121.png)
+![Logigramme de kb import, partie 1, lire, décrit dans la section « L'enchaînement, pas à pas »](images/logigramme-import-lire_20261121.png)
 
 [La partie 1 du logigramme de `kb import` en taille réelle (image de 1 873 × 843 pixels)](images/logigramme-import-lire_20261121.png)
 
-![Logigramme de kb import, partie 2, écrire en base en une seule transaction, décrit en texte dans la section « L'enchaînement, pas à pas »](images/logigramme-import-ecrire_20261121.png)
+![Logigramme de kb import, partie 2, écrire, décrit dans la section « L'enchaînement, pas à pas »](images/logigramme-import-ecrire_20261121.png)
 
 [La partie 2 du logigramme de `kb import` en taille réelle (image de 2 701 × 1 119 pixels)](images/logigramme-import-ecrire_20261121.png)
 
