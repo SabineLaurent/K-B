@@ -64,11 +64,11 @@ Le schéma suivant montre le chemin des données, de la collecte à la base et a
 ```mermaid
 flowchart LR
     accTitle: Le chemin des données, de la collecte à la base et au coffre
-    accDescr: kb collect écrit chaque jour le brut daté dans raw. kb import lit ce brut, le nettoie et l'écrit dans la base, SQLite sur le Mac et PostgreSQL en ligne, que lit l'API de données lancée par kb serve-data. kb write-tops lit les classements dans raw et écrit leurs fiches dans le coffre Obsidian, sous veille/tops.
+    accDescr: kb collect écrit chaque jour le brut daté dans raw. kb import lit ce brut, le nettoie et l'écrit dans la base, SQLite en local et PostgreSQL en ligne, que lit l'API de données lancée par kb serve-data. kb write-tops lit les classements dans raw et écrit leurs fiches dans le coffre Obsidian, sous veille/tops.
     collect("kb collect<br>chaque jour")
     raw[("raw/<br>le brut, daté")]
     import("kb import<br>lecture, nettoyage, écriture")
-    base[("Base<br>SQLite sur le Mac<br>PostgreSQL en ligne")]
+    base[("Base<br>SQLite en local<br>PostgreSQL en ligne")]
     api("API de données<br>kb serve-data")
     tops("kb write-tops")
     vault[("Coffre Obsidian<br>veille/tops/")]
@@ -78,7 +78,7 @@ flowchart LR
 
 Texte équivalent du schéma. `kb collect`, chaque jour, écrit le brut daté de chaque source dans `raw/`, sous le
 dossier de données. `kb import` lit le brut pas encore importé, le nettoie et écrit les items dans la base: un
-fichier SQLite sur le Mac, PostgreSQL en ligne. L'API de données, lancée par `kb serve-data`, lit la base.
+fichier SQLite en local, PostgreSQL en ligne. L'API de données, lancée par `kb serve-data`, lit la base.
 `kb write-tops` ne lit pas la base: il lit dans `raw/` les classements des dépôts les plus étoilés et les plus
 forkés, et écrit leurs fiches dans le coffre Obsidian, sous `veille/tops/`.
 
@@ -236,7 +236,7 @@ Source du tableau: `infra/README.md`, « La base PostgreSQL (#421) »; les rôle
 
 ### La lancer
 
-Sur le Mac:
+En local:
 
 ```sh
 KB_DATA_DIR=~/.knowledge_base uv run kb collect
@@ -302,7 +302,7 @@ Le tableau suivant donne les codes de sortie de `kb collect`.
 
 ### Le lancer
 
-Sur le Mac, après une collecte:
+En local, après une collecte:
 
 ```sh
 KB_DATA_DIR=~/.knowledge_base uv run kb import
@@ -583,7 +583,7 @@ ou n'a aucun relevé, en 1 si aucun n'a abouti, en 4 si l'un a échoué et l'un 
 top: il écrit ses fiches et garde un relevé illisible (`commands/write_tops_command.py:57-60`,
 `commands/write_tops_command.py:73`, `commands/exit_codes.py:88-93`).
 
-**Toute la chaîne.** Sur le Mac, chaque étape garde son propre code de sortie et tourne même si la précédente a
+**Toute la chaîne.** En local, chaque étape garde son propre code de sortie et tourne même si la précédente a
 échoué en partie (README, « Toute la chaîne en dev »):
 
 ```sh
@@ -651,7 +651,7 @@ administration » et « Vérifier les trois critères de #421 », sans l'avoir e
 - **Pas d'accès direct.** Le serveur n'accepte que les connexions Entra (mot de passe coupé,
     `infra/modules/postgresql-server.bicep:28-29`), et son pare-feu ne laisse entrer que les services Azure, tant
     qu'aucune administration n'est ouverte (`infra/README.md`, « Fermer l'administration »).
-- **L'administration**, depuis le Mac: l'adresse publique du Mac est ouverte le temps de l'administration, le jeton
+- **L'administration**, depuis le poste de travail: l'adresse publique du poste de travail est ouverte le temps de l'administration, le jeton
     d'accès Entra sert de mot de passe à `psql`, et chaque `psql` passe par la fonction `admin_psql`. L'administratrice
     ne lit dans `kb` que les catalogues, jamais une table du job (`infra/README.md`, « Ouvrir une administration »):
     cette voie ne lit donc pas les données.
@@ -671,5 +671,5 @@ administration » et « Vérifier les trois critères de #421 », sans l'avoir e
 - **Une page illisible** est rejetée à chaque import, tant que son brut ou son lecteur n'est pas corrigé
     (`etl/raw_reading.py:122-132`).
 - **La version de SQLite** est celle du Python installé par uv; K-B ne la fixe pas.
-- **Non décrits ici**: l'installation de PostgreSQL sur le Mac; les commandes d'accès en ligne, reprises sans avoir
+- **Non décrits ici**: l'installation de PostgreSQL en local; les commandes d'accès en ligne, reprises sans avoir
     été essayées.

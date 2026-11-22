@@ -50,7 +50,7 @@ Le tableau suivant décrit les deux déploiements.
 
 | Déploiement | Version | Type | Capacité | Mise à jour de la version | Filtre de contenu | Qui l'appelle |
 |---|---|---|---|---|---|---|
-| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, sur le Mac depuis le 2026-11-17, et en ligne depuis le 2026-11-18 |
+| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, en local depuis le 2026-11-17, et en ligne depuis le 2026-11-18 |
 | `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18; l'API IA en ligne ne l'appelle plus depuis |
 
 Les sections suivantes expliquent le type, la version figée et le filtre de contenu. Trois points complètent le
@@ -191,7 +191,7 @@ Qui a la clé peut donc appeler les deux déploiements, quels que soient ses rô
 
 La clé est gardée à deux endroits.
 
-- **Sur le Mac**, la clé est dans le fichier `.env` de l'opératrice. Ce fichier de réglages est exclu du dépôt de
+- **En local**, la clé est dans le fichier `.env` de l'opératrice. Ce fichier de réglages est exclu du dépôt de
     code. La commande `uv run --env-file .env` le passe au processus, c'est-à-dire au programme en cours. Aucune commande `kb` ne lit ce fichier
     elle-même.
 - **En ligne**, la clé est le secret `kb-llm-api-key` du coffre de secrets de K-B. Ce secret a été posé à la main,
@@ -206,7 +206,7 @@ La clé est gardée à deux endroits.
 Changer la clé, par exemple si elle a fuité, se fait en trois étapes.
 
 1. Régénérer la clé dans le portail: ouvrir la ressource, puis « Clés et point de terminaison ».
-2. Reporter la nouvelle clé dans le `.env` du Mac.
+2. Reporter la nouvelle clé dans le `.env` du poste de travail.
 3. Reporter la nouvelle clé dans le secret `kb-llm-api-key`, par la procédure « Pour refaire un seul secret » du
     README de l'infrastructure. Cette procédure redémarre `ca-kb-ai-api`.
 
@@ -246,10 +246,10 @@ L'API IA ne connaît du service que des réglages. Aucune partie de son code n'e
 ligne de K-B est décrite dans un fichier Bicep, le langage d'Azure qui décrit une infrastructure. Ce fichier
 s'applique en deux passes. La seconde passe, ou passe 2, pose entre autres l'adresse et le nom du modèle.
 
-Le tableau suivant donne les réglages du modèle, leur valeur pour ce service, et l'endroit où chacun est posé, sur le
-Mac et en ligne.
+Le tableau suivant donne les réglages du modèle, leur valeur pour ce service, et l'endroit où chacun est posé, en local
+et en ligne.
 
-| Réglage | Valeur pour ce service | Sur le Mac, dans le `.env` | En ligne |
+| Réglage | Valeur pour ce service | En local, dans le `.env` | En ligne |
 |---|---|---|---|
 | `KB_LLM_PROVIDER` | `openai_compatible` | à poser | fixé dans le fichier Bicep |
 | `KB_LLM_BASE_URL` | `https://<sous-domaine>.openai.azure.com/openai/v1` | à poser | paramètre `llmBaseUrl` de la passe 2 |
@@ -273,8 +273,8 @@ Ces réglages appellent quatre remarques.
     les secrets » et « 5. Seconde passe ». Le passage de la production à `gpt-6.1-sol`, fait le 2026-11-18, demande
     l'effort `low` en ligne, déjà fixé dans le fichier Bicep. Il demande aussi l'adresse (`llmBaseUrl`), le nom (`llmModel`) et la
     clé (`kb-llm-api-key`) de ce déploiement, posés à la main à la passe 2.
-- **Le nom du modèle.** Le dépôt de code ne fixe pas la valeur de `KB_LLM_MODEL`. Cette valeur vient du `.env` sur
-    le Mac, et du paramètre `llmModel` en ligne.
+- **Le nom du modèle.** Le dépôt de code ne fixe pas la valeur de `KB_LLM_MODEL`. Cette valeur vient du `.env` en local,
+    et du paramètre `llmModel` en ligne.
 
 ### Relire l'état
 
@@ -318,7 +318,7 @@ dans cette section.
 - Le bac à sable est un environnement d'essai, séparé de la production.
 - Le coffre de notes est le dossier d'Obsidian, une application de notes, où `kb` écrit les fiches de veille.
 
-**Le 2026-11-17, sur `gpt-6.1-sol`**, `kb serve-ai` a tourné sur le Mac, avec la version `f1eac19c` du code. L'effort
+**Le 2026-11-17, sur `gpt-6.1-sol`**, `kb serve-ai` a tourné en local, avec la version `f1eac19c` du code. L'effort
 de raisonnement était `low` (`KB_LLM_REASONING_EFFORT=low`). Les mesures partaient vers Grafana Cloud, dans le bac à
 sable (`KB_DEPLOYMENT_ENVIRONMENT=sandbox`). Aucune fiche n'a été écrite dans le coffre de notes pendant l'essai. La
 ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, model gpt-6.1-sol` et
@@ -337,8 +337,8 @@ ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, mod
     tentative. Elles ont compté 14 021 jetons en entrée et 1 281 en sortie, dont 170 de raisonnement.
 - **Aucune des 18 requêtes** n'a fini en `llm_content_filtered` ni en `llm_truncated`.
 - **Une condition de l'essai.** TLS est le chiffrement des connexions web. OpenSSL est la bibliothèque qui le réalise
-    pour le Python de K-B. ML-KEM est un procédé récent d'échange de clés dans TLS. Sur le Mac, `kb serve-ai` a
-    tourné avec un réglage d'OpenSSL qui retire de TLS l'échange de clés ML-KEM. Sans ce réglage, aucune requête
+    pour le Python de K-B. ML-KEM est un procédé récent d'échange de clés dans TLS. En local, sous macOS,
+    `kb serve-ai` a tourné avec un réglage d'OpenSSL qui retire de TLS l'échange de clés ML-KEM. Sans ce réglage, aucune requête
     n'atteignait le modèle (« Limites »).
 
 **Sur `gpt-6-luna`**, le modèle de K-B avant `gpt-6.1-sol`, trois essais ont eu lieu.
@@ -407,9 +407,9 @@ texte, élément par élément.
 ```mermaid
 flowchart LR
     accTitle: Qui appelle le service d'IA et ce dont l'appel dépend
-    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, sur le Mac, et en ligne depuis le 2026-11-18, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
+    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, en local, et en ligne depuis le 2026-11-18, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
     digest["kb digest<br>kb trend-report"] -->|"POST /digests<br>POST /trend-reports"| ai["API IA<br>kb serve-ai"]
-    ai -->|"chat/completions, clé de la ressource<br>sur le Mac et en ligne"| model["Foundry<br>déploiement gpt-6.1-sol"]
+    ai -->|"chat/completions, clé de la ressource<br>en local et en ligne"| model["Foundry<br>déploiement gpt-6.1-sol"]
     ai -->|"OTLP: mesures, traces"| grafana["Grafana Cloud"]
     vault["coffre de secrets<br>kb-llm-api-key"] -.->|"en ligne: la clé,<br>par l'identité managée"| ai
 ```
@@ -551,7 +551,7 @@ la section « Envoi des mesures à Grafana Cloud ».
 - **Les deux commandes de « Refaire le test » n'ont pas été relancées sur `gpt-6.1-sol`.** L'essai du 2026-11-17 a
     appelé ce modèle par `kb serve-ai`. Sans clé, seul un `GET` de la liste des modèles a été essayé ce jour-là, et
     `curl` a reçu le `401` attendu.
-- **Un contournement de TLS a été nécessaire pour l'essai du 2026-11-17.** Sur le Mac, le Python de K-B, avec
+- **Un contournement de TLS a été nécessaire pour l'essai du 2026-11-17.** En local, sous macOS, le Python de K-B, avec
     OpenSSL 3.5.6, a reçu une `SSLEOFError` sur 8 à 9 appels sur 10 vers la ressource, sans clé. Les mêmes appels ont
     reçu les `401` attendus dans trois cas: avec `curl`, qui utilise LibreSSL, avec ce même Python en TLS 1.2, ou
     avec ce Python sans l'échange de clés ML-KEM. Deux hypothèses restent non tranchées. La première est un
@@ -602,7 +602,7 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | La clé de K-B | la clé donnée au conteneur par une référence au coffre | `infra/modules/api-container-app.bicep:68-73`, `:75-81`, `:132`, `:152` |
 | La clé de K-B | la procédure qui refait le secret et redémarre `ca-kb-ai-api` | `infra/README.md`, « Pour refaire un seul secret » |
 | Le branchement de K-B | aucune partie du code de l'API IA n'est propre à Azure | [architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), « Vue d'ensemble » |
-| Le branchement de K-B | les réglages du modèle sur le Mac | `.env.example:114-133` |
+| Le branchement de K-B | les réglages du modèle en local | `.env.example:114-133` |
 | Le branchement de K-B | `KB_LLM_PROVIDER` fixé en ligne | `infra/main.bicep:298` |
 | Le branchement de K-B | `KB_LLM_BASE_URL`, paramètre `llmBaseUrl` | `infra/main.bicep:22-23`, `:299` |
 | Le branchement de K-B | `KB_LLM_MODEL`, paramètre `llmModel` | `infra/main.bicep:25-26`, `:300` |

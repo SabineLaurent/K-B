@@ -67,9 +67,9 @@ flowchart LR
 
 Les flèches du schéma, une à une:
 
-- Des sources de veille à la collecte (« collecte »): déployé, chaque jour, par le job `caj-kb-daily-routine`; sur
-    le Mac, par `kb collect`.
-- De la lecture choisie à la collecte (« collecte »): pour les clips, déployé; pour Zotero, sur le Mac seulement, la
+- Des sources de veille à la collecte (« collecte »): déployé, chaque jour, par le job `caj-kb-daily-routine`; en local,
+    par `kb collect`.
+- De la lecture choisie à la collecte (« collecte »): pour les clips, déployé; pour Zotero, en local seulement, la
     collecte en ligne est prévue (#425).
 - De la collecte aux fichiers bruts (« garde tel quel »): déployé.
 - Des fichiers bruts à la base (« range »): déployé, par `kb import`, dans le même job.
@@ -79,7 +79,7 @@ Les flèches du schéma, une à une:
 - De l'API de données à l'API IA (« sert les items »): déployé.
 - Entre l'API IA et le modèle de langage (« rédige »), dans les deux sens: déployé.
 - De l'API IA aux comptes rendus (« rédige »): déployé, par le job `caj-kb-digest-watch`.
-- Des comptes rendus à la base de connaissance (« écrit »): déployé, dans le coffre du job; le Mac les relit par
+- Des comptes rendus à la base de connaissance (« écrit »): déployé, dans le coffre du job; le poste de travail les relit par
     `make download-watch-sheets`.
 - De la base de connaissance à l'API de données (« jumeaux JSON des fiches »): déployé, en ligne seulement, pour les
     fiches des tops et des comptes rendus de veille; aucune page du site ne les demande encore (section
@@ -92,7 +92,7 @@ Les flèches du schéma, une à une:
 
 Les deux schémas de cette partie suivent le chemin du code: le premier va des sources au coffre, le second montre les
 jobs en ligne et le stockage d'échange. Un rectangle est une commande `kb`, un cylindre un fichier, une base ou un
-conteneur, un rectangle arrondi un service extérieur ou le Mac. Une flèche est une lecture, une écriture ou un appel
+conteneur, un rectangle arrondi un service extérieur ou le poste de travail. Une flèche est une lecture, une écriture ou un appel
 que fait la commande, dans le sens où vont les données: l'API IA appelle l'API de données, et les items vont de l'API
 de données à l'API IA. Un trait plein est un flux que le code fait aujourd'hui. Un trait en pointillés n'est pas
 encore en ligne: il est codé, sauf si son étiquette dit « pas encore codé ». Chaque schéma est suivi de la liste de
@@ -160,18 +160,18 @@ flowchart LR
 Les flèches du schéma, une à une. Toutes sont codées; « en ligne » dit si la commande tourne aussi sur Azure.
 
 - Des cinq sources de veille, de Zotero et des clips à `kb collect` (sept flèches « lit »): en ligne, déployé dans le
-    job `caj-kb-daily-routine` pour les sources de veille et les clips; pour Zotero, sur le Mac seulement, la lecture
+    job `caj-kb-daily-routine` pour les sources de veille et les clips; pour Zotero, en local seulement, la lecture
     en ligne est prévue (#425).
 - Entre l'état de la collecte et `kb collect` (« date de la dernière collecte de chaque source »), dans les deux
     sens: déployé, sur le partage `job-data`.
 - Entre `kb collect` et les fichiers bruts (« écrit le brut, relit le dernier extrait Zotero »), dans les deux sens:
-    déployé, sur le partage `job-data`; la relecture de l'extrait de Zotero ne sert que sur le Mac.
+    déployé, sur le partage `job-data`; la relecture de l'extrait de Zotero ne sert qu'en local.
 - Entre les fichiers bruts et `kb import` (« lit les pages non importées »), puis entre `kb import` et la base
     (« lit raw_data, écrit les items »), dans les deux sens: déployé dans la routine.
 - De `kb purge` aux fichiers bruts, et entre la base et `kb purge` (« supprime ce qui a passé sa durée »): déployé
     dans la routine.
 - De `kb create-db` et `kb migrate-database` à la base (« crée les tables »): `kb migrate-database` est déployé, dans
-    le job `caj-kb-migrate-database`, que lance le déploiement; `kb create-db` sert sur le Mac.
+    le job `caj-kb-migrate-database`, que lance le déploiement; `kb create-db` sert en local.
 - Entre les fichiers bruts et `kb write-tops` (« lit les classements, supprime les remplacés »), puis de
     `kb write-tops` à la base de connaissance (« écrit veille/tops/, fiches et jumeaux JSON »): déployé dans la
     routine.
@@ -191,13 +191,13 @@ Les flèches du schéma, une à une. Toutes sont codées; « en ligne » dit si 
 
 ### Les jobs en ligne et le stockage d'échange
 
-Le schéma suivant montre les jobs en ligne, le stockage d'échange et le Mac; la liste qui le suit le décrit flèche par
+Le schéma suivant montre les jobs en ligne, le stockage d'échange et le poste de travail; la liste qui le suit le décrit flèche par
 flèche.
 
 ```mermaid
 flowchart LR
     accTitle: Les jobs en ligne et le stockage d'échange
-    accDescr: Dans le stockage d'échange en ligne, kb smoke-test liste le conteneur smoke-test. kb daily-routine copie les clips du conteneur clippings dans le coffre du job, lance kb collect, kb import, kb purge et kb write-tops, puis publie veille dans le conteneur watch. kb digest-watch lance kb digest et kb trend-report, puis publie veille de même. L'API de données lit les jumeaux JSON de watch, et le Mac en copie les fiches. L'envoi des clips et de Zotero depuis le Mac et la copie de Zotero dans le job ne sont pas encore codés.
+    accDescr: Dans le stockage d'échange en ligne, kb smoke-test liste le conteneur smoke-test. kb daily-routine copie les clips du conteneur clippings dans le coffre du job, lance kb collect, kb import, kb purge et kb write-tops, puis publie veille dans le conteneur watch. kb digest-watch lance kb digest et kb trend-report, puis publie veille de même. L'API de données lit les jumeaux JSON de watch, et le poste de travail en copie les fiches. L'envoi des clips et de Zotero depuis le poste de travail et la copie de Zotero dans le job ne sont pas encore codés.
     subgraph exchange["Stockage d'échange en ligne, Azure Blob Storage"]
         smokeContainer[("conteneur<br>smoke-test")]
         subgraph choice["Lecture choisie (clips, Zotero), créée par #420"]
@@ -206,7 +206,7 @@ flowchart LR
         end
         watchContainer[("conteneur<br>watch")]
     end
-    mac("Mac")
+    workstation("Poste de travail")
     smokeTest["kb smoke-test<br>job caj-kb-smoke-test"]
     dailyRoutine["kb daily-routine<br>job caj-kb-daily-routine"]
     digestWatch["kb digest-watch<br>job caj-kb-digest-watch"]
@@ -217,7 +217,7 @@ flowchart LR
     steps["kb collect, kb import<br>kb purge, kb write-tops"]
     digestSteps["kb digest<br>kb trend-report"]
     smokeContainer -->|"liste, un compte seul"| smokeTest
-    mac -.->|"make upload-library<br>pas encore codé (#542)"| choice
+    workstation -.->|"make upload-library<br>pas encore codé (#542)"| choice
     choiceClips -->|"miroir des clips"| dailyRoutine
     dailyRoutine -->|"écrit les clips"| clippings
     choiceZotero -.->|"copie de Zotero<br>pas encore codé (#425)"| dailyRoutine
@@ -233,14 +233,14 @@ flowchart LR
     dailyRoutine -->|"publie veille/"| watchContainer
     digestWatch -->|"publie veille/"| watchContainer
     watchContainer -->|"lit les jumeaux JSON<br>(#559, #560)"| dataApi
-    watchContainer -->|"make<br>download-watch-sheets<br>(#424)"| mac
+    watchContainer -->|"make<br>download-watch-sheets<br>(#424)"| workstation
 ```
 
 Les flèches du schéma, une à une:
 
 - Du conteneur `smoke-test` à `kb smoke-test` (« liste, un compte seul »): déployé, dans le job manuel
     `caj-kb-smoke-test`.
-- Du Mac à la lecture choisie (« make upload-library », en pointillés): pas encore codé, prévu (#542).
+- Du poste de travail à la lecture choisie (« make upload-library », en pointillés): pas encore codé, prévu (#542).
 - Des clips à `kb daily-routine` (« miroir des clips »), puis de `kb daily-routine` au dossier `Clippings/` du coffre
     du job (« écrit les clips »): déployé.
 - Des copies de Zotero à `kb daily-routine` (« copie de Zotero ») et de `kb daily-routine` à la copie de Zotero du
@@ -253,7 +253,7 @@ Les flèches du schéma, une à une:
 - Du dossier `veille/` à `kb daily-routine` et à `kb digest-watch` (« lit veille/ »), puis de chacun au conteneur
     `watch` (« publie veille/ »): déployé.
 - Du conteneur `watch` à `kb serve-data` (« lit les jumeaux JSON »): déployé.
-- Du conteneur `watch` au Mac (« make download-watch-sheets »): codé, lancé à la main sur le Mac.
+- Du conteneur `watch` au poste de travail (« make download-watch-sheets »): codé, lancé à la main en local.
 
 ### La lecture des deux schémas
 
@@ -316,7 +316,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
 6. **Le stockage d'échange en ligne.** Le Bicep déclare quatre conteneurs
     (`infra/modules/exchange-storage.bicep:66-73`, `:92-106`). `kb smoke-test` liste le premier, `smoke-test`, et
     n'écrit que le nombre de blobs de sa première page, 100 au plus (`commands/smoke_test_command.py:1-3`, `:141`,
-    `core/config.py:665`). Les trois autres viennent de #420: `clippings` et `zotero`, la lecture choisie, où le Mac
+    `core/config.py:665`). Les trois autres viennent de #420: `clippings` et `zotero`, la lecture choisie, où le poste de travail
     déposera les clips et les copies de Zotero, et `watch`, où les jobs publient `veille/`. Les deux routines
     relancent les commandes dans le même processus (`commands/job_routine.py:4-6`). `kb daily-routine` copie les
     clips dans le coffre du job, puis lance `kb collect`, `kb import`, `kb purge` et `kb write-tops`, puis publie
@@ -328,15 +328,15 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
     (`commands/job_transfers.py:69`, `jobs/watch_publication.py:138`, `:146`). La copie de Zotero dans le job n'est
     pas encore codée: elle viendra entre le miroir des clips et `kb collect` (#425,
     `commands/daily_routine_command.py:51`). #425 la prévoit dans un dossier temporaire, que `KB_ZOTERO_DIR` nomme
-    pour `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du Mac. Dans un job, le
-    coffre est le dossier `KB_VAULT_DIR` du job, pas celui du Mac: `kb collect` y lit `Clippings/`, et lira la copie
+    pour `kb collect`: la flèche « pose la copie » va vers ce dossier, pas vers le Zotero du poste de travail. Dans un job, le
+    coffre est le dossier `KB_VAULT_DIR` du job, pas celui du poste de travail: `kb collect` y lit `Clippings/`, et lira la copie
     de Zotero dans le dossier de `KB_ZOTERO_DIR` (`etl/collected_sources.py:18-22`, `etl/sources/clipping.py:103`);
     `kb write-tops`, `kb digest` et `kb trend-report` y écrivent `veille/`. Ces deux jobs sont déclarés en ligne:
     `caj-kb-daily-routine` chaque jour à 08:00 UTC (#330), `caj-kb-digest-watch` le lundi et le jeudi à 10:00 UTC
     par défaut (#423), tous deux sur le partage `job-data`, où restent le brut, l'état de la collecte, le registre
     des comptes rendus des tendances et le coffre du job (`infra/main.bicep:379`, `:406`, `infra/deployment.json`).
-    L'envoi des clips et des copies de Zotero depuis le Mac n'est pas encore codé: il viendra par
-    `make upload-library` (#542). La relecture de `watch` par le Mac passe par `make download-watch-sheets` (#424,
+    L'envoi des clips et des copies de Zotero depuis le poste de travail n'est pas encore codé: il viendra par
+    `make upload-library` (#542). La relecture de `watch` par le poste de travail passe par `make download-watch-sheets` (#424,
     `commands/download_watch_sheets_command.py`), qui copie les fiches que les jobs publient. En ligne, l'API de
     données y lit les jumeaux (#559, #560), par le rôle Storage Blob Data Reader
     (`infra/modules/exchange-storage.bicep:170-174`).
@@ -395,7 +395,7 @@ La liste suivante donne chaque paquet de `src/k_b/`, son rôle, puis ce que les 
     publication et le téléchargement de `veille/`), l'appel de `GET /health`. Les tests lui interdisent d'importer
     autre chose que `exchange` et `core` (`test_layers.py:338`), et d'être importé par un autre paquet que
     `commands` (`:344`).
-- **`exchange/`**, le client du stockage d'échange, Azure Blob Storage, par l'identité managée ou, sur le Mac, le
+- **`exchange/`**, le client du stockage d'échange, Azure Blob Storage, par l'identité managée ou, en local, le
     compte d'`az login`: réglages, transport, erreurs nommées, téléchargement d'une version listée. Les tests lui
     interdisent d'importer autre chose que `core`, ou `core/atomic_write.py` (`test_layers.py:411`), et d'être
     importé par un autre paquet que `jobs`, `commands` et `data_api` (`:417`).
@@ -471,7 +471,7 @@ Le tableau suivant compare les deux API, propriété par propriété.
 | Propriété | API de données | API IA |
 |---|---|---|
 | Commande | `kb serve-data` | `kb serve-ai` |
-| Adresse par défaut, sur le Mac | `127.0.0.1:8000` (`core/config.py:214-215`) | `127.0.0.1:8001` (`core/config.py:307-308`) |
+| Adresse par défaut, en local | `127.0.0.1:8000` (`core/config.py:214-215`) | `127.0.0.1:8001` (`core/config.py:307-308`) |
 | Routes | `GET /items` (`data_api/routers/item_router.py:101`), `GET /items/{item_id}` (`:148`), `GET /trends` (`data_api/routers/trend_router.py:23`), et quatre routes du seul client `WEB`, que la phrase qui suit le tableau nomme | `POST /digests` (`ai_api/routers/digest_router.py:70`), `POST /trend-reports` (`ai_api/routers/trend_report_router.py:61`) |
 | Sans clé | `GET /health` (`data_api/app.py:82`) | `GET /health` (`ai_api/app.py:100`) |
 | Clients | chacun sa clé, `KB_DATA_API_KEY_<CLIENT>` (`core/api_keys.py:12`); l'API IA est le client `AI_DIGEST` (`ai_api/connectors/data_api_settings.py:15`), le site le client `WEB` (`core/config.py:375`) | `kb digest`, client `KB_DIGEST`, pour `POST /digests`; `kb trend-report`, client `KB_TREND_REPORT`, pour `POST /trend-reports` (`core/config.py:346-351`) |
@@ -520,7 +520,7 @@ refuse de démarrer si `KB_VAULT_DIR` n'est pas un dossier existant: elle ne le 
 
 K-B tourne de deux façons, par le même code.
 
-**Sur le Mac**, sans conteneur: chaque commande se lance par `uv run kb …`. Les données sont dans le dossier de
+**En local**, sans conteneur: chaque commande se lance par `uv run kb …`. Les données sont dans le dossier de
 `KB_DATA_DIR`: le brut, l'état de la collecte, la base SQLite, les journaux d'import, les journaux de fonctionnement
 (`logs/`) et le registre des tendances. Les deux API et le site écoutent sur `127.0.0.1`, la machine seule; le site
 sur le port 8002 (`core/config.py:317-318`).
@@ -567,9 +567,9 @@ puis une seconde liste donne le détail de chaque partie, avec ses renvois au co
 ```mermaid
 flowchart TB
     accTitle: Le déploiement de K-B sur Azure
-    accDescr: GitHub Actions pousse l'image dans le registre et met à jour les apps et les jobs de l'environnement Container Apps. Le coffre de secrets donne leurs secrets aux trois apps et aux deux jobs planifiés. L'API de données lit la base PostgreSQL et les jumeaux du conteneur watch, et sert l'API IA et le site, qui montre la veille à l'opératrice derrière la connexion Entra. L'API IA appelle le modèle de langage et l'API GitHub, et exporte vers Grafana Cloud. La routine quotidienne collecte, lit les clips, écrit la base et publie dans watch, comme le job des comptes rendus, tous deux sur le partage job-data. L'envoi depuis le Mac et la copie de Zotero sont prévus.
+    accDescr: GitHub Actions pousse l'image dans le registre et met à jour les apps et les jobs de l'environnement Container Apps. Le coffre de secrets donne leurs secrets aux trois apps et aux deux jobs planifiés. L'API de données lit la base PostgreSQL et les jumeaux du conteneur watch, et sert l'API IA et le site, qui montre la veille à l'opératrice derrière la connexion Entra. L'API IA appelle le modèle de langage et l'API GitHub, et exporte vers Grafana Cloud. La routine quotidienne collecte, lit les clips, écrit la base et publie dans watch, comme le job des comptes rendus, tous deux sur le partage job-data. L'envoi depuis le poste de travail et la copie de Zotero sont prévus.
     actions("GitHub Actions<br>deploy.yml, sur un tag vX.Y.Z<br>identité id-kb-deploy, OIDC")
-    mac("Mac<br>base de connaissance<br>(coffre Obsidian), Zotero")
+    workstation("Poste de travail<br>base de connaissance<br>(coffre Obsidian), Zotero")
     sources("Sources de veille")
     browser("Navigateur de l'opératrice")
     subgraph azure["Ressources d'infra/, Azure France Central"]
@@ -614,7 +614,7 @@ flowchart TB
     smokeContainer -->|"liste, Blob Data Reader"| smokeJob
     smokeJob -->|"GET /health<br>sondes sans clé"| dataApi
     smokeJob -->|"GET /health<br>sondes sans clé"| aiApi
-    mac -.->|"make upload-library<br>prévu #542"| choice
+    workstation -.->|"make upload-library<br>prévu #542"| choice
     sources -->|"collecte"| dailyJob
     clipContainer -->|"clips, Blob Data Reader"| dailyJob
     zoteroContainer -.->|"copie de Zotero<br>prévu #425"| dailyJob
@@ -625,7 +625,7 @@ flowchart TB
     dailyJob -->|"publie veille/, Blob Data Contributor"| watchContainer
     digestJob -->|"publie veille/, Blob Data Contributor"| watchContainer
     watchContainer -->|"jumeaux JSON, Blob Data Reader"| dataApi
-    watchContainer -->|"make<br>download-watch-sheets (#424)"| mac
+    watchContainer -->|"make<br>download-watch-sheets (#424)"| workstation
 ```
 
 Les flèches du schéma, une à une:
@@ -650,7 +650,7 @@ Les flèches du schéma, une à une:
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
     API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
     porte #499.
-- Du Mac à la lecture choisie (« make upload-library », en pointillés): prévu (#542).
+- Du poste de travail à la lecture choisie (« make upload-library », en pointillés): prévu (#542).
 - Des sources de veille à `caj-kb-daily-routine` (« collecte »): déployé.
 - Du conteneur des clips à `caj-kb-daily-routine` (« clips, Blob Data Reader »): déployé.
 - Du conteneur des copies de Zotero à `caj-kb-daily-routine` (« copie de Zotero », en pointillés): prévu (#425).
@@ -659,7 +659,7 @@ Les flèches du schéma, une à une:
 - De `ca-kb-ai-api` à `caj-kb-digest-watch` (« POST /digests, POST /trend-reports »): déployé.
 - De chacun des deux jobs planifiés au conteneur `watch` (« publie veille/, Blob Data Contributor »): déployé.
 - Du conteneur `watch` à `ca-kb-data-api` (« jumeaux JSON, Blob Data Reader »): déployé.
-- Du conteneur `watch` au Mac (« make download-watch-sheets »): codé, lancé à la main sur le Mac, par le compte Entra
+- Du conteneur `watch` au poste de travail (« make download-watch-sheets »): codé, lancé à la main en local, par le compte Entra
     de l'opératrice.
 
 Le détail de chaque partie:
@@ -709,7 +709,7 @@ Le détail de chaque partie:
     [la fiche du service d'IA](service_ia_pour_docu.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
     `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
     paramètres, les secrets et l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:22-29`, `:301-304`).
-- **Prévu**: l'envoi depuis le Mac viendra avec #542 (la relecture de `watch` est codée par #424), la copie de
+- **Prévu**: l'envoi depuis le poste de travail viendra avec #542 (la relecture de `watch` est codée par #424), la copie de
     Zotero avec #425.
 
 ## Limites

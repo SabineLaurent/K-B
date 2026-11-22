@@ -26,7 +26,7 @@ demande à l'autre, sauf ce que sa mémoire tient jusqu'au redémarrage: le comp
 mesures, traces et enregistrements de journal pas encore envoyés (`ai_api/app.py:1-4`). Seul `kb` écrit dans le
 coffre.
 
-Elle se lance par `kb serve-ai`. Sur le Mac, elle écoute par défaut sur `127.0.0.1:8001`, la machine seule
+Elle se lance par `kb serve-ai`. En local, elle écoute par défaut sur `127.0.0.1:8001`, la machine seule
 (`core/config.py:307-308`). En ligne, c'est l'app `ca-kb-ai-api` d'Azure Container Apps, sans adresse publique
 (section [En ligne](#en-ligne)).
 
@@ -269,7 +269,7 @@ Une clé de 43 caractères, par la commande du README:
 uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### La changer sur le Mac
+### La changer en local
 
 1. Ranger la nouvelle clé dans sa variable du `.env`: `KB_AI_API_KEY_KB_DIGEST` ou
     `KB_AI_API_KEY_KB_TREND_REPORT`. Le client lit la même variable que le serveur
@@ -382,7 +382,7 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
     profil du shell reste valide même retirée du `.env`.
 - **`uv run --env-file .env kb serve-ai` charge tout le `.env`**, donc aussi des secrets dont l'API IA n'a pas
     besoin.
-- **Sur le Mac, la clé passe en clair**, en HTTP sur `127.0.0.1`: la machine seule l'écoute. En ligne, le
+- **En local, la clé passe en clair**, en HTTP sur `127.0.0.1`: la machine seule l'écoute. En ligne, le
     transport est en HTTPS.
 - **En ligne, les comptes rendus ne sont demandés qu'à l'horaire de `caj-kb-digest-watch` ou par un lancement du
     job à la main, sans nouvelle tentative.** Le job part le lundi et le jeudi à 10:00 UTC par défaut

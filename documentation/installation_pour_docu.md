@@ -158,7 +158,7 @@ les variables des commandes qu'ils enchaînent; avec `--dry-run`, ils ne lisent 
 - **`KB_EXCHANGE_BLOB_URL`, `AZURE_CLIENT_ID`**: lues par `kb smoke-test`, `kb daily-routine` et `kb digest-watch`,
     pour qui elles sont obligatoires, et par `kb serve-data`, pour qui elles sont facultatives: sans l'une d'elles, ses routes
     des tops et des comptes rendus répondent 503 `watch_unconfigured` (`read_watch_settings_or_refusal`,
-    `data_api/settings.py`). `kb download-watch-sheets` ne lit que `KB_EXCHANGE_BLOB_URL`, obligatoire: sur le Mac,
+    `data_api/settings.py`). `kb download-watch-sheets` ne lit que `KB_EXCHANGE_BLOB_URL`, obligatoire: en local,
     il agit par le compte d'`az login`. `AZURE_CLIENT_ID` est lue aussi avec `KB_DATABASE_AUTH=entra`.
 - **Toute variable `OTEL_*`**: lue par `kb serve-ai`. À ne jamais poser: `kb serve-ai` refuse de démarrer avec une
     seule (`read_metrics_export_settings_or_refusal`, `ai_api/connectors/metrics_export.py`).
@@ -178,7 +178,7 @@ Le tableau suivant donne chaque dépendance, son plancher et sa borne haute dans
 
 | Paquet | Plancher | Borne haute | Version de `uv.lock` | Rôle dans K-B |
 |---|---|---|---|---|
-| `azure-identity` | 1.27.0 | — | 1.27.0 | le jeton de l'identité managée, en ligne: la base PostgreSQL avec `KB_DATABASE_AUTH=entra` (`database/entra.py`) et le stockage d'échange des jobs et de l'API de données; sur le Mac, le compte d'`az login` (`exchange/storage.py`) |
+| `azure-identity` | 1.27.0 | — | 1.27.0 | le jeton de l'identité managée, en ligne: la base PostgreSQL avec `KB_DATABASE_AUTH=entra` (`database/entra.py`) et le stockage d'échange des jobs et de l'API de données; en local, le compte d'`az login` (`exchange/storage.py`) |
 | `azure-storage-blob` | 12.31.1 | — | 12.31.1 | le stockage d'échange: le miroir des clips, la publication et le téléchargement de `veille/`, la liste de `kb smoke-test` (`jobs/`), et la lecture des jumeaux de `watch` par l'API de données (`data_api/watch_reading.py`) |
 | `beautifulsoup4` | 4.15.0 | — | 4.15.0 | la lecture des pages HTML de tldr.tech (`etl/sources/tldr.py`) |
 | `defusedxml` | 0.7.1 | — | 0.7.1 | la lecture du flux Atom d'arXiv, sans développer une entité déclarée dans le flux (`etl/sources/arxiv.py`) |
@@ -216,7 +216,7 @@ uv run mypy --strict
 vérifie aussi; elle lance `uv run ruff check` sans `--no-cache`, une précaution prise sur la machine
 ([la fiche des tests](tests_pour_docu.md), « Lancer les tests »).
 
-Les tests marqués `postgresql` demandent un serveur PostgreSQL de test, jamais la base de production. Sur le Mac,
+Les tests marqués `postgresql` demandent un serveur PostgreSQL de test, jamais la base de production. En local, sous macOS,
 c'est le PostgreSQL de Homebrew, sans conteneur; la formule `postgresql@18` (18.6 selon
 `brew info --json=v2 postgresql@18`, observé le 2026-11-08) est de la version majeure du service de la CI
 (`postgres:18.6`, job `tests-postgresql` de `.github/workflows/ci.yml`):

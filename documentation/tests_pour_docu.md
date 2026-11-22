@@ -48,7 +48,7 @@ retire pas les autres variables d'un `.env` exporté; `tests/commands/conftest.p
 ### Pour les tests marqués `postgresql`
 
 Un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
-un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
+un serveur de la machine (en local, sous macOS, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
 base de production. Son rôle doit pouvoir créer et supprimer une base (`make_postgresql_base`), et créer des rôles
 pour les tests des droits de la base en ligne (`identity_roles`, `tests/conftest.py`). Une base de test est créée
 par défaut en UTF8 et en collation C, comme `kb create-db` la demande (`create_postgresql_base`); un test peut en
