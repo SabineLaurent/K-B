@@ -24,8 +24,8 @@ ce que font la collecte qui précède l'import (`kb collect`) et le script d'agr
 pas, chacun avec son logigramme, comment l'import nettoie et homogénéise les données, la commande qui le suit
 (`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`
 (2026-11-11); la collecte et les logigrammes, d'après le commit `36c1e02` (2026-11-21). Les chemins du code de K-B (`etl/…`, `database/…`) partent de
-`src/k_b/`, les autres de la racine du dépôt. Le README garde sa section « Installer et lancer », que cette fiche
-reprend et détaille.
+`src/k_b/`, les autres de la racine du dépôt. [Utiliser K-B](utilisation.md) donne chaque commande de `kb` en bref;
+cette fiche détaille celles de la base.
 
 ## Deux usages, deux moteurs
 
@@ -87,7 +87,7 @@ forkés, et écrit leurs fiches dans le coffre Obsidian, sous `veille/tops/`.
 ### Langage et outils
 
 - **Python 3.13 ou plus récent**: `requires-python = ">=3.13"` (`pyproject.toml`).
-- **uv**, qui installe Python, K-B et ses dépendances (README, « Installer et lancer »).
+- **uv**, qui installe Python, K-B et ses dépendances ([la fiche de l'installation](installation_pour_docu.md)).
 - **La commande `kb`**: le point d'entrée `kb = "k_b.cli:main"` (`pyproject.toml`, `[project.scripts]`). `create-db`,
     `migrate-database`, `import`, `purge`, `write-tops` et `daily-routine` en sont des sous-commandes, que lance la
     table `RUN_BY_COMMAND` (`cli.py:95-103`).
@@ -173,11 +173,11 @@ Le tableau suivant donne les codes de sortie de `kb create-db`.
 | 0 | la base est créée | `commands/create_db_command.py:53-54` |
 | 1 | la création a échoué (erreur du moteur, du disque) | `commands/create_db_command.py:43-52` |
 | 2 | rien n'est fait: réglage refusé (une URL que libpq ne lit pas comprise), la base existe déjà, ou la base PostgreSQL n'est pas en UTF8 et en collation C | `commands/create_db_command.py:29-42` |
-| 130 | Ctrl-C: aucun fichier de base ne reste, sauf si un second Ctrl-C coupe sa suppression (README, « Créer la base ») | `commands/exit_codes.py:63-72` |
+| 130 | Ctrl-C: aucun fichier de base ne reste, sauf si un second Ctrl-C coupe sa suppression | `commands/exit_codes.py:63-72` |
 
 ### En local: PostgreSQL, pour essayer la branche en ligne
 
-Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL (README, « Lancer les tests sur
+Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL ([la fiche des tests](tests_pour_docu.md), « Pour les tests marqués `postgresql` »
 PostgreSQL »), sans décrire son installation: c'est une limite de cette fiche. K-B ne crée pas la base PostgreSQL,
 seulement ses tables. Elle se crée à la main, en UTF8 et en collation C, comme la base en ligne
 (`infra/postgresql/create-principals.sql:19`):
@@ -243,7 +243,7 @@ KB_DATA_DIR=~/.knowledge_base uv run kb collect
 ```
 
 `KB_COLLECT_ONLY` choisit les sources d'une collecte; Zotero, les clips et GH Archive ne tournent que si leur variable
-est posée (README, « Installer et lancer »). En ligne, `kb collect` est une étape de `kb daily-routine`, et `kb import`
+est posée ([la fiche de l'installation](installation_pour_docu.md), « Les variables d'environnement »). En ligne, `kb collect` est une étape de `kb daily-routine`, et `kb import`
 ne la suit pas si elle sort en 1 ou en 2 (`commands/daily_routine_command.py:52-59`).
 
 ### La collecte, pas à pas
@@ -461,7 +461,7 @@ Le tableau suivant donne les codes de sortie de `kb import`.
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
 | 1 | l'import a échoué: il s'arrête sans garder de journal, et le prochain import relit chaque fichier que la base n'a pas inscrit; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
 | 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:126-134`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
-| 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal (README, « Importer le brut dans la base ») | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
+| 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
 
 ## Le nettoyage et l'homogénéisation des formats
 
@@ -584,7 +584,7 @@ top: il écrit ses fiches et garde un relevé illisible (`commands/write_tops_co
 `commands/write_tops_command.py:73`, `commands/exit_codes.py:88-93`).
 
 **Toute la chaîne.** En local, chaque étape garde son propre code de sortie et tourne même si la précédente a
-échoué en partie (README, « Toute la chaîne en dev »):
+échoué en partie ([Utiliser K-B](utilisation.md#toute-la-chaine-en-local)):
 
 ```sh
 export KB_DATA_DIR=~/.knowledge_base KB_VAULT_DIR=<coffre>
@@ -621,7 +621,7 @@ Essayé le 2026-11-11 (Python 3.13.13 de uv, SQLite 3.50.4) sur une base neuve: 
 (`SELECT source_code, label FROM source ORDER BY id`), et une écriture est refusée
 (`sqlite3.OperationalError: attempt to write a readonly database`).
 
-**Limite observée.** La commande du README, `sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "…"`, échoue sur une base
+**Limite observée.** La commande `sqlite3 -readonly ~/.knowledge_base/k-b.sqlite "…"`, échoue sur une base
 au repos, sans ses fichiers `-wal` et `-shm`, comme après `kb create-db` ou `kb import`:
 `Error: in prepare, unable to open database file (14)`, avec le `sqlite3` de macOS (`/usr/bin/sqlite3`, 3.51.0).
 Elle réussit une fois qu'une lecture par Python a laissé `-wal` et `-shm` à côté de la base, jusqu'au `kb import`

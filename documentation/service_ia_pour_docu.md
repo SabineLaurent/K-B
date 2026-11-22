@@ -388,9 +388,9 @@ l'entrée standard (`-H @-`). L'entrée standard est le canal par lequel un prog
     Attendu: le nom du modèle avec sa version, puis `stop` ou `length`. La commande n'affiche ni la clé ni la réponse
     du modèle. Elle n'a pas été relancée sur `gpt-6.1-sol` (« Limites »).
 
-3. **La chaîne de K-B.** Lancer `kb serve-data` et `kb serve-ai`, selon les sections « Lancer l'API » et « Lancer
-    l'API IA » du [README](https://github.com/SabineLaurent/K-B/blob/main/README.md). Puis lancer `kb digest`, selon
-    la section « Écrire les comptes rendus de veille dans le coffre » du même README. Ce coffre est le coffre de notes
+3. **La chaîne de K-B.** Lancer `kb serve-data` et `kb serve-ai`, selon les sections « L'API de données:
+    `kb serve-data` » et « L'API IA: `kb serve-ai` » d'[Utiliser K-B](utilisation.md). Puis lancer `kb digest`, selon
+    sa section « Les comptes rendus de veille: `kb digest` ». Ce coffre est le coffre de notes
     Obsidian. La chaîne envoie une veille réelle au modèle, et coûte donc ses jetons.
 
 Les tests automatiques du dépôt n'appellent jamais le service. Ils se lancent par `uv run pytest`. L'intégration

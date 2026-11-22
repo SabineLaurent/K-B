@@ -675,8 +675,8 @@ de la requête.
   l'API de données ([specs-api.md](specs-api.md), « Accès par clé ») et le même module
   (`core/api_keys.py`, `core/api_access.py`) ; `kb digest` (#209) est le client `KB_DIGEST`,
   `kb trend-report` (#366) le client `KB_TREND_REPORT` ([tendances.md](tendances.md)). Sans
-  clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`
-  (« Changer une clé »).
+  clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans
+  `documentation/api_ia_pour_docu.md` (« Expiration et changement d'une clé »).
 - **Une route, un client** (OWASP API5:2023) : `POST /digests` s'ouvre à `KB_DIGEST` seul,
   `POST /trend-reports` à `KB_TREND_REPORT` seul (`AI_API_CLIENT_BY_ROUTE`, `core/config.py`). Tout
   autre client à clé valide reçoit 403 `client_not_allowed` ; une route absente de la table est refusée
@@ -1128,14 +1128,14 @@ limite. Aucune entrée n'est non tenue.
 
   La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue :
   clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
-  révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
+  révocation par rotation (`documentation/utilisation.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
   à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route, au débit et à
   l'écoute sur `127.0.0.1`, et en ligne à l'entrée interne (TLS mutuel, ci-dessus).
 - **Anti-force brute, plus strict que la limite de débit** : non appliqué, écart voulu, justifié
   (décision de Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ;
   les essais de clé ne sont pas limités. Il n'est pas nécessaire :
-  - la recherche exhaustive d'une clé est impraticable. La commande du `README.md`
-    (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
+  - la recherche exhaustive d'une clé est impraticable. La commande de
+    `documentation/api_ia_pour_docu.md` (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
     minimum, 32 caractères de l'alphabet, soit 192 bits. Le NIST définit sa catégorie 5, la plus
     haute face à un ordinateur quantique, par la recherche d'une clé AES de 256 bits (NIST IR
     8547, tableau 1), et juge que doubler la longueur d'une clé suffit contre l'algorithme de
@@ -1149,8 +1149,8 @@ limite. Aucune entrée n'est non tenue.
 
   **Limite** : une clé qui n'est pas tirée au hasard (le code contrôle sa longueur et son alphabet,
   pas son hasard), ou une entrée externe, qui ouvrirait les essais au réseau.
-  **Pour réduire le risque** : tirer chaque clé par la commande du `README.md`, et la changer
-  (« Changer une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
+  **Pour réduire le risque** : tirer chaque clé par la commande de `documentation/api_ia_pour_docu.md`, et la
+  changer (« Expiration et changement d'une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
   ci-dessus).
 
   **Pour la tenir**, si la limite est franchie : compter les 401 par adresse de client et rendre 429
@@ -1273,7 +1273,7 @@ limite. Aucune entrée n'est non tenue.
     « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Dans la vie d'une réplique,
     l'ordre de grandeur que permettent les limites de débit, au prix de sortie (12 $ par million de jetons
     pour gpt-6.1-sol, le plus cher) et sur les estimations de pire cas de la doc : 20 demandes de fiches × 420
-    000 jetons (`README.md`), environ 100 $, et 20 comptes rendus × 80 000 jetons
+    000 jetons (`documentation/produit.md`), environ 100 $, et 20 comptes rendus × 80 000 jetons
     ([tendances.md](tendances.md)), environ 19 $. En ligne, ce n'est pas un plafond par jour : avec
     `minReplicas: 0`, une réplique s'arrête 300 s après la dernière requête (« Cool down period is how long
     after the last event KEDA waits before the application scales down to its minimum replica count. », 300
@@ -1632,8 +1632,8 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   - Front Door Premium avec son WAF, par Private Link, sur un environnement « workload profiles ».
 - **Pas de données de production hors production** : tenue. La production tourne en ligne depuis
   `v0.1.0` (tag du 2026-11-08). Hors production, les deux API tournent sur la machine de Sabine, sur
-  une base que `kb collect` et `kb import` remplissent des mêmes sources (`README.md`, « Le POC du
-  25/10 et la suite ») : des données de la même sorte. La mesure demande alors le même traitement
+  une base que `kb collect` et `kb import` remplissent des mêmes sources (`documentation/utilisation.md`,
+  « La base et le brut ») : des données de la même sorte. La mesure demande alors le même traitement
   que la production (« If this is unavoidable, these endpoints should get the same security
   treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
   le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
@@ -2413,7 +2413,7 @@ tronqué et échappé (règle 3 de `conventions.md`).
   Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors refusée
   (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du lendemain a
   son propre nom. Pour les tops, le relevé est gardé et la même fiche réessayée : le top échoue à
-  chaque lancement (README, « `kb write-tops` »).
+  chaque lancement (`documentation/import_et_base_pour_docu.md`, « La commande qui suit l'import »).
 - **Un dossier remplacé par un lien** entre le dernier contrôle et l'écriture y fait écrire hors du
   coffre (CWE-59 ; limite acceptée par Sabine le 2026-11-10, registre, fiche 1, « Sécurité »). Seul
   un processus qui a déjà le compte de l'utilisatrice le peut ; un texte de source ou du modèle ne

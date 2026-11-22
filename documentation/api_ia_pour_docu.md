@@ -263,7 +263,7 @@ rotation est documentée (journal des décisions d'architecture, ou ADR, « POC 
 
 ### Faire une clé
 
-Une clé de 43 caractères, par la commande du README:
+Une clé de 43 caractères, par cette commande:
 
 ```sh
 uv run python -c "import secrets; print(secrets.token_urlsafe(32))"

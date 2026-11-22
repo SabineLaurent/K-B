@@ -330,7 +330,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
     la main: la dernière version publiée depuis 7 jours au moins (la même attente que Dependabot, qui ne voit pas un
     binaire téléchargé), l'empreinte lue sur sa release (le digest de `grype_<version>_linux_amd64.tar.gz`) et
     recoupée avec `grype_<version>_checksums.txt`. La version est aussi écrite dans les pages qui la citent
-    (`grep -rn "Grype v0" README.md docs/fiches-veille.md documentation/`).
+    (`grep -rn "Grype v0" docs/fiches-veille.md documentation/`).
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
     (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:29-32`). Avant de
     changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit

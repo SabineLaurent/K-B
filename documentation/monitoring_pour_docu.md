@@ -279,7 +279,8 @@ son renvoi au code ou aux règles.
 
 Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
 `<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`,
-`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données (`README.md:286-292`). Les traces et les
+`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données ([la fiche des données](import_et_base_pour_docu.md), « Le script
+d'agrégation et d'import: `kb import` »). Les traces et les
 enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le même réglage
 (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
 
@@ -446,7 +447,8 @@ période.
     chacune de ses requêtes (listes, détails) tire le sien (`src/k_b/core/api_request_log.py:27`). Les lignes des
     deux API se rapprochent par l'heure et par le nom du client que l'API de données journalise.
 - **Un seul `kb serve-data` et un seul `kb serve-ai` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même
-    fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
+    fichier (`docs/specs-api.md`, « Journal »; [Utiliser K-B](utilisation.md), « La lancer et lui demander des
+    comptes rendus »).
 
 ## Sources
 
