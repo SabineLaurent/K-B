@@ -353,6 +353,12 @@ def test_the_empty_feed_says_so_and_proposes_seven_days():
     assert "<title>Quoi de neuf, aucun item · K-B</title>" in response.text
 
 
+def test_the_feed_groups_the_thousands_of_its_total():
+    response = get_feed(handler=serve(make_page(20, total=12_345)))
+
+    assert f"12{chr(0x202F)}345 items depuis le" in response.text
+
+
 def test_the_feed_beyond_the_last_page_served_says_to_refine():
     response = get_feed(handler=serve(make_page(20, total=10_021)))
 
