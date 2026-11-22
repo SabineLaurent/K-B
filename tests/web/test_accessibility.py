@@ -324,9 +324,9 @@ def test_every_link_to_another_site_has_the_same_form_its_arrow_held_to_its_text
 
     assert links
     assert all(
-        re.search(
-            r'<span aria-hidden="true">&nbsp;↗</span> <span class="link-note">\(.*nouvel'
-            r" onglet\)</span>$",
+        re.fullmatch(
+            r'<span>[^<]+<span class="external-arrow" aria-hidden="true">&nbsp;↗</span>'
+            r'</span> <span class="link-note">\([^<]*nouvel onglet\)</span>',
             link,
         )
         for link in links
@@ -682,6 +682,43 @@ def test_the_page_not_found_leads_to_the_feed_and_to_the_trends():
         (link.attributes["href"], " ".join(link.text.split()))
         for link in outline(actions.group(1)).links
     ] == [("/", "← Retour au fil de veille"), ("/tendances", "Voir les tendances")]
+
+
+# The label of a button with an arrow: the arrow and its words in one span, tied by a no-break space
+# in the hidden arrow; the announcement of a link to another site after it.
+ARROW_LABEL = re.compile(
+    r'<span>(?:<span class="arrow-start" aria-hidden="true">←&nbsp;</span>[^<]+'
+    r'|[^<]+<span class="arrow-end" aria-hidden="true">&nbsp;→</span>'
+    r'|[^<]+<span class="external-arrow" aria-hidden="true">&nbsp;↗</span>)</span>'
+    r'(?: <span class="link-note">\([^<]*\)</span>)?'
+)
+
+
+def test_the_arrow_of_a_button_stays_on_the_line_of_its_word():
+    """WCAG 1.4.4 and 1.4.10: at 200 % text on a phone, the arrow went alone on its line. The label
+    is one item of the flex button, its name free of the no-break space."""
+    labels = {
+        name: [
+            label
+            for label in re.findall(
+                r'<a\b[^>]*\bclass="button(?:-secondary)?"[^>]*>(.*?)</a>',
+                page,
+                flags=re.DOTALL,
+            )
+            if re.search("[←→↗]", label)
+        ]
+        for name, page in PAGES.items()
+    }
+
+    assert {"404", "405", "500", "/?page=2", "item-paper"} <= {
+        name for name, found in labels.items() if found
+    }
+    assert [
+        label
+        for found in labels.values()
+        for label in found
+        if not ARROW_LABEL.fullmatch(label)
+    ] == []
 
 
 def test_the_sources_name_gh_archive_for_the_trends():
