@@ -26,7 +26,7 @@ fait en CSS.
 ### Quatre dégradés : deux ombres fixées au cadre, deux caches qui défilent
 
 ```css
-/* src/k_b/web/static/site.css:917-925 */
+/* src/k_b/web/static/site.css:952-960 */
     background-image:
       linear-gradient(to right, var(--color-card) 50%, var(--color-card-clear)),
       linear-gradient(to left, var(--color-card) 50%, var(--color-card-clear)),
@@ -61,7 +61,7 @@ Le résultat, aux trois moments du défilement :
 ### Chaque dégradé finit sur sa propre couleur rendue transparente
 
 ```css
-/* src/k_b/web/static/site.css:52-53 */
+/* src/k_b/web/static/site.css:55-56 */
     --color-card-clear: #FFFFFF00;
     --color-stone-clear: #DADCD600;
 ```
@@ -86,7 +86,7 @@ test calcule, par la formule de luminance relative de WCAG déjà présente dans
 couleur de texte sur l'ombre :
 
 ```python
-# tests/web/test_stylesheet.py:447-451
+# tests/web/test_stylesheet.py:538-545
 def test_each_text_of_the_table_keeps_its_contrast_on_the_shadows_of_its_frame(text):
     ...
     for shadow in read_frame_shadows():
@@ -150,7 +150,7 @@ Les résultats : encre 12,08:1, ardoise 5,96:1, lien 5,36:1, lien survolé 7,91:
 
 1. **Comment l'ombre sait-elle que le tableau continue, sans JavaScript ?** Elle ne le sait pas. Les caches
    défilent avec le contenu (`local`) et couvrent les ombres fixées au cadre (`scroll`) quand le contenu s'arrête à
-   ce bord. C'est la géométrie du défilement qui décide (`site.css:917-925`).
+   ce bord. C'est la géométrie du défilement qui décide (`site.css:952-960`).
 2. **Pourquoi une ombre si pâle ?** Parce que le texte passe dessus et doit garder 4,5:1 (WCAG 1.4.3). Le lien
    bornerait l'ombre à 1,65:1 environ. L'ombre n'a pas à tenir 3:1 (WCAG 1.4.11), car la légende donne aussi
    l'information.
@@ -159,7 +159,7 @@ Les résultats : encre 12,08:1, ardoise 5,96:1, lien 5,36:1, lien survolé 7,91:
 4. **Pourquoi `#FFFFFF00` plutôt que `transparent` ?** `transparent` est du noir transparent. Un moteur qui
    n'interpole pas en alpha prémultiplié en ferait une bande grise ; Firefox l'a fait faux dans certains cas avant sa
    version 137 (bugs 1869681 et 1904106). Une couleur qui finit sur elle-même transparente ne change jamais de teinte
-   (`site.css:52-53`).
+   (`site.css:55-56`).
 5. **Et en couleurs forcées de Windows ?** Le navigateur retire les dégradés, mesuré dans l'émulation de Chrome. Le
    cadre garde sa bordure, et la barre de défilement de Windows reste l'indice.
 
