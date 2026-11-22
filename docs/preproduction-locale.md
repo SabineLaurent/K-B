@@ -216,6 +216,20 @@ Sur le commit `8a047e6b`, Docker Engine 29.9.2 (`arm64`), Compose 5.6.1, 7,7 Gio
 | `git ls-files '.env.*.example'` | les quatre modèles, et `.env.e2e_test.example` |
 | `down -v` | `0` ; aucun conteneur ni volume de `kb-essai` ne reste |
 
+Le même jour, un contre-essai, sur le commit `f24d5cd7`, projet `kb-contre-essai` sur des volumes neufs,
+vérifie la sonde de la base en TCP, ses ressources et l'API de données en `production` :
+
+| Étape | Mesure |
+|---|---|
+| `create-db`, volume neuf | `0`, 6 s ; au journal de `postgres`, deux serveurs prêts, le temporaire puis le final, et un seul à l'écoute en TCP |
+| `up -d --wait` | `0`, les trois services sains en 12 s |
+| `/docs` et `/openapi.json` | `404` sur l'API de données, `200` sur l'API IA ; sans clé, `401` sur `/items` et sur `POST /digests` |
+| `id -u` | `999` (`postgres`), `10001` (`api-donnees`, `api-ia`) |
+| limite de mémoire, par `docker stats` | 2 Gio pour `postgres`, 1 Gio pour chaque API |
+| `POST /digests`, base vide | `200` en 0,11 s : 0 item lu par l'API de données, 9 sujets sans item, aucun appel au modèle |
+| `stop` | 0,70 s ; les API en `143`, la base en `0` |
+| `down -v` | `0` ; aucun conteneur, volume ni réseau de `kb-contre-essai` ne reste |
+
 ## Ce que le test vérifie sans Docker
 
 `tests/test_compose_file.py` lit `compose.yaml`, ses modèles, le `Dockerfile` et `.gitignore` à chaque
