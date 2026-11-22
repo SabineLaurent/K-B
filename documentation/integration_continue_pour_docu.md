@@ -82,7 +82,7 @@ Les jobs d'un même workflow tournent en parallèle, chacun sur un runner neuf, 
 `deploy` de `Docs` attend son `build` (`needs`, `docs.yml:45`). Dans un job, les étapes s'enchaînent, et la première
 qui échoue arrête le job. Chaque workflow n'a qu'un jeton qui lit le dépôt (`permissions: contents: read`,
 `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`, `docs.yml:14-15`), et aucun ne lit de secret. Seul le job `deploy`
-de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:52-54`), pour publier sur GitHub Pages.
+de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:53-55`), pour publier sur GitHub Pages.
 
 #### Le workflow `CI`
 
@@ -155,10 +155,10 @@ tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lanc
     11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 29-32). Depuis `main`, sur un push
     quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin `site/` en artefact de
     Pages (l. 33-38), que `deploy` publie.
-- `deploy` (l. 40-60) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
-    (l. 42-44), après `build` (l. 45); un seul déploiement tourne à la fois (l. 47-49). Il a les droits
-    `pages: write` et `id-token: write` (l. 52-54), dans l'environnement `github-pages` (l. 55-57), et publie le site
-    par `actions/deploy-pages` (l. 59-60).
+- `deploy` (l. 40-61) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
+    (l. 42-44), après `build` (l. 45); un seul déploiement tourne à la fois (l. 48-50). Il a les droits
+    `pages: write` et `id-token: write` (l. 53-55), dans l'environnement `github-pages` (l. 56-58), et publie le site
+    par `actions/deploy-pages` (l. 60-61).
 
 Sur une PR, `deploy` est donc sauté. GitHub Pages n'est pas activé sur le dépôt le 2026-11-14:
 voir [GitHub Pages](#github-pages).
