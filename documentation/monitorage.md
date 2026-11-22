@@ -152,9 +152,8 @@ chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources]
     date (moindre privilège). Dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**,
     **Cloud access policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
     - <span lang="en">**Display name**</span> et <span lang="en">**Name**</span>: le nom de la politique.
-    - <span lang="en">**Scopes**</span>: <span lang="en">**Write**</span> sur les seules lignes
-        <span lang="en">**Metrics**, **Logs**</span> et <span lang="en">**Traces**</span> (`metrics:write`,
-        `logs:write`, `traces:write`), puis <span lang="en">**Create**</span>.
+    - <span lang="en">**Scopes**</span>: l'écriture sur les seules lignes des mesures, des journaux et des traces
+        (`metrics:write`, `logs:write`, `traces:write`), puis <span lang="en">**Create**</span>.
     - Sous la politique, <span lang="en">**Add token**</span> ouvre la boîte <span lang="en">**Create new
         token**</span>: un nom (<span lang="en">**Display name**</span>), une date d'expiration
         (<span lang="en">**Expiration date**</span>, sous la forme année/mois/jour; vide, le jeton n'expire pas), puis
@@ -232,7 +231,7 @@ chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources]
 
 Sur la pile qui reçoit les mesures ([Brancher l'export](#brancher-lexport)), par l'interface, sans jeton ni outil à
 installer.
-Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
+Les chemins sont ceux de l'interface de Grafana 13.
 
 1. **Le tableau**: <span lang="en">**Dashboards**, **New**, **Import**, **Upload dashboard JSON file**</span>, le
     fichier `observability/grafana/dashboard.json`. Dossier: K-B (créé au besoin par
@@ -255,7 +254,7 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
     <span lang="en">**Save rule**</span>. Une requête en échec déclenche alors une alerte à part, `DatasourceError`.
     Le fichier des règles ne porte pas ce réglage: il est à refaire après chaque import des règles. Une règle
     enregistrée repart sans instance jusqu'à son évaluation suivante, au plus 5 minutes après: une alerte en cours y
-    repasse un moment par « <span lang="en">Normal</span> » (vu le 2026-11-08).
+    repasse un moment par « <span lang="en">Normal</span> ».
 4. **Le point de contact**: <span lang="en">**Alerts & IRM**, **Alerting**, **Notification configuration**,
     **Contact points**</span>. Modifier le point de contact de la politique par défaut:
     <span lang="en">**Add contact point integration**, **Email**</span>, l'adresse d'une utilisatrice de la pile,
@@ -410,11 +409,7 @@ Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 202
 
 ## Journaux de l'application
 
-Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`, et le commentaire
-du plafond, par #566, d'après le code de sa demande de fusion (PR, <span lang="en">pull request</span>); mis en forme
-le 2026-11-21 (#669), et le site et le job des fiches de veille ajoutés le même jour d'après `main` au commit
-`54ba488c`; l'identifiant de trace, qui relie les deux API, ajouté le 2026-11-22 d'après le code de sa demande de fusion
-au commit `e0d87df2` (#281). Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
+Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
 `kb`, de `kb serve-data` (l'API de données), de `kb serve-ai` (l'API IA) et de `kb serve-web` (le site). En local, ils ne demandent rien à
 installer: `kb` les écrit par le module `logging` de Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`,
 qu'`infra/main.bicep` crée. Aucune alerte ne les lit ([Limites des journaux](#limites-des-journaux)).
@@ -467,9 +462,8 @@ relie: chaque ligne écrite pendant une requête de l'une des deux API le porte 
 dans l'en-tête `traceparent` du W3C (<span lang="en">World Wide Web Consortium</span>) <span lang="en">Trace Context</span>,
 dont les lignes le reprennent (`src/k_b/core/trace_context.py:27-44`; `src/k_b/ai_api/connectors/data_api_client.py:345-352`).
 
-Relevé sur un `KB_DATA_DIR` neuf. Les deux premières lignes viennent de `logs/kb.log`, le 2026-11-11: `kb create-db`,
-`kb import`, puis `kb purge`. Les deux suivantes viennent du relevé de #281, le 2026-11-22, au commit `e0d87df2`: les
-deux API construites par `kb serve-data` et `kb serve-ai`, servies par uvicorn en HTTP (<span lang="en">Hypertext
+Les deux premières lignes viennent de `logs/kb.log`, sur un `KB_DATA_DIR` neuf: `kb create-db`, `kb import`, puis
+`kb purge`. Les deux suivantes viennent des deux API construites par `kb serve-data` et `kb serve-ai`, servies par uvicorn en HTTP (<span lang="en">Hypertext
 Transfer Protocol</span>) réel sur 127.0.0.1, dans un seul processus, sur la
 base de test et avec le rejeu du modèle (`tests/commands/test_live_apis.py`). La première est une requête de l'API IA
 à l'API de données, la seconde la demande de `kb digest` à l'API IA: elles portent le même identifiant de trace.
@@ -493,8 +487,8 @@ de l'environnement, ou d'un fichier passé par `uv run --env-file .env kb …` (
     (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:71-72`).
 - `KB_LOG_TO_FILE`, `true` par défaut (`src/k_b/core/config.py:223-225`), lue par
     `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre
-    valeur arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false`
-    (relevé le 2026-11-09). Son modèle commenté est dans `.env.example:59-61`.
+    valeur arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false`.
+    Son modèle commenté est dans `.env.example:59-61`.
 
 Une commande dont le fichier de journal ne s'ouvre pas ne se lance pas: `error: log file not opened: …`, code 2
 (`src/k_b/cli.py:213-229`). `kb openapi` et le `--dry-run` des routines n'écrivent aucun journal
@@ -535,12 +529,11 @@ réglé (les sections du monitorage du modèle, de [Ce que le monitorage suit](#
 
 ### En ligne: installer et configurer
 
-Tout est posé par `infra/main.bicep`, que Sabine applique à la main (`infra/README.md`, « Appliquer »):
+Tout est posé par `infra/main.bicep`, qui s'applique à la main (`infra/README.md`, « Appliquer »):
 
 - l'espace `log-kb` (`infra/modules/log-analytics.bicep:5-23`): 30 jours de rétention, et un plafond de 0,2 Go par
     jour (`:13-22`): atteint, la collecte s'arrête jusqu'à l'heure de remise à zéro, propre à chaque espace et non
-    réglable (Microsoft Learn, « <span lang="en">Set daily cap on Log Analytics workspace</span> », lu le
-    2026-11-11);
+    réglable (Microsoft Learn, « <span lang="en">Set daily cap on Log Analytics workspace</span> »);
 - l'environnement `cae-kb` y envoie les journaux des conteneurs par Azure Monitor, sans clé partagée, par le
     paramètre de diagnostic `logs-to-log-kb`, en deux tables: `ContainerAppConsoleLogs` (sortie standard et sortie
     d'erreur des conteneurs) et `ContainerAppSystemLogs` (démarrage, tirage de l'image, réveil d'une app à 0
@@ -562,8 +555,8 @@ Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:
 
 Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
 `az monitor log-analytics query` (`az extension add --name log-analytics`; message
-<q lang="en">This command is from the following extension: log-analytics</q>, relevé le 2026-11-09 avec azure-cli
-2.92.0 et l'extension 1.0.0b3, encore les dernières le 2026-11-11). Le rôle Lecteur (`*/read`) suffit à lire
+<q lang="en">This command is from the following extension: log-analytics</q>, avec azure-cli 2.92.0 et l'extension
+1.0.0b3). Le rôle Lecteur (`*/read`) suffit à lire
 `log-kb` (`docs/registre-traitements.md:234`, source Microsoft Learn: `:328`). `RG` se règle comme pour
 l'application de l'infrastructure (`infra/README.md`, « 0. Les variables du shell »); `az account show` doit être
 l'abonnement du groupe de ressources (`infra/README.md:415`).
@@ -644,7 +637,7 @@ Pour [Brancher l'export](#brancher-lexport), l'expiration d'un jeton et Explore:
     [page de Grafana Cloud sur l'envoi en OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
 - Identifiant d'instance affiché sur la tuile, sans y générer de jeton:
     [page de Grafana Cloud qui décrit la tuile <span lang="en">OpenTelemetry</span> et son identifiant d'instance](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
-- <span lang="en">**Create access policy**</span>, <span lang="en">**Write**</span> par signal,
+- <span lang="en">**Create access policy**</span>, droits d'écriture par signal,
     <span lang="en">**Add token**</span>, la boîte <span lang="en">**Create new token**</span> et son champ
     <span lang="en">**Expiration date**</span>, jeton affiché une fois:
     [parcours de Grafana sur la politique et son jeton](https://grafana.com/docs/learning-paths/connect-agent-to-agent-observability/create-access-policy-and-token/)
