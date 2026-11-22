@@ -73,7 +73,10 @@ seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un messag
 « Erreur. » : le mot dit l'erreur sans couleur (#590). Sans lui, seule la couleur séparait le message du libellé
 au-dessus, `#7C2D12` et `#1C1E21`, 1,78:1 entre eux (RGAA 3.1, WCAG 1.4.1), et en couleurs forcées le message
 prend la couleur du texte, comme le libellé (RGAA 11.10). Le résumé, sous son titre « Filtre à corriger », dit chaque message
-sans ce mot. Le mot est écrit dans les gabarits, jamais dans les messages de `web/feed.py`. Tout autre
+sans ce mot. Il a l'encadré « Couleur signalée » de la planche « Charte graphique » (Sabine, 2026-11-22) : bordure
+rouille (`--color-alert`), fond pêche pâle (`--color-alert-wash`), titre en rouille sombre (`--color-alert-deep`, 8,47:1
+sur le fond), texte en brun brûlé (`--color-alert-ink`, 11,13:1), liens soulignés en rouille sombre (8,47:1) ; l'anneau de
+focus y a 6,70:1. Le mot est écrit dans les gabarits, jamais dans les messages de `web/feed.py`. Tout autre
 échec de l'API (5xx, 429, 401, délai, réponse hors schéma, 422 sur un paramètre que le site construit) rend
 la page 500, et le journal écrit `data_api_failed: <état> http_status=<n|-> request_id=<id>`, jamais `q`.
 

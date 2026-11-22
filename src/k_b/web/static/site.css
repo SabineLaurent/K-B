@@ -556,9 +556,13 @@
     cursor: pointer;
   }
 
+  /* The box « Couleur signalée » of the planche « Charte graphique » (Sabine, 2026-11-22): bordered
+     in rust, on pale peach, its title in deep rust and its text in burnt brown. */
   .error-summary {
     padding: 1rem 1.25rem;
-    border: 2px solid var(--color-alert-deep);
+    color: var(--color-alert-ink);
+    background: var(--color-alert-wash);
+    border: 2px solid var(--color-alert);
     border-radius: 6px;
 
     & h2 {
