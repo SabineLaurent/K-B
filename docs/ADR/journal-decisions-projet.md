@@ -7615,6 +7615,62 @@ les jetons du modèle (#501) »).
   comme celle de `budget-kb` ; elle est caviardée dans toute sortie et toute capture recopiées (décision de Sabine du
   2026-11-20). — PR #665
 
+## 2026-11-22
+
+### Préproduction locale : compose, l'image de la production et PostgreSQL 18 (#419)
+
+Conception validée par Sabine le 2026-11-21 (« ok conception #419, clé du modèle ») ; écarts mineurs tranchés par le
+Second (délégation de Sabine du 15/10) ; les cinq points de sécurité et de données personnelles des revues, décidés par
+Sabine le 2026-11-22 (« ok sécu #419 : E, J, K, R, Z »). Essai et contre-essai du 2026-11-22 :
+`docs/preproduction-locale.md`.
+
+- **La préproduction locale se fait par compose : l'image de la production, construite pour `linux/amd64`, et
+  PostgreSQL 18.6, avec l'image et les réglages d'`initdb` de la CI.** Six services : `postgres`, `api-donnees`,
+  `api-ia`, et les jobs `create-db`, `collecte` et `import` dans le profil `jobs`. Pourquoi : essayer une version dans
+  les conteneurs de la production avant sa mise en ligne (I5 du plan de mise en ligne du 06/11), sur la base des
+  tests sur PostgreSQL. Écartés : le site, les autres jobs et le stockage d'échange, hors de la conception ; un job
+  de CI qui lance compose, pour ses minutes d'Actions (mission du 21/11). Un test lit `compose.yaml` à chaque PR
+  (`tests/test_compose_file.py`), et l'essai prouve le lancement. — PR de #419
+- **`sandbox` pour la seule API IA ; l'API de données en `production`, comme en ligne.** Pourquoi : l'API IA appelle
+  `http://api-donnees:8000`, que K-B n'admet qu'en `sandbox` (« API : `https` vers une API interne, `http` vers la
+  machine ou un service du compose (#473) », plus haut) ; l'API de données n'appelle personne, et en `sandbox` elle
+  servirait `/docs` et `/openapi.json` sans clé. Écarté : `sandbox` pour les deux API, celui de la conception, revu
+  après la revue de code du 2026-11-22 (tri du Second). — PR de #419
+- **Un seul rôle, `kb`, superutilisateur du serveur et propriétaire de la base, créé par l'image de PostgreSQL ; la
+  base se crée par `kb create-db`.** Pourquoi : l'image crée `POSTGRES_USER` en superutilisateur, et
+  `kb migrate-database` donne les tables aux rôles des identités d'Azure, absents du compose (`src/k_b/cli.py`).
+  Écarté : un rôle de lecture pour l'API de données, par un script d'initialisation monté, hors de la conception
+  (Sabine, E). Limite assumée : l'API de données se connecte en superutilisateur ; chaque connexion de son pool lit en
+  `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`). Un seul réseau, où l'API IA joint aussi
+  `postgres`, dont elle n'a pas besoin (Sabine, Z : rien de changé). — PR de #419
+- **`init: true` pour chaque service, sans revenir sur « Pas de processus d'init » du 2026-11-06 (#200) : l'image
+  reste sans init.** Pourquoi : #419 le demande. Limite assumée (revue de code du 2026-11-22) : l'arrêt essayé en
+  préproduction n'est pas celui de `kb` en PID 1. `kb serve-data` et `kb serve-ai` sortent en 143 ici, et une
+  commande sans gestionnaire de SIGTERM s'y arrête, alors qu'en ligne elle finit en SIGKILL. L'arrêt en ligne reste
+  tenu par `COMMANDS_STOPPED_BY_SIGTERM` et `tests/commands/test_sigterm.py`. — PR de #419
+- **Système de fichiers en lecture seule et `/tmp` en mémoire, plus stricts qu'en ligne.** Pourquoi : une écriture
+  hors du volume des données et de `/tmp` échoue, ce qui vérifie la règle 4 de `.claude/rules/poc.md` (aucun état hors
+  de `KB_DATA_DIR`). Écarté : un système de fichiers inscriptible, comme en ligne, qui laisserait passer une telle
+  écriture (revue de code du 2026-11-22, tri du Second). — PR de #419
+- **Les ressources : 0,5 CPU et 1 Gio par service `kb`, la combinaison des apps en ligne ; 1 CPU et 2 Gio pour la base,
+  la taille du serveur en ligne (`Standard_B1ms`) ; 250 s d'arrêt pour l'API IA, 20 s ailleurs.** Pourquoi : la base
+  en ligne n'est pas une app, et la mesurer sur la moitié de son serveur fausserait les délais (revue de code du
+  2026-11-22, tri du Second) ; 250 s comme en ligne, la plus longue demande que laisse passer l'entrée d'ACA (240 s)
+  et une marge. Écartés : 0,5 CPU et 1 Gio pour la base, ceux de la conception ; moins de 30 s d'arrêt partout, le
+  texte de #419, qui couperait une demande de fiches. Limite assumée : les jobs ont les ressources des apps, et non
+  celles de `caj-kb-migrate-database`. — PR de #419
+- **Aucune mesure ni trace vers Grafana Cloud : `compose.yaml` ne pose pas `KB_OTLP_*`.** Pourquoi : les demandes de
+  la préproduction ne se mêlent pas aux séries de la production (tri du Second, 2026-11-22). — PR de #419
+- **Un fichier de secrets par service, ignoré par git, à côté de son modèle suivi ; un seul `.env.jobs` pour les trois
+  jobs.** Pourquoi : chaque service ne reçoit que ses secrets, et le modèle dit quoi remplir sans valeur. Un seul
+  fichier pour les jobs (tranché par le Second, gardé par Sabine, K). Limite assumée : chaque job reçoit un secret
+  dont il ne se sert pas (`collecte` l'URL de la base, `create-db` et `import` le jeton GitHub). Dans le how-to, une
+  clé passe à `curl` par l'entrée standard, jamais par ses arguments (Sabine, R). Pas de `.env.mac.example` : aucune
+  commande `kb` du critère de fin ne se lance sur le poste (Sabine, conception). — PR de #419
+- **Un essai finit par `docker compose down -v`, et la préproduction entre au registre des traitements.** Pourquoi :
+  les volumes gardent la collecte réelle, données personnelles comprises, et le compose n'a pas de `kb purge`
+  (Sabine, J ; registre, « Préproduction locale (compose, #419) »). — PR de #419
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
