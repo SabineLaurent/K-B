@@ -1,3 +1,4 @@
+{%- from "links.html" import back_to_feed_button -%}
 {% extends "base.html" %}
 {% block title %}Demande non servie{% endblock %}
 {% block main_class %}error-page{% endblock %}
@@ -7,7 +8,7 @@
 <h1>Demande non servie</h1>
 <p class="error-explanation">K-B ne sert pas cette demande à cette adresse.</p>
 <div class="error-actions">
-<a class="button" href="/"><span><span class="arrow-start" aria-hidden="true">←&nbsp;</span>Retour au fil de veille</span></a>
+{{ back_to_feed_button() }}
 </div>
 </div>
 {% endblock %}

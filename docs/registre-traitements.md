@@ -185,6 +185,20 @@ migrate-database` n'y écrit que les tables et les sept sources, aucun item ; l'
 | Durée de conservation | Celle de chaque table (procédure de tri), par `kb purge`. Une ligne purgée ou effacée à la demande (étape 5) reste jusqu'à 7 jours dans les sauvegardes du serveur. |
 | Journaux du serveur | PostgreSQL y écrit ses erreurs ; `log_error_verbosity = TERSE` en retire le `DETAIL`, qui recopie la ligne refusée par une contrainte, un auteur avec elle. Restent le message principal, qui peut citer une valeur refusée (22003, 22P02), et l'ordre en cause, avec ses marqueurs (`$1`) : psycopg envoie les valeurs à part, et PostgreSQL ne les journalise pas tant que `log_parameter_max_length_on_error` vaut 0, son défaut (celui d'Azure : non vérifié). Aucun paramètre de diagnostic ne les envoie à Log Analytics. Ce qu'Azure en garde, et combien de temps : **non vérifié**. |
 
+## Préproduction locale (compose, #419)
+
+Depuis #419, la préproduction locale (`compose.yaml`, [preproduction-locale.md](preproduction-locale.md))
+garde sur le poste une copie de ce qu'elle collecte, le temps d'un essai.
+
+| Rubrique | Contenu |
+|---|---|
+| Données | Celles des tables de la base (« Tables de la base qui portent une donnée personnelle ») et du brut, pour les sources que le compose collecte : ni Zotero ni les clips, qu'il ne collecte pas. |
+| Lieu | Le poste de l'utilisatrice, dans deux volumes Docker du projet compose : `pg-data`, la base, et `kb-data`, le brut et le journal d'import. La base ne publie aucun port ; les deux API ne publient le leur que sur `127.0.0.1`. La réponse d'une `POST /digests` du how-to, qui peut porter un login ou une adresse comme toute fiche (fiche 1), s'écrit dans un dossier temporaire du poste (`mktemp -d`), hors du dépôt. |
+| Qui la lit | Les conteneurs du compose ; depuis le poste, l'utilisatrice, par les API et leurs clés, et par `docker compose exec postgres psql`, sans clé. |
+| Envois | `POST /digests` envoie les items au modèle de la production : section « Envoi des items au modèle des fiches ». Aucune mesure ni trace vers Grafana Cloud : `compose.yaml` ne pose pas `KB_OTLP_*`. |
+| Durée de conservation | Le temps d'un essai : un essai finit par `docker compose down -v`, qui retire les deux volumes, et par `rm -r` du dossier temporaire de la réponse. Le compose n'a pas de `kb purge`. |
+| Vérification | Essai et contre-essai du 2026-11-22 : après `down -v`, aucun volume du projet ne reste ([preproduction-locale.md](preproduction-locale.md), « L'essai du 2026-11-22 »). |
+
 ## Dépôt public (#278)
 
 Le dépôt de code, ses issues, ses PR et les journaux de GitHub Actions deviennent publics le 08/11/2026. Relevé de

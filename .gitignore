@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 !.env.e2e_test.example
+# The templates of the secrets of compose.yaml (#419): .env.<service>.example
+!.env.*.example
 
 # Environnement Python
 .venv/
