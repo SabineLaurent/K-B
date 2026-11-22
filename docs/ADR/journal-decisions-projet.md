@@ -7615,6 +7615,49 @@ les jetons du modèle (#501) »).
   comme celle de `budget-kb` ; elle est caviardée dans toute sortie et toute capture recopiées (décision de Sabine du
   2026-11-20). — PR #665
 
+## 2026-11-22
+
+### Site : l'ombre au bord du cadre du tableau des tendances (#618)
+
+Ce que la limite assumée de #596 (ci-dessus au 2026-11-14) proposait pour réduire son risque. Plan du 2026-11-19 ;
+les autres choix, tris de time-knight du 2026-11-22 (délégation du 15/10).
+
+- **Une ombre à chaque bord du cadre où le tableau continue, par quatre dégradés en fond, en CSS seul : deux ombres
+  fixées au cadre (`scroll`), deux caches de la couleur du cadre qui défilent avec le tableau (`local`).** Pourquoi : à
+  390 px, le cadre coupe juste entre « Dépôt » et les comptes, et une barre de défilement superposée (macOS, iOS)
+  n'apparaît qu'au défilement : rien ne disait que deux colonnes suivaient. La technique de Lea Verou (2012), citée par
+  l'issue, tient en une règle, sans élément ni script. Écartés (plan) : `container-type: scroll-state` et
+  `animation-timeline: scroll()`, pas Baseline. — PR de #618
+- **`background-attachment: local` est admis par sa propre clé web-features, Baseline « widely available » depuis le
+  2024-09-14, alors que la fonction `background-attachment` ne l'est plus depuis le 2026-01-29.** Précise la règle de
+  la feuille de style (ci-dessus, #562) sans l'inverser. Pourquoi : la fonction est déclassée par la seule valeur
+  `fixed`, sans effet sur iOS (`features/background-attachment.yml`, web-features 3.47.0, lu le 2026-11-22) ; `local`
+  est dans Safari et Safari iOS depuis 15.4 (browser-compat-data). Comme `text-wrap: balance`, elle ne fait qu'ajouter :
+  sans elle, les caches restent sur les ombres, et le tableau défile comme avant, sans ombre. — PR de #618
+- **L'ombre a la couleur des bordures de la charte (`--color-stone`), sans 3:1 à tenir.** Pourquoi : le texte du
+  tableau passe dessus et doit y garder 4,5:1 (WCAG 1.4.3 ; le lien y a 5,36:1) ; foncée, l'ombre serait bornée à
+  1,65:1 environ par le lien. WCAG 1.4.11 ne la soumet pas au 3:1 : ce qu'elle dit est aussi donné par la légende,
+  qui nomme les étoiles et les *forks* gagnés (Understanding 1.4.11, « The information is available in another
+  form », lu le 2026-11-22), et la charte classe `--color-stone` sur blanc en décor. La charte de Sabine reste telle
+  quelle (tri de time-knight du constat A1 du relecteur accessibilité : « L'ombre ne fonce pas : la charte de Sabine
+  reste telle quelle »). Écartée : une ombre foncée jusqu'à 1,65:1 environ, que le relecteur proposait en option.
+  Limite assumée : l'ombre est discrète,
+  1,36:1 au plus sombre (mesuré dans Chrome 157), et tout le monde ne la voit pas ; en couleurs forcées, le
+  navigateur la retire, et le cadre garde sa bordure. — PR de #618
+- **Chaque dégradé finit sur sa propre couleur rendue transparente, deux propriétés nouvelles de la charte
+  (`--color-card-clear`, `--color-stone-clear`), jamais sur `transparent`.** Pourquoi (tri de time-knight, constat
+  CR5 de la revue de code) : `transparent` est du noir transparent ; un moteur qui n'interpole pas en alpha
+  prémultiplié en ferait une bande grise sur un tableau qui tient, et un milieu d'ombre où le lien tomberait à 3,67:1.
+  Firefox interpole en prémultiplié depuis sa version 36 (bug 591600), mais un cas restait faux en 120 à 122 (bug
+  1869681, encore ouvert), et le cas « Premultiplied alpha » n'a été corrigé qu'en 137 (bug 1904106), lus le
+  2026-11-22. Peu coûteux, et sans dépendre d'aucune version. Écarté : garder `transparent` et l'écrire en limite. —
+  PR de #618
+- **Aucune règle d'impression pour l'ombre.** Revient sur le plan du 2026-11-19, qui la retirait à l'impression.
+  Pourquoi (tri de time-knight, constat CR1, sur mesure) : sur papier, le cadre ne défile plus, `local` s'y comporte
+  comme `scroll`, et les caches restent sur les ombres. En impression émulée dans Chrome 157, les captures avec et
+  sans la règle ne diffèrent que de 4 pixels, dans le texte d'un lien. Écarté : garder la règle, du code sans effet
+  dont la raison écrite était fausse. — PR de #618
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
