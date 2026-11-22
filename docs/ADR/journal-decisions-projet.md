@@ -7623,10 +7623,10 @@ les jetons du modèle (#501) »).
   fusion, quand la variable de dépôt `PAGES_PUBLISH` vaut `true` ; il se lance toujours à la main, depuis `main`
   seulement.** Revient sur l'entrée du 2026-11-14 (#167, « publié sur GitHub Pages à la main ») ; ce qui a changé :
   la décision de Sabine du 2026-11-21 (« publication automatique », dans le périmètre de la PR du README, relayé par
-  tn-orchestrateur). Pourquoi, inféré et à faire valider par Sabine : le site suit `main` sans qu'une exécution à la
-  main soit oubliée. La variable, choisie par le Second le 2026-11-21 (option A) : tant que Pages n'est pas activé, le
+  tn-orchestrateur). Pourquoi : le site suit `main` sans qu'une exécution à la main soit oubliée (décision de Sabine
+  du 2026-11-21, pourquoi validé le 2026-11-22). La variable, choisie par le Second le 2026-11-21 (option A) : tant que Pages n'est pas activé, le
   job `deploy` échouerait à chaque fusion ; sans elle, il est sauté (`.github/workflows/docs.yml:33-35`, `:42-44`).
-  Options écartées : garder la publication à la main (le site prendrait du retard sur `main`, raison inférée) ;
+  Options écartées : garder la publication à la main (une exécution oubliée laisse le site en retard sur `main`) ;
   `queue: max`, qui garderait en file chaque déploiement en attente, car la documentation de GitHub ne le montre qu'au
   niveau du workflow et `deploy` le porterait au niveau du job (non vérifié, tri du Second du 2026-11-22) ; retirer
   `docs.yml` du contrôle de `deploy.yml`, déjà écarté le 2026-11-14 (un contrôle de sécurité de la livraison).
