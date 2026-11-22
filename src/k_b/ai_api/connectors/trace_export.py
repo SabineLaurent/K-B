@@ -19,6 +19,7 @@ from opentelemetry.sdk._shared_internal import BatchProcessor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import SpanLimits, TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.trace.id_generator import RandomIdGenerator
 from opentelemetry.sdk.trace.sampling import ALWAYS_ON
 
 from k_b.ai_api.connectors.metrics_export import (
@@ -34,6 +35,7 @@ from k_b.core.config import (
     TRACE_STOP_TIMEOUT_SECONDS,
     TraceContent,
 )
+from k_b.core.trace_context import read_current_trace_id
 
 logger = logging.getLogger(__name__)
 
@@ -50,6 +52,17 @@ EXPORTER_LOGGER_NAMES = (
 )
 SPAN_LIMITS = SpanLimits(max_attribute_length=MAX_TRACE_ATTRIBUTE_BYTES)
 LOG_RECORD_LIMITS = LogRecordLimits(max_attribute_length=MAX_TRACE_ATTRIBUTE_BYTES)
+
+
+class RequestTraceIdGenerator(RandomIdGenerator):
+    """The trace id of a root span: the one of the request under way (core/trace_context.py), so
+    that the spans and the log lines of a request share it; drawn at random out of a request."""
+
+    def generate_trace_id(self) -> int:
+        trace_id = read_current_trace_id()
+        if trace_id is None:
+            return super().generate_trace_id()
+        return int(trace_id, 16)
 
 
 @dataclass(frozen=True)
@@ -73,6 +86,7 @@ class TraceExport:
             resource=resource,
             shutdown_on_exit=False,
             span_limits=SPAN_LIMITS,
+            id_generator=RequestTraceIdGenerator(),
         )
         logger_provider = LoggerProvider(
             resource=resource,
