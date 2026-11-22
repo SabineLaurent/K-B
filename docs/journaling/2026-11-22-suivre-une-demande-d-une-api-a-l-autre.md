@@ -105,8 +105,8 @@ et ses enfants en héritent. Hors d'une demande, le tirage du SDK reste.
     )
 ```
 
-Le parent envoyé est le span en cours, celui de `read_watch`, quand il appartient à la trace de la demande ; sans span
-qui enregistre (traces non exportées), un identifiant tiré. Chaque requête de `send` porte l'en-tête : la liste et
+Le parent envoyé est le span en cours, celui de `read_watch`, quand il appartient à la trace de la demande ; sinon, sans span
+qui enregistre (traces non exportées) ou avec le span d'une autre trace, un identifiant tiré. Chaque requête de `send` porte l'en-tête : la liste et
 chaque détail.
 
 ## Choix faits et options écartées
@@ -130,14 +130,15 @@ chaque détail.
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | `test_a_request_and_its_reading_share_the_trace_id_of_the_root_span` (`tests/ai_api/test_digest_router.py:1893`) | la ligne de `POST /digests`, celles des `GET /items` et le span racine ont un seul identifiant |
-| la même, avec l'envoi de l'en-tête retiré à la main (`data_api_client.py:346`), le 2026-11-22 | elle échoue : l'en-tête passe bien par le `TestClient` en mémoire |
-| `test_a_traceparent_received_by_the_ai_api_is_ignored` (`:1913`) | un `traceparent` valide reçu par l'API IA n'est ni sa trace, ni dans son journal, ni dans ses en-têtes |
-| `test_the_traceparent_sent_to_the_data_api_holds_identifiers_only` (`:1958`) | l'en-tête envoyé : la trace de la demande et le span de `read_watch` ; l'échec de la lecture journalisé dans la même trace |
+| la même, avec l'envoi de l'en-tête retiré à la main (`data_api_client.py:345`), le 2026-11-22 | elle échoue : l'en-tête passe bien par le `TestClient` en mémoire |
+| `test_a_traceparent_received_by_the_ai_api_is_ignored` (`:1913`) | un `traceparent` valide reçu par l'API IA n'est ni sa trace, ni le parent de son span racine, ni dans son journal (lignes de l'API de données comprises), ni dans ses en-têtes |
+| `test_a_span_of_another_trace_is_never_the_parent_sent` (`tests/ai_api/test_tracing.py:311`) | un span en cours d'une autre trace n'est jamais le parent envoyé ; avec la condition retirée à la main (`tracing.py:226`), le 2026-11-22, le test échoue |
+| `test_the_traceparent_sent_to_the_data_api_holds_identifiers_only` (`tests/ai_api/test_digest_router.py:1961`) | l'en-tête envoyé : la trace de la demande et le span de `read_watch` ; l'échec de la lecture journalisé dans la même trace |
 | `test_a_refused_traceparent_starts_a_new_trace_and_is_never_quoted`, six valeurs (`tests/data_api/test_request_log.py:185`) | majuscules, version 01, identifiants à zéro, champ de trop, texte : trace neuve, valeur jamais citée |
 | `test_two_traceparents_start_a_new_trace` (`:201`) | deux en-têtes sont refusés |
 | `test_a_line_out_of_a_request_has_no_trace_id` (`tests/commands/test_run_log.py:229`) | une ligne de `kb` hors demande garde son format |
-| capture du 2026-11-22 à 00:39 UTC, au commit `adce824f`, par `tests/commands/test_live_apis.py` (relevé non versionné) | les deux API servies par uvicorn en HTTP sur 127.0.0.1 : 16 lignes (15 de l'API de données, 1 de l'API IA), un seul `trace_id` |
-| `uv run pytest --cov` | 5 680 tests verts, couverture 98,55 % |
+| capture du 2026-11-22 à 00:46 UTC, au commit `e0d87df2`, par `tests/commands/test_live_apis.py` (relevé non versionné) | les deux API servies par uvicorn en HTTP sur 127.0.0.1 : 16 lignes (15 de l'API de données, 1 de l'API IA), un seul `trace_id` |
+| `uv run pytest --cov` | 5 681 tests verts, couverture 98,55 % |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -158,7 +159,7 @@ chaque détail.
 
 - La copie de la `ContextVar` dans le thread d'une route synchrone (`post_digests`, `digest_router.py:71`) est un
   comportement de Starlette et d'anyio : il est prouvé par la ligne d'erreur de `read_watch`, journalisée avec le
-  `trace_id` (test de `test_digest_router.py:1958`), pas relu dans leur code.
+  `trace_id` (test de `test_digest_router.py:1961`), pas relu dans leur code.
 - `draw_trace_id` ne refait pas un tirage nul, à la différence du SDK : une chance sur 2^128, écrite dans sa
   docstring.
 - Deux demandes servies en même temps n'ont pas de test : l'isolement repose sur la `ContextVar`.

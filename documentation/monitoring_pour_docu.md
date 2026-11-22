@@ -258,8 +258,8 @@ Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 202
 Écrit le 2026-11-09 pour #165 et revu le 2026-11-11 d'après le code de `main` au commit `33fa59c`, et le commentaire
 du plafond, par #566, d'après le code de sa demande de fusion (PR, <span lang="en">pull request</span>); mis en forme
 le 2026-11-21 (#669), et le site et le job des fiches de veille ajoutés le même jour d'après `main` au commit
-`54ba488c`; l'identifiant de trace, qui relie les deux API, ajouté le même jour d'après le code de sa demande de fusion
-(#281). Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
+`54ba488c`; l'identifiant de trace, qui relie les deux API, ajouté le 2026-11-22 d'après le code de sa demande de fusion
+au commit `e0d87df2` (#281). Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
 `kb`, de `kb serve-data` (l'API de données), de `kb serve-ai` (l'API IA) et de `kb serve-web` (le site). En local, ils ne demandent rien à
 installer: `kb` les écrit par le module `logging` de Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`,
 qu'`infra/main.bicep` crée. Aucune alerte ne les lit ([Limites des journaux](#limites-des-journaux)).
@@ -286,8 +286,9 @@ enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le
 
 ### Lire une ligne
 
-Une ligne s'écrit `<date> <niveau> <module>: <message>` (`src/k_b/commands/run_log.py:30`), la date en ISO 8601, en
-UTC, à la seconde, avec son `Z` (`:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent
+Une ligne s'écrit `<date> <niveau> <module>: <message>`, et `<date> <niveau> <module>: trace_id=<identifiant> <message>`
+pendant une requête de l'une des deux API; la date en ISO 8601, en UTC, à la seconde, avec son `Z`
+(`src/k_b/commands/run_log.py:84-86`). Le niveau est INFO ou au-dessus (`:95`). Les bibliothèques n'écrivent
 qu'à partir d'un niveau supérieur, car aux niveaux inférieurs elles citent ce que `kb` ne journalise pas: `httpx2` dès
 WARNING (l'URL du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un
 clip); `psycopg` et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:31-55`, `:96-97`). uvicorn écrit
@@ -305,22 +306,23 @@ répond 200 n'est pas écrit; une sonde en échec l'est (`:36-38`). Une erreur d
 une même API. Chaque API tire le sien (`src/k_b/core/api_request_log.py:27`): une demande de `kb digest` a un
 identifiant dans l'API IA, et chacune des requêtes que l'API IA fait alors à l'API de données (une liste par sorte,
 un détail par item) a le sien (`src/k_b/ai_api/connectors/data_api_client.py:211-214`). L'identifiant de trace les
-relie: chaque ligne écrite pendant une requête le porte après le nom de son journal (`trace_id=`,
+relie: chaque ligne écrite pendant une requête de l'une des deux API le porte après le nom de son journal (`trace_id=`,
 `src/k_b/commands/run_log.py:36`, `:115-123`). L'API IA le tire pour chaque demande et l'envoie à l'API de données
-dans l'en-tête `traceparent` du W3C (<span lang="en">World Wide Web Consortium</span>) Trace Context, dont les lignes
-le reprennent (`src/k_b/core/trace_context.py:27-46`; `src/k_b/ai_api/connectors/data_api_client.py:345-352`).
+dans l'en-tête `traceparent` du W3C (<span lang="en">World Wide Web Consortium</span>) <span lang="en">Trace Context</span>,
+dont les lignes le reprennent (`src/k_b/core/trace_context.py:27-44`; `src/k_b/ai_api/connectors/data_api_client.py:345-352`).
 
 Relevé sur un `KB_DATA_DIR` neuf. Les deux premières lignes viennent de `logs/kb.log`, le 2026-11-11: `kb create-db`,
-`kb import`, puis `kb purge`. Les deux suivantes viennent du relevé de #281, le 2026-11-21: les deux API construites
-par `kb serve-data` et `kb serve-ai`, servies par uvicorn en HTTP réel sur 127.0.0.1, dans un seul processus, sur la
+`kb import`, puis `kb purge`. Les deux suivantes viennent du relevé de #281, le 2026-11-22, au commit `e0d87df2`: les
+deux API construites par `kb serve-data` et `kb serve-ai`, servies par uvicorn en HTTP (<span lang="en">Hypertext
+Transfer Protocol</span>) réel sur 127.0.0.1, dans un seul processus, sur la
 base de test et avec le rejeu du modèle (`tests/commands/test_live_apis.py`). La première est une requête de l'API IA
 à l'API de données, la seconde la demande de `kb digest` à l'API IA: elles portent le même identifiant de trace.
 
 ```text
 2026-11-11T14:37:27Z INFO k_b.cli: import started
 2026-11-11T14:37:28Z INFO k_b.purge.run_records: logs and journals purge: 0 files older than 6 months deleted
-2026-11-21T21:23:19Z INFO k_b.core.api_request_log: trace_id=81d2e89770aecb7524275828eefb1375 request method='GET' route=/items status=200 duration_ms=5 client=AI_DIGEST request_id=a6a4d444-b447-4e03-a522-e175c5aeb38e
-2026-11-21T21:23:19Z INFO k_b.core.api_request_log: trace_id=81d2e89770aecb7524275828eefb1375 request method='POST' route=/digests status=200 duration_ms=83 client=KB_DIGEST request_id=6a292641-0a9b-4865-a5ab-5238d6b8eaf4
+2026-11-22T00:46:36Z INFO k_b.core.api_request_log: trace_id=07365d77d4dcfa1b6582835926dd526c request method='GET' route=/items status=200 duration_ms=6 client=AI_DIGEST request_id=d1ffc68f-d1be-41d0-b4d5-0015a6d783b3
+2026-11-22T00:46:36Z INFO k_b.core.api_request_log: trace_id=07365d77d4dcfa1b6582835926dd526c request method='POST' route=/digests status=200 duration_ms=43 client=KB_DIGEST request_id=9a023c6c-3e41-45d2-8c31-151dbe4b5ce4
 ```
 
 ### En local: installer et configurer
