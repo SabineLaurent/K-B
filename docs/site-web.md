@@ -183,8 +183,11 @@ ombres, fixées au cadre, tant que le tableau s'arrête à leur bord ([Lea Verou
 L'ombre a la couleur des bordures (`--color-stone`) : chaque texte du tableau y garde 4,5:1 au moins, 5,36:1 pour un
 lien (WCAG 1.4.3). Chaque dégradé finit sur sa propre couleur rendue transparente (`--color-card-clear`,
 `--color-stone-clear`), jamais sur le noir transparent de `transparent` : un moteur qui n'interpole pas en alpha
-prémultiplié en ferait une bande grise, plus sombre que l'ombre (Firefox, [bug 1869681](https://bugzilla.mozilla.org/show_bug.cgi?id=1869681),
-ouvert, lu le 2026-11-22). L'ombre n'a pas de 3:1 à tenir (WCAG 1.4.11) : ce qu'elle dit est aussi donné ailleurs, la
+prémultiplié en ferait une bande grise, plus sombre que l'ombre. Firefox interpole en alpha prémultiplié depuis sa
+version 36 ([bug 591600](https://bugzilla.mozilla.org/show_bug.cgi?id=591600)) ; un cas resté faux en Firefox 120 à
+122 ([bug 1869681](https://bugzilla.mozilla.org/show_bug.cgi?id=1869681), encore ouvert) ; le cas « Premultiplied
+alpha » corrigé en Firefox 137 ([bug 1904106](https://bugzilla.mozilla.org/show_bug.cgi?id=1904106), qui ne cite pas
+1869681) ; tous lus le 2026-11-22. Les deux couleurs transparentes ne dépendent d'aucune version. L'ombre n'a pas de 3:1 à tenir (WCAG 1.4.11) : ce qu'elle dit est aussi donné ailleurs, la
 légende nomme les étoiles et les *forks* gagnés ([Understanding 1.4.11](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast),
 « The information is available in another form »), et la charte classe `--color-stone` sur blanc en décor. Choix
 (time-knight, 2026-11-22) : l'ombre garde la couleur de la charte. Elle est discrète, 1,36:1 au plus sombre sur 12 px

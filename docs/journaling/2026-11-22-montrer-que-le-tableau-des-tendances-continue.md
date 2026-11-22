@@ -69,9 +69,11 @@ Le résultat, aux trois moments du défilement :
 Le premier code finissait sur `transparent`, qui est du noir transparent, `rgba(0, 0, 0, 0)`.
 - **Ce que dit la spécification.** Un navigateur doit interpoler un dégradé en alpha prémultiplié : le blanc va alors
   directement vers le transparent.
-- **Le risque.** Le bug Firefox 1869681, ouvert, montre que Firefox 120 à 122 ne le faisaient pas toujours. Sans
-  prémultiplication, un cache passerait par du gris à mi-chemin, une bande grise visible même sur un tableau qui
-  tient. Le milieu de l'ombre passerait par un gris plus sombre que `--color-stone` : #B6B6B5 sur blanc, où le lien
+- **Le risque.** Sans prémultiplication, un cache passerait par du gris à mi-chemin, une bande grise visible même
+  sur un tableau qui tient. Firefox interpole en prémultiplié depuis sa version 36 (bug 591600), mais un cas restait
+  faux en Firefox 120 à 122 (bug 1869681, encore ouvert), et le cas « Premultiplied alpha » n'a été corrigé qu'en
+  Firefox 137 (bug 1904106). Ces trois bugs ont été lus le 2026-11-22, après une revue de code qui trouvait la
+  première version de ce texte trop affirmative. Le milieu de l'ombre passerait par un gris plus sombre que `--color-stone` : #B6B6B5 sur blanc, où le lien
   tomberait à 3,67:1.
 - **La correction.** Finir chaque dégradé sur sa propre couleur, d'alpha nul (les deux derniers chiffres `00`).
   Qu'on prémultiplie ou non, on ne passe alors jamais par une autre teinte. Les deux couleurs entrent dans la charte,
@@ -155,8 +157,9 @@ Les résultats : encre 12,08:1, ardoise 5,96:1, lien 5,36:1, lien survolé 7,91:
 3. **Et dans un navigateur qui ne connaît pas `local` ?** Les caches restent sur les ombres, on ne voit aucune ombre :
    le tableau défile comme avant. C'est le même raisonnement que pour `text-wrap: balance`.
 4. **Pourquoi `#FFFFFF00` plutôt que `transparent` ?** `transparent` est du noir transparent. Un moteur qui
-   n'interpole pas en alpha prémultiplié (bug Firefox 1869681) en ferait une bande grise. Une couleur qui finit sur
-   elle-même transparente ne change jamais de teinte (`site.css:52-53`).
+   n'interpole pas en alpha prémultiplié en ferait une bande grise ; Firefox l'a fait faux dans certains cas avant sa
+   version 137 (bugs 1869681 et 1904106). Une couleur qui finit sur elle-même transparente ne change jamais de teinte
+   (`site.css:52-53`).
 5. **Et en couleurs forcées de Windows ?** Le navigateur retire les dégradés, mesuré dans l'émulation de Chrome. Le
    cadre garde sa bordure, et la barre de défilement de Windows reste l'indice.
 

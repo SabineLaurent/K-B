@@ -8,7 +8,10 @@ from importlib.resources import files
 import pytest
 
 STYLESHEET = (files("k_b.web") / "static" / "site.css").read_text(encoding="utf-8")
-CUSTOM_PROPERTY = re.compile(r"(--[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{6})\s*;")
+# A colour of the chart, opaque, or made transparent by its last two digits.
+CUSTOM_PROPERTY = re.compile(
+    r"(--[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)\s*;"
+)
 DECLARATION = re.compile(r"(?<![-\w])([a-z-]+)\s*:\s*([^;{}]+);")
 # The pairs of the chart (planche « Charte graphique ») the stylesheet uses, and their minimum: 4.5
 # for a text, 3 for a component of the interface (WCAG 2.1, 1.4.3 and 1.4.11).
@@ -400,21 +403,18 @@ def read_frame_shadows():
 
 
 def test_each_gradient_of_the_frame_fades_to_its_own_colour_made_transparent():
-    """Never to transparent black: an engine that does not interpolate in premultiplied alpha
-    would draw a grey band, darker than the shadow (Firefox, bug 1869681)."""
+    """Never to transparent black, which an engine that does not interpolate in premultiplied
+    alpha would turn into a grey band, darker than the shadow."""
     colours = read_colours()
-    clear_colours = dict(
-        re.findall(r"(--color-[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{8})\s*;", STYLESHEET)
-    )
 
     assert len(read_frame_gradients()) == 4
     for _, colour, _, end in read_frame_gradients():
-        assert clear_colours[end] == f"{colours[colour]}00"
+        assert colours[end].upper() == f"{colours[colour]}00".upper()
 
 
 def test_the_covers_of_the_frame_hide_its_shadows_while_the_table_ends_at_their_edge():
-    """A cover lies on its shadow, and its plain part is as wide at least: a table that fits shows
-    no grey at its edges."""
+    """A cover lies on its shadow, from the same edge, and its plain part is as wide at least: a
+    table that fits shows no grey at its edges."""
     declarations = dict(
         DECLARATION.findall(strip_nested_rules(read_rule(".table-frame")))
     )
@@ -425,9 +425,13 @@ def test_the_covers_of_the_frame_hide_its_shadows_while_the_table_ends_at_their_
         float(part.split()[0].removesuffix("rem"))
         for part in declarations["background-size"].split(",")
     ]
+    sides = [side for side, _, _, _ in read_frame_gradients()]
     stops = [int(stop) for _, _, stop, _ in read_frame_gradients()[:2]]
 
-    assert positions[:2] == positions[2:]
+    assert sides[:2] == sides[2:]
+    # Each gradient starts at its edge: to the right from the left one, to the left from the right.
+    for side, position in zip(sides, positions, strict=True):
+        assert position == {"right": "0 0", "left": "100% 0"}[side]
     for cover, stop, shadow in zip(widths[:2], stops, widths[2:], strict=True):
         assert cover * stop / 100 >= shadow
 

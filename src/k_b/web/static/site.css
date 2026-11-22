@@ -48,7 +48,7 @@
     --color-field-border: #8A8F96;
     /* The card and the borders made transparent, where a gradient of the frame of a table fades:
        never to transparent black, which an engine that does not interpolate in premultiplied alpha
-       would turn into a grey band (Firefox, bug 1869681). */
+       would turn into a grey band, whatever its version (docs/site-web.md, "Tendances"). */
     --color-card-clear: #FFFFFF00;
     --color-stone-clear: #DADCD600;
     --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
