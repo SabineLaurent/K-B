@@ -7731,6 +7731,28 @@ personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-ess
   comprises, et le compose n'a pas de `kb purge` (Sabine, le 2026-11-22 ; registre, « Préproduction locale (compose,
   #419) »). Écarté : garder les volumes d'un essai au suivant, où ces données resteraient sans purge. — PR de #419
 
+### Documentation : le site publié à chaque fusion (#684)
+
+- **Le workflow `Docs` publie le site de `documentation/` sur GitHub Pages à chaque push sur `main`, donc à chaque
+  fusion, quand la variable de dépôt `PAGES_PUBLISH` vaut `true` ; il se lance toujours à la main, depuis `main`
+  seulement.** Revient sur l'entrée du 2026-11-14 (#167, « publié sur GitHub Pages à la main ») ; ce qui a changé :
+  la décision de Sabine du 2026-11-21 (« publication automatique », dans le périmètre de la PR du README, relayé par
+  tn-orchestrateur). Pourquoi : le site suit `main` sans qu'une exécution à la main soit oubliée (décision de Sabine
+  du 2026-11-21, pourquoi validé le 2026-11-22). La variable, choisie par le Second le 2026-11-21 (option A) : Pages
+  n'étant pas activé ce jour-là, le job `deploy` aurait échoué à chaque fusion ; sans elle, il est sauté
+  (`.github/workflows/docs.yml:33-35`, `:42-44`).
+  Options écartées : garder la publication à la main (une exécution oubliée laisse le site en retard sur `main`) ;
+  `queue: max`, qui garderait en file chaque déploiement en attente, car la documentation de GitHub ne le montre qu'au
+  niveau du workflow et `deploy` le porterait au niveau du job (non vérifié, tri du Second du 2026-11-22) ; retirer
+  `docs.yml` du contrôle de `deploy.yml`, déjà écarté le 2026-11-14 (un contrôle de sécurité de la livraison).
+  Limites assumées : `Docs` tourne désormais sur chaque commit de `main`, et `deploy.yml:59-67` refuse le tag d'un
+  commit dont l'exécution `Docs` a échoué ou a été annulée, jusqu'à sa relance ; un seul déploiement tourne
+  (`concurrency` `pages`, sans `cancel-in-progress`), et GitHub annule celui qui attend quand un plus récent arrive
+  (« By default, any existing pending job or workflow in the same concurrency group will be canceled », GitHub Docs,
+  « Control the concurrency of workflows and jobs », lu le 2026-11-22) : le site publié est celui de la dernière
+  fusion ; Pages est activé depuis le 2026-11-22 et la première publication faite à la main, et la publication à
+  chaque fusion attend que la variable soit posée (`documentation/accessibilite.md`, « Publier »). — PR de #684
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

@@ -819,7 +819,7 @@ avec ses sources.
 - **API4, dépense** : tenue par une alerte de facturation. Aucune requête n'appelle un service
   payant ; l'app est payée à l'usage d'une réplique active (« You aren't billed usage charges if
   your container app scales to zero. », page de la mise à l'échelle d'ACA, lue le 2026-11-10), et
-  le serveur PostgreSQL à l'heure (`README.md`, « Budget »). Tous deux, étiquetés `project=k-b`
+  le serveur PostgreSQL à l'heure (`documentation/produit.md`, « Les moyens et leurs coûts »). Tous deux, étiquetés `project=k-b`
   (`infra/main.bicep:187`, `:286`), sont comptés par `budget-kb`, qui alerte par e-mail
   (`infra/modules/budget.bicep:16-56`).
   **Limite** : l'alerte n'arrête rien, et le budget n'est évalué que toutes les 24 h (API IA, API4,

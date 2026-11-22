@@ -44,7 +44,7 @@ class ExitCode(IntEnum):
         "kb serve-data, kb serve-ai, kb serve-web: the server did not start",
     )
     # 4: the first value after the one of uvicorn. A part is a source, a top or a subject
-    # (README).
+    # (documentation/utilisation.md).
     PARTIAL_FAILURE = (
         4,
         (

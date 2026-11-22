@@ -444,7 +444,7 @@ le `CHECK` de sa colonne. Côté SQLite, `tests/test_schema.py` et `tests/test_d
 
 L'installation des deux SGBD, et la création de la base par `kb create-db` puis, en ligne, par
 `kb migrate-database`, sont décrites dans
-[L'agrégation, l'import et la base](import_et_base_pour_docu.md#installer-le-systeme-de-gestion-de-base-de-donnees),
+[L'agrégation, l'import et la base](donnees.md#installer-le-systeme-de-gestion-de-base-de-donnees),
 section « Installer le système de gestion de base de données ».
 
 ## Vérifier cette fiche

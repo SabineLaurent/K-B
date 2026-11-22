@@ -1,7 +1,7 @@
 """The sandbox of the alerts of the model, run by make sandbox-alerts: one test per alert, its
 requests on the replay exported to the real OTLP endpoint, labelled sandbox.
 
-Each test is one process of the AI API, as after a wake online (documentation/monitoring_pour_docu.md)."""
+Each test is one process of the AI API, as after a wake online (documentation/monitorage.md)."""
 
 import math
 import os

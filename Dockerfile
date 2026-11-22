@@ -1,6 +1,6 @@
 # The image of K-B: one image for every kb command, each run as its own container app or job on
 # Azure Container Apps (issue #200). Base images are pinned by digest, tag in front (Dependabot
-# updates both). Build: docker buildx build --platform linux/amd64 --tag k-b . (README).
+# updates both). Build: docker buildx build --platform linux/amd64 --tag k-b . (documentation/utilisation.md).
 
 # uv builds K-B with its own build backend: its version stays in the range of build-system.requires
 # of pyproject.toml (uv_build>=0.13.6,<0.14.0), and is the version setup-uv installs in ci.yml.

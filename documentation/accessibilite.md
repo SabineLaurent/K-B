@@ -10,22 +10,21 @@
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
 visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
-`mkdocs.yml`, qui a reçu à sa ligne 16 l'entrée de la fiche des maquettes dans le menu (#619), aux lignes 17 à
-23 la partie « 2. Les données » et ses cinq fiches nouvelles (#685), puis aux lignes 33-34 la partie « 5. Conduite
-du projet » (#512): ses renvois visent le fichier avec ces lignes.
+`.github/workflows/docs.yml` et `mkdocs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
 Les fiches sont écrites en Markdown dans `documentation/`. MkDocs 1.6.1, avec le thème Material for MkDocs 9.8.1, en
 fait un site HTML statique: une page par fiche, une page d'accueil ([La documentation de K-B](index.md)) et un
-champ de recherche (`mkdocs.yml:3-38`, `:80-81`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
+champ de recherche (`mkdocs.yml:4-41`, `:83-84`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
-seul menu, à gauche, donne la page d'accueil, puis les cinq parties numérotées de la documentation et leurs fiches.
-La table des matières de la page ouverte est sous son lien (`mkdocs.yml:47-53`). Sur un écran plus étroit, le bouton
+seul menu, à gauche, donne la page d'accueil et la page du produit, puis les cinq parties numérotées de la
+documentation et leurs fiches.
+La table des matières de la page ouverte est sous son lien (`mkdocs.yml:50-56`). Sur un écran plus étroit, le bouton
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
-n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:35-36`). Le
+n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:38-39`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
 (`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
 (`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
@@ -33,8 +32,8 @@ une ligne « K-B », résultats de la recherche compris, et dans un tableau une 
 (`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
-(`mkdocs.yml:54-70`). Le site se publie sur
-GitHub Pages, à la main (section [Publier](#publier)).
+(`mkdocs.yml:57-73`). Le site se publie sur
+GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée à `true`, ou à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
 l'outil, MkDocs avec Material, la sienne du 2026-11-12 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
@@ -74,16 +73,16 @@ vérifie.
 |---|---|---|---|
 | Des titres hiérarchisés | AVH; Microsoft; RGAA 9.1 | Un seul titre de niveau 1 par fiche, puis `##` à `####` sans saut de niveau. Un paragraphe en gras n'est pas un titre. | Le contrôle du HTML construit |
 | De vraies listes | AVH; RGAA 9.3 | Les listes Markdown, rendues en `ul` et `ol`. Chaque niveau est en retrait de quatre espaces: Python-Markdown, qui construit les pages, ne rattache à un point de liste que ce qui est en retrait de quatre espaces. | Le HTML construit |
-| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:53`); le menu donne la page d'accueil, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
+| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:56`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les huit images, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, ont chacune un texte de remplacement court qui nomme la section de leur description, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche; chaque logigramme comparé au code; chaque schéma Merise comparé aux deux scripts de la base |
-| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:45-46`). | La configuration |
+| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:48-49`). | La configuration |
 | Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:85-87`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
-| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:42`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:102-104`). | Le contrôle du HTML construit |
-| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:82-83`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:88-90`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:45`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:105-107`). | Le contrôle du HTML construit |
+| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:85-86`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
@@ -144,7 +143,7 @@ schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisi
 | Le libellé d'une boîte dans un sous-graphe de troisième niveau (calculé, non vu) | `#36464E` sur `#B1B8B6` | 4,85:1 | `#DADCD6` sur `#585C5D` | 4,89:1 |
 
 Le troisième niveau est celui du schéma du déploiement sur Azure, dans
-[la fiche de l'architecture](architecture_pour_docu.md).
+[la fiche de l'architecture](architecture.md).
 
 Hors de l'en-tête, l'anneau de focus prend la couleur de l'accent (`documentation/stylesheets/extra.css:42-43`), y
 compris sur la liste des résultats de recherche (`:194-197`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur
@@ -157,13 +156,13 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les dix-huit pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
-Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
-2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base
-de nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son
-écriture (#512), et les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et
-de l'API de données le 2026-11-22 (#685). Le tableau suivant donne chaque règle de la notice, son résultat sur les
-dix-huit pages, et comment il a été vérifié.
+Les vingt pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
+sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
+2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base de
+nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son écriture
+(#512), les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et de l'API de
+données le 2026-11-22 (#685), et les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684). Le
+tableau suivant donne chaque règle de la notice, son résultat sur les vingt pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -198,9 +197,9 @@ peut y paraître avant le texte qui le développe.
     ```
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-    (`mkdocs.yml:94-100`). Le workflow `docs.yml` la lance sur chaque demande de fusion
-    (PR, <span lang="en">pull request</span>)
-    (`.github/workflows/docs.yml:6-9`, `:25`).
+    (`mkdocs.yml:97-103`). Le workflow `docs.yml` la lance sur chaque demande de fusion
+    (PR, <span lang="en">pull request</span>) et sur chaque push sur `main`
+    (`.github/workflows/docs.yml:7-12`, `:28`).
 
 2. Le contrôle du HTML construit, lancé sur `site/` pour chaque PR de mise en forme, compte dans chaque page: l'attribut
     `lang`, les titres de niveau 1 et les sauts de niveau, les tableaux sans `th`, les liens dont le texte est une
@@ -235,19 +234,22 @@ peut y paraître avant le texte qui le développe.
 
 ## Publier
 
-Le workflow `docs.yml` publie le site sur GitHub Pages quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:9`, `:30-49`). Seul son job `deploy` a le droit d'écrire sur Pages (`:41-43`). Le
-2026-11-14, Pages n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la
-première publication, deux gestes de Sabine:
+Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
+la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
+(`.github/workflows/docs.yml:10-12`, `:33-61`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
+quand Pages n'était pas encore activé, et `deploy` aurait échoué à chaque fusion. Un seul déploiement tourne à la
+fois, jamais interrompu, et un seul attend: quand une fusion arrive
+pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
+([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
+annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`).
 
-1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14). Pages ne sert un dépôt privé qu'avec une offre
-    payante de GitHub (Pro, Team ou Enterprise), et **un site publié depuis un dépôt privé est public**: activer Pages
-    sur le dépôt encore privé publierait toutes les fiches.
-2. Dans les réglages du dépôt, <span lang="en">Settings > Pages > Build and deployment > Source</span>, choisir
-    <span lang="en">« GitHub Actions »</span>.
-
-Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, sur `main`. Cette procédure n'a pas
-été essayée.
+Pages est activé depuis le 2026-11-22, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
+`"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). La première publication a été lancée à
+la main le même jour: l'exécution de `Docs` sur `main`, à 02:54 UTC, a réussi. La publication à chaque fusion demande
+un geste de l'administratrice du dépôt: créer la variable de dépôt `PAGES_PUBLISH`, de valeur `true`, dans les
+réglages (<span lang="en">Settings > Secrets and variables > Actions > Variables</span>) ou par
+`gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`. Elle se vérifie à la fusion suivante: le job
+`deploy` de `Docs` tourne et finit vert.
 
 ## Limites
 
@@ -271,8 +273,9 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
 - **WAVE relève des libellés vides ou multiples sur les cases cachées du thème et sur les radios du mode.** Material ouvre son menu, sa
     recherche et la table des matières d'une page par des cases à cocher cachées, liées à des `label` sans texte ou à
-    plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, et 7 et 8
-    depuis: le menu numéroté ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les
+    plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, 7 et 8
+    après lui, et 7 et 9 depuis la rubrique « 5. Conduite du projet » (#512; relevé du 2026-11-22): le menu numéroté
+    ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les
     cases sont en `display: none`: elles ne sont ni dans
     l'ordre de la touche Tab ni dans l'arbre d'accessibilité de Chrome (relevé le 2026-11-18). Seuls y sont le
     champ de recherche et les deux radios du mode, chacun avec son nom (« Rechercher », « Passer au mode sombre »,
@@ -292,15 +295,15 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
     Il vient du thème, hors du texte des fiches.
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
-    rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:5`): tant que Pages n'est
-    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les sept fiches qui en ont, l'erreur de ce
-    chargement arrête aussi, dans l'aperçu seulement, le bouton du mode et la recherche.
+    rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:6`): un aperçu local de
+    `site/` le charge depuis le site en ligne, qui le sert (relevé le 2026-11-22: réponse 200 à
+    `https://sabinelaurent.github.io/K-B/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js`).
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
     qui bouge. Le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
     vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
-    (`.github/workflows/docs.yml:26-29`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
+    (`.github/workflows/docs.yml:29-32`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.

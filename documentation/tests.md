@@ -52,7 +52,7 @@ retire pas les autres variables d'un `.env` exporté; `tests/commands/conftest.p
 ### Pour les tests marqués `postgresql`
 
 Un serveur PostgreSQL de test, nommé par `KB_TEST_POSTGRESQL_URL`. C'est
-un serveur de la machine (sur le Mac, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
+un serveur de la machine (en local, sous macOS, le PostgreSQL de Homebrew, sans conteneur) ou le service de la CI, jamais la
 base de production. Son rôle doit pouvoir créer et supprimer une base (`make_postgresql_base`), et créer des rôles
 pour les tests des droits de la base en ligne (`identity_roles`, `tests/conftest.py`). Une base de test est créée
 par défaut en UTF8 et en collation C, comme `kb create-db` la demande (`create_postgresql_base`); un test peut en
@@ -71,14 +71,16 @@ le remplir. Il ne porte que leurs variables:
 | `KB_ZOTERO_DIR` | le test de Zotero est sauté |
 | `KB_VAULT_DIR` | le test des clips est sauté |
 | `GOOGLE_APPLICATION_CREDENTIALS` | le test de `gh_archive` est sauté; avec elle, il lance une vraie requête BigQuery |
-| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté |
+| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté; avec une seule des deux, il échoue (`tests/e2e/test_real_export.py:5-7`) |
 | `KB_DEPLOYMENT_ENVIRONMENT` | avec `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`, le test de l'export échoue (`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`); posée, elle lui parvient ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)); `sandbox` dans le modèle |
 
 Ils se lancent depuis un terminal sans `.env` exporté. Si l'environnement porte une autre variable de
 `.env.example` (hors de celles que le test pose lui-même, `KB_DATA_DIR` et `KB_COLLECT_ONLY`, et de celles que
 `tests/conftest.py` retire), ou la clé d'un client de l'API de données (`KB_DATA_API_KEY_<CLIENT>`), la fixture
 `no_variable_beyond_the_end_to_end_tests` (`tests/e2e/conftest.py`) arrête pytest avant tout `kb`, en citant leurs
-noms, jamais leurs valeurs.
+noms, jamais leurs valeurs. Ce qu'ils écrivent, et ce qu'il en reste:
+[le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
+« Procédure de tri », étape 10.
 
 ## Les dépendances installées
 
@@ -91,7 +93,7 @@ Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions plancher
 | `pytest-cov` | 7.1.0 | mesure la couverture (`--cov`) et fait échouer la commande sous le seuil |
 | `pytest-html` | 4.2.0 | écrit le rapport HTML d'une exécution (`--html`) |
 | `openapi-spec-validator` | 0.9.0 | valide l'OpenAPI de chaque API (`tests/data_api/test_openapi.py`, `tests/ai_api/test_ai_api_openapi.py`) |
-| `ruff` | 0.16.10 | le lint et le format |
+| `ruff` | 0.16.10 | le <span lang="en">lint</span> et le format |
 | `mypy` | 2.4.0 | le typage strict |
 | `types-defusedxml`, `types-pyyaml` | 0.7.0.20260504, 6.0.12.20260906 | les annotations de `defusedxml` et de `pyyaml`, pour mypy |
 
@@ -111,7 +113,7 @@ en mémoire du SDK (le kit de développement, <span lang="en">software developme
 | `make test` | comme `uv run pytest`, avec le rapport `reports/test.html` |
 | `make test-ai-api`, `make test-data-api` | `tests/ai_api` ou `tests/data_api`, puis les tests du code commun aux deux API (`API_COMMON_TESTS` du `Makefile`); rapports `reports/test-ai-api.html` ou `reports/test-data-api.html`, puis `reports/test-api-common.html` |
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
-| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache`; sur la machine, `--no-cache` est une précaution: `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie |
+| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le <span lang="en">lint</span>, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache`; sur la machine, `--no-cache` est une précaution: `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie |
 
 ### Sur PostgreSQL
 
@@ -126,6 +128,10 @@ module (`make_postgresql_base`); les tests de lecture partagent une base, constr
 dossier en `0700` s'il le crée, avant que pytest-html l'écrive: il garde la sortie capturée de chaque test. Un rapport demandé
 dans le dépôt hors de `reports/`, que git ne laisserait pas de côté, arrête pytest. Chaque exécution écrase le
 rapport précédent.
+
+Les tests du code commun aux deux API sont à la racine de `tests/`: `test_api_methods.py`, `test_api_rate_limit.py` et
+`test_api_telemetry.py`, listés dans `API_COMMON_TESTS` (`Makefile:47`); un nouveau test commun s'y ajoute à la main.
+`make` s'arrête au premier échec: si les tests d'une API échouent, les tests communs ne sont pas lancés.
 
 ### Les tests de bout en bout
 
@@ -195,7 +201,7 @@ scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclen
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
 `cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
-Sabine: [la fiche du monitorage](monitoring_pour_docu.md), sections « Le bac à sable » et « Relevé des alertes du
+Sabine: [la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
 bac à sable ».
 
 ### Ce que lance la CI

@@ -16,7 +16,7 @@ Cette fiche donne les spécifications techniques de la collecte de K-B: son pér
 données brutes, les technologies et les outils qui la font, les services externes qu'elle interroge, les exigences de
 programmation que tient son code, la disponibilité et l'accès de chaque source, puis le jeu de données brutes
 lui-même. Le déroulé de `kb collect`, pas à pas, avec son logigramme et ses codes de sortie, est dans
-[la fiche de l'import et de la base, « La commande qui précède l'import: `kb collect` »](import_et_base_pour_docu.md#la-commande-qui-precede-limport-kb-collect);
+[la fiche de l'import et de la base, « La commande qui précède l'import: `kb collect` »](donnees.md#la-commande-qui-precede-limport-kb-collect);
 le détail de chaque source est dans
 [les spécifications de la collecte](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md). Elle est
 écrite d'après le code de `main` au commit `39cb5eb9` (2026-11-22). Les chemins du code de K-B (`etl/…`, `core/…`,
@@ -94,7 +94,7 @@ trois étapes: la lecture de chaque fichier brut pas encore importé par le lect
 `etl/transform.py:1-2`), la normalisation de chaque item dans un seul modèle, quelle que soit sa source
 (`etl/normalize.py:1`, `items.py`), puis l'écriture dans la base, en une transaction, où la clé naturelle de chaque
 sorte écarte les doublons (`etl/load.py:1-2`, par exemple `database/writers/paper_writer.py:16`). Le détail est dans
-[L'agrégation, l'import et la base](import_et_base_pour_docu.md).
+[L'agrégation, l'import et la base](donnees.md).
 
 **En ligne**, `kb collect` est une étape de `kb daily-routine`, après le miroir des clips
 (`commands/daily_routine_command.py:44-54`), que le job `caj-kb-daily-routine` lance chaque jour à 08:00 UTC
@@ -109,7 +109,7 @@ sorte écarte les doublons (`etl/load.py:1-2`, par exemple `database/writers/pap
     (`pyproject.toml:9`). L'image qui tourne en ligne part de `python:3.13-slim-trixie` (`Dockerfile:10`, `:27`).
 - **uv** installe Python, K-B et ses dépendances aux versions de `uv.lock`; l'intégration continue (CI) et l'image
     prennent uv 0.13.6 (`.github/workflows/ci.yml:34`, `Dockerfile:7`). L'installation est dans
-    [L'installation et l'environnement de développement](installation_pour_docu.md).
+    [L'installation et l'environnement de développement](installation.md).
 - **La commande `kb`**: le point d'entrée `kb = "k_b.cli:main"` (`pyproject.toml:49-50`); `kb collect` lance
     `run_collect` (`commands/collect_command.py:37-59`). Le Makefile la lance par `make collect` (`Makefile:12-13`).
 
@@ -117,7 +117,7 @@ sorte écarte les doublons (`etl/load.py:1-2`, par exemple `database/writers/pap
 
 Le tableau suivant donne chaque bibliothèque dont se sert la collecte, sa version dans `uv.lock`, son rôle et le code
 qui l'appelle. La liste de toutes les dépendances de K-B est dans
-[L'installation et l'environnement de développement, « Les dépendances »](installation_pour_docu.md#les-dependances).
+[L'installation et l'environnement de développement, « Les dépendances »](installation.md#les-dependances).
 
 | Bibliothèque | Version (`uv.lock`) | Rôle dans la collecte | Où |
 |---|---|---|---|
@@ -252,7 +252,7 @@ l'import (`etl/raw_store.py:120-132`).
 - **Des codes nommés**: `ExitCode` (`commands/exit_codes.py:7-85`). `kb collect` sort en 0, 1 ou 4 selon ses
     sources et son état (`commands/collect_command.py:115-124`), en 2 s'il ne démarre pas (`:45-46`, `:54-56`), en 143 sur SIGTERM et en 130 sur Ctrl-C
     (`cli.py:249-260`). Le sens de chaque code est dans
-    [la fiche de l'import et de la base](import_et_base_pour_docu.md#la-commande-qui-precede-limport-kb-collect).
+    [la fiche de l'import et de la base](donnees.md#la-commande-qui-precede-limport-kb-collect).
 - **L'arrêt sur SIGTERM**: le signal devient `StoppedBySigtermError`, qui défait le travail en cours comme toute
     exception; un second SIGTERM est ignoré (`commands/sigterm.py:13-17`, `:39-65`). Un fichier brut déjà écrit
     reste.
@@ -411,7 +411,7 @@ lisible par le seul utilisateur de l'image: dossiers en `0700`, fichiers en `060
 exécution à l'autre (`infra/modules/daily-routine-job.bicep:1-4`). Le stockage d'échange, Azure Blob Storage, ne
 porte pas le brut: il porte ce qui entre dans le job et ce qui en sort, les clips du conteneur `clippings` et les
 fiches de `veille/` publiées dans le conteneur `watch` (`commands/job_transfers.py:1-2`,
-[L'architecture, « Les jobs en ligne et le stockage d'échange »](architecture_pour_docu.md#les-jobs-en-ligne-et-le-stockage-dechange)).
+[L'architecture, « Les jobs en ligne et le stockage d'échange »](architecture.md#les-jobs-en-ligne-et-le-stockage-dechange)).
 
 ## Vérifier cette fiche
 
