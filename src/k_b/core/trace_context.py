@@ -78,7 +78,7 @@ def draw_trace_id() -> str:
 
 
 def draw_span_id() -> str:
-    """A new span id, the parent id of a request sent when no span records."""
+    """A new span id, the parent id of a request sent when no span of its trace records."""
     return secrets.token_hex(SPAN_ID_BYTES)
 
 

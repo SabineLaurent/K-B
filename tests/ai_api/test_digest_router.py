@@ -1923,12 +1923,15 @@ def test_a_traceparent_received_by_the_ai_api_is_ignored(
         )
 
     log = capsys.readouterr().err
-    root_trace_id = read_root_trace_id(recorded_traces)
+    lines = read_logged_request_lines(log)
+    [root] = recorded_traces.find_spans(digest_router.ROOT_SPAN)
+    root_trace_id = format(root.context.trace_id, "032x")
     assert root_trace_id != TRACE_ID
-    assert {
-        TRACE_FIELD.findall(line)[0] for line in read_logged_request_lines(log)
-    } == {root_trace_id}
+    assert root.parent is None
+    assert any(" route=/items" in line for line in lines)
+    assert {TRACE_FIELD.findall(line)[0] for line in lines} == {root_trace_id}
     assert TRACE_ID not in log
+    assert PARENT_ID not in log
     assert all(TRACE_ID not in value for value in response.headers.values())
 
 

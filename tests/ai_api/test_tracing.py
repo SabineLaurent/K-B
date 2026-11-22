@@ -303,5 +303,22 @@ def test_a_request_sent_without_a_span_under_way_gets_a_drawn_parent():
     assert first is not None
     assert second is not None
     assert re.fullmatch(rf"00-{trace_id}-[0-9a-f]{{16}}-01", first)
+    assert re.fullmatch(rf"00-{trace_id}-[0-9a-f]{{16}}-01", second)
     assert first != second
     assert build_traceparent() is None
+
+
+def test_a_span_of_another_trace_is_never_the_parent_sent(recorded_traces):
+    """A span under way that is not of the trace of the request: the parent id is drawn."""
+    trace_id = "4bf92f3577b34da6a3ce929d0e0e4736"
+    tracing = recorded_traces.trace_export.build_tracing()
+
+    with tracing.step("out_of_the_request"), following_trace(trace_id):
+        sent = build_traceparent()
+
+    [other] = recorded_traces.find_spans("out_of_the_request")
+    assert format(other.context.trace_id, "032x") != trace_id
+    assert sent is not None
+    match = re.fullmatch(rf"00-{trace_id}-([0-9a-f]{{16}})-01", sent)
+    assert match is not None
+    assert match.group(1) != format(other.context.span_id, "016x")
