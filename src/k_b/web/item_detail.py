@@ -22,7 +22,7 @@ from k_b.web.feed import (
     write_link_note,
     write_newsletter_name,
 )
-from k_b.web.french_dates import write_day
+from k_b.web.french_dates import write_count, write_day
 from k_b.web.received_text import (
     clean_received_text,
     clean_received_value,
@@ -175,7 +175,8 @@ def write_page_title(detail: ItemDetail) -> str:
         case NewsletterArticleDetail():
             name = write_newsletter_name(detail.edition)
             return (
-                f"Article {name} du {write_day(detail.source_date)}, n° {detail.rank}"
+                f"Article {name} du {write_day(detail.source_date)},"
+                f" n° {write_count(detail.rank)}"
             )
         case _:
             assert_never(detail)
@@ -213,7 +214,7 @@ def build_line(detail: ItemDetail) -> tuple[LinePart, ...]:
             return (
                 LinePart(write_newsletter_name(detail.edition)),
                 LinePart("édition du", day=published),
-                LinePart(f"n° {detail.rank}"),
+                LinePart(f"n° {write_count(detail.rank)}"),
             )
         case _:
             assert_never(detail)
