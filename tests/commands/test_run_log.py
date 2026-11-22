@@ -224,3 +224,12 @@ def test_a_library_that_logs_what_an_answer_says_is_held_and_set_back(
         assert library_logger.level == level
 
     assert library_logger.level == level_before
+
+
+def test_a_line_out_of_a_request_has_no_trace_id(tmp_path, capsys):
+    """Only a line written during a request of an API carries its trace id."""
+    with cli.logging_to(tmp_path, None):
+        logging.getLogger("k_b.cli").info("a line of the test")
+
+    [line] = capsys.readouterr().err.splitlines()
+    assert line.endswith(" INFO k_b.cli: a line of the test")

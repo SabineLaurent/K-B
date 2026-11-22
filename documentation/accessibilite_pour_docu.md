@@ -9,24 +9,31 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-18, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
+`mkdocs.yml`, qui a reçu à sa ligne 16 l'entrée de la fiche des maquettes dans le menu (#619), aux lignes 17 à
+23 la partie « 2. Les données » et ses cinq fiches nouvelles (#685), puis aux lignes 33-34 la partie « 5. Conduite
+du projet » (#512): ses renvois visent le fichier avec ces lignes.
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
 Les fiches sont écrites en Markdown dans `documentation/`. MkDocs 1.6.1, avec le thème Material for MkDocs 9.8.1, en
 fait un site HTML statique: une page par fiche, une page d'accueil ([La documentation de K-B](index.md)) et un
-champ de recherche (`mkdocs.yml:3-29`, `:71-72`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
+champ de recherche (`mkdocs.yml:3-38`, `:80-81`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
-seul menu, à gauche, donne la page d'accueil, puis les quatre parties numérotées de la documentation et leurs fiches.
-La table des matières de la page ouverte est sous son lien (`mkdocs.yml:38-44`). Sur un écran plus étroit, le bouton
+seul menu, à gauche, donne la page d'accueil, puis les cinq parties numérotées de la documentation et leurs fiches.
+La table des matières de la page ouverte est sous son lien (`mkdocs.yml:47-53`). Sur un écran plus étroit, le bouton
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
-n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:26-27`). Le
+n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:35-36`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-62`). Le site a un mode clair et un mode sombre. À la première visite, il
+(`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
+(`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
+une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
+(`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
+visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
-(`mkdocs.yml:45-61`). Le site se publie sur
+(`mkdocs.yml:54-70`). Le site se publie sur
 GitHub Pages, à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
@@ -67,16 +74,16 @@ vérifie.
 |---|---|---|---|
 | Des titres hiérarchisés | AVH; Microsoft; RGAA 9.1 | Un seul titre de niveau 1 par fiche, puis `##` à `####` sans saut de niveau. Un paragraphe en gras n'est pas un titre. | Le contrôle du HTML construit |
 | De vraies listes | AVH; RGAA 9.3 | Les listes Markdown, rendues en `ul` et `ol`. Chaque niveau est en retrait de quatre espaces: Python-Markdown, qui construit les pages, ne rattache à un point de liste que ce qui est en retrait de quatre espaces. | Le HTML construit |
-| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:44`); le menu donne la page d'accueil, puis les quatre parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
-| Une alternative à chaque élément non textuel | AVH; Microsoft | Les fiches n'ont aucune image. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche |
-| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:36-37`). | La configuration |
+| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:53`); le menu donne la page d'accueil, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
+| Une alternative à chaque élément non textuel | AVH; Microsoft | Les huit images, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, ont chacune un texte de remplacement court qui nomme la section de leur description, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche; chaque logigramme comparé au code; chaque schéma Merise comparé aux deux scripts de la base |
+| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:45-46`). | La configuration |
 | Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:76-78`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
-| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:33`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:93-95`). | Le contrôle du HTML construit |
-| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:73-74`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:85-87`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:42`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:102-104`). | Le contrôle du HTML construit |
+| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:82-83`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
@@ -150,10 +157,13 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les onze pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web,
-sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche du monitorage le
-2026-11-21, après sa mise en forme (#669). Le tableau suivant donne chaque règle de la notice, son résultat sur les
-onze pages, et comment il a été vérifié.
+Les dix-huit pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
+Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
+2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base
+de nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son
+écriture (#512), et les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et
+de l'API de données le 2026-11-22 (#685). Le tableau suivant donne chaque règle de la notice, son résultat sur les
+dix-huit pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -161,21 +171,21 @@ onze pages, et comment il a été vérifié.
 | 2. Utiliser correctement la hiérarchie des titres | Tenue: un titre de niveau 1 par page, puis aucun saut de niveau. | Le HTML construit |
 | 3.1. Rédiger des intitulés de liens explicites | Tenue (règle « Des liens explicites » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). | Le HTML construit |
 | 3.2. Savoir utiliser les titres de liens en dernier recours | Tenue dans le texte des fiches: aucun lien n'y a d'attribut `title`. Les deux liens du logo du thème, dans l'en-tête et dans le menu, en portent un, le nom du site (« Limites »). | Le HTML construit |
-| 4.1 à 4.3. Images décoratives, informatives, images-liens | Sans objet: aucune image. | Le HTML construit |
-| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les huit schémas des fiches (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Le rendu dans un navigateur n'est pas vérifié. | La relecture |
+| 4.1 à 4.3. Images décoratives, informatives, images-liens | Tenue: huit images informatives, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, chacune avec son texte de remplacement; aucune image décorative ni image-lien dans le texte des fiches. | Le HTML construit |
+| 4.4. Images informatives complexes: un court texte de remplacement et une description détaillée | Tenue pour les onze schémas des fiches (un dans le service d'IA, quatre dans l'architecture, un dans l'API IA, deux dans l'import et la base, un dans les maquettes, un dans la collecte, un dans l'API de données): chacun a un titre et une description courts (`accTitle` et `accDescr`, que Mermaid rend en `title` et `desc` du dessin), et le texte qui le suit pour description détaillée. Neuf schémas ont été rendus le 2026-11-19 par le Mermaid du site, dans Chrome sans interface, et ceux de la collecte et de l'API de données le 2026-11-22: leur `title` et leur `desc` y sont. Tenue pour les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données: chacun a un texte de remplacement court, qui nomme la section de sa description détaillée, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle. | La relecture; le rendu des onze schémas dans Chrome sans interface |
 | 5. Utiliser correctement les listes à puces et listes numérotées | Tenue: des listes Markdown, en retrait de quatre espaces, aucune liste tapée à la main. | Le HTML construit |
 | 6.1. Déclarer les citations en ligne et les blocs de citations | Tenue: une citation en ligne est un `q`, un bloc de citation un `blockquote` (règle « Des citations déclarées » des [règles appliquées aux fiches](#les-regles-appliquees-aux-fiches)). Chaque paire de guillemets tapés a été triée: celles qui restent entourent un titre, un mot dont on parle ou un libellé. | Le HTML construit; la relecture |
 | 6.2. Déclarer les changements de langue | Tenue: chaque passage en anglais du texte des fiches est balisé `<span lang="en">`; le pied de page anglais du thème est retiré. | Le HTML construit |
 | 6.3. Ne pas faire référence à un élément en se basant uniquement sur sa couleur, sa taille, sa forme ou sa position | Tenue: un renvoi nomme l'élément et suit l'ordre de lecture (« le tableau suivant donne… »), jamais une place à l'écran. | La relecture; le contrôle des renvois vagues |
 | 7.1. Contrastes entre le texte et l'arrière-plan | Tenue ([Les contrastes du thème](#les-contrastes-du-theme)). | Le calcul des rapports de contraste |
 | 7.2. Les couleurs ne sont pas le seul moyen de porter une information | Tenue: un lien est souligné. | La relecture; la feuille de style |
-| 8.1. Associer une description détaillée aux contenus riches | Tenue: chaque schéma Mermaid a sa description en texte. | La relecture |
+| 8.1. Associer une description détaillée aux contenus riches | Tenue: chaque schéma Mermaid, chaque planche et chaque logigramme a sa description en texte. | La relecture |
 | 8.2 et 8.3. Contenus en mouvement; vidéos | Sans objet: ni l'un ni l'autre. | Le HTML construit |
 | 9. Fournir une alternative textuelle aux contenus textuels ambigus (émoticônes, art ASCII) | Tenue: aucune émoticône ni art ASCII. La flèche « → » sert à écrire un chemin de menu ou le résultat d'une commande; ce qu'en dit un lecteur d'écran n'est pas vérifié. | Le HTML construit |
 
 Ses bonnes pratiques: aucun lien n'ouvre de nouvelle fenêtre (aucun `target`, le pied de page du thème retiré); aucun fichier n'est proposé au
 téléchargement; les capitales gardent leurs accents; aucun texte n'est justifié. Les sigles du domaine (RGAA, WCAG,
-AELE, RGPD, PR, ADR, CVE, DINUM, OSV) sont développés à leur premier emploi dans chaque fiche; les sigles techniques
+AELE, RGPD, PR, ADR, CVE, DINUM, OSV, MCD, MLD, MPD, SGBD, CNIL) sont développés à leur premier emploi dans chaque fiche; les sigles techniques
 courants (API, HTML, URL, UTC, SHA) ne le sont pas. Le libellé d'un schéma ne compte pas comme premier emploi: un sigle
 peut y paraître avant le texte qui le développe.
 
@@ -188,7 +198,7 @@ peut y paraître avant le texte qui le développe.
     ```
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-    (`mkdocs.yml:85-91`). Le workflow `docs.yml` la lance sur chaque demande de fusion
+    (`mkdocs.yml:94-100`). Le workflow `docs.yml` la lance sur chaque demande de fusion
     (PR, <span lang="en">pull request</span>)
     (`.github/workflows/docs.yml:6-9`, `:25`).
 
@@ -217,7 +227,11 @@ peut y paraître avant le texte qui le développe.
     critère 1.4.3 des WCAG 2.1 n'impose aucun contraste à un texte que personne ne voit, et s'applique au texte qui
     paraît au focus: le lien passe le seuil de 4,5:1 dès qu'il paraît. Le parcours à la touche Tab suivait l'ordre de
     la page, le menu de gauche titre par titre. Le thème donne le focus à un bloc de code qui défile, pour le faire
-    défiler au clavier (WCAG 2.1, critère 2.1.1).
+    défiler au clavier (WCAG 2.1, critère 2.1.1). Depuis, le lien d'évitement est placé hors de l'écran tant qu'il n'a
+    pas le focus, comme le recommande WebAIM, et non plus transparent: son texte garde ses couleurs
+    (`documentation/stylesheets/extra.css:227-235`). Au premier appui sur la touche Tab, il paraît en haut à gauche de
+    la page, avec son anneau blanc, en mode clair comme en mode sombre (relevé le 2026-11-19 dans Chrome sans interface,
+    à 1 512 et à 390 pixels).
 
 ## Publier
 
@@ -238,7 +252,7 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 ## Limites
 
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
-    en dit. Parade: un essai avec VoiceOver par Sabine sur une fiche de chaque lot, le site construit.
+    en dit. Le vérifier demande un essai avec un lecteur d'écran, VoiceOver par exemple, sur le site construit.
 - **Lue sur GitHub, une citation en ligne ne reçoit pas la feuille de style du site.** Le rendu de GitHub garde le
     `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
     navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
@@ -246,12 +260,14 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 - **Les schémas larges sont réduits à la largeur du texte.** Dans l'architecture, le flux en bref et le déploiement
     sur Azure sont dessinés sur 688 pixels de large, et leurs libellés ne se lisent qu'avec le zoom du navigateur
     (relevé le 2026-11-18 dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.
+    Les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de
+    données sont réduits de même: chacun donne la vue d'ensemble, et le lien vers son fichier en taille réelle et sa description en texte en donnent le détail.
 - **La partie et la page ouvertes ne sont signalées qu'à la vue.** Le thème marque l'onglet de la partie ouverte et
     le lien de la page ouverte par une classe CSS, sans attribut `aria-current` (relevé le 2026-11-18 dans le HTML
     construit). Sans cet attribut, rien dans le HTML ne les désigne comme courants pour un lecteur d'écran.
 - **Le bouton du menu d'un écran étroit n'est pas atteint au clavier.** Sous 76,25em, ce bouton est un `label` du
     thème, sans `tabindex`: la touche Tab ne s'y arrête pas (relevé le 2026-11-18 dans Chrome sans interface, à
-    390 pixels; #651). Parade: le champ de recherche, atteint au clavier, mène à chaque fiche. Une fenêtre élargie, ou
+    390 pixels; #651). Le champ de recherche, atteint au clavier, mène à chaque fiche. Une fenêtre élargie, ou
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
 - **WAVE relève des libellés vides ou multiples sur les cases cachées du thème et sur les radios du mode.** Material ouvre son menu, sa
     recherche et la table des matières d'une page par des cases à cocher cachées, liées à des `label` sans texte ou à
@@ -277,12 +293,12 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
     rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:5`): tant que Pages n'est
-    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les quatre fiches qui en ont, l'erreur de ce
+    pas activé, un aperçu local de `site/` n'affiche pas les schémas. Sur les sept fiches qui en ont, l'erreur de ce
     chargement arrête aussi, dans l'aperçu seulement, le bouton du mode et la recherche.
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
-    qui bouge. Parade: le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
+    qui bouge. Le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
     vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
     (`.github/workflows/docs.yml:26-29`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
     de changer l'empreinte.
@@ -319,8 +335,11 @@ Lues le 2026-11-18:
     (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
     une recherche web du même jour.
 
-Lue le 2026-11-19:
+Lues le 2026-11-19:
 
 - W3C, <span lang="en">« Understanding SC 1.4.3: Contrast (Minimum) »</span>,
     [page du W3C](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum), après une recherche web du même jour:
     un texte que personne ne voit n'a pas d'exigence de contraste; le texte qui paraît au focus en a une.
+- WebAIM, <span lang="en">« Skip Navigation Links »</span>,
+    [page de WebAIM](https://webaim.org/techniques/skipnav/), après une recherche web du même jour: un lien
+    d'évitement caché hors de l'écran, qui y revient au focus, plutôt que transparent ou de la couleur du fond.
