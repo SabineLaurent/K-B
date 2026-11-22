@@ -33,6 +33,7 @@ nav:
           - tests.md
           - integration-continue.md
           - livraison-continue.md
+          - incident.md
       - 5. Conduite du projet:
           - conduite-du-projet.md
       # Without a number, and in the footer too, so the page keeps its table of contents (Sabine's choice, issue 654).
