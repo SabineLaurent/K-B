@@ -90,6 +90,21 @@ def test_the_focus_ring_is_the_one_of_the_chart():
     assert "outline-offset: 2px;" in rule.group(1)
 
 
+def test_the_focus_ring_stays_in_sight_when_tab_scrolls_down_to_it():
+    """Chrome scrolls an element that Tab reaches at the foot of the screen only up to its bottom
+    edge: the margin below it is the room of its ring, the width of the outline plus its offset."""
+    block = strip_nested_rules(read_rule(":focus-visible"))
+    rule = re.sub(r"/\*.*?\*/", "", block, flags=re.DOTALL)
+    declarations = {name: value.strip() for name, value in DECLARATION.findall(rule)}
+    width = re.fullmatch(r"(\d+)px solid var\(--color-teal\)", declarations["outline"])
+    offset = re.fullmatch(r"(\d+)px", declarations["outline-offset"])
+
+    assert width is not None
+    assert offset is not None
+    ring = int(width[1]) + int(offset[1])
+    assert declarations.get("scroll-margin-block-end") == f"{ring}px"
+
+
 def test_every_font_size_is_in_rem():
     sizes = [
         value.strip()

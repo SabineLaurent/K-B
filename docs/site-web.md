@@ -386,6 +386,18 @@ par une espace insécable, dans un seul élément du bouton avec son libellé ; 
 avait. Mesuré dans Chrome 157 le 2026-11-21, avec la police système de macOS : aucune des 24 pages de
 `tests/web/test_accessibility.py` ne défile en largeur, de 320 à 1280 px, à texte de 100 à 200 %.
 
+L'anneau de focus (`:focus-visible`, un contour de 3 px à 2 px de l'élément) a une marge de défilement en bas,
+`scroll-margin-block-end: 5px`, la place de l'anneau sous l'élément (#700). Au Tab, Chrome ne fait défiler la page
+vers un élément en partie sous l'écran que jusqu'au bord bas de l'élément : sans la marge, le bas de l'anneau restait
+caché, de 5 px au plus. Mesuré dans Chrome 157 sans interface, au clavier seul, sur les 24 pages de
+`tests/web/test_accessibility.py`, à 1280 px, à 200 % (640 px CSS à 2 px d'écran par px CSS) et à 320 px : 10, 41 et
+21 arrêts coupés sur `main` b35ad6c8, aucun avec la marge, sur `main` 9658225a (2026-11-22). Le reste de l'essai ne
+change pas. Le haut n'a pas de marge : Chrome centre un élément atteint par Maj+Tab depuis le bas (mesuré). Écarté :
+`scroll-padding-block` sur la page, qui vaut pour tout défilement et décale de 5 px la cible du lien d'évitement
+(mesuré avec les deux côtés) ; une marge sur chaque élément que le clavier atteint, qui jouerait hors du focus
+clavier. La marge ne ramène pas un lien en partie hors du cadre des tendances (plus haut, #693). Firefox et Safari ne
+sont pas mesurés.
+
 ## Accessibilité
 
 La cible est le RGAA 4.1.2, soit WCAG 2.1 AA, avec les règles du référentiel Opquast 2025 (version 5.0)
@@ -418,7 +430,8 @@ l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une r
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
-vérifie l'anneau de focus, la taille du lien d'évitement, les règles du fort zoom et la feuille d'impression.
+vérifie l'anneau de focus et sa marge de défilement en bas, la taille du lien d'évitement, les règles du fort zoom et
+la feuille d'impression.
 `tests/web/test_accessibility.py` vérifie aussi la flèche de chaque bouton liée à son mot.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement
