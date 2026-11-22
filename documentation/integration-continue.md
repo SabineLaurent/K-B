@@ -160,7 +160,7 @@ tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lanc
     `pages: write` et `id-token: write` (l. 53-55), dans l'environnement `github-pages` (l. 56-58), et publie le site
     par `actions/deploy-pages` (l. 60-61).
 
-Sur une PR, `deploy` est donc sauté. GitHub Pages n'est pas activé sur le dépôt le 2026-11-14:
+Sur une PR, `deploy` est donc sauté. GitHub Pages est activé sur le dépôt depuis le 2026-11-22:
 voir [GitHub Pages](#github-pages).
 
 #### Après la CI
@@ -283,13 +283,14 @@ gh api repos/SabineLaurent/K-B/automated-security-fixes            # lu le 2026-
 
 ### GitHub Pages
 
-Pour que `Docs` publie le site des fiches, GitHub Pages doit être activé sur le dépôt. Il ne l'est pas le 2026-11-14:
+Pour que `Docs` publie le site des fiches, GitHub Pages doit être activé sur le dépôt. Il l'est depuis le
+2026-11-22, avec pour source GitHub Actions:
 
 ```sh
-gh api -i repos/SabineLaurent/K-B/pages | head -1   # lu le 2026-11-14: HTTP/2.0 404 Not Found
+gh api -i repos/SabineLaurent/K-B/pages | head -1   # lu le 2026-11-22: HTTP/2.0 200 OK
 ```
 
-Les gestes de la première publication, et pourquoi pas avant que le dépôt soit public, sont dans
+La première publication, et le geste qui fait publier le site à chaque fusion, sont dans
 [la section Publier de la fiche de l'accessibilité](accessibilite.md#publier).
 
 ### Sur le poste

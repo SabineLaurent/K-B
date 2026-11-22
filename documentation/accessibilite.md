@@ -236,8 +236,9 @@ peut y paraître avant le texte qui le développe.
 
 Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
 la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:10-12`, `:33-61`). Sans cette variable, son job `deploy` est sauté: tant que Pages n'est
-pas activé, il échouerait. Un seul déploiement tourne à la fois, jamais interrompu, et un seul attend: quand une fusion arrive
+(`.github/workflows/docs.yml:10-12`, `:33-61`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
+quand Pages n'était pas encore activé, et `deploy` aurait échoué à chaque fusion. Un seul déploiement tourne à la
+fois, jamais interrompu, et un seul attend: quand une fusion arrive
 pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
 ([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
 annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`).

@@ -87,10 +87,10 @@ dans tout le site.
       cancel-in-progress: false
 ```
 
-Le job `deploy` publie à chaque push sur `main` quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, et toujours à
-la main. Tant que Pages n'est pas activé, la variable n'est pas posée et le job est sauté : sans cette condition, il
-échouerait à chaque fusion. `concurrency` fait tourner un seul déploiement ; GitHub garde un seul déploiement en
-attente et l'annule quand un plus récent arrive.
+Le job `deploy` publie à chaque push sur `main` quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, et toujours à la
+main. Sans la variable, le job est sauté : elle a été choisie quand Pages n'était pas encore activé, et le job aurait
+échoué à chaque fusion. Pages est activé depuis le 2026-11-22 ; la variable reste à poser. `concurrency` fait tourner un
+seul déploiement ; GitHub garde un seul déploiement en attente et l'annule quand un plus récent arrive.
 
 ### Les noms courts des pages
 
@@ -108,9 +108,10 @@ dernière fusion de `main`, pour attraper les renvois des PR fusionnées avant.
 - **Aucune section « Utilisateurs »** : règle de Sabine (ni acteurs ni rôles dans les pages).
 - **Les coûts du 2026-10-25 gardés, datés, sans leur origine** : décision du Second ; la ligne « Temps », fausse
   (les issues portent une taille, pas des heures), retirée ; la phrase de Microsoft sur le niveau Burstable, retirée.
-- **`PAGES_PUBLISH` plutôt qu'une publication sans condition** (option A du Second) : sans elle, `deploy` échouerait à
-  chaque fusion tant que Pages n'est pas activé. **`queue: max` écarté** : la documentation de GitHub ne le montre
-  qu'au niveau du workflow, et `deploy` le porterait au niveau du job. Décision au journal, entrée du 2026-11-22.
+- **`PAGES_PUBLISH` plutôt qu'une publication sans condition** (option A du Second) : sans elle, `deploy` aurait échoué
+  à chaque fusion tant que Pages n'était pas activé (il l'est depuis le 2026-11-22). **`queue: max` écarté** : la
+  documentation de GitHub ne le montre qu'au niveau du workflow, et `deploy` le porterait au niveau du job. Décision au
+  journal, entrée du 2026-11-22.
 - **Six contrôles requis**, le fait lu au ruleset le 2026-11-22, alors que le journal dit `image-build` exigé depuis
   #498 : la question est posée à Sabine.
 
@@ -121,7 +122,7 @@ dernière fusion de `main`, pour attraper les renvois des PR fusionnées avant.
 | `uv run --locked --only-group docs mkdocs build --strict` vert | aucun lien ni aucune ancre cassés, aucune page hors du menu |
 | le contrôle du HTML construit : `lang`, un `h1`, aucun saut de titre, chaque tableau à en-têtes, aucun lien vague | les deux pages nouvelles tiennent les règles de la notice d'AcceDe Web que le HTML montre |
 | aucune espace avant « : » ni « ; » hors du code dans `documentation/`, aucun caractère `Cc` ou `Cf` | la règle typographique de Sabine, et aucun caractère invisible |
-| `uv run pytest` : 5 664 réussis ; ruff, format et mypy verts | les commentaires changés dans `src/` ne cassent rien, et le tableau « Contenus de tiers » reste lu |
+| `uv run pytest` : 5 708 réussis ; ruff, format et mypy verts | les commentaires changés dans `src/` ne cassent rien, et le tableau « Contenus de tiers » reste lu |
 | `diff` de la fin du README contre l'ancienne | la licence, les contenus de tiers et les crédits sont inchangés |
 | une relecture de cohérence neuve, puis une relecture du delta | chaque phrase confrontée au code et au journal ; 20 constats triés par le Second |
 
@@ -135,13 +136,15 @@ dernière fusion de `main`, pour attraper les renvois des PR fusionnées avant.
 - **Que se passe-t-il si trois fusions se suivent ?** Le déploiement du milieu est annulé par GitHub ; le site publié
   est celui de la dernière, et un tag posé sur le commit annulé attend la relance de son `Docs`
   (`documentation/accessibilite.md`, « Publier »).
-- **Pourquoi la publication est-elle conditionnée ?** Pages n'est pas activé : sans `PAGES_PUBLISH`, `deploy` échouerait
-  à chaque fusion (`.github/workflows/docs.yml:42-44`).
+- **Pourquoi la publication est-elle conditionnée ?** Pages n'était pas activé quand la condition a été choisie : sans
+  `PAGES_PUBLISH`, `deploy` aurait échoué à chaque fusion (`.github/workflows/docs.yml:42-44`). Pages l'est depuis le
+  2026-11-22 : poser la variable est le seul geste qui reste pour publier à chaque fusion.
 
 ## Zones non vérifiées
 
 - `queue: max` au niveau d'un job : non essayé, d'où le choix de garder le comportement par défaut.
-- La publication elle-même : Pages n'est pas activé ; la procédure se vérifie à la première publication.
+- La publication à chaque fusion : `PAGES_PUBLISH` n'est pas encore posée ; elle se vérifie à la première fusion qui
+  suit (la première publication, à la main, a réussi le 2026-11-22).
 - Le rendu des deux pages nouvelles au lecteur d'écran, comme pour les autres fiches.
 
 ## Ce qui reste

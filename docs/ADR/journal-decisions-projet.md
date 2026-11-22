@@ -7632,8 +7632,9 @@ les jetons du modèle (#501) »).
   seulement.** Revient sur l'entrée du 2026-11-14 (#167, « publié sur GitHub Pages à la main ») ; ce qui a changé :
   la décision de Sabine du 2026-11-21 (« publication automatique », dans le périmètre de la PR du README, relayé par
   tn-orchestrateur). Pourquoi : le site suit `main` sans qu'une exécution à la main soit oubliée (décision de Sabine
-  du 2026-11-21, pourquoi validé le 2026-11-22). La variable, choisie par le Second le 2026-11-21 (option A) : tant que Pages n'est pas activé, le
-  job `deploy` échouerait à chaque fusion ; sans elle, il est sauté (`.github/workflows/docs.yml:33-35`, `:42-44`).
+  du 2026-11-21, pourquoi validé le 2026-11-22). La variable, choisie par le Second le 2026-11-21 (option A) : Pages
+  n'étant pas activé ce jour-là, le job `deploy` aurait échoué à chaque fusion ; sans elle, il est sauté
+  (`.github/workflows/docs.yml:33-35`, `:42-44`).
   Options écartées : garder la publication à la main (une exécution oubliée laisse le site en retard sur `main`) ;
   `queue: max`, qui garderait en file chaque déploiement en attente, car la documentation de GitHub ne le montre qu'au
   niveau du workflow et `deploy` le porterait au niveau du job (non vérifié, tri du Second du 2026-11-22) ; retirer
@@ -7643,8 +7644,8 @@ les jetons du modèle (#501) »).
   (`concurrency` `pages`, sans `cancel-in-progress`), et GitHub annule celui qui attend quand un plus récent arrive
   (« By default, any existing pending job or workflow in the same concurrency group will be canceled », GitHub Docs,
   « Control the concurrency of workflows and jobs », lu le 2026-11-22) : le site publié est celui de la dernière
-  fusion ; la publication attend toujours que le dépôt soit public et Pages activé
-  (`documentation/accessibilite.md`, « Publier »). — PR de #684
+  fusion ; Pages est activé depuis le 2026-11-22 et la première publication faite à la main, et la publication à
+  chaque fusion attend que la variable soit posée (`documentation/accessibilite.md`, « Publier »). — PR de #684
 
 ## Décisions encore ouvertes
 
