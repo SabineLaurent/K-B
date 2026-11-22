@@ -77,9 +77,9 @@ def test_each_repository_links_to_github_in_a_new_tab_it_announces():
 
     assert (
         '<a href="https://github.com/morluto/rea" hreflang="en" target="_blank"'
-        ' rel="noopener noreferrer">morluto/rea<span aria-hidden="true">&nbsp;↗</span>'
-        ' <span class="link-note">(en anglais, site externe, nouvel onglet)</span></a>'
-        in response.text
+        ' rel="noopener noreferrer"><span>morluto/rea<span class="external-arrow"'
+        ' aria-hidden="true">&nbsp;↗</span></span> <span class="link-note">(en anglais,'
+        " site externe, nouvel onglet)</span></a>" in response.text
     )
 
 
@@ -99,8 +99,8 @@ def test_a_day_refused_gives_the_page_in_422_without_asking_the_data_api():
     assert requests == []
     assert "<title>Tendances, date à corriger · K-B</title>" in response.text
     assert (
-        '<p id="window-end-error" class="field-error">Date invalide: 2026-02-30'
-        " n’existe pas. Un jour attendu, sous la forme AAAA-MM-JJ.</p>" in response.text
+        '<p id="window-end-error" class="field-error">Erreur. Date invalide: 2026-02-30'
+        " n’existe pas. Choisissez un jour qui existe.</p>" in response.text
     )
     field = read_field(response)
     assert 'aria-invalid="true"' in field
@@ -119,8 +119,8 @@ def test_a_value_refused_out_of_the_form_of_a_day_never_reaches_the_page():
     assert requests == []
     assert "Appelez" not in response.text
     assert (
-        '<p id="window-end-error" class="field-error">Date invalide: un jour attendu,'
-        " sous la forme AAAA-MM-JJ.</p>" in response.text
+        '<p id="window-end-error" class="field-error">Erreur. Date invalide: choisissez'
+        " un jour dans le champ.</p>" in response.text
     )
 
 
@@ -131,8 +131,8 @@ def test_a_window_end_refused_by_the_data_api_is_said_under_its_field():
 
     assert response.status_code == 422
     assert (
-        '<p id="window-end-error" class="field-error">La base de K-B refuse cette date:'
-        " choisissez-en une autre.</p>" in response.text
+        '<p id="window-end-error" class="field-error">Erreur. La base de K-B refuse cette'
+        " date: choisissez-en une autre.</p>" in response.text
     )
     assert 'value=""' in read_field(response)
 

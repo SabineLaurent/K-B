@@ -12,7 +12,7 @@ from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
 from opentelemetry.sdk.trace.export.in_memory_span_exporter import InMemorySpanExporter
 
-from k_b.ai_api.connectors.trace_export import TraceExport
+from k_b.ai_api.connectors.trace_export import RequestTraceIdGenerator, TraceExport
 
 
 @dataclass(frozen=True)
@@ -42,7 +42,10 @@ def recorded_traces():
     """Providers that keep each span and each log record once ended, at once."""
     spans = InMemorySpanExporter()
     log_records = InMemoryLogRecordExporter()
-    tracer_provider = TracerProvider(shutdown_on_exit=False)
+    # The trace id of a root span is the one of its request, as in kb serve-ai.
+    tracer_provider = TracerProvider(
+        shutdown_on_exit=False, id_generator=RequestTraceIdGenerator()
+    )
     tracer_provider.add_span_processor(SimpleSpanProcessor(spans))
     logger_provider = LoggerProvider(shutdown_on_exit=False)
     logger_provider.add_log_record_processor(SimpleLogRecordProcessor(log_records))
