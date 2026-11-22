@@ -1341,7 +1341,7 @@ Il n'a aucun rôle sur la base : il la lit par les deux API.
 | Secrets | `KB_AI_API_KEY_KB_DIGEST` ← `kb-ai-api-key-kb-digest` ; `KB_AI_API_KEY_KB_TREND_REPORT` ← `kb-ai-api-key-kb-trend-report` |
 
 **Aucun secret nouveau** : ce sont les deux clés que l'API IA vérifie déjà (étape 4 d'« Appliquer »). Une clé se
-change pour les deux côtés à la fois ([README](../README.md), « Changer une clé »). Qu'une exécution du job lise la
+change pour les deux côtés à la fois ([Utiliser K-B](../documentation/utilisation.md), « Changer une clé »). Qu'une exécution du job lise la
 nouvelle version n'est pas encore vérifié, comme pour la routine.
 
 **Changer l'heure** : la passe ajoute `digestWatchCronExpression='<minute> <heure> * * <jours>'` à ses `-p`. Les

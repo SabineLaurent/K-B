@@ -33,7 +33,8 @@ K-B a deux usages: en local, sur un poste de travail, sans déploiement, avec SQ
 ([En local: SQLite, sans serveur](#en-local-sqlite-sans-serveur)); en ligne, déployé sur Azure, avec PostgreSQL
 ([En ligne: PostgreSQL sur Azure](#en-ligne-postgresql-sur-azure)). En local, un PostgreSQL sert aussi à essayer la
 branche en ligne ([En local: PostgreSQL, pour essayer la branche en ligne](#en-local-postgresql-pour-essayer-la-branche-en-ligne)).
-La variable `KB_DATABASE_URL` choisit le moteur: absente, la base est le fichier `<KB_DATA_DIR>/k-b.sqlite`; posée,
+La variable `KB_DATABASE_URL` choisit le moteur: absente, la base est le fichier `<KB_DATA_DIR>/k-b.sqlite`, et une commande refuse de démarrer si
+`KB_DATABASE_AUTH` vaut `entra`; posée,
 c'est l'URL `postgresql://` ou `postgres://` d'une base PostgreSQL ([Réglages](#reglages), `database/location.py:106-135`).
 
 ### Pourquoi deux systèmes de gestion de base de données
@@ -46,7 +47,11 @@ c'est l'URL `postgresql://` ou `postgres://` d'une base PostgreSQL ([Réglages](
     de Container Apps ne dit rien des verrous de SQLite sur un partage SMB (<span lang="en">Server Message
     Block</span>), et des sources de la communauté le jugent peu fiable; un conteneur Blob, lui, ne se monte pas
     dans Container Apps ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-11-06, « Base: PostgreSQL en ligne, par un adaptateur
-    maison (#417) »). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
+    maison (#417) »). La page de Microsoft sur les volumes de Container Apps, relue le 2026-11-22, ne dit rien des
+    verrous de fichiers, et dit pour Blob: <q lang="en">Azure Container Apps doesn't support mounting file shares from
+    Azure NetApp Files or Azure Blob Storage</q>
+    ([<span lang="en">Use storage mounts in Azure Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts),
+    Microsoft Learn, mise à jour le 2026-10-26). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
     connexion sans mot de passe, par Entra (même journal, « Base en ligne: trois rôles, posés par l'administratrice
     (#421) » et « Base en ligne: Entra seul, un jeton à chaque connexion (#421) »).
 
@@ -177,8 +182,8 @@ Le tableau suivant donne les codes de sortie de `kb create-db`.
 
 ### En local: PostgreSQL, pour essayer la branche en ligne
 
-Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL ([la fiche des tests](tests_pour_docu.md), « Pour les tests marqués `postgresql` »
-PostgreSQL »), sans décrire son installation: c'est une limite de cette fiche. K-B ne crée pas la base PostgreSQL,
+Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL ([la fiche des tests](tests_pour_docu.md), « Pour les tests marqués `postgresql` »),
+sans décrire son installation: c'est une limite de cette fiche. K-B ne crée pas la base PostgreSQL,
 seulement ses tables. Elle se crée à la main, en UTF8 et en collation C, comme la base en ligne
 (`infra/postgresql/create-principals.sql:19`):
 

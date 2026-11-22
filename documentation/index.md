@@ -12,7 +12,7 @@ titre.
     ce qui n'est pas vérifié.
 - [Le produit](produit.md): ce que fait K-B, ce qu'il ne fait pas, ses contraintes et ses moyens.
 - [L'installation et l'environnement de développement](installation_pour_docu.md)
-- [Utiliser K-B](utilisation.md): chaque commande, ses réglages, sa sortie et ses codes.
+- [Utiliser K-B](utilisation.md): les commandes, leurs réglages, leur sortie et leurs codes.
 - [L'architecture de l'application](architecture_pour_docu.md)
 - [L'agrégation, l'import et la base](import_et_base_pour_docu.md)
 - [L'API IA](api_ia_pour_docu.md)

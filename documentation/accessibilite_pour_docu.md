@@ -10,7 +10,7 @@
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
 visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
-`.github/workflows/docs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
+`.github/workflows/docs.yml` et `mkdocs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
@@ -33,7 +33,7 @@ une ligne « K-B », résultats de la recherche compris, et dans un tableau une 
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:48-64`). Le site se publie sur
-GitHub Pages, à la main (section [Publier](#publier)).
+GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée, ou à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
 l'outil, MkDocs avec Material, la sienne du 2026-11-12 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
@@ -235,10 +235,12 @@ peut y paraître avant le texte qui le développe.
 Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
 la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
 (`.github/workflows/docs.yml:10-12`, `:33-60`). Sans cette variable, son job `deploy` est sauté: tant que Pages n'est
-pas activé, il échouerait. Un seul déploiement tourne à la fois, jamais interrompu: celui d'une fusion qui suit attend
-la fin du précédent (`:46-49`). Seul le job `deploy` a le droit d'écrire sur Pages (`:52-54`). Le 2026-11-22, Pages
+pas activé, il échouerait. Un seul déploiement tourne à la fois, jamais interrompu, et un seul attend: quand une fusion arrive
+pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
+([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:47-49`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
+annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:52-54`). Le 2026-11-22, Pages
 n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la première publication, trois
-gestes de Sabine:
+gestes de l'administratrice du dépôt:
 
 1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14). Pages ne sert un dépôt privé qu'avec une offre
     payante de GitHub (Pro, Team ou Enterprise), et **un site publié depuis un dépôt privé est public**: activer Pages
@@ -250,7 +252,8 @@ gestes de Sabine:
     `gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`.
 
 Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, sur `main`, pour la première
-publication; ensuite, chaque fusion publie le site. Cette procédure n'a pas été essayée.
+publication; ensuite, chaque fusion publie le site. La procédure se vérifie à la première publication: le job `deploy` de `Docs` finit
+vert, et l'adresse du site, `https://sabinelaurent.github.io/K-B/` (`mkdocs.yml:6`), sert la page d'accueil.
 
 ## Limites
 

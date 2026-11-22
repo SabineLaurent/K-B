@@ -100,8 +100,8 @@ de sortie.
 
 Chaque client d'une API a sa clé, dans `KB_DATA_API_KEY_<CLIENT>` pour l'API de données et dans
 `KB_AI_API_KEY_<CLIENT>` pour l'API IA ; l'API IA lit la veille par l'API de données, qui doit tourner. Leurs contrats
-sont versionnés dans `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json`. Chaque commande, ses réglages, sa
-sortie et ses codes sont décrits dans [Utiliser K-B](documentation/utilisation.md).
+sont versionnés dans `docs/api/openapi-donnees.json` et `docs/api/openapi-ia.json`. Les commandes, leurs réglages, leur
+sortie et leurs codes sont décrits dans [Utiliser K-B](documentation/utilisation.md).
 
 ## Lancer les tests
 

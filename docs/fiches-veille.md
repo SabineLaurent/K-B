@@ -2413,7 +2413,7 @@ tronqué et échappé (règle 3 de `conventions.md`).
   Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors refusée
   (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du lendemain a
   son propre nom. Pour les tops, le relevé est gardé et la même fiche réessayée : le top échoue à
-  chaque lancement (`documentation/import_et_base_pour_docu.md`, « La commande qui suit l'import »).
+  chaque lancement (`documentation/utilisation.md`, « Écrire les fiches des tops »).
 - **Un dossier remplacé par un lien** entre le dernier contrôle et l'écriture y fait écrire hors du
   coffre (CWE-59 ; limite acceptée par Sabine le 2026-11-10, registre, fiche 1, « Sécurité »). Seul
   un processus qui a déjà le compte de l'utilisatrice le peut ; un texte de source ou du modèle ne

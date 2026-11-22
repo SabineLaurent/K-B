@@ -1,6 +1,6 @@
 # Utiliser K-B
 
-Cette page donne chaque commande de `kb` dans l'ordre où elle sert: la base, la collecte et l'import, les deux API, les
+Cette page donne les commandes de `kb` dans l'ordre où elles servent: la base, la collecte et l'import, les deux API, les
 comptes rendus, le site, puis les commandes des jobs en ligne. Pour chacune, elle dit comment la lancer, ce qu'elle
 affiche et ses codes de sortie, et renvoie à la fiche qui la détaille. Elle est écrite d'après `main` au commit
 `39cb5eb9` (2026-11-22). Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
@@ -108,7 +108,8 @@ uv run --env-file .env kb purge
 ```
 
 `kb purge` supprime ce qui a passé sa durée de conservation, à compter de l'heure de son lancement: les bruts remplacés
-des catalogues d'état (Zotero, le catalogue KEV de la CISA, l'agence américaine de cybersécurité), la veille de la base
+des catalogues d'état (Zotero, le catalogue KEV (<span lang="en">Known Exploited Vulnerabilities</span>) de la CISA, l'agence américaine de
+cybersécurité), la veille de la base
 (items et tendances, 3 ans), le brut de plus de 6 mois, les lignes du registre dont le fichier n'est plus là et que rien
 ne cite, puis les journaux de fonctionnement et les journaux d'import de plus de 6 mois ([le registre des
 traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md), « Procédure de tri »).
@@ -349,8 +350,8 @@ porte:
 Chaque affirmation et chaque titre est écrit en texte: ni lien, ni image, ni balise, ni code, ni requête Dataview ne
 peut s'y activer. Une fiche n'est jamais réécrite, même par deux lancements qui se chevauchent: s'il en existe une du
 jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s. `kb digest` attend 240 s au plus, une
-réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai ne compte qu'à partir du premier morceau de
-la réponse ([les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches
+réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai court depuis l'envoi, mais n'est contrôlé
+qu'après chaque morceau de la réponse: rien ne borne l'attente avant le premier ([les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches
 dans le coffre », « Limites »). Il montre qu'il attend: une ligne qui tourne dans un terminal, une ligne datée toutes
 les 10 s ailleurs. Il journalise son début et sa fin, avec la durée, puis affiche un bilan: la fenêtre et le nombre
 d'items lus, un tableau par sujet (statut, chemin de la fiche), le total, puis le modèle et le `request_id`, que
@@ -388,8 +389,8 @@ au jour UTC du lancement: un <span lang="en">frontmatter</span> (`generated`, la
 nombre, celui des manquantes, `windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`,
 `choice_failure`, l'état d'un choix du modèle qui a échoué, ou `null`, puis `request_id`;
 `post/trend_report_sheets.py:190-205`), la période et ses limites, la limite de GH Archive (un échantillon d'environ 1 %
-des étoiles), le tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération), puis les
-dépôts que le modèle a choisis, chacun avec ses quatre textes. Il ajoute enfin une entrée au registre, qui donne sa
+des étoiles), les dépôts que le modèle a choisis, chacun avec ses quatre textes, puis le tableau des dépôts qui
+remplissent au moins un critère (durable, nouveau, en accélération). Il ajoute enfin une entrée au registre, qui donne sa
 période au compte rendu suivant: le coffre n'est jamais relu. Un compte rendu n'est jamais réécrit: s'il en existe un du
 jour, aucune demande n'est faite. Un choix du modèle qui échoue laisse un compte rendu des seuls faits, et un texte qui
 échoue laisse les textes de son dépôt de côté; chacun est journalisé avec son état et le `request_id`
@@ -424,7 +425,7 @@ uv run --env-file .env kb serve-web
 Le site montre le fil des items, leur détail et les tendances, sans JavaScript. Il écoute par défaut sur
 `http://127.0.0.1:8002` et lit l'API de données avec la clé de son client, `KB_DATA_API_KEY_WEB`. Il est privé: chaque
 requête, sauf `/health`, doit porter dans l'en-tête `X-MS-CLIENT-PRINCIPAL-ID` l'identifiant d'objet Microsoft Entra de
-`KB_WEB_OPERATOR_ID`, un GUID, que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
+`KB_WEB_OPERATOR_ID`, un GUID (<span lang="en">globally unique identifier</span>), que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
 journalisé ni cité. En local, `KB_WEB_AUTH=off` n'en lit aucun, sur `127.0.0.1` et hors d'Azure seulement.
 `KB_WEB_HOST`, `KB_WEB_PORT` et `KB_WEB_ALLOWED_HOSTS` changent l'hôte, le port et les noms servis ([le
 site](https://github.com/SabineLaurent/K-B/blob/main/docs/site-web.md)).
@@ -483,7 +484,7 @@ Ce que la commande laisse à l'opératrice:
     nouveau du partage `job-data` à la publication suivante. Pour la retirer: la supprimer dans `job-data`, puis dans
     `watch`, puis en local. Supprimer un blob demande le rôle Storage Blob Data Contributor
     ([<span lang="en">Delete Blob</span>](https://learn.microsoft.com/rest/api/storageservices/delete-blob), lu le
-    2026-11-10), un rôle temporaire qu'un <span lang="en">Owner</span> peut se donner
+    2026-11-10), un rôle temporaire qu'un Owner peut se donner
     ([le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
     « Procédure de tri », étape 9); l'opératrice n'a que Reader sur `watch`.
 - **Une fiche est du Markdown qu'Obsidian affiche**, écrit par l'identité d'un job. Le téléchargement refuse le Markdown
@@ -497,8 +498,11 @@ Ce que la commande laisse à l'opératrice:
 - **`az` reçoit tout l'environnement** que `uv run --env-file` charge, secrets du `.env` compris (azure-identity le
     passe au processus d'`az`). Un fichier d'environnement réduit aux trois variables de la commande ne lui donne que
     celles-ci.
-- **L'écriture du coffre** (`post/vault_files.py`) suit un lien posé après son contrôle, et remplace une fiche qu'un
-    autre programme écrit entre le contrôle et le renommage.
+- **L'écriture du coffre** (`post/vault_files.py`) contrôle chaque dossier et chaque fiche avant d'écrire: un lien
+    posé après ce contrôle est suivi, et une fiche qu'un autre programme écrit entre le contrôle et le renommage est
+    remplacée. Ce choix et sa vérification sont dans
+    [les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches dans le
+    coffre », « Limites ».
 - **Le disque**: au pire, 20 000 blobs de 4 000 000 octets par passage.
 
 ## Les commandes des jobs en ligne
@@ -519,7 +523,7 @@ et à l'API IA (`KB_AI_API_URL`), sans clé. Après le `/health` de chaque API, 
 vérifient qu'elle refuse ce qu'elle doit refuser (`jobs/api_probes.py`): une route à clé rend 401 (`GET /items`,
 `POST /digests`), `GET /docs` rend 404 (200 avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, où les API le servent) et
 `HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Puis il demande le jeton de l'identité managée
-attribuée au job (`AZURE_CLIENT_ID`, un GUID; sans lui, le SDK chercherait l'identité système, que les jobs de K-B
+attribuée au job (`AZURE_CLIENT_ID`, un GUID; sans lui, le SDK (<span lang="en">software development kit</span>) d'Azure chercherait l'identité système, que les jobs de K-B
 n'ont pas), et liste une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange
 (`KB_EXCHANGE_BLOB_URL`, en `https`, sans défaut). Les neuf contrôles tournent toujours. Il n'écrit que des comptes:
 jamais le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
@@ -588,7 +592,7 @@ dans l'image: elle se donne au lancement, avec le volume, et sans elle `kb` refu
 sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore` refuse tout
 par défaut: la construction ne reçoit que `pyproject.toml`, `uv.lock`, `README.md` et `src/`, sans les fichiers
 d'environnement, les bases `*.sqlite` et leurs fichiers annexes, ni les caches de `src/`. Le contrôle de l'image
-par la CI est dans [la fiche de l'intégration continue](integration_continue_pour_docu.md), « Le workflow `Image` ».
+par l'intégration continue (CI) est dans [la fiche de l'intégration continue](integration_continue_pour_docu.md), « Le workflow `Image` ».
 
 ## Lire la base, lancer les tests
 

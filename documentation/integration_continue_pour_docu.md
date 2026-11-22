@@ -147,16 +147,18 @@ Bicep à la main (`infra/README.md`).
 tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lance à la main (`workflow_dispatch`)
 (`docs.yml:7-12`).
 
-- `build` (l. 16-33) récupère le dépôt (l. 19) et installe uv 0.13.6, sans enregistrer le cache (l. 20-23). Il
-    construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 24-25): le groupe `docs` seul, aux
+- `build` (l. 19-38) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
+    construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 27-28): le groupe `docs` seul, aux
     versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
     ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:88-94`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
-    11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 26-29). Lancé à la main depuis
-    `main`, il dépose enfin `site/` en artefact de Pages (l. 30-33), que `deploy` publie.
-- `deploy` (l. 35-49) ne tourne que lancé à la main depuis `main` (l. 37), après `build` (l. 38). Il a les droits
-    `pages: write` et `id-token: write` (l. 41-43), dans l'environnement `github-pages` (l. 44-46), et publie le site
-    par `actions/deploy-pages` (l. 48-49).
+    11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 29-32). Depuis `main`, sur un push
+    quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin `site/` en artefact de
+    Pages (l. 33-38), que `deploy` publie.
+- `deploy` (l. 40-60) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
+    (l. 42-44), après `build` (l. 45); un seul déploiement tourne à la fois (l. 47-49). Il a les droits
+    `pages: write` et `id-token: write` (l. 52-54), dans l'environnement `github-pages` (l. 55-57), et publie le site
+    par `actions/deploy-pages` (l. 59-60).
 
 Sur une PR, `deploy` est donc sauté. GitHub Pages n'est pas activé sur le dépôt le 2026-11-14:
 voir [GitHub Pages](#github-pages).
