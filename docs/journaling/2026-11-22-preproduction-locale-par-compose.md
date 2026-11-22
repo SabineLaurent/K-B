@@ -15,12 +15,12 @@ Les commandes, les sorties attendues et les mesures de l'essai et du contre-essa
 
 K-B tourne en ligne sur Azure Container Apps : une image, deux API, des jobs, une base PostgreSQL. Avant de
 mettre une version en ligne, il faut pouvoir l'essayer **dans les mêmes conteneurs**, sur le poste, sans
-toucher à la production : c'est la préproduction. Le compose lance l'image de la production et PostgreSQL 18,
+toucher à la production : c'est la préproduction. Le compose construit sur le poste l'image du `Dockerfile` de la production, lance PostgreSQL 18,
 crée la base, collecte, importe, puis sert les deux API jusqu'à une `POST /digests` réelle, la chaîne entière
 de la base au modèle.
 
 Ce que le compose doit prouver, c'est que l'image se comporte en conteneur comme en ligne : utilisateur non
-root, aucun état écrit hors du dossier de données, arrêt propre sur signal, secrets hors du dépôt. D'où les six
+root, aucun état écrit hors du dossier de données, arrêt sur signal, sous init, secrets hors du dépôt. D'où les six
 services, les règles de durcissement et un test qui les tient à chaque PR sans Docker.
 
 ## Le comment
@@ -110,7 +110,7 @@ exemple, la règle des secrets :
 ```
 
 (`tests/test_compose_file.py:180-187`.) La première ligne existe parce qu'un `environment` écrit en liste
-(`- KB_LLM_API_KEY=…`) ferait passer les deux suivantes à vide. La troisième trouve un mot de passe dans une
+(`- KB_LLM_API_KEY=…`) ferait passer la suivante à vide, et la troisième lèverait une erreur au lieu de vérifier. La troisième trouve un mot de passe dans une
 URL, quel que soit le nom de la variable. Le test lit aussi le `Dockerfile` (son `USER` n'est pas root), le
 `ci.yml` (la base a l'image et les réglages d'`initdb` de la CI) et le `.env.example` (chaque variable d'un
 modèle y est décrite).
@@ -120,23 +120,23 @@ modèle y est décrite).
 | Choix | Retenu, et pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Créer la base | `kb create-db` : la base `k_b` et son rôle viennent de l'image (`POSTGRES_USER`, `POSTGRES_DB`) | `kb migrate-database` : il donne les tables aux rôles des identités d'Azure, absents ici (`src/k_b/cli.py:146-149`) |
-| Le rôle de la base | un seul rôle, `kb`, superutilisateur du serveur, car l'image le crée ainsi ; décision de Sabine du 2026-11-22 (E). L'API de données lit en `READ ONLY` | un rôle de lecture pour l'API de données : il faudrait un script d'initialisation monté, hors de la conception validée |
-| Arrêt | `init: true`, exigé par l'issue : il transmet le signal d'arrêt et récupère les processus fils | `kb` en PID 1, comme en ligne : l'issue demande `init`. Ce que cela change pour l'arrêt est écrit dans les écarts de la fiche |
+| Le rôle de la base | un seul rôle, `kb`, superutilisateur du serveur, car l'image le crée ainsi (décision de Sabine du 2026-11-22 sur le rôle de la base). L'API de données lit en `READ ONLY`, ce qui protège d'une écriture par erreur du code de K-B, et n'envoie que son propre SQL paramétré | un rôle de lecture pour l'API de données : il demanderait un script d'initialisation monté dans `postgres` et une seconde URL de base (écarté par Sabine le 2026-11-22) |
+| Arrêt | `init: true`, exigé par l'issue : il transmet le signal d'arrêt et récupère les processus fils | `kb` en PID 1, comme en ligne, qui essaierait l'arrêt de la production : le critère de #419 demande `init`. Ce que cela change pour l'arrêt est écrit dans les écarts de la fiche |
 | Délai d'arrêt | 250 s pour l'API IA, comme en ligne, la plus longue demande que laisse passer l'entrée d'ACA (240 s) et une marge ; 20 s ailleurs | moins de 30 s partout, le texte de l'issue : une demande de fiches serait coupée |
-| Système de fichiers | `read_only` et `tmpfs: /tmp`, plus stricts qu'en ligne : une écriture hors du volume et de `/tmp` échoue, ce qui vérifie la règle 4 de `.claude/rules/poc.md` | un système de fichiers inscriptible, comme en ligne : il laisserait passer une écriture d'état hors de `KB_DATA_DIR` |
-| Fichiers de secrets | un par service, et un seul `.env.jobs` pour les trois jobs (tranché par le Second, gardé par Sabine, K) | un fichier par job : trois fichiers pour deux secrets ; ou un seul fichier pour tout : chaque API lirait les secrets de l'autre |
-| Clé dans le how-to | passée à `curl` par l'entrée standard (`-H @-`), puis `unset KEY` (décision de Sabine, R) | `-H "Authorization: Bearer $KEY"` : la clé est dans les arguments de `curl`, que `ps` montre |
-| Réseau | le réseau par défaut du projet (décision de Sabine, Z) | deux réseaux, pour que l'API IA ne joigne pas `postgres` : hors périmètre |
+| Système de fichiers | `read_only` et `tmpfs: /tmp`, plus stricts qu'en ligne : une écriture hors du volume et de `/tmp` échoue ; seul `/tmp`, en mémoire et perdu à l'arrêt, s'écrit, ce qui vérifie la règle 4 de `.claude/rules/poc.md` | un système de fichiers inscriptible, comme en ligne : il laisserait passer une écriture d'état hors de `KB_DATA_DIR` |
+| Fichiers de secrets | un par service, et un seul `.env.jobs` pour les trois jobs (tranché par time-knight, délégation de Sabine du 15/10 ; gardé par Sabine le 2026-11-22) | un fichier par job : trois fichiers pour deux secrets ; ou un seul fichier pour tout : chaque API lirait les secrets de l'autre |
+| Clé dans le how-to | passée à `curl` par l'entrée standard (`-H @-`), puis `unset KEY` (décision de Sabine du 2026-11-22) | `-H "Authorization: Bearer $KEY"` : la clé est dans les arguments de `curl`, que `ps` montre |
+| Réseau | le réseau par défaut du projet ; l'API IA n'a ni l'URL ni le mot de passe de la base, que son modèle ne porte pas (`test_the_ai_api_holds_no_access_to_the_base` ; décision de Sabine du 2026-11-22) | deux réseaux, pour que l'API IA ne joigne pas `postgres` : un réseau de plus à déclarer pour chaque service, alors que l'API IA n'a pas de quoi ouvrir la base |
 | Mesures | aucun export vers Grafana Cloud (`KB_OTLP_*` non posés) : la préproduction ne se mêle pas aux séries de la production | l'export : les demandes de la préproduction se mêleraient aux séries de la production |
-| CI | aucun job pour compose : le test tient les règles à chaque PR, l'essai prouve le lancement (mission du 21/11) | un job qui lance compose à chaque PR |
-| Documentation | un how-to dans `docs/` (décision du Second) ; la doc d'installation reste à #202 | tout dans le README |
+| CI | aucun job pour compose : le test tient les règles à chaque PR, l'essai prouve le lancement (conception de #419, commentaire du 2026-11-21) | un job qui lance compose à chaque PR |
+| Documentation | un how-to dans `docs/` (tranché par time-knight, délégation de Sabine du 15/10) ; la doc d'installation reste à #202 | tout dans le README |
 
 ## Preuve
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| `uv run pytest tests/test_compose_file.py` : 70 tests passés, 3 en échec avant les corrections de la revue (ressources de la base, sonde en TCP, API de données en `production`) | chaque règle du compose est tenue, et chaque correction de la revue a eu son test rouge d'abord |
-| Cinq copies modifiées dans le scratchpad (négation avant `.env.*`, `USER root`, `environment` en liste, mot de passe dans une URL, hôte non permis) : chacune fait échouer son test | les tests renforcés échouent sur un fichier fautif, ils ne passent pas à vide |
+| `uv run pytest tests/test_compose_file.py` : 72 tests passés ; avant la correction du compose de la revue, 3 en échec observés (ressources de la base, sonde en TCP, API de données en `production`) | chaque règle du compose est tenue, et les trois corrections du compose ont eu leur test en échec avant le code |
+| Sept copies modifiées dans le scratchpad (négation avant `.env.*`, `USER root`, `environment` en liste, mot de passe dans une URL d'un environnement, puis dans un commentaire, hôte non permis, URL de la base dans l'API IA) : chacune fait échouer son test | les tests renforcés échouent sur un fichier fautif, ils ne passent pas à vide |
 | Essai du 2026-11-22, `8a047e6b` : trois jobs à `0`, 3 201 items, services sains en 11 s, `POST /digests` `200` en 32,9 s, `stop` en 0,83 s, données gardées après `down` puis `up` | la chaîne entière tourne en conteneurs, de la collecte au modèle |
 | Contre-essai, `f24d5cd7` : `create-db` à `0` sur un volume neuf, après la sonde en TCP ; `404` et `200` sur `/docs` ; `docker stats` à 2 GiB pour `postgres` | les trois changements du compose après l'essai tiennent |
 | `id -u` : `999`, puis `10001` pour chaque service `kb` | aucun service ne tourne en root |
@@ -148,40 +148,41 @@ modèle y est décrite).
 1. **Pourquoi la préproduction n'est-elle pas identique à la production ?** Parce que certaines choses n'ont
    pas d'équivalent local : les identités Entra et leurs rôles, le HTTPS de l'entrée d'ACA. Chaque différence
    est un écart nommé, avec sa raison, dans la fiche (« Les écarts voulus à la production ») et dans le
-   commentaire de tête de `compose.yaml:12-16`.
+   journal ADR (2026-11-22, « Préproduction locale »).
 2. **Que se passe-t-il si un service écrit hors de son volume ?** L'écriture échoue : le système de fichiers
    est en lecture seule (`read_only: true`, `compose.yaml:24`), seul `/tmp` est en mémoire. C'est plus strict
    qu'en ligne, volontairement : la préproduction attrape une écriture d'état qu'en ligne on perdrait au
    redémarrage.
 3. **Où sont les secrets, et comment sait-on qu'ils ne fuient pas ?** Dans `.env.<service>`, ignoré par git
-   et exclu du contexte du build (`.dockerignore`, `**/.env*`). Le test refuse un nom de secret ou une URL
-   avec mot de passe dans `compose.yaml` et une valeur dans un modèle. `docker compose config` ne se lance
+   et exclu du contexte du build (`.dockerignore`, `**/.env*`). Le test refuse un nom de secret dans l'environnement
+   d'un service, une URL avec mot de passe dans tout `compose.yaml` et une valeur dans un modèle. `docker compose config` ne se lance
    qu'avec `--quiet`, car sans lui il affiche les secrets résolus.
 4. **Pourquoi `--host 127.0.0.1` dans la sonde de la base ?** Pour ne déclarer la base saine qu'une fois le
    serveur final à l'écoute en TCP. Le serveur temporaire de l'initialisation ne répond que sur le socket
-   (`compose.yaml:74-78`).
+   (`compose.yaml:76-78`).
 5. **Pourquoi l'API IA est-elle en `sandbox` et pas l'API de données ?** L'API IA appelle un service du
    compose en `http`, ce que seul `sandbox` permet (`src/k_b/core/outbound.py:58-61`). L'API de données
    n'appelle personne : en `production`, comme en ligne, elle ne sert pas sa documentation sans clé.
 
 ## Zones non vérifiées
 
-- La limite de CPU des conteneurs n'est pas lue : `docker stats` ne la donne pas, et `docker inspect` est
-  écarté par la mission. Seule la limite de mémoire est constatée (2 GiB, 1 GiB).
+- La limite de mémoire est constatée par `docker stats` (2 GiB, 1 GiB) ; celle de CPU, qu'il ne donne pas,
+  n'est pas lue : `docker inspect` n'est pas lancé, car il afficherait l'environnement du conteneur,
+  secrets compris.
 - Le comportement du serveur temporaire de l'image `postgres` est lu dans sa documentation (Context7,
   `docker-library/postgres`) et constaté au journal ; le script `docker-entrypoint.sh` n'est pas relu ligne à
   ligne.
-- « Joignable des seuls conteneurs du compose » : c'est le réseau par défaut du projet. Le contre-essai n'en
-  vérifie qu'une partie : chaque API répond en `http` depuis le poste par `127.0.0.1`.
-- Les journaux de la `POST /digests` de l'essai n'ont pas été comptés : ils ont été retirés avec les
-  conteneurs avant le comptage. Ceux du contre-essai n'ont aucune ligne `WARNING`, `ERROR` ou `CRITICAL`.
+- Le réseau du projet compose est vérifié depuis le poste : chaque API y répond en `http` par
+  `127.0.0.1`.
+- Les journaux comptés à l'essai sont ceux des conteneurs recréés après `down` ; au contre-essai, ceux de
+  l'API IA après sa `POST /digests` : aucune ligne `WARNING`, `ERROR` ou `CRITICAL`.
 
 ## Ce qui reste
 
 - **#202** : la documentation de l'installation par compose, avec la sauvegarde de la base (`pg_dump`), dans
   la fiche de l'installation.
-- **`VARIABLE_LINE`** apparaît pour la troisième fois dans les tests (`tests/architecture/test_environment.py`,
-  `tests/e2e/conftest.py`, ce test) : la factorisation toucherait deux autres fichiers de test et est laissée
-  hors de cette PR.
-- Hors du compose, volontairement : le site (`kb serve-web`), les autres jobs (`kb daily-routine`,
-  `kb digest-watch`, `kb smoke-test`) et le stockage d'échange.
+- **`VARIABLE_LINE`**, le motif d'une ligne `NOM=valeur`, est gardé en copie dans ce test, comme dans
+  `tests/architecture/test_environment.py` et `tests/e2e/conftest.py` : le factoriser toucherait ces deux
+  fichiers, hors de cette PR (tri de time-knight du 2026-11-22).
+- Hors du compose, volontairement : le site (`kb serve-web`), les autres jobs (`kb migrate-database`,
+  `kb daily-routine`, `kb digest-watch`, `kb smoke-test`) et le stockage d'échange.

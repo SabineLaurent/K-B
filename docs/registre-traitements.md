@@ -193,10 +193,10 @@ garde sur le poste une copie de ce qu'elle collecte, le temps d'un essai.
 | Rubrique | Contenu |
 |---|---|
 | Données | Celles des tables de la base (« Tables de la base qui portent une donnée personnelle ») et du brut, pour les sources que le compose collecte : ni Zotero ni les clips, qu'il ne collecte pas. |
-| Lieu | Le poste de l'utilisatrice, dans deux volumes Docker du projet compose : `pg-data`, la base, et `kb-data`, le brut et le journal d'import. La base ne publie aucun port ; les deux API ne publient le leur que sur `127.0.0.1`. |
-| Qui la lit | Les conteneurs du compose ; depuis le poste, l'utilisatrice, par les API et leurs clés. |
+| Lieu | Le poste de l'utilisatrice, dans deux volumes Docker du projet compose : `pg-data`, la base, et `kb-data`, le brut et le journal d'import. La base ne publie aucun port ; les deux API ne publient le leur que sur `127.0.0.1`. La réponse d'une `POST /digests` du how-to, qui peut porter un login ou une adresse comme toute fiche (fiche 1), s'écrit dans un dossier temporaire du poste (`mktemp -d`), hors du dépôt. |
+| Qui la lit | Les conteneurs du compose ; depuis le poste, l'utilisatrice, par les API et leurs clés, et par `docker compose exec postgres psql`, sans clé. |
 | Envois | `POST /digests` envoie les items au modèle de la production : section « Envoi des items au modèle des fiches ». Aucune mesure ni trace vers Grafana Cloud : `compose.yaml` ne pose pas `KB_OTLP_*`. |
-| Durée de conservation | Le temps d'un essai : un essai finit par `docker compose down -v`, qui retire les deux volumes. Le compose n'a pas de `kb purge`. |
+| Durée de conservation | Le temps d'un essai : un essai finit par `docker compose down -v`, qui retire les deux volumes, et par `rm -r` du dossier temporaire de la réponse. Le compose n'a pas de `kb purge`. |
 | Vérification | Essai et contre-essai du 2026-11-22 : après `down -v`, aucun volume du projet ne reste ([preproduction-locale.md](preproduction-locale.md), « L'essai du 2026-11-22 »). |
 
 ## Dépôt public (#278)

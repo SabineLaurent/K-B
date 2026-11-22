@@ -13,7 +13,8 @@
 # environment where kb calls a service of the compose in http (http://api-donnees:8000); one role,
 # superuser of the server and owner of the base, and kb create-db rather than kb migrate-database,
 # which grants the roles of Azure; an init process; a read-only file system with /tmp in memory,
-# where the file system of a container online is writable.
+# where the file system of a container online is writable; no export of measures nor traces
+# (KB_OTLP_* unset).
 
 # The resources of each kb service: a combination of Azure Container Apps, the one of the apps
 # online (infra/modules/api-container-app.bicep:154-155;
@@ -124,7 +125,8 @@ services:
       # The only environment where kb calls a service of the compose in http (core/outbound.py).
       KB_DEPLOYMENT_ENVIRONMENT: sandbox
       KB_DATA_API_URL: http://api-donnees:8000
-      # The model and the effort of production (infra/main.bicep:327-331).
+      # The model and the effort of production (infra/main.bicep:325-331, the name of the model by
+      # the comment of lines 328-330).
       KB_LLM_PROVIDER: openai_compatible
       KB_LLM_MODEL: gpt-6.1-sol
       KB_LLM_REASONING_EFFORT: low

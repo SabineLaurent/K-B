@@ -1,5 +1,6 @@
 """The compose of the local preproduction keeps its rules: each rule is read in compose.yaml, its
-templates, the Dockerfile and .gitignore, without Docker (the trial proves the run)."""
+templates, .env.example, ci.yml, the Dockerfile and .gitignore, without Docker (the trial proves the
+run)."""
 
 import re
 from pathlib import Path
@@ -187,6 +188,21 @@ def test_no_secret_is_written_in_the_compose_file(service):
     ] == []
 
 
+def test_no_url_of_the_compose_file_carries_a_password():
+    # The whole text: a command, a healthcheck or a comment as well as an environment.
+    assert CREDENTIALS_IN_URL.findall(COMPOSE_PATH.read_text(encoding="utf-8")) == []
+
+
+def test_the_ai_api_holds_no_access_to_the_base():
+    # It reads the base through the data API only: neither its URL nor its password.
+    template_names = VARIABLE_LINE.findall(
+        read_template(ENV_FILE_BY_SERVICE[AI_API_SERVICE])
+    )
+
+    assert "KB_DATABASE_URL" not in template_names
+    assert "KB_DATABASE_URL" not in read_services()[AI_API_SERVICE]["environment"]
+
+
 @pytest.mark.parametrize("env_file", sorted(set(ENV_FILE_BY_SERVICE.values())))
 def test_a_template_holds_no_value(env_file):
     assert {
@@ -213,7 +229,7 @@ def test_the_template_of_the_base_holds_its_password_only():
     ]
 
 
-def test_git_ignores_the_files_of_secrets_and_follows_their_templates():
+def test_the_gitignore_follows_the_templates_after_it_ignores_the_files_of_secrets():
     lines = GITIGNORE_PATH.read_text(encoding="utf-8").splitlines()
 
     # The last pattern that matches decides: the templates come back after the files are ignored.

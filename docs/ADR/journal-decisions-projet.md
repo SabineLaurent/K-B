@@ -7619,57 +7619,68 @@ les jetons du modèle (#501) »).
 
 ### Préproduction locale : compose, l'image de la production et PostgreSQL 18 (#419)
 
-Conception validée par Sabine le 2026-11-21 (« ok conception #419, clé du modèle ») ; écarts mineurs tranchés par le
-Second (délégation de Sabine du 15/10) ; les cinq points de sécurité et de données personnelles des revues, décidés par
-Sabine le 2026-11-22 (« ok sécu #419 : E, J, K, R, Z »). Essai et contre-essai du 2026-11-22 :
+Conception validée par Sabine le 2026-11-21 (« ok conception #419, clé du modèle », commentaire de conception de #419) ;
+écarts mineurs tranchés par time-knight (délégation de Sabine du 15/10) ; les points de sécurité et de données
+personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-essai du 2026-11-22 :
 `docs/preproduction-locale.md`.
 
-- **La préproduction locale se fait par compose : l'image de la production, construite pour `linux/amd64`, et
-  PostgreSQL 18.6, avec l'image et les réglages d'`initdb` de la CI.** Six services : `postgres`, `api-donnees`,
-  `api-ia`, et les jobs `create-db`, `collecte` et `import` dans le profil `jobs`. Pourquoi : essayer une version dans
-  les conteneurs de la production avant sa mise en ligne (I5 du plan de mise en ligne du 06/11), sur la base des
-  tests sur PostgreSQL. Écartés : le site, les autres jobs et le stockage d'échange, hors de la conception ; un job
-  de CI qui lance compose, pour ses minutes d'Actions (mission du 21/11). Un test lit `compose.yaml` à chaque PR
-  (`tests/test_compose_file.py`), et l'essai prouve le lancement. — PR de #419
+- **La préproduction locale se fait par compose : l'image du `Dockerfile` de la production, construite sur le poste
+  pour `linux/amd64`, et PostgreSQL 18.6, avec l'image et les réglages d'`initdb` de la CI.** Six services :
+  `postgres`, `api-donnees`, `api-ia`, et les jobs `create-db`, `collecte` et `import` dans le profil `jobs`.
+  Pourquoi : essayer une version dans les conteneurs de la production avant sa mise en ligne (I5 du plan de mise en
+  ligne du 06/11), sur la base des tests sur PostgreSQL. Écartés : le site, les autres jobs et le stockage d'échange,
+  que #419 ne nomme pas ; un job de CI qui lance compose, pour ses minutes d'Actions (tranché par time-knight). Un
+  test lit `compose.yaml` à chaque PR (`tests/test_compose_file.py`), et l'essai prouve le lancement. — PR de #419
 - **`sandbox` pour la seule API IA ; l'API de données en `production`, comme en ligne.** Pourquoi : l'API IA appelle
   `http://api-donnees:8000`, que K-B n'admet qu'en `sandbox` (« API : `https` vers une API interne, `http` vers la
   machine ou un service du compose (#473) », plus haut) ; l'API de données n'appelle personne, et en `sandbox` elle
   servirait `/docs` et `/openapi.json` sans clé. Écarté : `sandbox` pour les deux API, celui de la conception, revu
-  après la revue de code du 2026-11-22 (tri du Second). — PR de #419
+  après la revue de code du 2026-11-22 (tranché par time-knight). — PR de #419
 - **Un seul rôle, `kb`, superutilisateur du serveur et propriétaire de la base, créé par l'image de PostgreSQL ; la
   base se crée par `kb create-db`.** Pourquoi : l'image crée `POSTGRES_USER` en superutilisateur, et
   `kb migrate-database` donne les tables aux rôles des identités d'Azure, absents du compose (`src/k_b/cli.py`).
-  Écarté : un rôle de lecture pour l'API de données, par un script d'initialisation monté, hors de la conception
-  (Sabine, E). Limite assumée : l'API de données se connecte en superutilisateur ; chaque connexion de son pool lit en
-  `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`). Un seul réseau, où l'API IA joint aussi
-  `postgres`, dont elle n'a pas besoin (Sabine, Z : rien de changé). — PR de #419
+  Écarté (Sabine, le 2026-11-22) : un rôle de lecture pour l'API de données, qui demanderait un script
+  d'initialisation monté dans `postgres` et une seconde URL de base. Limite assumée : l'API de données se connecte en
+  superutilisateur. Chaque connexion de son pool lit en `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`),
+  ce qui protège d'une écriture par erreur du code de K-B, et l'API n'envoie que son propre SQL paramétré. — PR de
+  #419
+- **Un seul réseau, celui du projet compose.** Pourquoi : l'API IA n'a ni l'URL ni le mot de passe de la base, que son
+  modèle ne porte pas (`test_the_ai_api_holds_no_access_to_the_base`). Écarté (Sabine, le 2026-11-22) : deux
+  réseaux, un de plus à déclarer pour chaque service. — PR de #419
 - **`init: true` pour chaque service, sans revenir sur « Pas de processus d'init » du 2026-11-06 (#200) : l'image
-  reste sans init.** Pourquoi : #419 le demande. Limite assumée (revue de code du 2026-11-22) : l'arrêt essayé en
-  préproduction n'est pas celui de `kb` en PID 1. `kb serve-data` et `kb serve-ai` sortent en 143 ici, et une
-  commande sans gestionnaire de SIGTERM s'y arrête, alors qu'en ligne elle finit en SIGKILL. L'arrêt en ligne reste
-  tenu par `COMMANDS_STOPPED_BY_SIGTERM` et `tests/commands/test_sigterm.py`. — PR de #419
+  reste sans init.** Pourquoi : le processus d'init transmet le signal d'arrêt à `kb` et récupère les processus fils,
+  et le critère de #419 le demande. Écarté : `kb` en PID 1, comme en ligne, qui essaierait l'arrêt de la production.
+  Limite assumée (revue de code du 2026-11-22) : l'arrêt essayé en préproduction n'est pas celui de `kb` en PID 1.
+  `kb serve-data` et `kb serve-ai` sortent en 143 ici, et une commande sans gestionnaire de SIGTERM s'y arrête, alors
+  qu'en ligne elle finit en SIGKILL. L'arrêt en ligne reste tenu par `COMMANDS_STOPPED_BY_SIGTERM` et
+  `tests/commands/test_sigterm.py`. — PR de #419
 - **Système de fichiers en lecture seule et `/tmp` en mémoire, plus stricts qu'en ligne.** Pourquoi : une écriture
-  hors du volume des données et de `/tmp` échoue, ce qui vérifie la règle 4 de `.claude/rules/poc.md` (aucun état hors
-  de `KB_DATA_DIR`). Écarté : un système de fichiers inscriptible, comme en ligne, qui laisserait passer une telle
-  écriture (revue de code du 2026-11-22, tri du Second). — PR de #419
-- **Les ressources : 0,5 CPU et 1 Gio par service `kb`, la combinaison des apps en ligne ; 1 CPU et 2 Gio pour la base,
-  la taille du serveur en ligne (`Standard_B1ms`) ; 250 s d'arrêt pour l'API IA, 20 s ailleurs.** Pourquoi : la base
-  en ligne n'est pas une app, et la mesurer sur la moitié de son serveur fausserait les délais (revue de code du
-  2026-11-22, tri du Second) ; 250 s comme en ligne, la plus longue demande que laisse passer l'entrée d'ACA (240 s)
-  et une marge. Écartés : 0,5 CPU et 1 Gio pour la base, ceux de la conception ; moins de 30 s d'arrêt partout, le
-  texte de #419, qui couperait une demande de fiches. Limite assumée : les jobs ont les ressources des apps, et non
-  celles de `caj-kb-migrate-database`. — PR de #419
+  hors du volume des données et de `/tmp` échoue ; seul `/tmp`, perdu à l'arrêt, s'écrit, ce qui vérifie la règle 4 de
+  `.claude/rules/poc.md` (aucun état hors de `KB_DATA_DIR`). Écarté : un système de fichiers inscriptible, comme en
+  ligne, qui laisserait passer une telle écriture (revue de code du 2026-11-22, tranché par time-knight). — PR de #419
+- **Les ressources : 0,5 CPU et 1 Gio par service `kb`, la combinaison des apps en ligne et de
+  `caj-kb-daily-routine` ; 1 CPU et 2 Gio pour la base, la taille du serveur en ligne (`Standard_B1ms`) ; 250 s
+  d'arrêt pour l'API IA, 20 s ailleurs.** Pourquoi : la base en ligne n'est pas une app, et la mesurer sur la moitié de
+  son serveur fausserait les délais (revue de code du 2026-11-22, tranché par time-knight) ; 250 s comme en ligne, la
+  plus longue demande que laisse passer l'entrée d'ACA (240 s) et une marge. Écartés : 0,5 CPU et 1 Gio pour la base,
+  ceux de la conception ; moins de 30 s d'arrêt partout, le texte de #419, qui couperait une demande de fiches.
+  Limite assumée : `create-db` a plus que `caj-kb-migrate-database` (0,25 CPU et 0,5 Gio). — PR de #419
 - **Aucune mesure ni trace vers Grafana Cloud : `compose.yaml` ne pose pas `KB_OTLP_*`.** Pourquoi : les demandes de
-  la préproduction ne se mêlent pas aux séries de la production (tri du Second, 2026-11-22). — PR de #419
+  la préproduction ne se mêlent pas aux séries de la production (tranché par time-knight, 2026-11-22). Écarté :
+  l'export, qui les y mêlerait. — PR de #419
 - **Un fichier de secrets par service, ignoré par git, à côté de son modèle suivi ; un seul `.env.jobs` pour les trois
-  jobs.** Pourquoi : chaque service ne reçoit que ses secrets, et le modèle dit quoi remplir sans valeur. Un seul
-  fichier pour les jobs (tranché par le Second, gardé par Sabine, K). Limite assumée : chaque job reçoit un secret
-  dont il ne se sert pas (`collecte` l'URL de la base, `create-db` et `import` le jeton GitHub). Dans le how-to, une
-  clé passe à `curl` par l'entrée standard, jamais par ses arguments (Sabine, R). Pas de `.env.mac.example` : aucune
-  commande `kb` du critère de fin ne se lance sur le poste (Sabine, conception). — PR de #419
-- **Un essai finit par `docker compose down -v`, et la préproduction entre au registre des traitements.** Pourquoi :
-  les volumes gardent la collecte réelle, données personnelles comprises, et le compose n'a pas de `kb purge`
-  (Sabine, J ; registre, « Préproduction locale (compose, #419) »). — PR de #419
+  jobs.** Pourquoi : chaque API ne reçoit que ses secrets, et le modèle dit quoi remplir sans valeur ; un seul fichier
+  pour les jobs (tranché par time-knight, gardé par Sabine le 2026-11-22). Limite assumée : chaque job reçoit un
+  secret dont il ne se sert pas (`collecte` l'URL de la base, `create-db` et `import` le jeton GitHub). Dans le
+  how-to, une clé passe à `curl` par l'entrée standard, jamais par ses arguments, que `ps` montre (Sabine, le
+  2026-11-22). — PR de #419
+- **Pas de `.env.mac.example`.** Pourquoi : aucune commande `kb` du critère de fin de #419 ne se lance sur le poste
+  (conception validée par Sabine le 2026-11-21). Écarté : le modèle de l'issue pour les commandes du poste, sans
+  usage dans cette PR. — PR de #419
+- **Un essai finit par `docker compose down -v` et par le retrait de la réponse de `POST /digests` ; la préproduction
+  entre au registre des traitements.** Pourquoi : les volumes gardent la collecte réelle, données personnelles
+  comprises, et le compose n'a pas de `kb purge` (Sabine, le 2026-11-22 ; registre, « Préproduction locale (compose,
+  #419) »). Écarté : garder les volumes d'un essai au suivant, où ces données resteraient sans purge. — PR de #419
 
 ## Décisions encore ouvertes
 

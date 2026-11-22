@@ -34,7 +34,10 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
 - **Les ressources** : 0,5 CPU et 1 Gio par service `kb`, la combinaison des apps en ligne
   (`infra/modules/api-container-app.bicep:154-155` ;
   [Azure Container Apps, « Allocations »](https://learn.microsoft.com/en-us/azure/container-apps/containers),
-  lu le 2026-11-21) ; 1 CPU et 2 Gio pour la base, la taille du serveur en ligne, `Standard_B1ms`
+  lu le 2026-11-21), comme `caj-kb-daily-routine`, qui collecte et importe en ligne
+  (`infra/modules/daily-routine-job.bicep:113-114`) ; `create-db` en a autant, plus que son pendant en
+  ligne, `caj-kb-migrate-database` (0,25 CPU et 0,5 Gio, `infra/modules/migrate-database-job.bicep:100-101`) ;
+  1 CPU et 2 Gio pour la base, la taille du serveur en ligne, `Standard_B1ms`
   (`infra/modules/postgresql-server.bicep:21` ;
   [Azure Database for PostgreSQL, « Compute options »](https://learn.microsoft.com/en-us/azure/postgresql/compute-storage/concepts-compute),
   lu le 2026-11-22).
@@ -42,7 +45,8 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
   les API n'en ont pas, comme en ligne (`infra/main.bicep:69-72`).
 - **L'environnement de l'API de données** : `KB_DEPLOYMENT_ENVIRONMENT=production`, comme en ligne
   (`infra/main.bicep:296`) : elle ne sert ni `/docs` ni `/openapi.json`.
-- **Le modèle** : gpt-6.1-sol, effort `low`, comme en ligne (`infra/main.bicep:325-331`).
+- **Le modèle** : gpt-6.1-sol, effort `low`, comme en ligne (`infra/main.bicep:325-331`, le nom du modèle
+  par le commentaire des lignes 328-330).
 - **L'arrêt** : 250 s pour l'API IA, comme en ligne (`infra/main.bicep:337-339`), la plus longue demande
   que laisse passer l'entrée d'Azure Container Apps, 240 s, et une marge ; une demande de fiches est
   bornée à 200 s (`DIGEST_REQUEST_TIMEOUT_SECONDS`), plus l'appel au modèle en cours. 20 s pour les
@@ -60,10 +64,11 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
 - **Un seul rôle, `kb`, superutilisateur du serveur et propriétaire de la base `k_b`** : l'image de
   PostgreSQL le crée ainsi au premier démarrage (`POSTGRES_USER`, `POSTGRES_DB`) ; il se connecte par mot
   de passe, sur le réseau du compose, que `postgres` ne publie pas. L'API de données s'y connecte, et
-  chaque connexion de son pool lit en `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`). La base se crée par `kb create-db`, et non par `kb migrate-database`, qui
-  donne les tables aux rôles des identités d'Azure (`infra/postgresql/grant-roles.sql`), absents ici. En
-  ligne, chaque identité qui ouvre la base y a son rôle, de lecture ou d'écriture, et s'y connecte par son
-  jeton, en `sslmode=verify-full`.
+  chaque connexion de son pool lit en `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`) : cela
+  protège d'une écriture par erreur du code de K-B, et l'API n'envoie que son propre SQL paramétré. La
+  base se crée par `kb create-db`, et non par `kb migrate-database`, qui donne les tables aux rôles des
+  identités d'Azure (`infra/postgresql/grant-roles.sql`), absents ici. En ligne, chaque identité qui ouvre
+  la base y a son rôle, de lecture ou d'écriture, et s'y connecte par son jeton, en `sslmode=verify-full`.
 - **Un processus d'init** (`init: true`) : il transmet le signal d'arrêt à `kb` et récupère les
   processus fils. L'arrêt essayé ici est celui de `kb` sous init : `kb serve-data` et `kb serve-ai`
   sortent en `143`, `STOPPED_BY_SIGTERM` (`src/k_b/commands/exit_codes.py`). En ligne, `kb` est le
@@ -72,8 +77,9 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
   `tests/commands/test_sigterm.py`.
 - **Un système de fichiers en lecture seule** (`read_only`), `/tmp` en mémoire (`tmpfs`), plus strict
   qu'en ligne, où le système de fichiers d'un conteneur s'écrit : une écriture hors du volume des
-  données et de `/tmp` y échoue. La préproduction vérifie ainsi la règle 4 de
-  `.claude/rules/poc.md` : un conteneur n'écrit aucun état hors de `KB_DATA_DIR`.
+  données et de `/tmp` y échoue. Seul `/tmp`, en mémoire et perdu à l'arrêt, s'écrit hors du volume :
+  la préproduction vérifie ainsi la règle 4 de `.claude/rules/poc.md`, un conteneur n'écrit aucun état
+  hors de `KB_DATA_DIR`.
 - **Aucune mesure ni trace vers Grafana Cloud** : `compose.yaml` ne pose pas `KB_OTLP_*`, et `kb serve-ai`
   démarre sans export (`read_metrics_export_settings_or_refusal`,
   `src/k_b/ai_api/connectors/metrics_export.py`) : les demandes de la préproduction ne se mêlent pas aux
@@ -82,8 +88,8 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
   14 sources collectées sur 17 (`zotero` et `clipping`, que le poste collecte, et `gh_archive`, sans clé
   BigQuery, sautées). Le coffre et la bibliothèque Zotero ne sont pas montés.
 
-Hors du compose : le site (`kb serve-web`), les autres jobs (`kb daily-routine`, `kb digest-watch`,
-`kb smoke-test`) et le stockage d'échange.
+Hors du compose : le site (`kb serve-web`), les autres jobs (`kb migrate-database`, `kb daily-routine`,
+`kb digest-watch`, `kb smoke-test`) et le stockage d'échange.
 
 ## Prérequis
 
@@ -186,8 +192,9 @@ OUT=$(mktemp -d)/digests.json \
   && echo "$OUT"; unset KEY
 ```
 
-Attendu : `200` et sa durée, sous 200 s, puis le chemin de la réponse, dans un dossier temporaire hors du
-dépôt. La demande appelle le modèle de la production : ses jetons
+Attendu : `200` et sa durée, sous 240 s, puis le chemin de la réponse, dans un dossier temporaire hors du
+dépôt. La réponse porte des titres et des noms de dépôts : une fois lue, `rm -r "$(dirname "$OUT")"` la
+retire. La demande appelle le modèle de la production : ses jetons
 comptent dans la journée de sa ressource, que surveille l'alerte des 400 000 jetons sur 24 h
 ([infra/README.md](../infra/README.md), « L'alerte sur les jetons du modèle »).
 
@@ -199,7 +206,8 @@ comptent dans la journée de sa ressource, que surveille l'alerte des 400 000 je
 | `docker compose down` | retire les conteneurs et le réseau, garde les volumes : `docker compose up -d` retrouve la base et le brut |
 | `docker compose down -v` | retire aussi les volumes, donc la base et le brut : la fin de chaque essai |
 
-Un essai finit par `docker compose down -v` : les volumes gardent la collecte réelle, données
+Un essai finit par `docker compose down -v`, et par le retrait de la réponse de `POST /digests` s'il en
+reste une : les volumes gardent la collecte réelle, données
 personnelles comprises, et le compose n'a pas de `kb purge`
 ([registre-traitements.md](registre-traitements.md), « Préproduction locale »).
 
@@ -243,16 +251,18 @@ vérifie la sonde de la base en TCP, ses ressources et l'API de données en `pro
 
 ## Ce que le test vérifie sans Docker
 
-`tests/test_compose_file.py` lit `compose.yaml`, ses modèles, le `Dockerfile` et `.gitignore` à chaque
-`uv run pytest`, donc à chaque PR : les six services ; les ports sur `127.0.0.1`, aucun pour la base ;
-`init`, `read_only` et `tmpfs: /tmp` partout ; 0,5 CPU et 1 Gio par service `kb`, 1 CPU et 2 Gio pour la
-base ; l'arrêt sous 30 s, sauf les 250 s de l'API IA ; aucun service en root, l'utilisateur du `Dockerfile`
-compris ; l'image et les réglages d'`initdb` de la base de la CI ; `sandbox` pour la seule API IA ; un
-fichier de secrets par service, à côté de son modèle ; aucun secret dans `compose.yaml`, ni par son nom ni
-dans une URL, et aucune valeur dans un modèle ; chaque variable des modèles des services `kb` décrite
-dans `.env.example` ; les fichiers de secrets ignorés, puis leurs modèles suivis ; le profil `jobs` des
-seuls jobs ; le volume des données pour les seuls jobs ; les sondes de santé, celle de la base en TCP et
-celle de l'API de données avec un hôte qu'elle permet ; l'ordre de démarrage.
+`tests/test_compose_file.py` lit `compose.yaml`, ses modèles, `.env.example`, `ci.yml`, le `Dockerfile`
+et `.gitignore` à chaque `uv run pytest`, donc à chaque PR : les six services ; les ports sur
+`127.0.0.1`, aucun pour la base ; `init`, `read_only` et `tmpfs: /tmp` partout ; 0,5 CPU et 1 Gio par
+service `kb`, 1 CPU et 2 Gio pour la base ; l'arrêt sous 30 s, sauf les 250 s de l'API IA ; aucun service
+en root, l'utilisateur du `Dockerfile` compris ; l'image et les réglages d'`initdb` de la base de la CI ;
+`sandbox` pour la seule API IA ; un fichier de secrets par service, à côté de son modèle ; aucun nom de
+secret dans l'environnement d'un service, aucun mot de passe dans une URL de tout `compose.yaml`, aucune
+valeur dans un modèle ; l'API IA sans l'URL de la base ; chaque variable des modèles des services `kb`
+décrite dans `.env.example` ; la règle qui suit les modèles placée après celle qui ignore les fichiers de
+secrets ; le profil `jobs` des seuls jobs ; le volume des données pour les seuls jobs ; les sondes de
+santé, celle de la base en TCP et celle de l'API de données avec un hôte qu'elle permet ; l'ordre de
+démarrage.
 
 Le compose n'a pas de job de CI : le test tient ses règles à chaque PR, et l'essai ci-dessus prouve le
 lancement.
