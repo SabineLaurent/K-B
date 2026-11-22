@@ -7224,6 +7224,14 @@ points de revue tranchés par time-knight, sous la délégation de Sabine du 15/
   never sent back raw », `web/feed.py`). Limite assumée : Opquast 81 tenue en partie, la valeur ne revient pas dans
   le champ ; un jour valide que l'API refuserait (même règle `WrittenDay` que le site) vide aussi le champ, sans
   être nommé. — PR de #596
+  **Précisée le 2026-11-22** : le sélecteur de date envoie aussi une valeur que `WrittenDay` refuse. Dans Chrome 157,
+  une année de 5 ou 6 chiffres tapée au clavier part telle quelle (`window_end=20266-01-01`, frappes réelles du
+  2026-11-21) : une valeur refusée ne vient donc pas seulement d'une adresse écrite à la main. Elle n'est pas nommée,
+  et sa phrase dit la cause : « Date invalide: l’année a plus de 4 chiffres. » (décision de Sabine du 2026-11-22,
+  constat CR1 de la revue). Toute autre valeur qui n'a pas la forme d'un jour reçoit « Date invalide: choisissez un
+  jour dans le champ. ». La forme d'un jour est
+  désormais `DAY_FORM` d'`items.py`, qui remplace `DAY_SHAPE`, et un jour qui n'existe pas reçoit « Date invalide:
+  2026-02-30 n’existe pas. Choisissez un jour qui existe. » — PR de #590 et #617
 - **Le dépôt est l'en-tête de sa ligne (`th scope="row"`), en graisse normale ; les colonnes portent les mots de la
   maquette, « Étoiles gagnées » et « *Forks* gagnés ».** Tris de time-knight (relecture d'accessibilité). Pourquoi :
   RGAA 5.7, un lecteur d'écran annonce le dépôt avec chacun de ses comptes ; « gagnées » reste dit avec son

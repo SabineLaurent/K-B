@@ -5,8 +5,10 @@
    Only features Baseline "widely available" (web-features 3.45.0, read on 2026-11-11): nesting,
    cascade layers, logical properties, :where(), the dynamic viewport units, the range syntax of
    media queries. text-wrap: balance, "newly available", only adds: a browser without it loses
-   nothing (docs/site-web.md, "Feuille de style"). So does background-attachment: local, "widely
-   available" by its own key (web-features 3.47.0, read on 2026-11-22): without it, no shadow. */
+   nothing (docs/site-web.md, "Feuille de style"). Container size queries: widely available since
+   2025-08-14 (web-features explorer, read on 2026-11-21). background-attachment: local, "widely
+   available" by its own key (web-features 3.47.0, read on 2026-11-22), only adds too: without it, no
+   shadow. */
 
 @layer reset, base, layout, components;
 
@@ -31,12 +33,13 @@
     --color-card: #FFFFFF;
     --color-stone: #DADCD6;
     --color-on-teal: #FFFFFF;
-    /* The mark Exploitée (KEV) and the messages of a field refused; #8A8F96 for the border of a
-       field only, never a text. */
+    /* The mark Exploitée (KEV), the messages of a field refused and the border of the summary of
+       the errors; #8A8F96 for the border of a field only, never a text. */
     --color-alert: #9A3412;
     --color-alert-deep: #7C2D12;
     --color-on-alert: #FFFFFF;
-    /* The banner of an item in the CISA KEV catalog (Maquette-faille.dc.html). */
+    /* The banner of an item in the CISA KEV catalog (Maquette-faille.dc.html) and the summary of the
+       errors (the box « Couleur signalée » of the chart). */
     --color-alert-wash: #FFF1E6;
     --color-alert-ink: #5B2410;
     /* The chip of a package (Maquette-alerte.dc.html). */
@@ -64,11 +67,20 @@
     outline-offset: 2px;
   }
 
+  /* The paper of the pages, on the canvas: the body, a container, would no longer give it its
+     background. */
+  html {
+    background: var(--color-paper);
+  }
+
   body {
     min-block-size: 100dvb;
+    /* The container of the queries of a strong zoom, at the end of the components: the page has no
+       other wrapper, and main cannot query itself, its margin changing. Named: the frame of the table
+       is a container too, nearer to what it holds. */
+    container: body / inline-size;
     display: flex;
     flex-direction: column;
-    background: var(--color-paper);
     color: var(--color-ink);
     font-family: var(--font-text);
     font-size: 1rem;
@@ -332,7 +344,8 @@
     align-items: center;
     /* Its label and its announcement wrap with large text on a phone (WCAG 1.4.10). */
     flex-wrap: wrap;
-    /* The space between the arrow and its text, which a flex container drops. */
+    /* The space between the label of a link to another site and its announcement, which a flex
+       container drops. */
     gap: 0.5rem;
     /* Transparent, but drawn when Windows forces its colours: the button keeps its frame. */
     border: 1px solid transparent;
@@ -355,6 +368,22 @@
     border-color: var(--color-teal);
   }
 
+  /* The arrow of a button, one item with its words so as never to go alone on its line: its margin
+     gives back, with its no-break space, the gap it had as an item of its own. */
+  :where(.button, .button-secondary) {
+    & .arrow-start {
+      margin-inline-end: 0.25rem;
+    }
+
+    & .arrow-end {
+      margin-inline-start: 0.25rem;
+    }
+
+    & .external-arrow {
+      margin-inline-start: 0.5rem;
+    }
+  }
+
   /* The card of the page 500: the time and the id of the request, then the note. */
   .incident {
     padding: 1.125rem 1.25rem;
@@ -366,7 +395,8 @@
 
     & dl {
       display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(12rem, 1fr));
+      /* Never a column wider than the card: 12rem is 384 px at 200 % text. */
+      grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));
       gap: 0.75rem 1.5rem;
     }
 
@@ -562,9 +592,14 @@
     cursor: pointer;
   }
 
+  /* The box « Couleur signalée » of the planche « Charte graphique » (Sabine, 2026-11-22): bordered
+     in rust, on pale peach, its title in deep rust and its text in burnt brown: its bullets, each
+     message being a link in deep rust. */
   .error-summary {
     padding: 1rem 1.25rem;
-    border: 2px solid var(--color-alert-deep);
+    color: var(--color-alert-ink);
+    background: var(--color-alert-wash);
+    border: 2px solid var(--color-alert);
     border-radius: 6px;
 
     & h2 {
@@ -1011,6 +1046,46 @@
     font-size: 0.875rem;
   }
 
+  /* A strong zoom on a narrow screen: under 15em of the font of the body, 240 px at 100 % text,
+     never reached from 320 px, and 480 px at 200 % (the em of a container query is the font size
+     of its container, CSS Conditional 5, 5.1). Without it, no page overflowed from 14.5em on
+     (measured on 2026-11-21). One column, a smaller title that still follows the text, and margins
+     that no longer double with it: no page scrolls sideways at 200 % text from 320 px (WCAG 1.4.4
+     and 1.4.10). */
+  @container body (inline-size < 15em) {
+    .site-header,
+    main,
+    .site-footer {
+      --gutter: 0.25rem;
+    }
+
+    .error-page h1 {
+      font-size: 1.625rem;
+    }
+
+    .feed-filters {
+      padding: 0.25rem;
+    }
+
+    .choices {
+      grid-template-columns: minmax(0, 1fr);
+    }
+
+    .card {
+      padding-inline: 0.5rem;
+    }
+
+    .button,
+    .button-secondary {
+      padding-inline: 0.75rem;
+    }
+
+    /* A date field cannot be narrower than its day and its calendar without hiding them. */
+    :where(input[type="search"], input[type="date"]) {
+      padding-inline: 0.25rem;
+    }
+  }
+
   /* A page prints its content alone (Opquast 2025, rules 195 and 196). */
   @media print {
     .skip-link,
@@ -1031,7 +1106,7 @@
     }
 
     /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */
-    .trends-table a > span[aria-hidden="true"],
+    .trends-table .external-arrow,
     .trends-table .link-note {
       display: none;
     }
