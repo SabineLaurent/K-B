@@ -344,6 +344,74 @@ def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
     )
 
 
+def test_the_card_of_an_incident_never_has_a_column_wider_than_itself():
+    """WCAG 1.4.4 and 1.4.10: at 200 % text, 12rem is 384 px, wider than a phone of 320 px."""
+    rule = read_block(read_rule(".incident"), r"^\s*& dl\s*\{")
+
+    assert (
+        "grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));"
+        in strip_nested_rules(rule)
+    )
+
+
+def test_the_body_is_the_container_of_the_queries_of_a_strong_zoom():
+    """Named: the frame of the table is a container too, nearer to what it holds."""
+    assert "container: body / inline-size;" in strip_nested_rules(read_rule("body"))
+
+
+def test_the_canvas_takes_the_paper_of_the_pages():
+    """A container, the body no longer gives its background to the canvas: html gives it alone."""
+    assert "background: var(--color-paper);" in strip_nested_rules(read_rule("html"))
+    assert "background" not in strip_nested_rules(read_rule("body"))
+
+
+@pytest.mark.parametrize(
+    ("selectors", "declaration"),
+    [
+        # One column of choices (Sabine, 2026-11-21): « Releases » no longer widens the form.
+        ((".choices",), "grid-template-columns: minmax(0, 1fr);"),
+        # The size of the other titles on a phone, in rem: it still follows the text (WCAG 1.4.4).
+        ((".error-page h1",), "font-size: 1.625rem;"),
+        # The margins no longer double with the text: a date field holds in 320 px at 200 %.
+        ((".site-header", "main", ".site-footer"), "--gutter: 0.25rem;"),
+        ((".feed-filters",), "padding: 0.25rem;"),
+        ((".card",), "padding-inline: 0.5rem;"),
+        ((".button", ".button-secondary"), "padding-inline: 0.75rem;"),
+        (
+            (':where(input[type="search"], input[type="date"])',),
+            "padding-inline: 0.25rem;",
+        ),
+    ],
+)
+def test_a_narrow_screen_for_the_size_of_its_text_takes_one_column_and_thin_margins(
+    selectors, declaration
+):
+    """WCAG 1.4.4 and 1.4.10: no page scrolls sideways at 200 % text from 320 px (docs/site-web.md)."""
+    strong_zoom = read_block(STYLESHEET, r"@container body \(inline-size < 15em\)\s*\{")
+    opening = r"^\s*" + r",\s*".join(map(re.escape, selectors)) + r"\s*\{"
+
+    assert declaration in strip_nested_rules(read_block(strong_zoom, opening))
+
+
+@pytest.mark.parametrize(
+    ("selector", "declaration"),
+    [
+        (".arrow-start", "margin-inline-end: 0.25rem;"),
+        (".arrow-end", "margin-inline-start: 0.25rem;"),
+        (".external-arrow", "margin-inline-start: 0.5rem;"),
+    ],
+)
+def test_the_arrow_of_a_button_keeps_the_space_it_had_as_an_item_of_its_own(
+    selector, declaration
+):
+    """One item with its word, the arrow no longer has the gap of 8 px of the button: a margin
+    gives it back, with its no-break space, and nothing moves at 100 % text."""
+    buttons = read_block(STYLESHEET, r"^\s*:where\(\.button, \.button-secondary\)\s*\{")
+    rule = read_block(buttons, rf"^\s*& {re.escape(selector)}\s*\{{")
+
+    assert declaration in strip_nested_rules(rule)
+
+
 def test_the_counts_of_the_trends_are_aligned_as_numbers():
     """Maquette-tendances.dc.html: on the right, in tabular figures, a count never cut; the header
     of its column, « Étoiles gagnées », wraps on a narrow screen."""
@@ -415,7 +483,7 @@ def test_a_table_printed_drops_the_announcement_of_its_links():
     they would repeat on each row."""
     print_rules = read_block(STYLESHEET, r"@media print\s*\{")
     rule = re.search(
-        r'\.trends-table a > span\[aria-hidden="true"\],\s*\.trends-table \.link-note\s*\{'
+        r"\.trends-table \.external-arrow,\s*\.trends-table \.link-note\s*\{"
         r"\s*display:\s*none;",
         print_rules,
     )

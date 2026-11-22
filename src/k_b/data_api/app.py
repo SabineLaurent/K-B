@@ -20,6 +20,7 @@ from k_b.core.config import (
     DATA_API_QUERY_TIMEOUT_SECONDS,
     DATA_API_RATE_LIMITS,
 )
+from k_b.core.trace_context import follow_trace
 from k_b.data_api.api_router import api_router
 from k_b.data_api.errors import ERROR_HANDLERS
 from k_b.data_api.watch_reading import WatchReader
@@ -73,9 +74,10 @@ def create_app(
     # The last added is the outermost.
     app.add_middleware(TrustedHostMiddleware, allowed_hosts=list(allowed_hosts))
     app.middleware("http")(respond_to_unexpected_error)
-    # The outermost: the 400 of TrustedHostMiddleware and the 500 of an unexpected error have
-    # their line too.
+    # The 400 of TrustedHostMiddleware and the 500 of an unexpected error have their line too.
     app.middleware("http")(log_request)
+    # The outermost: the trace of the request is known to each of its lines, its own included.
+    app.middleware("http")(follow_trace)
     app.include_router(api_router)
     # add_route, as FastAPI adds /docs: a route of Starlette, which the key of the app does not
     # reach (fastapi/applications.py, 0.143).

@@ -14,8 +14,14 @@ nav:
           - installation_pour_docu.md
           - architecture_pour_docu.md
           - maquettes-et-parcours.md
+      # In the order of the data: collected, queried, imported, modelled, sorted, served (issue 685).
       - 2. Les données:
+          - collecte.md
+          - requetes.md
           - import_et_base_pour_docu.md
+          - modele-de-donnees.md
+          - donnees-personnelles.md
+          - api-donnees.md
       - 3. La brique d'intelligence artificielle:
           - api_ia_pour_docu.md
           - service_ia_pour_docu.md
@@ -24,6 +30,8 @@ nav:
           - tests_pour_docu.md
           - integration_continue_pour_docu.md
           - livraison_continue_pour_docu.md
+      - 5. Conduite du projet:
+          - conduite-du-projet.md
       # Without a number, and in the footer too, so the page keeps its table of contents (Sabine's choice, issue 654).
       - Accessibilité: accessibilite_pour_docu.md
   - Le dépôt GitHub: https://github.com/SabineLaurent/K-B

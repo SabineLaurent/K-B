@@ -15,6 +15,7 @@ from k_b.core.config import (
     SERVE_WEB_LOG_FILE_NAME,
 )
 from k_b.core.dates import DATABASE_DATE_FORMAT
+from k_b.core.trace_context import read_current_trace_id
 
 # The name of the logger of cli.py and of every module of commands/, written in each line: one
 # name for the command line, whichever of its modules logs.
@@ -30,7 +31,9 @@ SERVE_DATA_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_DATA_LOG_FILE_NAME
 SERVE_AI_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_AI_LOG_FILE_NAME
 # The log of kb serve-web, apart for the same reason.
 SERVE_WEB_LOG_FILE_PATH = Path(LOGS_DIR_NAME) / SERVE_WEB_LOG_FILE_NAME
-LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s: %(message)s"
+# A line written during a request of an API carries its trace id after the name of the logger:
+# `trace_field` is set by TracedFormatter.
+LOG_LINE_FORMAT = "%(asctime)s %(levelname)s %(name)s:%(trace_field)s %(message)s"
 # The HTTP client of the AI API logs each request at INFO, with its URL (the resource of the
 # provider) and without the id of the request of kb serve-ai: from WARNING only.
 HTTP_CLIENT_LOGGER_NAME = "httpx2"
@@ -84,7 +87,7 @@ def logging_to(
                 encoding="utf-8",
             )
         )
-    formatter = logging.Formatter(LOG_LINE_FORMAT, datefmt=DATABASE_DATE_FORMAT)
+    formatter = TracedFormatter(LOG_LINE_FORMAT, datefmt=DATABASE_DATE_FORMAT)
     # The Z of the format says UTC: the time is read in UTC, not in local time.
     formatter.converter = time.gmtime
     root_logger = logging.getLogger()
@@ -107,6 +110,17 @@ def logging_to(
         for handler in handlers:
             root_logger.removeHandler(handler)
             handler.close()
+
+
+class TracedFormatter(logging.Formatter):
+    """The format of a log line, with the trace id of the request under way, read in the thread
+    that logs (core/trace_context.py); nothing out of a request."""
+
+    def format(self, record: logging.LogRecord) -> str:
+        """The line of the record, its trace field set first."""
+        trace_id = read_current_trace_id()
+        record.trace_field = "" if trace_id is None else f" trace_id={trace_id}"
+        return super().format(record)
 
 
 def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:
