@@ -15,14 +15,30 @@ branchement de l'export, lui, n'était écrit que dans `docs/fiches-veille.md` e
 suivait la fiche ne pouvait pas installer la chaîne d'un bout à l'autre. L'étape « Brancher l'export » comble cet
 écart : de la pile vide jusqu'aux séries vues dans Explore, puis l'import du tableau et des règles.
 
-Le jeton de la production expire : la fiche dit quand, et qui Grafana prévient avant, sous « Maintenir ».
+Un jeton expire : la fiche dit, sous « Maintenir », où se choisit sa date d'expiration, comment un jeton expiré se
+repère, et qui Grafana prévient avant.
+
+Le 2026-11-22, avant la sortie du brouillon, trois demandes s'ajoutent (décisions de Sabine) :
+
+- **L'encadré des compétences porte, mot pour mot, les sept phrases du référentiel** qui demandent une documentation du
+  monitorage (C11 et C20, l'accessibilité comprise), et une liste rattache chacune aux sections qui y répondent
+  (`documentation/monitorage.md:37-52`). Le jury lit la fiche critère par critère.
+- **La fiche décrit la procédure et l'état, pas l'histoire** : dans les sections touchées, plus aucune date de
+  réalisation, de relecture ou de relevé, ni le nom d'une personne. Chaque seuil cite sa ligne du journal des
+  décisions ; la tête de la fiche nomme le seul commit que visent ses renvois.
+- **Les deux alertes d'Azure entrent dans la liste des seuils** (C20 : <q>la documentation liste les métriques et les
+  seuils et valeurs d'alerte pour chaque métrique à risque</q>) : `budget-kb` et `alert-kb-model-tokens`, avec leurs
+  chiffres lus dans le code (`documentation/monitorage.md:86-94`).
+
+Le parcours de l'interface par Sabine est remplacé, par sa décision, par la vérification de chaque libellé et de chaque
+chemin dans la documentation officielle de Grafana Cloud.
 
 ## Le comment
 
 ### Une étape, six parties, avant « Installer »
 
 La section est placée entre « Lire le tableau » et « Installer », car l'import du tableau suppose une pile qui reçoit
-déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitorage.md:181`) :
+déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitorage.md:222`) :
 
 ```markdown
 Sur la pile qui reçoit les mesures ([Brancher l'export](#brancher-lexport)), par l'interface, sans jeton ni outil à
@@ -35,7 +51,7 @@ variables, la vérification. Chaque libellé de l'interface de Grafana Cloud est
 
 ### Le jeton : une politique de la pile, trois droits d'écriture
 
-`documentation/monitorage.md:106-114` crée la politique depuis le Grafana de la pile, et non depuis le
+`documentation/monitorage.md:146-156` crée la politique depuis le Grafana de la pile, et non depuis le
 portail de l'organisation :
 
 ```markdown
@@ -50,7 +66,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
 
 ### L'en-tête : un jeton qui ne passe ni par l'écran ni par l'historique
 
-`documentation/monitorage.md:123-129` :
+`documentation/monitorage.md:165-171` :
 
 ```sh
 {
@@ -73,7 +89,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
   y reste sur la ligne de commande jusqu'à Entrée ; un jeton collé à ce moment rejoindrait la ligne de commande,
   affiché et gardé dans l'historique. L'invite dit quand coller le jeton : seulement une fois `Jeton:` affiché, donc
   une fois `read` en attente. La fiche le dit en clair : coller le bloc, Entrée s'il reste sur la ligne de commande,
-  puis le jeton quand `Jeton:` s'affiche (`documentation/monitorage.md:118-121`).
+  puis le jeton quand `Jeton:` s'affiche (`documentation/monitorage.md:160-163`).
 
 ### Les variables, en local et en ligne
 
@@ -85,7 +101,7 @@ que `kb serve-ai` refuse au démarrage, « par exemple » : la liste complète e
 
 ### La vérification : le test, puis Explore
 
-`documentation/monitorage.md:166-169` :
+`documentation/monitorage.md:208-211` :
 
 ```markdown
     Un jeton refusé fait échouer le test (`tests/e2e/test_real_export.py:119`). Le test vérifie que chaque envoi est
@@ -97,12 +113,26 @@ réponse 3xx, une redirection, comme un succès (`tests/e2e/test_real_export.py:
 séries sont arrivées. Le test n'envoie que les mesures (`:96-97`) : les traces se lisent dans Tempo après une demande
 à `kb serve-ai`.
 
-### L'expiration du jeton de la production
+### L'expiration d'un jeton
 
-`documentation/monitorage.md:226-231` : 90 jours depuis le 2026-11-11, jusqu'au 2027-02-09 (#522). Le
-destinataire des e-mails d'avant expiration est cité mot pour mot de Grafana, en `<q lang="en">` : pour une politique
-de pile, « the admins of the corresponding stack ». La case qui les active est cochée, lue par Sabine le 2026-11-20
-(`docs/fiches-veille.md:1700-1701`).
+`documentation/monitorage.md:264-275` donne la règle, et non une date : la date d'expiration est celle choisie dans le
+champ « Expiration date » de la boîte « Create new token » (vide, le jeton n'expire pas), et un jeton expiré est
+marqué « Expired » sur la page « Access Policies » du portail. Le destinataire des e-mails d'avant expiration est cité
+mot pour mot de Grafana, en `<q lang="en">` : pour une politique de pile, « the admins of the corresponding stack ».
+Ces e-mails partent par défaut ; la case « Enable token expiration emails », page « Settings » des « Org Settings »,
+les coupe. Tout cela vient des deux pages de Grafana sur les politiques d'accès, citées dans les sources.
+
+La date du jeton de la production n'est pas écrite : « 2027-02-09 » était un calcul (90 jours depuis le 2026-11-11,
+#522), jamais lu dans Grafana.
+
+### Les alertes d'Azure dans la liste des seuils
+
+`documentation/monitorage.md:86-94` : `budget-kb`, 40 € par mois sur les coûts étiquetés `project=k-b`, un e-mail à
+50 % et 100 % du réel et à 100 % de la prévision (`infra/modules/budget.bicep:11-12`, `:20-22`, `:27-58`) ;
+`alert-kb-model-tokens`, `TotalTokens` au-dessus de 400 000 sur 24 h glissantes, évaluée toutes les 15 minutes
+(`infra/modules/model-token-alert.bicep:41-42`, `:52-55` ; `infra/main.bicep:176`). Toutes deux écrivent à l'adresse
+de `budgetContactEmail` (`infra/main.bicep:161`, `:181`). Ni le job `caj-kb-digest-watch`, qui n'est pas une
+alerte, ni les alertes d'erreurs de #553, qui ne sont pas déployées.
 
 ## Choix faits et options écartées
 
@@ -121,12 +151,24 @@ de pile, « the admins of the corresponding stack ». La case qui les active est
   installateur rencontre, et renvoie au code pour le reste.
 - **Les libellés d'Apple en français** : le Mac de Sabine est en français ; la page d'aide citée est la page fr-fr.
 - **Une source par recherche web** : Context7 n'était pas connecté le 2026-11-21. Chaque page a été lue le jour même.
+- **Les libellés vérifiés dans la documentation officielle de Grafana Cloud**, plutôt que parcourus par Sabine dans sa
+  pile (décision de Sabine du 2026-11-22). Un libellé absent de la documentation est écrit de façon générique : le
+  questionnaire de l'inscription, que la documentation ne décrit pas, n'est pas dans la fiche ; seul
+  « Add Stack » l'est.
+- **La règle de l'expiration, plutôt qu'une date** : la date du jeton de la production n'a jamais été lue dans
+  Grafana ; la fiche dit où elle se choisit et comment un jeton expiré se repère.
+- **Les sources des seuils par la ligne du journal des décisions**, sans nom ni date, plutôt que par le titre de
+  l'entrée.
 
 ## Preuve
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | Les 20 renvois `fichier:ligne` de la section, relus sur `main` au commit `36c1e02d`, puis de nouveau le 2026-11-22 sur `9658225a` après la fusion de `main` (trois renvois vers `docs/fiches-veille.md` décalés de 10 à 13 lignes, corrigés) | Chaque phrase dit ce que la ligne citée contient |
+| Les 97 renvois `fichier:ligne` de toute la fiche comparés, ligne à ligne, entre le dernier commit de `main` qui touche la fiche (`96ec90ef`) et `a1a01efd` : un seul décalé, `docs/registre-traitements.md:199` et `:293`, qui visaient déjà une ligne vide en `96ec90ef`, corrigés en `:234` et `:328` | La tête de la fiche peut nommer un seul commit, `a1a01efd` |
+| Chaque libellé et chemin de Grafana Cloud de la fiche retrouvé dans une page officielle : création d'une pile, envoi en OTLP, création d'une politique et d'un jeton, politiques d'accès, analyse des séries dans Explore, sources de données, éditeur de requêtes d'Explore, politique des traces | Les libellés de la fiche sont ceux de Grafana |
+| Les chiffres des deux alertes d'Azure lus dans `infra/modules/budget.bicep`, `infra/modules/model-token-alert.bicep` et `infra/main.bicep` | La liste des seuils ne dit que ce que le code pose |
+| Le HTML construit : 7 citations dans l'encadré, chaque ancre de la liste de l'encadré présente, 7 tableaux, tous à en-têtes `th` | L'encadré et sa liste se lisent, au clavier comme au lecteur d'écran |
 | `uv run --locked --only-group docs mkdocs build --strict` : sortie 0 | Aucun lien ni ancre cassé |
 | Le HTML construit : une liste ordonnée de six étapes, les deux blocs de code dans leur étape, les ancres `#brancher-lexport`, `#limites`, `#sources` présentes | La section se lit comme une suite d'étapes, au clavier comme au lecteur d'écran |
 | Contrôle du HTML de la déclaration d'accessibilité sur la section : `lang="fr"`, un seul `h1`, aucun saut de niveau, aucun lien nommé par une adresse, « ici » ou « plus haut » | La section tient la vérification d'AcceDe du 2026-11-21 |
@@ -138,25 +180,29 @@ de pile, « the admins of the corresponding stack ». La case qui les active est
 
 1. **Pourquoi pas le jeton de la tuile OpenTelemetry ?** Ses droits ne se choisissent pas à l'étape où on le
    génère ; celui de la politique ne porte que les trois droits d'écriture, sur cette pile seule
-   (`documentation/monitorage.md:106-114`).
+   (`documentation/monitorage.md:146-156`).
 2. **Le jeton peut-il fuiter pendant l'installation ?** Ni à l'écran (`read -s`), ni dans l'historique, ni dans la
    liste des processus (`printf` interne), même collé d'un coup sous zsh : l'invite `Jeton:` dit quand le coller. Il
    reste dans le presse-papiers, que l'étape vide, et dans l'historique de Spotlight s'il est activé, que l'étape
-   efface (`:130-133`).
+   efface (`:173-176`).
 3. **Le test passe : les mesures sont-elles arrivées ?** Pas forcément : une redirection compte comme un succès pour
-   le SDK. La preuve est la série vue dans Explore (`:165-171`).
-4. **Que se passe-t-il le 2027-02-09 ?** Le jeton expire, l'export reçoit des 401 (`Failed to export 'metrics' batch
-   code: 401` dans le journal). Grafana écrit avant aux administratrices de la pile ; la rotation est la procédure
-   « Pour refaire un seul secret » d'`infra/README.md` (`:222-230`).
-5. **Pourquoi `prod-eu-west-2` est-il en Allemagne ?** La page des adresses des régions de Grafana Cloud range ce
+   le SDK. La preuve est la série vue dans Explore (`:211-214`).
+4. **Que se passe-t-il quand le jeton expire ?** L'export reçoit des 401 (`Failed to export 'metrics' batch
+   code: 401` dans le journal). Grafana écrit avant aux administrateurs de la pile ; la rotation est la procédure
+   « Pour refaire un seul secret » d'`infra/README.md` (`:264-275`).
+5. **Quelles alertes surveillent la dépense ?** Dans Grafana, `KbModelCostOverBudget` sur le coût estimé ; dans Azure,
+   `budget-kb` sur les coûts réels et prévus du mois, et `alert-kb-model-tokens` sur les jetons de la ressource du
+   modèle (`:86-94`).
+6. **Pourquoi `prod-eu-west-2` est-il en Allemagne ?** La page des adresses des régions de Grafana Cloud range ce
    nom sous AWS, Allemagne ; le registre le lit sur l'hôte de l'adresse OTLP (`docs/registre-traitements.md:128`).
 
 ## Zones non vérifiées
 
-- Les chemins de l'interface dans la pile de Sabine : ils viennent de la documentation de Grafana du jour. Sabine les
-  parcourt avant que la PR quitte le brouillon.
-- La date d'expiration exacte du jeton : 2027-02-09 est le calcul de 90 jours depuis le 2026-11-11. Sabine la lit sur
-  la page « Cloud access policies » pendant son parcours.
+- Les chemins de l'interface dans la pile de Sabine : ils viennent de la documentation officielle de Grafana Cloud,
+  non d'un parcours à l'écran (décision de Sabine du 2026-11-22).
+- La date d'expiration du jeton de la production : jamais lue dans Grafana, elle n'est pas écrite.
+- L'endroit de l'interface où s'affiche la date d'un jeton encore valide : la documentation ne le nomme pas ; la fiche
+  dit seulement où elle se choisit, et comment un jeton expiré se repère.
 - Les lignes « Metrics » et « Logs » du champ « Scopes » : la documentation nomme la ligne « Traces » ; les deux
   autres suivent le même modèle, à voir dans l'interface.
 - Le collage de l'en-tête dans un vrai Terminal ou iTerm2, et avec les fichiers `~/.zshrc` ou `~/.bashrc` de Sabine :
@@ -164,5 +210,5 @@ de pile, « the admins of the corresponding stack ». La case qui les active est
 
 ## Ce qui reste
 
-- Le parcours de l'interface par Sabine, puis la PR sort du brouillon.
+- La relecture du delta, puis la PR sort du brouillon et part sur l'accord de Sabine.
 - La branche `docs/monitoring-export-and-reimport` est supprimée après la fusion.

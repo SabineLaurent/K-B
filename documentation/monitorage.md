@@ -10,21 +10,52 @@
 
     — C11
 
+    > La documentation technique de la chaîne de monitorage couvre la procédure d'installation de la chaîne, de
+    > configurations, et d'utilisation du monitorage à destination des équipes techniques.
+
+    — C11
+
+    > Documentation du monitorage et des procédures d'installation et de configuration de l'outillage utilisé dans
+    > l'environnement de l'application.
+
+    — C20
+
+    > La documentation liste les métriques et les seuils et valeurs d'alerte pour chaque métrique à risque.
+
+    — C20
+
     > La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du
     > monitorage de l'application.
 
     — C20
 
-Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
-commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
-production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour; l'étape
-[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d`, ses renvois relus
-le 2026-11-22 sur `main` au commit `9658225a` (#620). Le
-monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord,
-`observability/grafana/dashboard.json`, et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les
-mesures viennent de l'API IA, qui les envoie en
-OpenTelemetry depuis #162 (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de
-l'outil est écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
+    > La documentation est communiquée dans un format qui respecte les recommandations d'accessibilité (par exemple
+    > celles de l'association Valentin Haüy ou de Microsoft).
+
+    — C11, C20
+
+La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette fiche qui y répondent.
+
+- L'installation et la maintenance du monitorage du modèle: [Brancher l'export](#brancher-lexport),
+    [Installer](#installer) et [Maintenir](#maintenir).
+- L'utilisation du monitorage: [Qui lit le tableau et l'alerte](#qui-lit-le-tableau-et-lalerte) et
+    [Lire le tableau](#lire-le-tableau).
+- La chaîne de monitorage, son installation, ses configurations et son utilisation par les équipes techniques:
+    [Brancher l'export](#brancher-lexport), [Installer](#installer), [Lire le tableau](#lire-le-tableau) et
+    [Journaux de l'application](#journaux-de-lapplication).
+- Le monitorage et l'outillage de l'environnement de l'application, leur installation et leur configuration:
+    [Journaux de l'application](#journaux-de-lapplication), en local et en ligne.
+- Les métriques, les seuils et les valeurs d'alerte: [Ce que le monitorage suit](#ce-que-le-monitorage-suit).
+- Les dépendances de l'outillage, leur installation et leur configuration: [Brancher l'export](#brancher-lexport)
+    (la pile, la politique d'accès, le jeton, les variables de l'API IA) et
+    [Journaux de l'application](#journaux-de-lapplication).
+- Le format accessible: [L'accessibilité de la documentation](accessibilite.md).
+
+Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`. Le monitorage du modèle tient dans deux
+fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`,
+et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie
+en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est
+écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
 [Journaux de l'application](#journaux-de-lapplication) (#165).
 
 ## Ce que le monitorage suit
@@ -33,26 +64,34 @@ L'API IA mesure chaque appel au modèle et la durée de chaque demande de compte
 dans `src/k_b/ai_api/observability/metric_instruments.py`. Grafana Cloud les range sous 25 noms de séries, relevés
 dans Explore (`NAMES_SEEN_IN_GRAFANA`, `tests/test_grafana_files.py`), par exemple `k_b_llm_calls_total` (les
 appels), `k_b_llm_cost_total` (le coût estimé), `k_b_digest_facts_found_total` et `k_b_digest_facts_checked_total`
-(la fidélité). Chaque série porte son environnement, `deployment_environment_name`: `production` pour l'API en
-ligne, `sandbox` pour le bac à sable. 22 noms ont été relevés le 2026-11-08. Les trois noms de la durée d'une
-demande, `k_b_request_duration_seconds_bucket`, `_count` et `_sum` (#634, 2026-11-18), l'ont été le 2026-11-21, sur
-les séries de la production du 2026-11-19
-([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
+(la fidélité), et les trois noms de la durée d'une demande, `k_b_request_duration_seconds_bucket`, `_count` et
+`_sum`. Chaque série porte son environnement, `deployment_environment_name`: `production` pour l'API en ligne,
+`sandbox` pour le bac à sable.
 
 Le tableau suivant donne les cinq alertes: ce que chacune mesure, sa fenêtre, son seuil et la source de ce seuil.
 
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source du seuil |
 |---|---|---|---|---|
-| `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | grille de Sabine du 2026-10-15: <q>100 % de schémas valides après une nouvelle tentative</q> (`docs/ADR/journal-decisions-projet.md`) |
-| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | même grille: <q>au moins 95 % de fidélité</q>; provisoire jusqu'au <span lang="en">benchmark</span> des modèles et à l'optimisation de la consigne (Sabine, 2026-11-08) |
-| `KbModelCostOverBudget` | le coût estimé des appels, aux prix de gpt-6.1-sol de `src/k_b/core/config.py` | 7 jours | au-dessus de 2 USD | seuil de Sabine du 2026-11-18 pour gpt-6.1-sol: au-dessus de son maximum normal, 1,55 USD par semaine, l'alerte signale une dépense anormale (`docs/ADR/journal-decisions-projet.md`) |
-| `KbModelCallFailures` | la part des appels en échec après leur nouvelle tentative: délai dépassé (`llm_timeout`), service indisponible (`llm_unavailable`), trop de requêtes (`llm_rate_limited`), filtre de contenu (`llm_content_filtered`), sortie coupée au plafond de jetons (`llm_truncated`) | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: un appel en échec est un sujet ou un compte rendu qui manque; `llm_truncated` ajouté par Sabine le même jour, sur la revue de code |
-| `KbRequestOverDuration` | la part des demandes de compte rendu (`POST /digests`, `POST /trend-reports`) de plus de 180 s, de l'entrée dans leur route à leur réponse, comme l'échéance de 200 s | 24 h | au-dessus de 0 % | seuil de Sabine du 2026-11-18: 180 s, sous l'échéance de 200 s d'une demande (le 2026-11-17, `POST /digests` sur gpt-6.1-sol l'a atteinte) |
+| `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | la grille de lecture du journal des décisions: <q>100 % de schémas valides après une nouvelle tentative</q> (`docs/ADR/journal-decisions-projet.md:3389`) |
+| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | la même grille: <q>au moins 95 % de fidélité</q> (`docs/ADR/journal-decisions-projet.md:3389-3390`); provisoire jusqu'au <span lang="en">benchmark</span> des modèles et à l'optimisation de la consigne |
+| `KbModelCostOverBudget` | le coût estimé des appels, aux prix de gpt-6.1-sol de `src/k_b/core/config.py` | 7 jours | au-dessus de 2 USD | au-dessus du maximum normal de gpt-6.1-sol, 1,55 USD par semaine: l'alerte signale une dépense anormale (`docs/ADR/journal-decisions-projet.md:7419-7421`) |
+| `KbModelCallFailures` | la part des appels en échec après leur nouvelle tentative: délai dépassé (`llm_timeout`), service indisponible (`llm_unavailable`), trop de requêtes (`llm_rate_limited`), filtre de contenu (`llm_content_filtered`), sortie coupée au plafond de jetons (`llm_truncated`) | 24 h | au-dessus de 0 % | un appel en échec est un sujet ou un compte rendu qui manque (`docs/ADR/journal-decisions-projet.md:7428-7433`) |
+| `KbRequestOverDuration` | la part des demandes de compte rendu (`POST /digests`, `POST /trend-reports`) de plus de 180 s, de l'entrée dans leur route à leur réponse, comme l'échéance de 200 s | 24 h | au-dessus de 0 % | 180 s, sous l'échéance de 200 s d'une demande (`docs/ADR/journal-decisions-projet.md:7436-7438`) |
 
 Les fenêtres sont longues: les fiches ne sortent que deux fois par semaine. Sans appel au modèle sur la fenêtre, il
 n'y a pas de série, et l'alerte reste normale. De même pour la fidélité sans fait vérifié: elle n'est pas calculée
 (le tableau affiche « Aucun appel sur la période ») et l'alerte reste au repos, plutôt qu'une fidélité jamais mesurée
 affichée saine.
+
+Deux alertes d'Azure, posées par `infra/main.bicep`, suivent aussi la dépense: le budget du groupe de ressources et,
+si `modelAccountName` est donné, les jetons de la ressource du modèle (`infra/main.bicep:159`, `:178`). Le tableau suivant les donne, avec ce que chacune mesure, sa fenêtre, son seuil
+et sa source dans le code. Toutes deux écrivent par e-mail à l'adresse du paramètre `budgetContactEmail`
+(`infra/main.bicep:161`, `:181`).
+
+| Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source |
+|---|---|---|---|---|
+| `budget-kb` | les coûts étiquetés `project=k-b`, hébergement et inférence | le mois (`Monthly`) | 40 € par mois; un e-mail à 50 % et à 100 % des coûts réels, et à 100 % des coûts prévus (`Forecasted`) | `infra/modules/budget.bicep:11-12`, `:20-22`, `:27-58`; `docs/ADR/journal-decisions-projet.md:7414-7418` |
+| `alert-kb-model-tokens` | les jetons (`TotalTokens`) de la ressource du modèle, en somme | 24 h glissantes (`P1D`), évaluées toutes les 15 minutes (`PT15M`) | au-dessus de 400 000 jetons | `infra/modules/model-token-alert.bicep:30`, `:41-42`, `:52-55`; `infra/main.bicep:176` |
 
 ## Qui lit le tableau et l'alerte
 
@@ -90,7 +129,7 @@ l'alerte, son environnement, sa valeur et son seuil.
 
 L'API IA envoie ses mesures et ses traces à Grafana Cloud par OTLP (le protocole d'export d'OpenTelemetry) sur HTTP
 quand ses variables d'export sont posées; sans elles, rien n'est exporté (`docs/fiches-veille.md:1892-1896`). Les
-chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2026-11-21 ([Sources](#sources)).
+chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources](#sources)).
 
 1. **La pile**: dans le portail Grafana Cloud, <span lang="en">**Add Stack**</span>, un nom, puis une région de
     l'Union européenne. Celle de K-B est `prod-eu-west-2`, chez AWS (<span lang="en">Amazon Web Services</span>), en
@@ -101,7 +140,8 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
 2. **L'adresse et l'identifiant**: dans le portail, la pile choisie, <span lang="en">**Configure**</span> sur la
     tuile <span lang="en">**OpenTelemetry**</span>. Y relever l'adresse OTLP, de la forme
     `https://otlp-gateway-<région>.grafana.net/otlp`, et l'identifiant d'instance, le nombre affiché sur la tuile. Ne
-    pas y générer de jeton: celui de l'étape 3 a ses droits choisis.
+    pas y générer de jeton: celui de l'étape 3 a ses droits choisis. Ne pas reprendre non plus les variables
+    `OTEL_EXPORTER_OTLP_*` que la tuile propose: `kb serve-ai` refuse toute variable `OTEL_*` (étape 5).
 
 3. **Le jeton**: dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**, **Cloud access
     policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
@@ -109,7 +149,9 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
     - <span lang="en">**Scopes**</span>: <span lang="en">**Write**</span> sur les seules lignes
         <span lang="en">**Metrics**, **Logs**</span> et <span lang="en">**Traces**</span> (`metrics:write`,
         `logs:write`, `traces:write`), puis <span lang="en">**Create**</span>.
-    - Sous la politique, <span lang="en">**Add token**</span>: un nom, une date d'expiration, puis
+    - Sous la politique, <span lang="en">**Add token**</span> ouvre la boîte <span lang="en">**Create new
+        token**</span>: un nom (<span lang="en">**Display name**</span>), une date d'expiration
+        (<span lang="en">**Expiration date**</span>, sous la forme année/mois/jour; vide, le jeton n'expire pas), puis
         <span lang="en">**Create**</span>. Le jeton ne s'affiche qu'une fois. Il ne fait qu'écrire: K-B ne relit rien
         de ce qu'il envoie.
 
@@ -167,14 +209,13 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
     accepté; l'arrivée des séries se vérifie dans Explore, car le SDK d'OpenTelemetry
     (<span lang="en">Software Development Kit</span>, la bibliothèque qui exporte) compte aussi une réponse 3xx, une
     redirection, comme un succès (`tests/e2e/test_real_export.py:7-8`). Dans Grafana, donc,
-    <span lang="en">**Explore**</span>, la source Prometheus de la pile, la requête
+    <span lang="en">**Explore**</span>, la source Prometheus de la pile, `grafanacloud-<pile>-prom`, la requête
     `k_b_llm_calls_total{deployment_environment_name="sandbox"}`, <span lang="en">**Run query**</span>: la série de
     la demande y paraît. Le test n'envoie que les mesures (`tests/e2e/test_real_export.py:96-97`): les traces se
     vérifient après une demande à `kb serve-ai`, dans <span lang="en">**Explore**</span>, la source Tempo, par la
     requête `{resource.service.name="k-b-ai-api"}` (`docs/fiches-veille.md:2004`). En ligne, les séries arrivent
     avec la première demande à l'API IA: la durée de lecture des données se mesure à chaque `POST /digests` lu, que
-    le modèle soit appelé ou non (`src/k_b/ai_api/routers/digest_router.py:177-178`;
-    [Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
+    le modèle soit appelé ou non (`src/k_b/ai_api/routers/digest_router.py:177-178`).
 
 ## Installer
 
@@ -222,13 +263,16 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
     `ModelMetrics` crée, convertis comme Grafana Cloud le fait; il échoue sur un nom qui n'existe plus.
 - **Le jeton d'envoi**: un par environnement (`.env.e2e_test` pour le bac à sable; le secret `kb-otlp-headers` du
     coffre pour la production, refait par la procédure « Pour refaire un seul secret » d'`infra/README.md`). Un refus
-    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`. Le jeton de la
-    production, de la politique `kb-production`, vaut 90 jours depuis sa création, le 2026-11-11: jusqu'au
-    2027-02-09 (#522). Avant l'expiration d'un jeton, Grafana écrit aux administratrices de la pile de sa politique:
+    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`. La date
+    d'expiration d'un jeton est celle choisie à sa création, dans le champ
+    <span lang="en">**Expiration date**</span> de la boîte <span lang="en">**Create new token**</span> (étape 3 de
+    [Brancher l'export](#brancher-lexport)); un jeton expiré est marqué <span lang="en">Expired</span> sur la page
+    <span lang="en">**Access Policies**</span> du portail. Le jeton de la production est celui de la politique
+    `kb-production`. Avant l'expiration d'un jeton, Grafana écrit aux administrateurs de la pile de sa politique:
     <q lang="en">Warning emails are sent to the admins of the corresponding stack</q>. Ces e-mails partent par
-    défaut, et la case <span lang="en">**Enable token expiration emails**</span> des
-    <span lang="en">**Org Settings**</span> du portail est cochée (lue par Sabine le 2026-11-20,
-    `docs/fiches-veille.md:1700-1701`; [Sources](#sources)).
+    défaut; la case <span lang="en">**Enable token expiration emails**</span>, page
+    <span lang="en">**Settings**</span> des <span lang="en">**Org Settings**</span> du portail, les coupe si elle
+    est décochée ([Sources](#sources)).
 
 ## Le bac à sable
 
@@ -509,7 +553,7 @@ Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son
 `az monitor log-analytics query` (`az extension add --name log-analytics`; message
 <q lang="en">This command is from the following extension: log-analytics</q>, relevé le 2026-11-09 avec azure-cli
 2.92.0 et l'extension 1.0.0b3, encore les dernières le 2026-11-11). Le rôle Lecteur (`*/read`) suffit à lire
-`log-kb` (`docs/registre-traitements.md:199`, source Microsoft Learn: `:293`). `RG` se règle comme pour
+`log-kb` (`docs/registre-traitements.md:234`, source Microsoft Learn: `:328`). `RG` se règle comme pour
 l'application de l'infrastructure (`infra/README.md`, « 0. Les variables du shell »); `az account show` doit être
 l'abonnement du groupe de ressources (`infra/README.md:415`).
 
@@ -558,8 +602,6 @@ période.
 
 ## Sources
 
-Lues le 2026-11-08.
-
 - Grafana Cloud, conversion OTLP (le protocole d'export d'OpenTelemetry) et promotion des attributs de ressource:
     [page de Grafana Cloud sur le format OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/otlp-format-considerations/)
     et
@@ -575,11 +617,10 @@ Lues le 2026-11-08.
     `docs/sources/shared/alerts/modify-error-state.md` du dépôt grafana/grafana, version v13.3.0.
 - Repères des règles de champ d'un tableau (`byFrameRefID`):
     `packages/grafana-data/src/transformations/matchers/ids.ts` du dépôt grafana/grafana, version v13.3.0.
-- Noms des séries et comportement d'`increase`: relevés de Sabine dans Explore, le 2026-11-08; les trois noms de
-    la durée d'une demande et l'environnement de la production, le 2026-11-21, sur les séries du 2026-11-19
-    ([Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
+- Noms des séries et comportement d'`increase`: relevés dans Explore; les trois noms de la durée d'une demande, sur
+    les séries de la production ([le relevé de la production](#releve-de-la-production-du-2026-11-19)).
 
-Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport) et l'expiration d'un jeton.
+Pour [Brancher l'export](#brancher-lexport), l'expiration d'un jeton et Explore:
 
 - Création d'une pile, <span lang="en">**Add Stack**</span>:
     [page de Grafana Cloud sur la création d'une pile](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/account-management/cloud-stacks/create-update-stacks/).
@@ -587,19 +628,26 @@ Lues le 2026-11-21 par recherche web, pour [Brancher l'export](#brancher-lexport
     [page de Grafana Cloud sur les régions](https://grafana.com/docs/grafana-cloud/account-management/regional-availability/);
     `prod-eu-west-2`, chez AWS, en Allemagne:
     [page de Grafana Cloud sur les adresses des régions](https://grafana.com/docs/grafana-cloud/security-and-account-management/region-url-formats/).
-- Tuile <span lang="en">**OpenTelemetry**</span>, <span lang="en">**Configure**</span>, et forme de l'adresse OTLP:
+- Tuile <span lang="en">**OpenTelemetry**</span>, <span lang="en">**Configure**</span>, forme de l'adresse OTLP et
+    variables `OTEL_EXPORTER_OTLP_*` que la tuile propose:
     [page de Grafana Cloud sur l'envoi en OTLP](https://grafana.com/docs/grafana-cloud/send-data/otlp/send-data-otlp/).
 - Identifiant d'instance affiché sur la tuile, sans y générer de jeton:
     [page de Grafana Cloud qui décrit la tuile <span lang="en">OpenTelemetry</span> et son identifiant d'instance](https://grafana.com/docs/grafana-cloud/observe-and-act/agent-observability/get-started/grafana-cloud/).
 - <span lang="en">**Create access policy**</span>, <span lang="en">**Write**</span> par signal,
-    <span lang="en">**Add token**</span>, jeton affiché une fois:
+    <span lang="en">**Add token**</span>, la boîte <span lang="en">**Create new token**</span> et son champ
+    <span lang="en">**Expiration date**</span>, jeton affiché une fois:
     [parcours de Grafana sur la politique et son jeton](https://grafana.com/docs/learning-paths/connect-agent-to-agent-observability/create-access-policy-and-token/)
     et
     [page de Grafana Cloud sur la création d'une politique](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/create-access-policies/).
 - Une ligne par signal dans <span lang="en">**Scopes**</span>:
     [page de Grafana Cloud sur la politique des traces](https://grafana.com/docs/grafana-cloud/send-data/traces/set-up/add-access-policy/).
-- Politique d'une pile, dont les jetons ne valent que pour elle; e-mails avant l'expiration d'un jeton, leurs
-    destinataires et leur réglage:
+- Politique d'une pile, dont les jetons ne valent que pour elle; jeton expiré marqué
+    <span lang="en">Expired</span> sur la page <span lang="en">**Access Policies**</span>; e-mails avant l'expiration
+    d'un jeton, leurs destinataires et leur réglage dans les <span lang="en">**Org Settings**</span>:
     [page de Grafana Cloud sur les politiques d'accès](https://grafana.com/docs/grafana-cloud/platform/security-and-account-management/security-and-access/authentication-and-permissions/access-policies/).
+- <span lang="en">**Explore**</span>, la source `grafanacloud-<pile>-prom` et <span lang="en">**Run query**</span>:
+    [page de Grafana Cloud sur l'analyse des séries dans Explore](https://grafana.com/docs/grafana-cloud/account-management/billing-and-usage/control-prometheus-metrics-usage/usage-analysis-explore),
+    [page de Grafana Cloud sur ses sources de données](https://grafana.com/docs/grafana-cloud/observe-and-act/connect-externally-hosted/data-sources-in-cloud/)
+    et [page de Grafana sur l'éditeur de requêtes d'Explore](https://grafana.com/docs/grafana/latest/visualizations/explore/query-editor/).
 - Historique du presse-papiers de Spotlight, son ouverture et son effacement:
     [aide d'Apple, « Effectuer une recherche dans l'historique du presse-papiers à l'aide de Spotlight sur Mac »](https://support.apple.com/fr-fr/guide/mac-help/mchl40d5b86b/mac).
