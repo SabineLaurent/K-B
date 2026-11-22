@@ -45,7 +45,7 @@ répond qu'aux hôtes `127.0.0.1` et `localhost` (`core/config.py:214-219`); `KB
 `KB_DATA_API_ALLOWED_HOSTS` les changent (`data_api/settings.py:21-53`). En ligne, c'est l'app `ca-kb-data-api`
 d'Azure Container Apps, sans adresse publique (section [En ligne](#en-ligne)). `kb serve-data` sort en code 2, sans
 écouter, si un réglage est refusé (`commands/serve_data_command.py:38-52`), et en code 3 si uvicorn ne démarre pas,
-par exemple quand le port est déjà pris (`commands/exit_codes.py:40-45`, README).
+par exemple quand le port est déjà pris (`commands/exit_codes.py:40-45`; [Utiliser K-B](utilisation.md), « L'API de données: `kb serve-data` »).
 
 ## Architecture
 
@@ -55,12 +55,12 @@ Le schéma suivant montre qui appelle l'API de données et ce qu'elle lit. Le pa
 ```mermaid
 flowchart LR
     accTitle: Les appelants de l'API de données et ce qu'elle lit
-    accDescr: kb digest et kb trend-report appellent l'API IA, qui lit les items et les tendances par l'API de données avec la clé du client AI_DIGEST. Le site appelle avec la clé du client WEB. En local, un terminal, un script ou un agent appelle avec sa propre clé. Les jobs kb smoke-test et kb digest-watch appellent GET /health sans clé. L'API de données lit la base en lecture seule, et le conteneur watch du stockage d'échange pour les tops et les comptes rendus.
+    accDescr: kb digest et kb trend-report appellent l'API IA, qui lit les items et les tendances par l'API de données avec la clé du client AI_DIGEST. Le site appelle avec la clé du client WEB. En local, le terminal ou un script appelle avec sa propre clé. Les jobs kb smoke-test et kb digest-watch appellent GET /health sans clé. L'API de données lit la base en lecture seule, et le conteneur watch du stockage d'échange pour les tops et les comptes rendus.
     digest["kb digest"] -->|"POST /digests"| ai["API IA<br>kb serve-ai"]
     trend["kb trend-report"] -->|"POST /trend-reports"| ai
     ai -->|"GET /items, GET /items/{item_id}, GET /trends<br>clé AI_DIGEST"| data["API de données<br>kb serve-data"]
     web["site<br>kb serve-web"] -->|"clé WEB"| data
-    other["terminal, script ou agent<br>en local"] -->|"sa propre clé"| data
+    other["terminal ou script<br>en local"] -->|"sa propre clé"| data
     jobs["kb smoke-test<br>kb digest-watch"] -->|"GET /health<br>sans clé"| data
     data -->|"lecture seule"| base[("base<br>SQLite ou PostgreSQL")]
     data -->|"tops et comptes rendus"| watch[("conteneur watch<br>du stockage d'échange")]
@@ -71,8 +71,8 @@ comptes rendus à l'API IA, par `POST /digests` et `POST /trend-reports`. L'API 
 par l'API de données, `GET /items`, `GET /items/{item_id}` et `GET /trends`
 (`ai_api/connectors/data_api_client.py:268`, `:289`, `:308`), avec la clé du client `AI_DIGEST`
 (`ai_api/connectors/data_api_settings.py:15`). Le site appelle avec la clé du client `WEB` (`web/settings.py:40`). En
-local, un terminal, un script ou un agent appelle avec sa propre clé, par exemple celle du client `TERMINAL` du
-README. Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
+local, le terminal ou un script appelle avec sa propre clé, par exemple celle du client `TERMINAL`
+([Utiliser K-B](utilisation.md), « La lancer et l'appeler »). Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
 (`commands/smoke_test_command.py:94-101`, `commands/digest_watch_command.py:43-48`); `kb smoke-test` y ajoute des
 sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`). L'API de données lit la base, SQLite
 ou PostgreSQL, en lecture seule, et le conteneur `watch` du stockage d'échange pour les tops et les comptes rendus
@@ -450,7 +450,7 @@ change ou la retire. L'OpenAPI le dit dans la description de `HTTPBearer` (`core
 
 ### Faire une clé
 
-Une clé de 43 caractères, par la commande du README:
+Une clé de 43 caractères, par cette commande:
 
 ```sh
 uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
@@ -527,7 +527,8 @@ chaque environnement, la base, ses réglages, la connexion, la lecture seule et 
 
 ### En local: le fichier SQLite
 
-Avec la clé d'un client dans le `.env`, les commandes du README lancent l'API, puis l'appellent:
+Avec la clé d'un client dans le `.env`, les commandes d'[Utiliser K-B](utilisation.md) lancent l'API, puis
+l'appellent:
 
 ```sh
 KB_DATA_DIR=~/.knowledge_base uv run --env-file .env kb serve-data
