@@ -27,6 +27,7 @@ titre.
 - [Les tests](tests.md)
 - [L'intégration continue](integration-continue.md)
 - [La livraison continue](livraison-continue.md)
+- [L'incident de l'arrêt de kb sur Ctrl-C](incident.md): l'erreur, sa cause et chaque étape de sa résolution.
 - [La conduite du projet](conduite-du-projet.md)
 
 ## Lire une fiche
