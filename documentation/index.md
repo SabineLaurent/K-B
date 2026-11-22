@@ -11,6 +11,7 @@ fiches de documentation, une par sujet. Chacune dit, sous son titre, la compéte
     ce qui n'est pas vérifié.
 - [L'installation et l'environnement de développement](installation_pour_docu.md)
 - [L'architecture de l'application](architecture_pour_docu.md)
+- [Les maquettes du site et le parcours de l'opératrice](maquettes-et-parcours.md)
 - [L'agrégation, l'import et la base](import_et_base_pour_docu.md)
 - [L'API IA](api_ia_pour_docu.md)
 - [Le service d'IA: le déploiement du modèle](service_ia_pour_docu.md)
