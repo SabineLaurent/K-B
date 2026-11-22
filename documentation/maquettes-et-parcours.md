@@ -10,11 +10,11 @@
 
     — C17
 
-Cette fiche montre deux planches des maquettes du site, validées par Sabine le 09/11/2026: la charte graphique et les
+Cette fiche montre deux planches des maquettes du site, validées par Sabine: la charte graphique et les
 maquettes du fil de veille. Chacune vient en image, suivie de sa description textuelle, qui en donne tout le contenu.
 Les descriptions sont tirées des fichiers source des planches, pas lues sur l'image: les textes, les codes de couleur et
 les mesures sont ceux des maquettes. La fiche donne ensuite le parcours de l'opératrice sur le site, en schéma
-fonctionnel, d'après le code de `main` au commit `ffc0942` (2026-11-14). Les chemins du code de K-B (`web/…`) partent
+fonctionnel, d'après le code de `main` au commit `ffc0942`. Les chemins du code de K-B (`web/…`) partent
 de `src/k_b/`, les autres de la racine du dépôt.
 
 Les sigles de la fiche: CISA KEV, le catalogue des failles exploitées (<span lang="en">Known Exploited Vulnerabilities</span>)
@@ -27,7 +27,7 @@ le référentiel français.
 
 Les maquettes ont été réalisées dans l'outil Design de claude.ai, à partir des wireframes et de la charte. Le site
 intégré s'en écarte sur des points décidés, que `docs/site-web.md` et le journal des décisions
-(`docs/ADR/journal-decisions-projet.md`, entrées « Site » du 11/11 au 14/11) écrivent avec leur raison. Par exemple,
+(`docs/ADR/journal-decisions-projet.md:6634-7182`, entrées « Site ») écrivent avec leur raison. Par exemple,
 la navigation reste visible à toutes les largeurs, sans le menu replié des maquettes mobile et tablette (D2 de #564),
 et « Se déconnecter » est à la fin de l'en-tête (#587).
 

@@ -9,7 +9,7 @@
 Cette fiche dit comment le modèle de données de K-B suit la méthode Merise, du modèle conceptuel des données (MCD)
 au modèle logique des données (MLD), puis aux deux modèles physiques des données (MPD), un par système de gestion de
 base de données (SGBD). Elle décrit chaque schéma, entité par entité et relation par relation, et le rapproche des
-deux scripts SQL de la base. Elle est écrite d'après le code de `main` au commit `39cb5eb9` (2026-11-22). Les chemins
+deux scripts SQL de la base. Elle est écrite d'après le code de `main` au commit `39cb5eb9`. Les chemins
 du code de K-B (`database/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## La méthode
@@ -25,18 +25,18 @@ et le fichier qui le porte dans K-B.
 | MLD | les relations (les tables), leurs colonnes, leurs clés primaires et étrangères, déduites du MCD par les règles de passage | `docs/merise/mld-k-b_20261107.drawio` |
 | MPD | les tables d'un SGBD donné, leurs types, leurs contraintes et leurs index, en SQL | `database/schema.sql` pour SQLite, en local; `database/schema_postgresql.sql` pour PostgreSQL, en ligne |
 
-Le MCD et le MLD sont dessinés avec draw.io depuis la décision du 2026-10-08, qui remplace des schémas Mermaid:
+Le MCD et le MLD sont dessinés avec draw.io depuis une décision qui remplace des schémas Mermaid:
 draw.io dessine la notation de Merise, qu'un `flowchart` Mermaid ne faisait qu'imiter (journal des décisions,
-`docs/ADR/journal-decisions-projet.md`, 2026-10-08, « Schémas »). Le MPD est le script SQL: `database/schema.sql` est la référence, que
+`docs/ADR/journal-decisions-projet.md:578`, « Schémas »). Le MPD est le script SQL: `database/schema.sql` est la référence, que
 `database/schema_postgresql.sql` suit table par table (`database/schema_postgresql.sql:3-5`).
 
 ### Concevoir, puis corriger
 
 Le MCD et le MLD ont été conçus d'abord, puis corrigés quand ils n'étaient plus en phase avec le besoin. Le modèle a été
-corrigé pour la dernière fois le 2026-10-20 (#211)
+corrigé pour la dernière fois par #211
 ([la spécification de stockage](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « MCD et MLD »). Les
 schémas du 2026-11-07, que montre cette fiche, portent ce modèle, avec des flèches et une disposition revues; le MLD a
-été repris le 2026-11-12. Le dossier `docs/merise/` garde aussi les versions du 2026-10-20 et du 2026-10-12
+été repris depuis. Le dossier `docs/merise/` garde aussi les versions du 2026-10-20 et du 2026-10-12
 (`mcd-k-b_20261012.drawio`, `mld-k-b_20261012.drawio`); celle du 2026-10-12
 elle portait déjà, marquées « prévu », des entités que le code n'avait pas encore, l'article de newsletter (#57) et la
 tendance (#142, #143).
@@ -240,7 +240,7 @@ Le schéma suivant est le MLD. Le tableau qui le suit en donne chaque relation, 
 
 Le MLD compte 19 relations et 21 clés étrangères. Quinze relations sont des tables du MPD. Quatre, `ranking`,
 `author`, `tracked_package` et `affected_package`, n'ont pas de table au MPD, qui les écrit autrement, par une décision
-du 2026-10-20 ([Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld)). La note du
+([Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld)). La note du
 schéma le dit, avec l'identifiant et la colonne `kind` que le MPD donne à chaque sous-type, et la clé étrangère de
 `highlight`; elle dit aussi que les contraintes et les index sont au MPD.
 
@@ -332,7 +332,7 @@ composées `(item_id, kind)` des sous-types.
 
 ### Ce que le MPD écrit autrement que le MLD
 
-Le MPD s'écarte du MLD par deux dénormalisations voulues, décidées le 2026-10-20, et par la forme de deux contraintes
+Le MPD s'écarte du MLD par deux dénormalisations voulues, décidées, et par la forme de deux contraintes
 ([la spécification de stockage](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « MCD et MLD »,
 `docs/stockage.md:340-364`). Chaque écart est écrit dans le MLD, sur la relation qu'il touche.
 
@@ -349,9 +349,9 @@ Le MPD s'écarte du MLD par deux dénormalisations voulues, décidées le 2026-1
     copie de la liste du code, `GITHUB_TRACKED_REPOSITORIES` (`core/config.py:58`), réécrite entière à chaque import
     (`database/writers/release_writer.py:24-30`). Un `CHECK` tient la forme de chaque liste, un tableau JSON non vide,
     et le nombre maximal des auteurs et des paquets touchés, 1 000 et 100. Les auteurs et les paquets touchés en liste
-    viennent des décisions du 2026-10-07 et du 2026-10-08
+    viennent de deux décisions
     ([le journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-    « Modèle de la base »).
+    « Modèle de la base », `docs/ADR/journal-decisions-projet.md:428` et `:515`).
 3. **Les sous-types.** Au MPD, chacun a sa propre clé primaire `id`, garde `item_id` comme colonne unique, et ajoute
     `kind` et la clé étrangère composée `(item_id, kind)` vers `item (id, kind)`: elles tiennent l'exclusion X
     ([L'héritage de l'item et de ses sous-types](#lheritage-de-litem-et-de-ses-sous-types)).

@@ -16,10 +16,10 @@
 
 Cette fiche dit ce que fait la chaîne de livraison continue de K-B, comment on la déclenche, comment elle
 s'installe, se configure et se teste, et que faire quand une livraison échoue. Elle est écrite d'après le code de
-`main` au commit `b412323` (2026-11-08), les jobs planifiés (#330, #423) d'après le code de la demande de fusion
+`main` au commit `b412323`, les jobs planifiés (#330, #423) d'après le code de la demande de fusion
 (PR, <span lang="en">pull request</span>) de #423, et les apps que la livraison met à jour, les exécutions attendues
 sur un commit de `main` et la place de `Docs` dans le contrôle de l'intégration continue (CI) d'après `main` au
-commit `fd956430` (2026-11-18), puis d'après la demande de fusion de #684 (2026-11-22), qui fait tourner `Docs` sur
+commit `fd956430`, puis d'après la demande de fusion de #684, qui fait tourner `Docs` sur
 chaque fusion. Les exécutions citées se relisent par `gh run view <id> --repo SabineLaurent/K-B`, et
 leur journal par `--log`.
 
@@ -83,8 +83,8 @@ Les exécutions de `Docs` (`.github/workflows/docs.yml`) comptent aussi: ce cont
 comme celle de `CI`. Pour livrer ce commit malgré tout, relancer `Docs`
 (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant de `main`. Retirer `Docs` de
 ce contrôle a été écarté: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou
-ADR, 2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »,
-`docs/ADR/journal-decisions-projet.md:7307-7310`). Le même fait est écrit dans
+ADR, « Documentation publiée par un site MkDocs sur GitHub Pages »,
+`docs/ADR/journal-decisions-projet.md:7358`). Le même fait est écrit dans
 [la section « Après la CI » de la fiche de l'intégration continue](integration-continue.md#apres-la-ci).
 
 Le SHA du commit passe ensuite à `deploy`.
@@ -137,7 +137,7 @@ git fetch origin
 gh run list --repo "$REPO" --commit "$(git rev-parse origin/main)" \
   --json workflowName,event,status,conclusion -q '.[] | [.workflowName, .event, .status, .conclusion] | @tsv'
 # attendu, sur fd956430: « CI push completed success », « Image push completed success » et « Infra push completed success »
-# (lu le 2026-11-18, avec deux « Dependabot Updates dynamic completed success », que check ne compte pas)
+# (avec deux « Dependabot Updates dynamic completed success », que check ne compte pas)
 ```
 
 ### Poser le tag
@@ -156,7 +156,7 @@ gh run watch --repo "$REPO" <id de l'exécution>
 ### C'est livré
 
 C'est livré quand les deux jobs sont verts et que la dernière ligne de `deploy` est `caj-kb-smoke-test: Succeeded`.
-Une livraison complète a pris 4 minutes 13 s, le 2026-11-08
+Une livraison complète a pris 4 minutes 13 s
 ([La livraison témoin `v0.1.0`](#la-livraison-temoin-v010)).
 
 ### Relancer une livraison refusée
@@ -221,7 +221,7 @@ gh secret list --repo "$REPO"    # les noms, jamais les valeurs
 az identity federated-credential list --identity-name id-kb-deploy -g "$RG" --query "[].{name:name,subject:subject}" -o table
 ```
 
-Lu le 2026-11-08: la règle de l'environnement est `["v*.*.*","tag"]`; les rulesets sont
+La règle de l'environnement est `["v*.*.*","tag"]`; les rulesets sont
 « Basic-rules-main-protect » (`branch`), « tags v » et « tags v immuables » (`tag`), tous trois `active`; « tags v »
 a pour seul contournement le rôle 5 (« <span lang="en">Repository admin</span> »), et « tags v immuables » n'en a
 aucun; les cinq secrets sont là. La dernière commande n'a pas été lancée pour cette fiche: le sujet attendu est celui
@@ -259,16 +259,16 @@ session de #415, avec de faux `az` et `gh` ou un registre local
 | Cas | Refusé par | Ce qui s'affiche | Vu |
 |---|---|---|---|
 | une référence qui n'est pas un tag de version: `v01.2.3`, ou une branche donnée à `workflow_dispatch` | `check`, étape 1 | `not a version tag vMAJOR.MINOR.PATCH: <ref>` | simulé (`v01.2.3`, `v1.2`, `v1.2.3-rc1` et `refs/heads/main` refusés, `v0.1.0` accepté) |
-| un tag sur la tête d'une branche | `check`, étape 2 | `v0.0.1 is not on main: 80d1327e80c6d0eac338c4b35bd1fe1a4eedd86d` | vu le 2026-11-06, exécution 42289900589: `check` en échec, `deploy` `skipped` |
+| un tag sur la tête d'une branche | `check`, étape 2 | `v0.0.1 is not on main: 80d1327e80c6d0eac338c4b35bd1fe1a4eedd86d` | exécution 42289900589: `check` en échec, `deploy` `skipped` |
 | un tag sur un commit d'une branche déjà fusionnée | `check`, étape 2 | `<tag> is not on main: <sha>` | simulé (`7f5de09` refusé, sa fusion `fde743e` acceptée) |
 | une CI en cours, rouge, absente, ou faite seulement de `Deploy` ou de Dependabot | `check`, étape 3 | `the CI of <sha> is not finished and green` | simulé; une CI verte est acceptée, même avec un Dependabot en cours ou rouge, et un `Deploy` rouge ne compte pas |
-| un job sans environnement qui demande un jeton à Azure | `id-kb-deploy` | `AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:SabineLaurent@189640103/K-B@1383589029:ref:refs/heads/test/oidc-outside-production'` | vu le 2026-11-06, exécution 42293728980 (workflow d'essai sur une branche supprimée ensuite), job `without-environment` |
-| un job de branche qui déclare `production` | la règle de l'environnement | le job échoue avant toute étape (<q lang="en">Branch … is not allowed to deploy to production due to environment protection rules</q>, relevé par la note) | vu le 2026-11-06, même exécution, job `with-environment` (0 étape) |
+| un job sans environnement qui demande un jeton à Azure | `id-kb-deploy` | `AADSTS700213: No matching federated identity record found for presented assertion subject 'repo:SabineLaurent@189640103/K-B@1383589029:ref:refs/heads/test/oidc-outside-production'` | exécution 42293728980 (workflow d'essai sur une branche supprimée ensuite), job `without-environment` |
+| un job de branche qui déclare `production` | la règle de l'environnement | le job échoue avant toute étape (<q lang="en">Branch … is not allowed to deploy to production due to environment protection rules</q>, relevé par la note) | même exécution, job `with-environment` (0 étape) |
 | un tag supprimé puis recréé sur un autre commit | `deploy`, étape 3 | `the image of <tag> was built from another commit: <sha>` | non essayé; la lecture du label et du « <span lang="en">not found</span> » l'est (registre local) |
 | un job de `run_job` qui finit en `Failed` ou `Degraded`, ou ne finit pas | `deploy`, étapes 5 et 9 | `<job>: Failed`, ou `<job>: still <état> after <n> reads, 15 s apart` | simulé |
 | une révision jamais prête, à une autre image, ou restée l'ancienne | `deploy`, étape 8 | `not ready at the image of <tag> after 40 reads, 15 s apart: <apps>` | simulé |
 
-Le ruleset « tags v » n'a pas été essayé par un compte qui n'est pas administrateur. Le 2026-11-06, le push de
+Le ruleset « tags v » n'a pas été essayé par un compte qui n'est pas administrateur. Le push de
 `v0.0.1` par Sabine, administratrice, a affiché <q lang="en">Bypassed rule violations… creations being restricted</q>
 (note).
 
@@ -296,14 +296,14 @@ depuis dans `ci.yml`, comme job `tests-postgresql` (`86a1c94`).
 | 8 | `Waits for the revisions of the apps at the image of the tag` | `the latest revision of each app is ready at v0.1.0 (sha256:37c6d42b…16a9fab2)`, à la première lecture | 00:27:11 |
 | 9 | `Runs the smoke test` | `caj-kb-smoke-test: Succeeded` | 00:28:19 |
 
-Relu ensuite par `az` le 2026-11-08 (note du 2026-11-06, « Preuve »): les deux apps, leur modèle comme leur
+Relu ensuite par `az` (note du 2026-11-06, « Preuve »): les deux apps, leur modèle comme leur
 révision `--0000002` (`Healthy`), et les deux jobs sont au digest de `k-b:v0.1.0`. Le site, `ca-kb-web`, n'était
-pas encore dans `deployment.json`: il y est entré le 2026-11-11 (`f43677d6`, #571). L'étape 6 de la livraison de
-`v0.1.5` (exécution 43230567404, 2026-11-12) écrit `ca-kb-web: v0.1.5 (sha256:…)`, après les deux API.
+pas encore dans `deployment.json`: il y est entré par `f43677d6` (#571). L'étape 6 de la livraison de
+`v0.1.5` (exécution 43230567404) écrit `ca-kb-web: v0.1.5 (sha256:…)`, après les deux API.
 
 **Une fusion ne déploie rien**: de `ccf1455` à `b412323`, `main` a reçu 18 fusions
 (`git log --first-parent --merges ccf1455..b412323`), et `Deploy` n'a toujours que deux exécutions, celle de
-`v0.1.0` et celle du refus de `v0.0.1` (`gh run list --workflow deploy.yml`, lu le 2026-11-08).
+`v0.1.0` et celle du refus de `v0.0.1` (`gh run list --workflow deploy.yml`).
 
 ## Quand une livraison échoue
 
@@ -375,8 +375,8 @@ Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
 - **Aucune validation humaine avant la mise en ligne.** L'environnement `production` n'a que sa règle des tags:
     aucun validateur, et `can_admins_bypass: true` (`gh api repos/SabineLaurent/K-B/environments/production`). L'étape
     d'`infra/README.md` qui fait de Sabine la validatrice de chaque livraison (`reviewers`, `can_admins_bypass: false`)
-    n'est pas appliquée. Un tag poussé part donc en ligne sans autre geste. Ce risque a été accepté par Sabine le
-    2026-11-06, jusqu'au 2026-11-08 (`infra/README.md`).
+    n'est pas appliquée. Un tag poussé part donc en ligne sans autre geste. Ce risque a été accepté par Sabine
+    jusqu'au 2026-11-08 (`infra/README.md`).
 - **Pas de retour automatique**: revenir en arrière, c'est livrer le tag précédent.
 - **Pas de cache entre deux tags**: une version nouvelle se construit en entier.
 - **Une passe 2 faite à la main** repose l'image par son tag (`k-b:<TAG>`), une référence que l'on peut réécrire, et

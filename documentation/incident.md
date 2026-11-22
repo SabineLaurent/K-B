@@ -10,7 +10,7 @@ Cette fiche documente un incident de K-B, de l'erreur jusqu'à la solution fusio
 `kb` imprimait toute la trace de Python au lieu d'une ligne du journal. Elle dit l'erreur, sa cause, chaque étape de
 sa résolution puis de son implémentation, ce que le code en garde aujourd'hui et ses limites. La procédure de débogage
 pas à pas est dans l'outil de suivi, sur [l'issue n° 352](https://github.com/SabineLaurent/K-B/issues/352), l'issue de
-l'incident. La fiche est écrite d'après le code de `main` au commit `9658225a` (2026-11-22). Un renvoi au code d'avant
+l'incident. La fiche est écrite d'après le code de `main` au commit `9658225a`. Un renvoi au code d'avant
 le correctif nomme son commit, `503dcd0d`, et un renvoi au correctif, celui de sa fusion, `d76b731a`. Les chemins du
 code de K-B (`commands/…`, `core/…`, `etl/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
@@ -18,7 +18,7 @@ code de K-B (`commands/…`, `core/…`, `etl/…`) partent de `src/k_b/`, les a
 
 ### Le message
 
-L'erreur a été reproduite le 2026-11-22 sur `503dcd0d`, le `main` d'avant le correctif, avec Python 3.13.13 et
+L'erreur a été reproduite sur `503dcd0d`, le `main` d'avant le correctif, avec Python 3.13.13 et
 uv 0.13.6. Un faux serveur, `nc`, à l'écoute sur `127.0.0.1:8099`, tenait le rôle de l'API IA: il reçoit la demande et
 ne répond jamais. `kb digest` a été lancé par `uv run`, puis il a reçu SIGINT, le signal qu'envoie un Ctrl-C, pendant
 qu'il attendait la réponse. La sortie d'erreur compte 64 lignes: la ligne datée d'avant l'interruption, puis
@@ -67,7 +67,7 @@ même jour d'une seule touche: avec `nc` comme API IA, avant et après #351, et 
 
 Le code de sortie que lit un shell ne change pas avec le correctif: il vaut 130 avant comme après. Seul un processus
 qui lance `kb` lui-même, sans uv, voit une différence de code. Le tableau suivant donne, pour chaque façon de lancer `kb digest`, ce
-qu'ont donné les deux versions le 2026-11-22.
+qu'ont donné les deux versions.
 
 | Ce qui est observé | Avant le correctif (`503dcd0d`) | Après (`9658225a`) |
 |---|---|---|
@@ -162,7 +162,7 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
 - `git grep -c KeyboardInterrupt origin/main -- tests/` trouve six fichiers de tests: `commands/test_sigint.py`,
     `commands/test_job_routine.py`, `commands/test_purge_command.py`, `etl/test_load_commit.py`,
     `purge/test_purge_raw.py` et `test_atomic_write.py`.
-- La reproduction du 2026-11-22 sur `9658225a` donne la ligne `kb stopped by SIGINT`, sur la sortie d'erreur et dans
+- La reproduction sur `9658225a` donne la ligne `kb stopped by SIGINT`, sur la sortie d'erreur et dans
     `kb.log`, et le code 130.
 
 ## Les limites
@@ -183,8 +183,8 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
     fini ([Utiliser K-B](utilisation.md#ses-limites-de-debit)).
 - **Le signal que reçoit un job Azure Container Apps arrêté** n'est pas écrit dans la documentation de Microsoft, qui
     donne pour un conteneur SIGTERM, puis SIGKILL 30 s plus tard
-    ([<span lang="en">Application lifecycle management in Azure Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/application-lifecycle-management),
-    lue le 2026-10-28). Il devait être vérifié à la mise en ligne du 08/11: `git grep -n "job stop"` ne trouve que l'entrée du journal
+    ([<span lang="en">Application lifecycle management in Azure Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/application-lifecycle-management)).
+    Il devait être vérifié à la mise en ligne: `git grep -n "job stop"` ne trouve que l'entrée du journal
     des décisions qui le demande.
 
 ## Pour aller plus loin
@@ -196,5 +196,5 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
 - [La note pédagogique du correctif](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-arreter-kb-sur-ctrl-c.md):
     le pourquoi, le comment, les choix et les preuves.
 - [Le journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md):
-    son entrée du 2026-10-28 sur le code de sortie de SIGINT (#352).
+    son entrée sur le code de sortie de SIGINT (#352), `docs/ADR/journal-decisions-projet.md:4500`.
 - [Utiliser K-B](utilisation.md): les codes de sortie de chaque commande.

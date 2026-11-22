@@ -12,7 +12,7 @@
 
 Cette fiche dit comment installer l'environnement de développement de K-B sur une machine, le configurer, quelles
 dépendances il installe, puis comment y ajouter l'environnement de test, dont le détail est dans
-[la fiche des tests](tests.md). Elle est écrite d'après `main` au commit `fd956430` (2026-11-18). Les
+[la fiche des tests](tests.md). Elle est écrite d'après `main` au commit `fd956430`. Les
 chemins du code de K-B (`commands/…`, `core/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du
 dépôt.
 
@@ -24,7 +24,7 @@ Le tableau suivant donne les outils nécessaires, ce que chacun fait, et où sa 
 |---|---|---|
 | git | clone le dépôt | — |
 | uv ([la documentation de uv](https://docs.astral.sh/uv/)) | installe Python, l'environnement virtuel et les dépendances, et lance `kb` | l'intégration continue (CI) installe uv 0.13.6 (`astral-sh/setup-uv`, `.github/workflows/ci.yml`), le `Dockerfile` prend l'image `ghcr.io/astral-sh/uv:0.13.6`, et `build-system.requires` du `pyproject.toml` demande `uv_build>=0.13.6,<0.14.0` |
-| Python 3.13 | fait tourner K-B | `requires-python = ">=3.13"` (`pyproject.toml`); `.python-version` donne `3.13`, la version que uv prend pour créer l'environnement. S'il ne la trouve pas sur la machine, uv la télécharge (documentation de uv, <span lang="en">« Automatic Python downloads »</span>, lue par Context7 le 2026-11-08) |
+| Python 3.13 | fait tourner K-B | `requires-python = ">=3.13"` (`pyproject.toml`); `.python-version` donne `3.13`, la version que uv prend pour créer l'environnement. S'il ne la trouve pas sur la machine, uv la télécharge (documentation de uv, <span lang="en">« Automatic Python downloads »</span>, lue par Context7) |
 
 Le tableau suivant donne les outils facultatifs, chacun avec ce qui le demande.
 
@@ -48,13 +48,13 @@ uv run kb --help
     K-B en mode éditable (`source = { editable = "." }` dans `uv.lock`: une modification de `src/` se voit sans
     réinstaller), ses dépendances et le groupe `dev` du `pyproject.toml`, aux versions de `uv.lock` (documentation de
     uv, <span lang="en">« Syncing the environment »</span> et <span lang="en">« Default groups »</span>, lue par
-    Context7 le 2026-11-08). Le groupe `docs`, qui construit le site de la documentation, n'est pas installé par
+    Context7). Le groupe `docs`, qui construit le site de la documentation, n'est pas installé par
     défaut: le workflow `docs.yml` le demande par `--only-group docs` (`.github/workflows/docs.yml`).
 - `uv sync --locked`, la commande de la CI, n'écrit jamais `uv.lock`: si `uv.lock` ne correspond plus au
     `pyproject.toml`, elle échoue au lieu de le mettre à jour. `uv lock --check` fait le même contrôle sans rien
     installer (documentation de uv 0.13.5, la dernière que donne Context7, <span lang="en">« Automatic lock and
-    sync »</span> et <span lang="en">« Checking the lockfile »</span>, lue le 2026-11-09;
-    `.github/workflows/ci.yml`). Lancé le 2026-11-18 au commit `fd956430`, avec uv 0.13.6, `uv lock --check` a
+    sync »</span> et <span lang="en">« Checking the lockfile »</span>;
+    `.github/workflows/ci.yml`). Lancé au commit `fd956430`, avec uv 0.13.6, `uv lock --check` a
     répondu `Resolved 110 packages` et est sorti en code 0.
 - `uv run <commande>` met l'environnement à jour avant de lancer la commande (documentation de uv,
     <span lang="en">« Automatic lock and sync »</span>): après un `git pull` qui change `uv.lock`, `uv run kb …`
@@ -68,7 +68,7 @@ uv run kb --help
 ### Le dossier de données et la base
 
 `KB_DATA_DIR` nomme le dossier des données, hors du dépôt. Toutes les commandes le lisent, sauf `kb openapi`
-(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356, encore ouverte le 2026-11-18): s'il n'existe pas, la
+(`main`, `cli.py`). **`kb` ne crée pas ce dossier** (#356): s'il n'existe pas, la
 commande s'arrête en code 2, avant tout travail, sur `error: KB_DATA_DIR is not an existing directory`
 (`read_data_dir`, `commands/environment.py`). Il se crée donc à la main, puis la base, une fois:
 
@@ -188,7 +188,7 @@ Le tableau suivant donne chaque dépendance, son plancher et sa borne haute dans
 | `httpx2` | 2.13.1 | — | 2.13.1 | les requêtes HTTP sortantes: la collecte (`etl/http_download.py`), l'API IA vers le modèle, l'API de données et GitHub (`ai_api/connectors/`), `kb digest` et `kb trend-report` vers l'API IA (`post/`), le site vers l'API de données (`web/data_api_client.py`), les `/health` des jobs (`jobs/api_health.py`) |
 | `jinja2` | 3.1.6 | — | 3.1.6 | les gabarits des pages du site, rendus par le serveur, chaque valeur échappée (`autoescape=True`, `web/rendering.py`) |
 | `opentelemetry-api`, `opentelemetry-sdk`, `opentelemetry-exporter-otlp-proto-http` | 1.45.1 | < 1.46 | 1.45.2 | l'export des mesures, des traces et des journaux de l'API IA par OTLP, le protocole d'export d'OpenTelemetry (`ai_api/connectors/metrics_export.py`, `ai_api/connectors/trace_export.py`, `ai_api/tracing.py`, `ai_api/observability/metric_instruments.py`). La borne: `trace_export.py` importe des modules privés du SDK (le kit de développement, <span lang="en">software development kit</span>) et de son exportateur, qui changent d'une version à l'autre |
-| `psycopg[binary]` | 3.3.8 | — | 3.3.8, avec `psycopg-binary` 3.3.8 | la connexion à PostgreSQL (`database/postgresql.py`, `database/errors.py`). L'option `binary` apporte libpq: la machine n'a pas à l'installer (documentation de psycopg, <span lang="en">« Installation »</span>, lue par Context7 le 2026-11-08) |
+| `psycopg[binary]` | 3.3.8 | — | 3.3.8, avec `psycopg-binary` 3.3.8 | la connexion à PostgreSQL (`database/postgresql.py`, `database/errors.py`). L'option `binary` apporte libpq: la machine n'a pas à l'installer (documentation de psycopg, <span lang="en">« Installation »</span>, lue par Context7) |
 | `psycopg-pool` | 3.3.3 | — | 3.3.3 | le pool des connexions de lecture de l'API de données sur PostgreSQL (`database/postgresql.py`) |
 | `pydantic` | 2.13.5 | — | 2.13.5 | la validation des entrées: les items des sources (`items.py`, `etl/sources/`), les schémas et les réglages des API (`data_api/`, `ai_api/`), les réponses que lisent `kb digest` et `kb trend-report` (`post/`) |
 | `pyyaml` | 6.0.3 | — | 6.0.3 | la lecture de l'en-tête YAML (<span lang="en">front matter</span>) des clips (`etl/sources/clipping.py`) |

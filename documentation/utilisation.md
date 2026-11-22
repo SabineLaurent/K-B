@@ -3,7 +3,7 @@
 Cette page donne les commandes de `kb` dans l'ordre où elles servent: la base, la collecte et l'import, les deux API, les
 comptes rendus, le site, puis les commandes des jobs en ligne. Pour chacune, elle dit comment la lancer, ce qu'elle
 affiche et ses codes de sortie, et renvoie à la fiche qui la détaille. Elle est écrite d'après `main` au commit
-`39cb5eb9` (2026-11-22). Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
+`39cb5eb9`. Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
 racine du dépôt. L'installation et chaque variable d'environnement sont dans
 [la fiche de l'installation](installation.md).
 
@@ -486,14 +486,13 @@ Ce que la commande laisse à l'opératrice:
 - **Une fiche supprimée en local revient** au passage suivant tant que `watch` la porte, et `watch` la reçoit de
     nouveau du partage `job-data` à la publication suivante. Pour la retirer: la supprimer dans `job-data`, puis dans
     `watch`, puis en local. Supprimer un blob demande le rôle Storage Blob Data Contributor
-    ([<span lang="en">Delete Blob</span>](https://learn.microsoft.com/rest/api/storageservices/delete-blob), lu le
-    2026-11-10), un rôle temporaire qu'un Owner peut se donner
+    ([<span lang="en">Delete Blob</span>](https://learn.microsoft.com/rest/api/storageservices/delete-blob)), un rôle temporaire qu'un Owner peut se donner
     ([le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
     « Procédure de tri », étape 9); l'opératrice n'a que Reader sur `watch`.
 - **Une fiche est du Markdown qu'Obsidian affiche**, écrit par l'identité d'un job. Le téléchargement refuse le Markdown
     actif; les modules qui agissent sur un fichier neuf, comme Templater avec <span lang="en">« Trigger Templater on new
     file creation »</span>, qui remplace alors chaque commande trouvée dans le fichier ([les réglages de
-    Templater](https://silentvoid13.github.io/Templater/settings.html), lus le 2026-11-10), se règlent dans le coffre.
+    Templater](https://silentvoid13.github.io/Templater/settings.html)), se règlent dans le coffre.
     Les gestes: vérifier que <span lang="en">« Enable JavaScript Queries »</span> et <span lang="en">« Enable Inline
     JavaScript Queries »</span> de Dataview sont désactivés, comme par défaut depuis sa version 0.4.13 (la vulnérabilité
     CVE-2021-42057; CVE, <span lang="en">Common Vulnerabilities and Exposures</span>), et que le déclencheur de
