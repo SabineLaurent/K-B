@@ -38,7 +38,7 @@ chemin dans la documentation officielle de Grafana Cloud.
 ### Une étape, six parties, avant « Installer »
 
 La section est placée entre « Lire le tableau » et « Installer », car l'import du tableau suppose une pile qui reçoit
-déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitorage.md:222`) :
+déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitorage.md:233`) :
 
 ```markdown
 Sur la pile qui reçoit les mesures ([Brancher l'export](#brancher-lexport)), par l'interface, sans jeton ni outil à
@@ -51,13 +51,17 @@ variables, la vérification. Chaque libellé de l'interface de Grafana Cloud est
 
 ### Le jeton : une politique de la pile, trois droits d'écriture
 
-`documentation/monitorage.md:146-156` crée la politique depuis le Grafana de la pile, et non depuis le
+`documentation/monitorage.md:149-162` crée la politique depuis le Grafana de la pile, et non depuis le
 portail de l'organisation :
 
 ```markdown
-3. **Le jeton**: dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**, **Cloud access
-    policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
+    date (moindre privilège). Dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**,
+    **Cloud access policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
 ```
+
+Chaque étape s'ouvre sur ce qu'elle produit et à quoi elle sert, puis dit comment faire (consigne de Sabine du
+2026-11-22 : une fiche pédagogique). Pour le jeton : il prouve que l'envoi vient de K-B, et ses droits sont bornés à
+l'écriture, sur une seule pile, jusqu'à une date.
 
 Une politique créée là a le *realm* de la pile : ses jetons ne valent que pour elle (page « Access policies » de
 Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:write` et `traces:write`, sont ceux de
@@ -66,7 +70,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
 
 ### L'en-tête : un jeton qui ne passe ni par l'écran ni par l'historique
 
-`documentation/monitorage.md:165-171` :
+`documentation/monitorage.md:173-179` :
 
 ```sh
 {
@@ -89,7 +93,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
   y reste sur la ligne de commande jusqu'à Entrée ; un jeton collé à ce moment rejoindrait la ligne de commande,
   affiché et gardé dans l'historique. L'invite dit quand coller le jeton : seulement une fois `Jeton:` affiché, donc
   une fois `read` en attente. La fiche le dit en clair : coller le bloc, Entrée s'il reste sur la ligne de commande,
-  puis le jeton quand `Jeton:` s'affiche (`documentation/monitorage.md:160-163`).
+  puis le jeton quand `Jeton:` s'affiche (`documentation/monitorage.md:168-171`).
 
 ### Les variables, en local et en ligne
 
@@ -101,7 +105,7 @@ que `kb serve-ai` refuse au démarrage, « par exemple » : la liste complète e
 
 ### La vérification : le test, puis Explore
 
-`documentation/monitorage.md:208-211` :
+`documentation/monitorage.md:219-222` :
 
 ```markdown
     Un jeton refusé fait échouer le test (`tests/e2e/test_real_export.py:119`). Le test vérifie que chaque envoi est
@@ -115,7 +119,7 @@ séries sont arrivées. Le test n'envoie que les mesures (`:96-97`) : les traces
 
 ### L'expiration d'un jeton
 
-`documentation/monitorage.md:264-275` donne la règle, et non une date : la date d'expiration est celle choisie dans le
+`documentation/monitorage.md:275-286` donne la règle, et non une date : la date d'expiration est celle choisie dans le
 champ « Expiration date » de la boîte « Create new token » (vide, le jeton n'expire pas), et un jeton expiré est
 marqué « Expired » sur la page « Access Policies » du portail. Le destinataire des e-mails d'avant expiration est cité
 mot pour mot de Grafana, en `<q lang="en">` : pour une politique de pile, « the admins of the corresponding stack ».
@@ -180,16 +184,16 @@ alerte, ni les alertes d'erreurs de #553, qui ne sont pas déployées.
 
 1. **Pourquoi pas le jeton de la tuile OpenTelemetry ?** Ses droits ne se choisissent pas à l'étape où on le
    génère ; celui de la politique ne porte que les trois droits d'écriture, sur cette pile seule
-   (`documentation/monitorage.md:146-156`).
+   (`documentation/monitorage.md:149-162`).
 2. **Le jeton peut-il fuiter pendant l'installation ?** Ni à l'écran (`read -s`), ni dans l'historique, ni dans la
    liste des processus (`printf` interne), même collé d'un coup sous zsh : l'invite `Jeton:` dit quand le coller. Il
    reste dans le presse-papiers, que l'étape vide, et dans l'historique de Spotlight s'il est activé, que l'étape
-   efface (`:173-176`).
+   efface (`:181-184`).
 3. **Le test passe : les mesures sont-elles arrivées ?** Pas forcément : une redirection compte comme un succès pour
-   le SDK. La preuve est la série vue dans Explore (`:211-214`).
+   le SDK. La preuve est la série vue dans Explore (`:222-225`).
 4. **Que se passe-t-il quand le jeton expire ?** L'export reçoit des 401 (`Failed to export 'metrics' batch
    code: 401` dans le journal). Grafana écrit avant aux administrateurs de la pile ; la rotation est la procédure
-   « Pour refaire un seul secret » d'`infra/README.md` (`:264-275`).
+   « Pour refaire un seul secret » d'`infra/README.md` (`:275-286`).
 5. **Quelles alertes surveillent la dépense ?** Dans Grafana, `KbModelCostOverBudget` sur le coût estimé ; dans Azure,
    `budget-kb` sur les coûts réels et prévus du mois, et `alert-kb-model-tokens` sur les jetons de la ressource du
    modèle (`:86-94`).

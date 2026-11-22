@@ -131,20 +131,26 @@ L'API IA envoie ses mesures et ses traces à Grafana Cloud par OTLP (le protocol
 quand ses variables d'export sont posées; sans elles, rien n'est exporté (`docs/fiches-veille.md:1892-1896`). Les
 chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources](#sources)).
 
-1. **La pile**: dans le portail Grafana Cloud, <span lang="en">**Add Stack**</span>, un nom, puis une région de
-    l'Union européenne. Celle de K-B est `prod-eu-west-2`, chez AWS (<span lang="en">Amazon Web Services</span>), en
+1. **La pile**: l'espace de Grafana Cloud qui reçoit et garde les mesures, les journaux et les traces, avec son
+    Grafana. Sa région fixe le pays où les données sont gardées: une région de l'Union européenne les y garde. Dans le
+    portail Grafana Cloud, <span lang="en">**Add Stack**</span>, un nom, puis une région de l'Union européenne. Celle
+    de K-B est `prod-eu-west-2`, chez AWS (<span lang="en">Amazon Web Services</span>), en
     Allemagne, lue sur l'hôte de son adresse OTLP (`docs/registre-traitements.md:128`). Grafana ne change pas la
     région d'une pile existante: une autre région demande une pile neuve, et l'offre gratuite n'a qu'une pile
     ([Limites](#limites)).
 
-2. **L'adresse et l'identifiant**: dans le portail, la pile choisie, <span lang="en">**Configure**</span> sur la
-    tuile <span lang="en">**OpenTelemetry**</span>. Y relever l'adresse OTLP, de la forme
+2. **L'adresse et l'identifiant**: l'adresse OTLP est celle où l'API IA envoie ses données; l'identifiant
+    d'instance est le nom d'utilisateur de l'authentification, que l'en-tête de l'étape 4 associe au jeton. Dans le
+    portail, la pile choisie, <span lang="en">**Configure**</span> sur la tuile <span lang="en">**OpenTelemetry**</span>. Y relever l'adresse OTLP, de la forme
     `https://otlp-gateway-<région>.grafana.net/otlp`, et l'identifiant d'instance, le nombre affiché sur la tuile. Ne
     pas y générer de jeton: celui de l'étape 3 a ses droits choisis. Ne pas reprendre non plus les variables
     `OTEL_EXPORTER_OTLP_*` que la tuile propose: `kb serve-ai` refuse toute variable `OTEL_*` (étape 5).
 
-3. **Le jeton**: dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**, **Cloud access
-    policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
+3. **Le jeton**: il prouve à Grafana Cloud que l'envoi vient de K-B. Il naît d'une politique d'accès, qui fixe ses
+    droits: écrire les mesures, les journaux et les traces, sur cette seule pile, jusqu'à une date d'expiration. Un
+    jeton qui fuirait ne permettrait ni de lire les données, ni d'agir sur une autre pile, et cesserait de valoir à sa
+    date (moindre privilège). Dans le Grafana de la pile, <span lang="en">**Administration**, **Users and access**,
+    **Cloud access policies**, **Create access policy**</span>. Une politique créée là ne vaut que pour cette pile.
     - <span lang="en">**Display name**</span> et <span lang="en">**Name**</span>: le nom de la politique.
     - <span lang="en">**Scopes**</span>: <span lang="en">**Write**</span> sur les seules lignes
         <span lang="en">**Metrics**, **Logs**</span> et <span lang="en">**Traces**</span> (`metrics:write`,
@@ -155,8 +161,10 @@ chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources]
         <span lang="en">**Create**</span>. Le jeton ne s'affiche qu'une fois. Il ne fait qu'écrire: K-B ne relit rien
         de ce qu'il envoie.
 
-4. **L'en-tête**: `Authorization=Basic%20` suivi du base64 de `<identifiant d'instance>:<jeton>`, sans espace ni
-    chevron (`.env.example:161-163`): `%20` tient la place de l'espace. Sur le Mac, dans un terminal interactif, car
+4. **L'en-tête**: l'en-tête d'authentification que l'API IA joint à chaque envoi, `Authorization=Basic%20` suivi du
+    base64 de `<identifiant d'instance>:<jeton>`, sans espace ni chevron (`.env.example:161-163`): `%20` tient la
+    place de l'espace. Le base64 est un codage, pas un chiffrement: qui voit l'en-tête lit le jeton. Le bloc suivant
+    le fabrique donc sans jamais l'afficher. Sur le Mac, dans un terminal interactif, car
     la saisie sans écho (`read -s`) demande un clavier. Remplacer `<instance>` par l'identifiant de l'étape 2, puis
     coller le bloc; s'il reste sur la ligne de commande, Entrée. Quand `Jeton:` s'affiche, coller le jeton, puis
     Entrée. Les accolades font lire tout le bloc au shell avant de lancer `read`, qui attend alors le jeton. Le jeton
@@ -175,7 +183,9 @@ chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources]
     Commande + 4), l'en-tête y reste: l'effacer là aussi, par le bouton **Plus** à droite du champ de recherche, puis
     **Effacer l'historique** ([Sources](#sources)).
 
-5. **Les variables**, sur la même pile, un jeton par environnement: pour chacun, l'étape 3 (ou seulement
+5. **Les variables**: elles disent à `kb serve-ai` où envoyer, avec quel en-tête, et sous quel environnement ranger
+    les séries, l'étiquette `deployment_environment_name` que le tableau et les alertes lisent. Sur la même pile, un
+    jeton par environnement: pour chacun, l'étape 3 (ou seulement
     <span lang="en">**Add token**</span>, sur une politique qui existe déjà) et l'étape 4. La production a sa
     politique, `kb-production` (#522), le bac à sable la sienne, `kb-sandbox` (`docs/registre-traitements.md:131`).
     - En local, pour le bac à sable, dans `.env.e2e_test` (modèle: `.env.e2e_test.example:25-30`):
@@ -198,8 +208,9 @@ chemins de l'interface sont ceux de la documentation de Grafana Cloud ([Sources]
     - avec l'export, `KB_DEPLOYMENT_ENVIRONMENT` absente, ou ni `sandbox` ni `production`;
     - une variable `OTEL_*`, même sans export.
 
-6. **Vérifier**: le test de l'export envoie à la pile les mesures d'une demande sur le rejeu, depuis un terminal où le
-    `.env` n'est pas chargé:
+6. **Vérifier**: la vérification montre que la chaîne marche de bout en bout, de l'API IA jusqu'aux séries dans
+    Grafana, avant d'importer le tableau et les règles. Le test de l'export envoie à la pile les mesures d'une demande
+    sur le rejeu, depuis un terminal où le `.env` n'est pas chargé:
 
     ```sh
     uv run --env-file .env.e2e_test pytest -m e2e -k real_export -rs
