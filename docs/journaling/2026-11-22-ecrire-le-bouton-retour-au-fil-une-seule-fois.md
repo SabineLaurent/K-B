@@ -103,10 +103,11 @@ la macro fait échouer la seconde.
 | `test_the_button_back_to_the_feed_is_written_by_its_macro_only`, rouge avant la macro : `['404.html', … 'error.html'] == ['links.html']` | Le test voyait les trois copies : il échouait pour la bonne raison |
 | Le même test, vert après | Le libellé n'est plus écrit que dans `links.html`, et les trois pages appellent la macro |
 | Les 24 pages rendues par `fetch_every_page` (`tests/web/test_accessibility.py:150`), écrites avant et après, puis `diff -r` : 0 différence | Le rendu de chaque page est inchangé, octet pour octet, et pas seulement celui des trois pages d'erreur. L'heure et l'identifiant de la demande de la page 500 sont masqués des deux côtés. Deux rendus avant le changement ne différaient pas : la comparaison est stable |
-| `uv run pytest` : 5 709 réussis, 365 écartés (`e2e`, `postgresql`) | Les tests existants des pages, dont celui des flèches et celui de la page 404, passent sans changement |
+| `uv run pytest --cov --cov-report=term-missing:skip-covered`, la commande du job `tests` : 5 709 réussis, 365 écartés (`e2e`, `postgresql`), couverture 98,55 % pour un seuil de 96 % | Les tests existants des pages, dont celui des flèches et celui de la page 404, passent sans changement |
 | `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | Contrôles du dépôt verts |
+| Les jobs `audit`, `tests-postgresql`, `tests-data` et `digests-reference` de `ci.yml`, rejoués sur le Mac : aucune vulnérabilité connue (pip-audit 2.10.1, 109 paquets) ; 350 tests sur `postgres:18.6`, l'image de la CI par son digest, sous Docker ; 1 365 tests ; les trois seuils tenus | GitHub Actions est sans budget jusqu'au déploiement, et la PR est fusionnée sans CI : ces jobs n'ont pas d'autre lancement |
 | Recherche des caractères Cc et Cf, et des espaces avant « : » ou « ; » dans les lignes ajoutées | Aucun |
-| `/code-review` (niveau high) sur `origin/main...HEAD` : aucun bug ; le relecteur a rendu les trois pages d'erreur avec les gabarits de `origin/main` et de `HEAD`, sans différence | Une seconde comparaison du rendu, faite à part, confirme la première. Ses deux remarques mineures sont rapportées dans la PR |
+| `/code-review` (niveau high) sur `origin/main...HEAD` : aucun bug ; le relecteur a rendu les trois pages d'erreur avec les gabarits de `origin/main` et de `HEAD`, sans différence | Une seconde comparaison du rendu, faite à part, confirme la première. De ses deux remarques mineures, l'une est corrigée (le commentaire de la macro nommait « chaque page d'erreur », alors que la page 403 n'a pas ce bouton) ; l'autre, la copie de la page de secours que le test ne voit pas, est écartée, cette page étant hors de #681 |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -130,6 +131,10 @@ la macro fait échouer la seconde.
 - Les pages n'ont pas été rouvertes dans un navigateur. Le HTML rendu étant identique octet pour octet, et la feuille
   de style inchangée, l'affichage ne peut pas différer.
 - Pas de passage par l'export en ligne ni par un lecteur d'écran : rien de ce qu'ils lisent n'a changé.
+- Les tests PostgreSQL ont tourné sur l'image de la CI en aarch64, l'architecture du Mac ; la CI la tire en amd64.
+- Les jobs `image-build`, `build` et `bicep-build` n'ont pas été rejoués. `infra/`, le `Dockerfile` et
+  `.dockerignore` ne changent pas, et `mkdocs.yml` lit `documentation/`, où rien ne change. L'image emporte les
+  gabarits comme avant, `links.html` compris.
 
 ## Ce qui reste
 
