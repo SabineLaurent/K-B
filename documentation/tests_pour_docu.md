@@ -71,14 +71,16 @@ le remplir. Il ne porte que leurs variables:
 | `KB_ZOTERO_DIR` | le test de Zotero est sauté |
 | `KB_VAULT_DIR` | le test des clips est sauté |
 | `GOOGLE_APPLICATION_CREDENTIALS` | le test de `gh_archive` est sauté; avec elle, il lance une vraie requête BigQuery |
-| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté |
+| `KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS` | le test de l'export des mesures est sauté; avec une seule des deux, il échoue (`tests/e2e/test_real_export.py:5-7`) |
 | `KB_DEPLOYMENT_ENVIRONMENT` | avec `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`, le test de l'export échoue (`KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`); posée, elle lui parvient ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)); `sandbox` dans le modèle |
 
 Ils se lancent depuis un terminal sans `.env` exporté. Si l'environnement porte une autre variable de
 `.env.example` (hors de celles que le test pose lui-même, `KB_DATA_DIR` et `KB_COLLECT_ONLY`, et de celles que
 `tests/conftest.py` retire), ou la clé d'un client de l'API de données (`KB_DATA_API_KEY_<CLIENT>`), la fixture
 `no_variable_beyond_the_end_to_end_tests` (`tests/e2e/conftest.py`) arrête pytest avant tout `kb`, en citant leurs
-noms, jamais leurs valeurs.
+noms, jamais leurs valeurs. Ce qu'ils écrivent, et ce qu'il en reste:
+[le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
+« Procédure de tri », étape 10.
 
 ## Les dépendances installées
 
@@ -126,6 +128,10 @@ module (`make_postgresql_base`); les tests de lecture partagent une base, constr
 dossier en `0700` s'il le crée, avant que pytest-html l'écrive: il garde la sortie capturée de chaque test. Un rapport demandé
 dans le dépôt hors de `reports/`, que git ne laisserait pas de côté, arrête pytest. Chaque exécution écrase le
 rapport précédent.
+
+Les tests du code commun aux deux API sont à la racine de `tests/`: `test_api_methods.py`, `test_api_rate_limit.py` et
+`test_api_telemetry.py`, listés dans `API_COMMON_TESTS` (`Makefile:47`); un nouveau test commun s'y ajoute à la main.
+`make` s'arrête au premier échec: si les tests d'une API échouent, les tests communs ne sont pas lancés.
 
 ### Les tests de bout en bout
 

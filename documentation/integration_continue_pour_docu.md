@@ -271,7 +271,8 @@ Le 2026-11-14, la seconde commande rend les règles de la liste, et la première
 ### Les réglages de Dependabot
 
 Dans les réglages de sécurité du dépôt, activer les alertes et les mises à jour de sécurité. `dependabot.yml` règle
-les mises à jour de version.
+les mises à jour de version, qui ne touchent pas `uv.lock`: seule une mise à jour de sécurité peut ouvrir une PR sur
+lui. Le graphe des dépendances du dépôt voit les paquets Python (96 le 2026-11-08).
 
 ```sh
 gh api -i repos/SabineLaurent/K-B/vulnerability-alerts | head -1   # lu le 2026-11-14: HTTP/2.0 204 (alertes actives)
@@ -298,7 +299,8 @@ uv 0.13.6 compris (`uv self update 0.13.6`), et, pour `tests-postgresql`, un ser
 ## Configurer la chaîne
 
 Rien ne se règle hors du dépôt, en dehors des réglages d'[Installer la chaîne](#installer-la-chaine): aucun workflow de
-la CI ne lit de variable (`vars.`) ni de secret.
+la CI ne lit de secret, et seul `docs.yml` lit une variable du dépôt, `PAGES_PUBLISH`, qui ouvre la publication du
+site à chaque push sur `main` (`.github/workflows/docs.yml:35`, `:44`).
 
 ### Ce qui se change, et où
 
@@ -385,9 +387,9 @@ echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/ass
 [La PR n° 533](https://github.com/SabineLaurent/K-B/pull/533), fusionnée le 2026-11-09, ne touche pas `infra/`. Elle a
 reçu sept contrôles, tous verts (`gh pr checks 533 --repo SabineLaurent/K-B`): `audit` (13 s), `tests` (1 min 21 s),
 `lint` (11 s), `types` (15 s), `tests-postgresql` (1 min 1 s), `tests-data` (30 s), dans l'exécution 42617081839 de
-`CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`; `bicep-build` n'y a pas tourné. Depuis #496,
-toute PR reçoit aussi `bicep-build`, un huitième contrôle, et avec `Docs` (#167), `build`, un neuvième, et
-`deploy`, sauté, un dixième.
+`CI`, et `image-build` (23 s), dans l'exécution 42617082007 d'`Image`; `bicep-build` n'y a pas tourné. Depuis, toute
+PR reçoit aussi `bicep-build` (#496), les deux jobs de `Docs` (#167), `build` et `deploy`, sauté, et
+`digests-reference`, ajouté à `CI` le 2026-11-20 (`63d22175`): onze contrôles ([Lancer la CI](#lancer-la-ci)).
 
 ### Un push témoin
 
@@ -438,7 +440,8 @@ se relance tel quel.
 
 ### Une vulnérabilité dans l'image
 
-C'est l'étape 10 d'`image-build`, un contrôle exigé: elle bloque toute PR, et la mise en ligne (`deploy.yml:51-67`).
+C'est l'étape 10 d'`image-build`. Le ruleset n'exige pas ce contrôle à la fusion; la mise en ligne, elle, refuse le
+tag d'un commit dont un workflow a échoué (`deploy.yml:51-67`).
 Dans cet ordre:
 
 1. Un paquet Python de l'environnement virtuel (type `python`, sous `/app/.venv`): `audit` échoue aussi. Monter le
@@ -487,11 +490,11 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     dépôt), mais <q lang="en">Pull request authors cannot approve their own pull requests</q>: avec une seule
     personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
     Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
-- **Deux contrôles ne bloquent pas la fusion**: `tests-data` et `build` de `Docs` ne sont pas dans le ruleset.
-    `tests-data` compte à la livraison (`deploy.yml:51-67`). `bicep-build` y est depuis #496, `image-build` depuis #498:
-    ni `infra.yml` ni `image.yml` n'ont de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
+- **Quatre contrôles ne bloquent pas la fusion**: `tests-data`, `digests-reference`, `image-build` et `build` de
+    `Docs` ne sont pas dans le ruleset, lu le 2026-11-22. Tous comptent à la livraison (`deploy.yml:51-67`).
+    `bicep-build` y est depuis #496: ni `infra.yml` ni `image.yml` n'ont de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
     « <span lang="en">Pending</span> » et bloque la fusion.
-    Pour réduire le risque: ajouter ces deux contrôles aux contrôles requis du ruleset (faisable avec nos droits).
+    Pour réduire le risque: ajouter ces quatre contrôles aux contrôles requis du ruleset (faisable avec nos droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
     services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
     Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
@@ -514,9 +517,9 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable avec nos droits. Un déclenchement planifié
     d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une PR: faisable avec nos
     droits, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`, lu le 2026-11-14).
-- **Une vulnérabilité publiée bloque toutes les PR** (#498): `image-build` étant exigé, une vulnérabilité haute ou
-    critique corrigée qui entre dans la base de Grype rend rouge toute PR, comme `audit` le 2026-11-13 (#606), jusqu'à
-    la montée du digest, l'installation du paquet corrigé ou une entrée de `.grype.yaml`.
+- **Une vulnérabilité publiée rend rouges toutes les PR** (#498): une vulnérabilité haute ou critique corrigée qui
+    entre dans la base de Grype rend rouge `image-build` sur toute PR, comme `audit` le 2026-11-13 (#606), et bloque la
+    mise en ligne, jusqu'à la montée du digest, l'installation du paquet corrigé ou une entrée de `.grype.yaml`.
     Pour réduire le risque: la marche à suivre est écrite ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage));
     faisable avec nos droits, une PR suffit.
 - **Une version épinglée de Debian fait échouer la construction de l'image quand l'archive de sécurité la remplace**

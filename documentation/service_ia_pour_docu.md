@@ -686,4 +686,4 @@ Dans le dépôt: [la note du branchement de gpt-6-luna](https://github.com/Sabin
 (2026-10-28), [la note des réglages des modèles du banc](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-11-17-appeler-les-modeles-du-banc.md)
 (2026-11-17), [le registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md),
 [l'architecture de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/architecture-api-ia.md), le journal ADR (`docs/ADR/journal-decisions-projet.md`),
-`infra/README.md`, et le [README](https://github.com/SabineLaurent/K-B/blob/main/README.md), « Lancer l'API IA ».
+`infra/README.md`, et [Utiliser K-B](utilisation.md), « L'API IA: `kb serve-ai` ».

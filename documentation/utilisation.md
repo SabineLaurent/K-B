@@ -43,8 +43,8 @@ uv run --env-file .env kb create-db
 ```
 
 `kb create-db` crée le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`, ou, avec `KB_DATABASE_URL`, les tables de la base
-PostgreSQL de l'URL, qui doit déjà exister. Une base qui existe n'est jamais touchée. Ses étapes et ses codes sont
-dans [la fiche des données](import_et_base_pour_docu.md), « Installer le système de gestion de base de données ».
+PostgreSQL de l'URL, qui doit déjà exister. Une base qui existe n'est jamais touchée: pour repartir de zéro, supprimer
+le fichier SQLite. Ses étapes et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md), « Installer le système de gestion de base de données ».
 
 ### Collecter: `kb collect`
 
@@ -52,13 +52,28 @@ dans [la fiche des données](import_et_base_pour_docu.md), « Installer le syst�
 uv run --env-file .env kb collect
 ```
 
+La collecte se lance une fois par jour; chaque source reprend à la date de sa dernière collecte réussie, gardée dans
+`<KB_DATA_DIR>/collection_state.json`. Trois sources ne tournent qu'avec leur variable:
+
+- Zotero, avec `KB_ZOTERO_DIR`, le dossier qui contient `zotero.sqlite`: les papiers et leurs surlignages sont
+    extraits dans `<KB_DATA_DIR>/raw/selected_library/zotero/`, d'une copie temporaire de la base de Zotero, que K-B
+    n'ouvre jamais elle-même;
+- les clips, avec `KB_VAULT_DIR`, le dossier du coffre qui contient `Clippings/`: chaque clip nouveau ou changé est
+    copié tel quel dans `<KB_DATA_DIR>/raw/selected_library/clipping/`, et K-B ne modifie jamais un clip;
+- GH Archive, avec `GOOGLE_APPLICATION_CREDENTIALS`, le chemin de la clé JSON d'un compte de service BigQuery, rangée
+    hors du dépôt, que lit le client BigQuery et que K-B n'ouvre pas.
+
+Ces chemins s'écrivent en entier: un `~` écrit dans le `.env` n'est pas développé. `KB_COLLECT_ONLY` choisit les
+sources d'une collecte, par leurs dossiers séparés par des virgules (`zotero,clipping`), sans tenir compte de la
+casse.
+
 `kb collect` journalise son début (`collection started: 17 sources selected`), le départ de chaque source puis ce
 qu'elle a écrit, et sa fin avec la durée. Il affiche ensuite une ligne par source:
 
 - `ok`, avec le nombre de fichiers bruts écrits, par exemple `ok (1 raw file)`;
 - `failed`, avec le type de l'erreur;
-- `skipped`: Zotero sans `KB_ZOTERO_DIR`, les clips sans `KB_VAULT_DIR`, GH Archive sans
-    `GOOGLE_APPLICATION_CREDENTIALS`, une source que `KB_COLLECT_ONLY` écarte.
+- `skipped`, avec sa raison: `zotero: skipped (KB_ZOTERO_DIR not set)`, `clipping: skipped (KB_VAULT_DIR not set)`,
+    `gh_archive: skipped (GOOGLE_APPLICATION_CREDENTIALS not set)`, `<dossier>: skipped (not in KB_COLLECT_ONLY)`.
 
 Ses codes de sortie:
 
@@ -118,9 +133,31 @@ Ses codes de sortie:
 uv run --env-file .env kb write-tops
 ```
 
-`kb write-tops` lit les classements dans le brut et écrit leurs fiches dans le coffre de `KB_VAULT_DIR`, sous
-`veille/tops/`. Ses lignes, ses règles et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md),
-« La commande qui suit l'import: `kb write-tops` ».
+`kb write-tops` lit les classements du top 100 des dépôts les plus étoilés et des plus forkés dans le brut, et écrit
+une fiche par jour de relevé encore dans le brut: `<KB_VAULT_DIR>/veille/tops/most_starred/AAAA-MM-JJ.md` et
+`.../most_forked/AAAA-MM-JJ.md`, nommées par le jour UTC du relevé. À côté de chaque fiche, il écrit son jumeau JSON,
+`AAAA-MM-JJ.json`, que l'API de données lit en ligne (`post/top_sheets.py:1-6`). Ses étapes et ses codes 0, 1, 2 et 4
+sont dans [la fiche des données](import_et_base_pour_docu.md), « La commande qui suit l'import: `kb write-tops` ».
+
+- Une fiche qui existe n'est jamais réécrite, même par deux lancements qui se chevauchent: deux collectes le même
+    jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut.
+- Un temporaire caché qu'un arrêt brutal laisse à côté d'une fiche (un SIGKILL, une session SMB perdue, ou un
+    SIGTERM reçu entre sa création et le bloc qui le retire), `.AAAA-MM-JJ.md.tmp`, arrête ce top à chaque lancement
+    (`temporary_file_found`), son relevé gardé, jusqu'à ce que le temporaire soit retiré à la main.
+- Au premier lancement, tout l'historique des relevés devient des fiches, puis ces relevés sont supprimés du brut.
+
+Il journalise son début et sa fin avec la durée, puis affiche une ligne par top (`commands/write_tops_command.py:52-75`, `:87-98`):
+
+- `ok, 1 sheet and 1 twin written`;
+- `ok, 0 sheets written, the sheet of the day already exists`;
+- `failed (<type>)` pour un top arrêté, avec le type de l'erreur seul, son erreur au journal;
+- `failed (ranking_unreadable)` pour un relevé illisible ou mal nommé, gardé;
+- `no ranking` sans relevé.
+
+Suivent les relevés remplacés supprimés (`Older raw files deleted: N`, absent si un top a été arrêté: l'erreur a pu
+venir pendant ses suppressions) et le dossier des fiches dans le coffre (`Sheets vault path: veille/tops/`). Une
+suppression qui échoue laisse celles déjà faites. Sur SIGTERM (143) ou SIGINT (130), les fiches déjà écrites sont
+gardées, aucun relevé n'est supprimé avant que ses fiches soient écrites, et aucune ligne de top n'est affichée.
 
 ### Toute la chaîne, en local
 
@@ -287,7 +324,11 @@ uv run --env-file .env kb digest
 dernière fiche du sujet dans le coffre et l'envoie. Un sujet sans fiche prend la fenêtre de `KB_DIGEST_WINDOW_DAYS`,
 lue par `kb serve-ai`; un début de plus de 14 jours est ramené à 14 jours, et journalisé. La demande part avec la clé
 `KB_AI_API_KEY_KB_DIGEST`, à l'adresse `KB_AI_API_URL` (`http://127.0.0.1:8001` par défaut; elle ne suit pas
-`KB_AI_API_PORT`: la changer aussi).
+`KB_AI_API_PORT`: la changer aussi). Cette adresse est en `https`, ou en `http` vers `127.0.0.1` ou `localhost`, ou,
+avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, vers `api-donnees` ou `api-ia`, les services d'un compose; sans utilisateur,
+requête ni fragment. Une autre adresse `http` fait sortir la commande en 2, et le message nomme la variable sans citer
+sa valeur. La même règle vaut pour `KB_DATA_API_URL`, lue par `kb serve-ai`, et pour les deux adresses de
+`kb smoke-test` et de `kb digest-watch`.
 
 Il écrit une fiche par sujet rendu, `<KB_VAULT_DIR>/veille/<sujet>/AAAA-MM-JJ.md`, au jour UTC de la demande, et une
 fiche « Aucun item classé dans ce sujet. » pour un sujet sans item, d'où part son compte rendu suivant. Une fiche
@@ -298,6 +339,9 @@ porte:
     `covered_after`), `request_id`;
 - les affirmations, chacune avec le numéro de ses sources;
 - les sources, leur titre et leur URL.
+
+À côté de chaque fiche, `kb digest` écrit son jumeau JSON, `AAAA-MM-JJ.json`, que l'API de données lit en ligne
+(`post/digest_sheets.py:1-2`).
 
 Chaque affirmation et chaque titre est écrit en texte: ni lien, ni image, ni balise, ni code, ni requête Dataview ne
 peut s'y activer. Une fiche n'est jamais réécrite, même par deux lancements qui se chevauchent: s'il en existe une du
@@ -320,7 +364,8 @@ Ses codes de sortie, l'unité étant le sujet:
     son `X-Request-ID` et son `Retry-After` sont affichés) ou hors du schéma attendu; ou chaque sujet a échoué; ou une
     erreur du système (`OSError`, un dossier illisible) arrête le contrôle d'avant la demande, sans rien demander;
 - 2: rien n'est demandé. `KB_DATA_DIR`, `KB_VAULT_DIR` (absente, ou pas un dossier existant) ou
-    `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour est déjà là, un dossier `veille/…` est un lien
+    `KB_AI_API_KEY_KB_DIGEST` manque ou est refusée, une fiche du jour ou son jumeau est déjà là (`sheet_exists`,
+    `twin_exists`), un dossier `veille/…` est un lien
     symbolique, ou la dernière fiche d'un sujet n'a pas de `until` valide (`previous_sheet_invalid`);
 - 143, 130: SIGTERM, SIGINT. Les fiches déjà écrites sont gardées.
 
@@ -336,7 +381,10 @@ uv run --env-file .env kb trend-report
 `kb trend-report` lit le registre des comptes rendus, `<KB_DATA_DIR>/trend_reports.json`, puis demande à l'API IA les
 fenêtres de GH Archive postérieures à la dernière du compte rendu précédent (les 4 dernières au premier), avec la clé
 `KB_AI_API_KEY_KB_TREND_REPORT`, à l'adresse `KB_AI_API_URL`. Il écrit `<KB_VAULT_DIR>/veille/tendances/AAAA-MM-JJ.md`,
-au jour UTC du lancement: la période et ses limites, la limite de GH Archive (un échantillon d'environ 1 % des
+au jour UTC du lancement: un <span lang="en">frontmatter</span> (`generated`, la première et la dernière fenêtre,
+leur nombre, celui des manquantes, `windows_capped`, `first_report`, `new_evaluated`, `repositories_dropped`, `model`,
+`choice_failure`, l'état d'un choix du modèle qui a échoué, ou `null`, puis `request_id`;
+`post/trend_report_sheets.py:190-205`), la période et ses limites, la limite de GH Archive (un échantillon d'environ 1 % des
 étoiles), le tableau des dépôts qui remplissent au moins un critère (durable, nouveau, en accélération), puis les
 dépôts que le modèle a choisis, chacun avec ses quatre textes. Il ajoute enfin une entrée au registre, qui donne sa
 période au compte rendu suivant: le coffre n'est jamais relu. Un compte rendu n'est jamais réécrit: s'il en existe
@@ -373,7 +421,7 @@ uv run --env-file .env kb serve-web
 Le site montre le fil des items, leur détail et les tendances, sans JavaScript. Il écoute par défaut sur
 `http://127.0.0.1:8002` et lit l'API de données avec la clé de son client, `KB_DATA_API_KEY_WEB`. Il est privé: chaque
 requête, sauf `/health`, doit porter dans l'en-tête `X-MS-CLIENT-PRINCIPAL-ID` l'identifiant d'objet Microsoft Entra
-de `KB_WEB_OPERATOR_ID`, que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
+de `KB_WEB_OPERATOR_ID`, un GUID, que pose Azure Container Apps une fois la connexion faite; cet identifiant n'est jamais
 journalisé ni cité. En local, `KB_WEB_AUTH=off` n'en lit aucun, sur `127.0.0.1` et hors d'Azure seulement.
 `KB_WEB_HOST`, `KB_WEB_PORT` et `KB_WEB_ALLOWED_HOSTS` changent l'hôte, le port et les noms servis
 ([le site](https://github.com/SabineLaurent/K-B/blob/main/docs/site-web.md)).
@@ -396,8 +444,9 @@ make download-watch-sheets
     0 fiche.
 - Seuls passent les noms `<dossier>/<jour>.md` (jour en `AAAA-MM-JJ`) d'un dossier où `kb` écrit: les 9 sujets,
     `tops/most_starred`, `tops/most_forked`, `tendances`. Un nom de cette forme d'un autre dossier (un sujet ajouté ou
-    retiré) est laissé de côté, sans échec. Tout autre nom est refusé, cité par sa position (`blob 3 of 12`), jamais
-    écrit; les autres fiches sont copiées quand même.
+    retiré) est laissé de côté, sans échec, comme le jumeau JSON d'une fiche, `<dossier>/<jour>.json`, que lit l'API
+    de données (`sheet_twin`, `jobs/watch_download.py:45`, `:57`). Tout autre nom est refusé, cité par sa position
+    (`blob 3 of 12`), jamais écrit; les autres fiches sont copiées quand même.
 - Sont refusés aussi: un blob de plus de 4 000 000 octets, un texte qui n'est pas de l'UTF-8, qui porte un caractère
     de contrôle autre que la tabulation et le retour à la ligne, ou un contrôle bidirectionnel (`BIDI_CONTROLS`, que
     `kb` n'écrit jamais).
@@ -534,7 +583,8 @@ les lance par émulation. L'image lance `kb` sous l'utilisateur `10001:10001`, j
 se monte le volume, est `/var/lib/knowledge_base`, et il appartient à cet utilisateur. `KB_DATA_DIR` n'a pas de valeur
 dans l'image: elle se donne au lancement, avec le volume, et sans elle `kb` refuse de démarrer. Le journal est la
 sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore` refuse tout
-par défaut: la construction ne reçoit que `pyproject.toml`, `uv.lock`, `README.md` et `src/`. Le contrôle de l'image
+par défaut: la construction ne reçoit que `pyproject.toml`, `uv.lock`, `README.md` et `src/`, sans les fichiers
+d'environnement, les bases `*.sqlite` et leurs fichiers annexes, ni les caches de `src/`. Le contrôle de l'image
 par la CI est dans [la fiche de l'intégration continue](integration_continue_pour_docu.md), « Le workflow `Image` ».
 
 ## Lire la base, lancer les tests
