@@ -19,7 +19,8 @@ s'installe, se configure et se teste, et que faire quand une livraison échoue. 
 `main` au commit `b412323` (2026-11-08), les jobs planifiés (#330, #423) d'après le code de la demande de fusion
 (PR, <span lang="en">pull request</span>) de #423, et les apps que la livraison met à jour, les exécutions attendues
 sur un commit de `main` et la place de `Docs` dans le contrôle de l'intégration continue (CI) d'après `main` au
-commit `fd956430` (2026-11-18). Les exécutions citées se relisent par `gh run view <id> --repo SabineLaurent/K-B`, et
+commit `fd956430` (2026-11-18), puis d'après la demande de fusion de #684 (2026-11-22), qui fait tourner `Docs` sur
+chaque fusion. Les exécutions citées se relisent par `gh run view <id> --repo SabineLaurent/K-B`, et
 leur journal par `--log`.
 
 ## La chaîne en bref
@@ -77,12 +78,10 @@ suivant. Le premier qui refuse arrête l'exécution, et `deploy` est `skipped`.
 | `Refuses a commit whose CI is not finished and green` | un commit dont une exécution de la CI est en cours, rouge ou annulée, ou qui n'en a aucune. Comptent les exécutions des workflows de `.github/workflows/`, sauf `deploy.yml` (une livraison s'attendrait elle-même, et une livraison ratée bloquerait un retour en arrière). Celles que GitHub crée lui-même, comme Dependabot, ne comptent pas | la liste `<chemin du workflow>: <status> <conclusion>`, puis `the CI of <sha> is not finished and green` |
 
 Les exécutions de `Docs` (`.github/workflows/docs.yml`) comptent aussi: ce contrôle n'écarte que `deploy.yml`
-(`.github/workflows/deploy.yml:60-62`). `Docs` n'a pas de déclencheur `push`: sur un commit de `main`, il ne tourne que
-lancé à la main (`workflow_dispatch`, `.github/workflows/docs.yml:6-9`). Une telle exécution en échec, ou pas encore
-finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer `Docs`
-(`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant de `main`. Qu'une relance réussie fasse
-passer le contrôle n'a pas été essayé: le 2026-11-18, `Docs` n'a encore aucune exécution lancée à la main
-(`gh run list --repo SabineLaurent/K-B --workflow docs.yml --event workflow_dispatch` ne rend rien). Retirer `Docs` de
+(`.github/workflows/deploy.yml:60-62`). `Docs` tourne sur chaque push sur `main`
+(`.github/workflows/docs.yml:10-11`): son exécution en échec, ou pas encore finie, fait refuser le tag de ce commit,
+comme celle de `CI`. Pour livrer ce commit malgré tout, relancer `Docs`
+(`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant de `main`. Retirer `Docs` de
 ce contrôle a été écarté: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou
 ADR, 2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »,
 `docs/ADR/journal-decisions-projet.md:7307-7310`). Le même fait est écrit dans
@@ -122,8 +121,8 @@ Cette partie s'adresse à la personne qui livre une version.
 
 ### Qui peut livrer
 
-Une administratrice du dépôt, seule à pouvoir créer un tag `v*` (ruleset « tags v »). Aucune session Claude ne pose
-ni ne pousse de tag sans une demande explicite de Sabine.
+Une administratrice du dépôt, seule à pouvoir créer un tag `v*` (ruleset « tags v »). Un tag n'est posé et poussé que
+sur la demande explicite de Sabine.
 
 ### Avant de livrer
 

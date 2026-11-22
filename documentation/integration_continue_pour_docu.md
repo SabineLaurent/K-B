@@ -13,7 +13,8 @@
 Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comment on la déclenche et la relance,
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
 `main` au commit `57ff235` (2026-11-14), avec le workflow `Docs` et l'audit de tous les groupes de dépendances ajoutés
-le même jour (#167), et d'après les réglages du dépôt lus le même jour. Les exécutions citées se relisent
+le même jour (#167), et d'après les réglages du dépôt lus le même jour; la publication du site à chaque fusion et les
+contrôles requis, d'après la demande de fusion de #684 et le ruleset lu le 2026-11-22. Les exécutions citées se relisent
 par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du dépôt
 (`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en ligne
 d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison_continue_pour_docu.md).
@@ -23,16 +24,17 @@ d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livr
 Chaque demande de fusion (PR, <span lang="en">pull request</span>) vers `main`, et chaque push sur `main` (donc chaque fusion), lance la CI. Elle vérifie le code (tests,
 couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Sur
 chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le workflow `Docs`](#le-workflow-docs)). Une
-PR ne fusionne que si ses sept contrôles requis sont verts sur une branche à jour avec `main`
+PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
 ([Le ruleset de `main`](#le-ruleset-de-main)). La CI ne pousse rien et ne déploie rien sur Azure, où elle n'a aucun
-droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le site des fiches, sur GitHub Pages.
+droit. Seul `Docs` publie quelque chose: le site des fiches, sur GitHub Pages, à chaque fusion une fois la variable
+de dépôt `PAGES_PUBLISH` posée, ou lancé à la main depuis `main`.
 
 ### Les outils
 
 | Outil | Rôle dans la chaîne | Où il est réglé |
 |---|---|---|
 | GitHub Actions | lance les workflows sur des runners `ubuntu-latest`; chaque action est épinglée par son SHA, sa version en commentaire | `.github/workflows/ci.yml`, `image.yml`, `infra.yml`, `docs.yml` |
-| uv 0.13.6 | installe Python 3.13 (`.python-version`) et les dépendances de `uv.lock` (`uv sync --locked`), lance chaque outil (`uv run`) | `ci.yml`, `version: "0.13.6"` dans chacun des sept jobs (l. 20, 34, 46, 58, 90, 106, 121); `docs.yml:22` |
+| uv 0.13.6 | installe Python 3.13 (`.python-version`) et les dépendances de `uv.lock` (`uv sync --locked`), lance chaque outil (`uv run`) | `ci.yml`, `version: "0.13.6"` dans chacun des sept jobs (l. 20, 34, 46, 58, 90, 106, 121); `docs.yml:25` |
 | pytest et pytest-cov | lancent les tests et mesurent la couverture des lignes et des branches de `src/k_b/` | `pyproject.toml`, `[tool.coverage.*]` (l. 76-89) |
 | ruff | lint et format du Python | `pyproject.toml`, `[tool.ruff.*]` (l. 52-71) |
 | mypy | typage, en mode `--strict` | `ci.yml:61`, `pyproject.toml:73-74` |
@@ -46,7 +48,7 @@ droit. Seul `Docs`, lancé à la main depuis `main`, publie quelque chose: le si
 | Ruleset « Basic-rules-main-protect » | dit quels contrôles une PR doit passer pour fusionner | réglages du dépôt ([Le ruleset de `main`](#le-ruleset-de-main)) |
 
 Les actions épinglées sont `actions/checkout` v7.0.1 et `astral-sh/setup-uv` v10.3.3 dans les workflows, et en plus,
-dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:31`, `:49`).
+dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:36`, `:60`).
 
 La chaîne tourne sur GitHub Actions, et ces faits l'y attachent: le dépôt est sur GitHub (`git remote get-url origin`
 → `git@github.com:SabineLaurent/K-B.git`); son ruleset exige des contrôles rendus par GitHub Actions (`integration_id`
@@ -58,9 +60,9 @@ chaque action (`sha_pinning_required`, `gh api repos/SabineLaurent/K-B/actions/p
 
 | Déclencheur | Ce qui tourne |
 |---|---|
-| une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI`, `Image`, `Infra` et `Docs` (`ci.yml:3-7`, `image.yml:3-7`, `infra.yml:3-7`, `docs.yml:6-8`); `Infra` sans filtre de chemin depuis #496 |
-| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image` et `Infra`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`); pas `Docs`, qui n'a pas de déclencheur `push` (`docs.yml:6-9`) |
-| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:9`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:30`, `:37`) |
+| une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI`, `Image`, `Infra` et `Docs` (`ci.yml:3-7`, `image.yml:3-7`, `infra.yml:3-7`, `docs.yml:7-9`); `Infra` sans filtre de chemin depuis #496 |
+| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image`, `Infra` et `Docs`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`, `docs.yml:10-11`); `Docs` n'y publie le site que si la variable de dépôt `PAGES_PUBLISH` vaut `true` (`docs.yml:33-35`, `:42-44`) |
+| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:12`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:33-35`, `:42-44`) |
 | « <span lang="en">Re-run all jobs</span> » ou « <span lang="en">Re-run failed jobs</span> » sur une exécution, ou `gh run rerun <id>` | la même exécution, sur le même commit |
 | le planning de Dependabot, chaque semaine (`dependabot.yml:6-7`, `:13-14`) | une PR de mise à jour, qui lance la CI comme toute PR |
 | une alerte de Dependabot, à tout moment (mises à jour de sécurité, activées dans [Les réglages de Dependabot](#les-reglages-de-dependabot)) | une PR de sécurité, sans attente, qui lance la CI comme toute PR |
@@ -77,10 +79,10 @@ première n'est pas annulée.
 ### Les jobs et leurs tâches
 
 Les jobs d'un même workflow tournent en parallèle, chacun sur un runner neuf, sauf un job qui en attend un autre: le
-`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:38`). Dans un job, les étapes s'enchaînent, et la première
+`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:45`). Dans un job, les étapes s'enchaînent, et la première
 qui échoue arrête le job. Chaque workflow n'a qu'un jeton qui lit le dépôt (`permissions: contents: read`,
-`ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`, `docs.yml:11-12`), et aucun ne lit de secret. Seul le job `deploy`
-de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:41-43`), pour publier sur GitHub Pages.
+`ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`, `docs.yml:14-15`), et aucun ne lit de secret. Seul le job `deploy`
+de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:52-54`), pour publier sur GitHub Pages.
 
 #### Le workflow `CI`
 
@@ -108,7 +110,8 @@ liste ni `mkdocs` ni `mkdocs-material`, mais liste `pytest` et `mypy`, du groupe
 
 #### Le workflow `Image`
 
-`.github/workflows/image.yml`, un job, `image-build`, requis à la fusion depuis #498. Le tableau suivant donne ses
+`.github/workflows/image.yml`, un job, `image-build`, que le ruleset de `main` ne requiert pas à la fusion (lu le
+2026-11-22). Le tableau suivant donne ses
 étapes dans l'ordre, et ce que fait chacune; une étape sans nom dans `image.yml` y est décrite en français.
 
 | # | Étape (lignes d'`image.yml`) | Ce qu'elle fait |
@@ -141,8 +144,8 @@ Bicep à la main (`infra/README.md`).
 #### Le workflow `Docs`
 
 `.github/workflows/docs.yml`, ajouté avec #167, deux jobs, aucun requis à la fusion (ruleset lu le 2026-11-14). Il
-tourne sur chaque PR vers `main` et quand on le lance à la main (`workflow_dispatch`), jamais sur un push sur `main`
-(`docs.yml:6-9`).
+tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lance à la main (`workflow_dispatch`)
+(`docs.yml:7-12`).
 
 - `build` (l. 16-33) récupère le dépôt (l. 19) et installe uv 0.13.6, sans enregistrer le cache (l. 20-23). Il
     construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 24-25): le groupe `docs` seul, aux
@@ -163,8 +166,8 @@ voir [GitHub Pages](#github-pages).
 `Deploy` ne met en ligne qu'un commit dont toutes les exécutions des workflows du dépôt sont finies et vertes, `Image`
 et `Infra` comprises (`deploy.yml:51-67`). Un contrôle non requis à la fusion compte donc à la livraison.
 
-`Docs` compte aussi. Sur un commit de `main`, il ne tourne que lancé à la main (`docs.yml:6-9`), et une telle
-exécution en échec, ou pas encore finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer
+`Docs` compte aussi. Il tourne sur chaque commit de `main` (`docs.yml:10-11`), et son exécution en échec, ou pas
+encore finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer
 `Docs` jusqu'à ce qu'il passe (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant. `Deploy`
 n'écarte pas `Docs` de son contrôle: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou ADR,
 2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »).
@@ -185,13 +188,13 @@ gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin,
 
 Une PR reçoit onze contrôles: les sept jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
 depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Dix tournent; `deploy`
-est sauté sur une PR (`docs.yml:37`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
+est sauté sur une PR (`docs.yml:42-44`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
 à `skipping`.
 
 ### Fusionner
 
-C'est possible quand les sept contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
-`bicep-build`, `image-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
+C'est possible quand les six contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
+`bicep-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
 (`git fetch origin`, puis `git rebase origin/main` et `git push --force-with-lease`, ou
 « <span lang="en">Update branch</span> » sur la PR): la CI repasse sur le nouveau commit. La fusion se fait par un
 commit de fusion, la seule méthode permise par le ruleset.
@@ -252,8 +255,8 @@ Dans <span lang="en">Settings → Rules → Rulesets</span>, avec ces règles:
     approbation requise (`required_approving_review_count: 0`), et le réglage par défaut
     `require_extra_approval_for_unattributed_changes: true`, sans effet ici: il ajoute une approbation à une PR que
     Copilot ouvre sans personne attribuée, et rien quand aucune n'est requise;
-- exiger les contrôles `audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build` (depuis #496) et
-    `image-build` (depuis #498), rendus par GitHub Actions (`integration_id` 15368), sur une branche à jour
+- exiger les contrôles `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build` (depuis #496), lus le
+    2026-11-22, rendus par GitHub Actions (`integration_id` 15368), sur une branche à jour
     (`strict_required_status_checks_policy: true`).
 
 ```sh
@@ -303,7 +306,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 
 | Réglage | Où | À changer avec |
 |---|---|---|
-| version de uv | `version:` des sept jobs de `ci.yml` et de `docs.yml:22`; `Dockerfile:7` | tous ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
+| version de uv | `version:` des sept jobs de `ci.yml` et de `docs.yml:25`; `Dockerfile:7` | tous ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
 | version de pip-audit | `ci.yml:26` | à la main |
 | image de PostgreSQL | `ci.yml:70`, tag et digest | à la main: d'après le commentaire de `ci.yml:64-65`, Dependabot ne la met pas à jour |
 | chemins envoyés à la construction | `.dockerignore`, `Dockerfile` et la liste de `image.yml:35` | ensemble: un chemin de plus à la racine du contexte fait échouer l'étape 3 d'`Image` tant qu'il manque à la liste |
@@ -311,7 +314,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 | version de Grype | `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71` | à la main, ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
 | version épinglée d'un paquet Debian | `Dockerfile:48-54` (zlib1g) | retirée par son issue, #647, quand l'image de base porte le correctif ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage), étape 3) |
 | versions de MkDocs et de Material | `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) | `uv lock --upgrade-package <paquet>`, puis la construction du site sur le poste |
-| fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:29` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
+| fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:32` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
 | seuil de couverture | `fail_under`, `pyproject.toml:87` | une décision consignée au journal ADR (le seuil de 96 % date du 2026-11-08) |
 | règles de lint | `[tool.ruff.lint]`, `pyproject.toml:52-71` | `uv run ruff check --no-cache` avant de pousser |
 | tests écartés par défaut | marqueurs `e2e` et `postgresql`, écartés sauf s'ils sont nommés par `-m` (`tests/conftest.py:125-137`) | un test marqué `postgresql` ne tourne que dans `tests-postgresql` |
@@ -329,7 +332,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
     recoupée avec `grype_<version>_checksums.txt`. La version est aussi écrite dans les pages qui la citent
     (`grep -rn "Grype v0" README.md docs/fiches-veille.md documentation/`).
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
-    (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:26-29`). Avant de
+    (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:29-32`). Avant de
     changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
     [la section Limites de la fiche de l'accessibilité](accessibilite_pour_docu.md#limites).
 - **Dependabot**: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, `dependabot.yml:8-9` et
@@ -538,7 +541,7 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     la PR n° 533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
     Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-    lance la CI et attend ses sept contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+    lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
     lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,

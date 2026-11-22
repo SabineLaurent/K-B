@@ -235,7 +235,7 @@ Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 202
     l'offre gratuite a supprimé ses <span lang="en">access policies</span>; le bac à sable a reçu `401 Unauthorized`
     jusqu'au jeton neuf. Le jeton de la production a été refait de même (#522, close le 2026-11-12).
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
-- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué
+- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche faite sur le jeu de #479 rejoué
     par les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits
     « non trouvés » manquent seulement dans le texte français de la fiche: des CVE
     (<span lang="en">Common Vulnerabilities and Exposures</span>, les identifiants publics des vulnérabilités) non

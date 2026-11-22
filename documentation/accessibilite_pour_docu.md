@@ -9,7 +9,8 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
 elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21).
+visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
+`.github/workflows/docs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
 `mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
@@ -194,8 +195,8 @@ peut y paraître avant le texte qui le développe.
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
     (`mkdocs.yml:85-91`). Le workflow `docs.yml` la lance sur chaque demande de fusion
-    (PR, <span lang="en">pull request</span>)
-    (`.github/workflows/docs.yml:6-9`, `:25`).
+    (PR, <span lang="en">pull request</span>) et sur chaque push sur `main`
+    (`.github/workflows/docs.yml:7-12`, `:28`).
 
 2. Le contrôle du HTML construit, lancé sur `site/` pour chaque PR de mise en forme, compte dans chaque page: l'attribut
     `lang`, les titres de niveau 1 et les sauts de niveau, les tableaux sans `th`, les liens dont le texte est une
@@ -230,19 +231,25 @@ peut y paraître avant le texte qui le développe.
 
 ## Publier
 
-Le workflow `docs.yml` publie le site sur GitHub Pages quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:9`, `:30-49`). Seul son job `deploy` a le droit d'écrire sur Pages (`:41-43`). Le
-2026-11-14, Pages n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la
-première publication, deux gestes de Sabine:
+Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
+la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
+(`.github/workflows/docs.yml:10-12`, `:33-60`). Sans cette variable, son job `deploy` est sauté: tant que Pages n'est
+pas activé, il échouerait. Un seul déploiement tourne à la fois, jamais interrompu: celui d'une fusion qui suit attend
+la fin du précédent (`:46-49`). Seul le job `deploy` a le droit d'écrire sur Pages (`:52-54`). Le 2026-11-22, Pages
+n'est pas activé sur le dépôt (`gh api repos/SabineLaurent/K-B/pages` rend 404). Avant la première publication, trois
+gestes de Sabine:
 
 1. Rendre le dépôt public, comme prévu (il est privé le 2026-11-14). Pages ne sert un dépôt privé qu'avec une offre
     payante de GitHub (Pro, Team ou Enterprise), et **un site publié depuis un dépôt privé est public**: activer Pages
     sur le dépôt encore privé publierait toutes les fiches.
 2. Dans les réglages du dépôt, <span lang="en">Settings > Pages > Build and deployment > Source</span>, choisir
     <span lang="en">« GitHub Actions »</span>.
+3. Créer la variable de dépôt `PAGES_PUBLISH`, de valeur `true`: dans les réglages,
+    <span lang="en">Settings > Secrets and variables > Actions > Variables</span>, ou par
+    `gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`.
 
-Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, sur `main`. Cette procédure n'a pas
-été essayée.
+Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, sur `main`, pour la première
+publication; ensuite, chaque fusion publie le site. Cette procédure n'a pas été essayée.
 
 ## Limites
 
@@ -295,7 +302,7 @@ Puis lancer le workflow `Docs` depuis l'onglet <span lang="en">Actions</span>, s
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
     qui bouge. Parade: le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
     vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
-    (`.github/workflows/docs.yml:26-29`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
+    (`.github/workflows/docs.yml:29-32`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.

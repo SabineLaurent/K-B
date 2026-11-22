@@ -19,13 +19,36 @@
 
     — C5
 
-Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment installer la base sur le Mac et en ligne,
+Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment installer la base en local et en ligne,
 ce que font la collecte qui précède l'import (`kb collect`) et le script d'agrégation et d'import (`kb import`), pas à
 pas, chacun avec son logigramme, comment l'import nettoie et homogénéise les données, la commande qui le suit
 (`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`
 (2026-11-11); la collecte et les logigrammes, d'après le commit `36c1e02` (2026-11-21). Les chemins du code de K-B (`etl/…`, `database/…`) partent de
 `src/k_b/`, les autres de la racine du dépôt. Le README garde sa section « Installer et lancer », que cette fiche
 reprend et détaille.
+
+## Deux usages, deux moteurs
+
+K-B a deux usages: en local, sur un poste de travail, sans déploiement, avec SQLite
+([En local: SQLite, sans serveur](#en-local-sqlite-sans-serveur)); en ligne, déployé sur Azure, avec PostgreSQL
+([En ligne: PostgreSQL sur Azure](#en-ligne-postgresql-sur-azure)). En local, un PostgreSQL sert aussi à essayer la
+branche en ligne ([En local: PostgreSQL, pour essayer la branche en ligne](#en-local-postgresql-pour-essayer-la-branche-en-ligne)).
+La variable `KB_DATABASE_URL` choisit le moteur: absente, la base est le fichier `<KB_DATA_DIR>/k-b.sqlite`; posée,
+c'est l'URL `postgresql://` ou `postgres://` d'une base PostgreSQL ([Réglages](#reglages), `database/location.py:106-135`).
+
+### Pourquoi deux systèmes de gestion de base de données
+
+- **En local, SQLite**: une utilisatrice, un seul écrivain, le pipeline, et quelques milliers d'items par an; aucun
+    serveur à installer, et, en mode WAL (<span lang="en">write-ahead logging</span>), l'API lit pendant que le
+    pipeline écrit ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-10-02, « Base des items »).
+- **En ligne, PostgreSQL**: les API et les jobs tournent chacun dans son conteneur (`infra/main.bicep:270`, `:307`,
+    `:386`, `:406`, `:433`, `:480`). SQLite y demanderait un fichier sur un partage Azure Files monté: la documentation
+    de Container Apps ne dit rien des verrous de SQLite sur un partage SMB (<span lang="en">Server Message
+    Block</span>), et des sources de la communauté le jugent peu fiable; un conteneur Blob, lui, ne se monte pas
+    dans Container Apps ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-11-06, « Base: PostgreSQL en ligne, par un adaptateur
+    maison (#417) »). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
+    connexion sans mot de passe, par Entra (même journal, « Base en ligne: trois rôles, posés par l'administratrice
+    (#421) » et « Base en ligne: Entra seul, un jeton à chaque connexion (#421) »).
 
 ## Vue d'ensemble
 
@@ -119,7 +142,7 @@ commande sort en 2, sans rien lire, quand:
 
 ## Installer le système de gestion de base de données
 
-### Sur le Mac: SQLite, sans serveur
+### En local: SQLite, sans serveur
 
 Rien à installer: le module `sqlite3` de Python ouvre le fichier (`database/engine.py:36-40`). La base est
 `<KB_DATA_DIR>/k-b.sqlite` (`core/config.py:189`, `database/location.py:123`).
@@ -152,7 +175,7 @@ Le tableau suivant donne les codes de sortie de `kb create-db`.
 | 2 | rien n'est fait: réglage refusé (une URL que libpq ne lit pas comprise), la base existe déjà, ou la base PostgreSQL n'est pas en UTF8 et en collation C | `commands/create_db_command.py:29-42` |
 | 130 | Ctrl-C: aucun fichier de base ne reste, sauf si un second Ctrl-C coupe sa suppression (README, « Créer la base ») | `commands/exit_codes.py:63-72` |
 
-### Sur le Mac: PostgreSQL, pour essayer la branche en ligne
+### En local: PostgreSQL, pour essayer la branche en ligne
 
 Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL (README, « Lancer les tests sur
 PostgreSQL »), sans décrire son installation: c'est une limite de cette fiche. K-B ne crée pas la base PostgreSQL,
@@ -577,7 +600,7 @@ démarre pas sans les réglages du stockage d'échange ni `KB_VAULT_DIR` (`comma
 
 ## Lire la base sans l'API
 
-### Sur le Mac: SQLite
+### En local: SQLite
 
 La base s'ouvre en lecture seule par le module `sqlite3` de Python, comme l'API de données l'ouvre (`mode=ro`,
 `database/engine.py:106-119`):
@@ -609,7 +632,7 @@ Les tables sont celles de `database/schema.sql`: `source` (ligne 16), `raw_data`
 `vulnerability`, `tracked_repository`, `release`, `advisory`, `newsletter_article`, `zotero_entry`, `clip`, `tag`,
 `item_has_tag`, lignes 56 à 336). Le modèle est décrit dans `docs/stockage.md`.
 
-### Sur un PostgreSQL du Mac
+### Sur un PostgreSQL local
 
 La base se lit par `psql`, avec l'URL que lit `kb` (`KB_DATABASE_URL`). Commande non essayée pour cette fiche:
 
