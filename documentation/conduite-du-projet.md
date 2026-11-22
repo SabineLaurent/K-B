@@ -157,8 +157,7 @@ Chaque PR vers `main`, et chaque push sur `main`, lance l'intégration continue 
 `lint`, `types`, `tests-postgresql`, `tests-data` et `digests-reference` (`.github/workflows/ci.yml`), `image-build`
 (`.github/workflows/image.yml`) et `bicep-build` (`.github/workflows/infra.yml`). Chaque PR construit aussi le site de
 ces fiches (`build`, `.github/workflows/docs.yml`). Une PR ne fusionne que si six contrôles sont verts, sur une
-branche à jour avec `main`: `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`. Du 2026-11-22 au
-prochain déploiement, le ruleset n'en exige aucun, et ils sont rejoués en local avant chaque fusion. Le détail est dans
+branche à jour avec `main`: `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`. Le détail est dans
 [la fiche de l'intégration continue](integration-continue.md).
 
 ```sh

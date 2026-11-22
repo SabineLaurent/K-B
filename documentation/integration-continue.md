@@ -25,10 +25,9 @@ Chaque demande de fusion (PR, <span lang="en">pull request</span>) vers `main`, 
 couverture, lint, format, typage), ses dépendances (vulnérabilités connues), l'image du conteneur et le Bicep. Sur
 chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le workflow `Docs`](#le-workflow-docs)). Une
 PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
-([Le ruleset de `main`](#le-ruleset-de-main)); du 2026-11-22 au prochain déploiement, GitHub Actions ne tourne plus,
-et ces contrôles sont rejoués en local avant chaque fusion. La CI ne pousse rien et ne déploie rien sur Azure, où
-elle n'a aucun droit. Seul `Docs` publie quelque chose: le site des fiches, sur GitHub Pages, à chaque fusion une
-fois la variable de dépôt `PAGES_PUBLISH` posée à `true`, ou lancé à la main depuis `main`.
+([Le ruleset de `main`](#le-ruleset-de-main)). La CI ne pousse rien et ne déploie rien sur Azure, où elle n'a aucun
+droit. Seul `Docs` publie quelque chose: le site des fiches, sur GitHub Pages, à chaque fusion une fois la variable
+de dépôt `PAGES_PUBLISH` posée à `true`, ou lancé à la main depuis `main`.
 
 ### Les outils
 
@@ -197,9 +196,8 @@ est sauté sur une PR (`docs.yml:42-44`), et GitHub le liste comme tel: le 2026-
 ### Fusionner
 
 C'est possible quand les six contrôles requis (`audit`, `tests`, `lint`, `types`, `tests-postgresql`,
-`bicep-build`) sont verts et que la branche est à jour avec `main`. Du 2026-11-22 au prochain déploiement, ils sont
-rejoués en local avant la fusion ([Chaque job sur le poste](#chaque-job-sur-le-poste)). Si `main` a avancé, mettre
-la branche à jour (`git fetch origin`, puis `git rebase origin/main` et `git push --force-with-lease`, ou
+`bicep-build`) sont verts et que la branche est à jour avec `main`. Si `main` a avancé, mettre la branche à jour
+(`git fetch origin`, puis `git rebase origin/main` et `git push --force-with-lease`, ou
 « <span lang="en">Update branch</span> » sur la PR): la CI repasse sur le nouveau commit. La fusion se fait par un
 commit de fusion, la seule méthode permise par le ruleset.
 
@@ -271,11 +269,6 @@ gh api repos/SabineLaurent/K-B/rulesets/25257125 --jq '{name, enforcement, bypas
 Le 2026-11-14, la seconde commande rend les règles de la liste, et la première trois rulesets actifs: celui-ci,
 25257125, et les deux des tags, « tags v » et « tags v immuables », qui servent la livraison
 ([la fiche de la livraison continue](livraison-continue.md)).
-
-Le 2026-11-22, les six contrôles requis sont retirés du ruleset jusqu'au prochain déploiement, GitHub Actions ne
-tournant plus faute de budget: la seconde commande ne rend plus que `deletion`, `non_fast_forward` et `pull_request`
-(lu le 2026-11-22). D'ici là, une PR fusionne sur ses six contrôles rejoués en local
-([Chaque job sur le poste](#chaque-job-sur-le-poste)).
 
 ### Les réglages de Dependabot
 
@@ -505,11 +498,6 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     `bicep-build` y est depuis #496: ni `infra.yml` ni `image.yml` n'ont de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
     « <span lang="en">Pending</span> » et bloque la fusion.
     Pour réduire le risque: ajouter ces quatre contrôles aux contrôles requis du ruleset (faisable avec nos droits).
-- **Du 2026-11-22 au prochain déploiement, aucun contrôle ne bloque la fusion**: le ruleset n'en exige aucun, et les
-    contrôles rejoués en local ne laissent sur la PR aucun statut que GitHub vérifie
-    ([Le ruleset de `main`](#le-ruleset-de-main)).
-    Pour réduire le risque: écrire dans chaque PR les contrôles rejoués et leur résultat, et remettre les six contrôles
-    au ruleset quand GitHub Actions tourne de nouveau (faisable avec nos droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
     services; ils se lancent sur le poste ([la fiche des tests](tests.md)).
     Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
@@ -559,9 +547,8 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     la PR n° 533). Faisable avec nos droits, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
     Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
-    lance la CI et attend ses six contrôles requis, rejoués en local du 2026-11-22 au prochain déploiement. Retirer
-    `branches: [main]` du `pull_request` de chaque workflow lancerait aussi la CI sur les autres PR (faisable avec nos
-    droits).
+    lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
+    lancerait aussi la CI sur les autres PR (faisable avec nos droits).
 
 Sources, lues le 2026-11-10: GitHub Docs,
 [« <span lang="en">Approving a pull request with required reviews</span> »](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews),

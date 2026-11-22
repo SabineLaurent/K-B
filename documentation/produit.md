@@ -100,8 +100,8 @@ Un modèle lit la veille, à travers l'API de données, et ce qui en sort est ra
     tenu par le
     [registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md).
 - **Les contrôles**: chaque demande de fusion vers `main`, branche protégée, passe les six contrôles requis de l'intégration continue (CI)
-    (`audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build`) avant d'être fusionnée, rejoués en local du
-    2026-11-22 au prochain déploiement ([la fiche de l'intégration continue](integration-continue.md)).
+    (`audit`, `tests`, `lint`, `types`, `tests-postgresql`, `bicep-build`) avant d'être fusionnée
+    ([la fiche de l'intégration continue](integration-continue.md)).
 
 ## Les moyens et leurs coûts
 
