@@ -26,9 +26,8 @@ et le fichier qui le porte dans K-B.
 | MPD | les tables d'un SGBD donné, leurs types, leurs contraintes et leurs index, en SQL | `database/schema.sql` pour SQLite, en local; `database/schema_postgresql.sql` pour PostgreSQL, en ligne |
 
 Le MCD et le MLD sont dessinés avec draw.io depuis la décision du 2026-10-08, qui remplace des schémas Mermaid:
-draw.io dessine la notation de Merise, qu'un `flowchart` Mermaid ne faisait qu'imiter
-([le journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-2026-10-08, « Schémas »). Le MPD est le script SQL: `database/schema.sql` est la référence, que
+draw.io dessine la notation de Merise, qu'un `flowchart` Mermaid ne faisait qu'imiter (journal des décisions,
+`docs/ADR/journal-decisions-projet.md`, 2026-10-08, « Schémas »). Le MPD est le script SQL: `database/schema.sql` est la référence, que
 `database/schema_postgresql.sql` suit table par table (`database/schema_postgresql.sql:3-5`).
 
 ### Concevoir, puis corriger
@@ -127,7 +126,7 @@ propriétés. Ses associations et leurs cardinalités sont celles de [La vue d'e
 sont décrites dans [L'héritage de l'item et de ses sous-types](#lheritage-de-litem-et-de-ses-sous-types) et
 [Les règles que la base tient](#les-regles-que-la-base-tient).
 
-![MCD complet de K-B, décrit en texte dans la section « Les entités, leurs identifiants et leurs propriétés »](images/mcd-k-b_20261107.png)
+![MCD complet de K-B, décrit dans la section « Les entités, leurs identifiants et leurs propriétés »](images/mcd-k-b_20261107.png)
 
 [Le MCD complet de K-B en taille réelle (image de 2 254 × 1 229 pixels)](images/mcd-k-b_20261107.png)
 

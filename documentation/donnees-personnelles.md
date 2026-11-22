@@ -187,7 +187,7 @@ GitHub Actions. Le tableau suivant donne les données personnelles qu'il porte (
 - Le 2026-11-16, un banc d'essai a fait passer le classement, la rédaction des fiches et les tendances par onze
     modèles chez trois fournisseurs (Microsoft, Google et Anthropic), pour choisir le modèle de production; terminé le
     2026-11-16. Ce qui est parti et les conditions de chaque fournisseur: la section du banc d'essai du 2026-11-16 du
-    [registre des traitements](https://github.com/SabineLaurent/K-B/blob/main/docs/registre-traitements.md).
+    même registre.
 
 ## Les tables de la base qui portent une donnée personnelle
 
@@ -228,7 +228,7 @@ automatisée, sa fréquence et le code qui la porte.
 | 6 | Les deux | Relire le registre: sources ajoutées, champs ajoutés à la base, durées. | non | une fois par an, et à chaque nouvelle source | (relecture) |
 | 7 | Les deux | Ne garder du brut que le dernier fichier importé de chaque catalogue d'état (Zotero, CISA KEV) et ceux pas encore importés; des tops, que le dernier relevé lisible et ceux qui le suivent. | oui, par `kb purge`; pour les tops, par `kb write-tops` | à chaque `kb purge`; à chaque `kb write-tops` | `purge/catalogs.py`, `post/top_sheets.py:84-85` |
 | 8 | Bibliothèque (fiche 2) | Les copies des clips du brut suivent l'étape 3, 6 mois au plus. K-B ne touche jamais au clip du coffre ni au clip de la base. | oui, par l'étape 3 | à chaque `kb purge` | `purge/raw.py` |
-| 9 | Les deux | Les fiches du coffre ne sont jamais purgées automatiquement: l'utilisatrice les supprime à la main. | non | à la décision de l'utilisatrice | (procédure écrite: [Les étapes manuelles](#les-etapes-manuelles)) |
+| 9 | Les deux | Les fiches du coffre ne sont jamais purgées automatiquement: l'utilisatrice les supprime à la main. | non | à la décision de l'utilisatrice | (procédure écrite: section « Les étapes manuelles ») |
 | 10 | Les deux | Effacer, à la fin de chaque test de bout en bout, tout son dossier de données sauf `logs/`: le brut, la base et les journaux d'import. | oui, à la fin de chaque test, réussi ou non | à chaque lancement des tests de bout en bout | `tests/e2e/test_real_sources.py:112-121`, `:197-203` |
 | 11 | Les deux | Supprimer les logs de fonctionnement et les journaux d'import de plus de 6 mois. | oui, par `kb purge` | à chaque `kb purge` | `purge/run_records.py` |
 
