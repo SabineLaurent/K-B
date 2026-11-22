@@ -2,7 +2,7 @@
 container watch that veille lacks is copied there, by the Entra account of az login.
 
 A sheet in veille is never downloaded nor replaced, changed on the Mac or not; one deleted there
-comes back at the next run, while watch holds it (README). The steps: the listing and the names
+comes back at the next run, while watch holds it (documentation/utilisation.md). The steps: the listing and the names
 (jobs/watch_download.py), then the writing, which follows no symbolic link (post/vault_files.py)."""
 
 import logging

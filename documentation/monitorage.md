@@ -235,7 +235,7 @@ Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 202
     l'offre gratuite a supprimé ses <span lang="en">access policies</span>; le bac à sable a reçu `401 Unauthorized`
     jusqu'au jeton neuf. Le jeton de la production a été refait de même (#522, close le 2026-11-12).
 - **Rétention de 14 jours** sur l'offre gratuite: aucune fenêtre ne la dépasse.
-- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche de time-knight, sur le jeu de #479 rejoué
+- **Ce que la fidélité mesure aujourd'hui** (2026-11-08): une recherche faite sur le jeu de #479 rejoué
     par les fonctions de K-B, trouve les 26 faits présents dans l'item cité, donc aucune invention; les 12 faits
     « non trouvés » manquent seulement dans le texte français de la fiche: des CVE
     (<span lang="en">Common Vulnerabilities and Exposures</span>, les identifiants publics des vulnérabilités) non
@@ -280,7 +280,8 @@ son renvoi au code ou aux règles.
 
 Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
 `<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`,
-`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données (`README.md:286-292`). Les traces et les
+`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données ([la fiche des données](donnees.md), « Le script
+d'agrégation et d'import: `kb import` »). Les traces et les
 enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le même réglage
 (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).
 
@@ -452,7 +453,8 @@ période.
     zéro du plafond; les lignes envoyées entre-temps ne sont pas reçues.
 - **Les lignes de mesure ne sont gardées nulle part en local**: la sortie standard de `kb serve-ai` va au terminal.
 - **Un seul `kb serve-data` et un seul `kb serve-ai` par `KB_DATA_DIR`**: deux, sur deux ports, écriraient le même
-    fichier (`docs/specs-api.md`, « Journal »; `README.md:476`).
+    fichier (`docs/specs-api.md`, « Journal »; [Utiliser K-B](utilisation.md), « La lancer et lui demander des
+    comptes rendus »).
 
 ## Sources
 

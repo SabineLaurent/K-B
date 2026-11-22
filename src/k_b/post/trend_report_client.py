@@ -55,7 +55,7 @@ from k_b.post.ai_api_client import (
     send_request,
 )
 
-# The client KB_TREND_REPORT of kb serve-ai: one value for both sides (README, "Changer une clé").
+# The client KB_TREND_REPORT of kb serve-ai: one value for both sides (documentation/utilisation.md, "Changer une clé").
 TREND_REPORT_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}{TREND_REPORT_CLIENT}"
 TREND_REPORTS_PATH = "trend-reports"
 # The criteria in the order the AI API gives them (docs/tendances.md, "Ce que rend #366").
