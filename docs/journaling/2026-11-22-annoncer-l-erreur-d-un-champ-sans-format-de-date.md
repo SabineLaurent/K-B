@@ -9,8 +9,9 @@
   [afficher les tendances sur le site](2026-11-14-afficher-les-tendances-sur-le-site.md) (le message d'un jour
   refusé, que cette PR partage avec le fil)
 
-Les commits de cette PR sont `8bdd1b6d` (le code et ses tests), `af54fd64` (les revues triées) et `84212273`
-(la fusion d'`origin/main` 39cb5eb9, sans conflit). Les autres commits de l'historique de la branche sont ceux de
+Les commits de cette PR sont `8bdd1b6d` (le code et ses tests), `af54fd64` (les revues triées), `84212273`
+(la fusion d'`origin/main` 39cb5eb9, sans conflit), cette note (`f77195f7`) et la précision du journal des
+décisions (`6e277769`). Les autres commits de l'historique de la branche sont ceux de
 `main` qu'apporte cette fusion (#658, #662, #664, #665, #670, #679) : ils ont leur propre note.
 
 ## Le pourquoi
@@ -121,6 +122,11 @@ hors du dépôt) ont montré ce que le champ laisse partir :
 Le seul refus qu'un vrai navigateur envoie au site est donc l'année de plus de 4 chiffres. Elle n'a pas la forme
 d'un jour : elle reçoit « … invalide: choisissez un jour dans le champ. ». La phrase « n’existe pas » ne sert qu'à
 une adresse modifiée à la main, ou à un navigateur sans calendrier.
+
+Le journal des décisions disait le contraire : son entrée du 2026-11-14 sur le jour des tendances (#596) écrivait
+que le sélecteur de date n'envoie qu'un jour valide, et qu'une valeur refusée ne vient que d'une adresse écrite à
+la main. Le texte d'une décision ne se réécrit pas : une ligne « **Précisée le 2026-11-22** » y ajoute le fait
+mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
 
 ## Choix faits et options écartées
 
