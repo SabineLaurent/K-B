@@ -279,7 +279,7 @@ son renvoi au code ou aux règles.
 
 Deux autres sorties ne sont pas des journaux de fonctionnement. Le journal d'import,
 `<KB_DATA_DIR>/journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`src/k_b/core/config.py:172-173`,
-`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données ([la fiche des données](import_et_base_pour_docu.md), « Le script
+`src/k_b/etl/pipeline.py:35`), dit ce qu'un import a décidé des données ([la fiche des données](donnees.md), « Le script
 d'agrégation et d'import: `kb import` »). Les traces et les
 enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le même réglage
 (`docs/architecture-api-ia.md`, « Les métriques et les journaux »).

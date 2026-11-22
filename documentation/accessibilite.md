@@ -143,7 +143,7 @@ schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisi
 | Le libellé d'une boîte dans un sous-graphe de troisième niveau (calculé, non vu) | `#36464E` sur `#B1B8B6` | 4,85:1 | `#DADCD6` sur `#585C5D` | 4,89:1 |
 
 Le troisième niveau est celui du schéma du déploiement sur Azure, dans
-[la fiche de l'architecture](architecture_pour_docu.md).
+[la fiche de l'architecture](architecture.md).
 
 Hors de l'en-tête, l'anneau de focus prend la couleur de l'accent (`documentation/stylesheets/extra.css:42-43`), y
 compris sur la liste des résultats de recherche (`:194-197`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur

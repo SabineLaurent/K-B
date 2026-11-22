@@ -7636,7 +7636,7 @@ les jetons du modèle (#501) »).
   (« By default, any existing pending job or workflow in the same concurrency group will be canceled », GitHub Docs,
   « Control the concurrency of workflows and jobs », lu le 2026-11-22) : le site publié est celui de la dernière
   fusion ; la publication attend toujours que le dépôt soit public et Pages activé
-  (`documentation/accessibilite_pour_docu.md`, « Publier »). — PR de #684
+  (`documentation/accessibilite.md`, « Publier »). — PR de #684
 
 ## Décisions encore ouvertes
 

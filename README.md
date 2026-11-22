@@ -38,7 +38,7 @@ deux parcours de l'ETL, la collecte et l'import, communiquent par les fichiers b
 K-B tourne en local, sur un poste de travail, sans conteneur, et en ligne, sur Azure Container Apps : une même image
 sert les trois applications (les deux API et le site) et les jobs (la routine de chaque jour, les comptes rendus, le
 test de fumée, la création de la base). L'infrastructure est décrite en Bicep, dans `infra/`. Le détail est dans
-[la fiche de l'architecture](documentation/architecture_pour_docu.md).
+[la fiche de l'architecture](documentation/architecture.md).
 
 ## Installation
 
@@ -64,15 +64,15 @@ cp .env.example .env
 uv run --env-file .env kb create-db
 ```
 
-Sans `KB_DATABASE_URL`, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Le détail est dans [la fiche de l'installation](documentation/installation_pour_docu.md)
-et, pour la base, dans [la fiche des données](documentation/import_et_base_pour_docu.md).
+Sans `KB_DATABASE_URL`, la base est le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`. Le détail est dans [la fiche de l'installation](documentation/installation.md)
+et, pour la base, dans [la fiche des données](documentation/donnees.md).
 
 ### En ligne
 
 K-B se déploie sur Azure depuis `infra/main.bicep`, appliqué en deux passes
 ([infra/README.md](infra/README.md), « Appliquer »). Ensuite, un tag `vX.Y.Z` posé sur `main` met la version en
 ligne, une fois la CI de son commit finie et verte ([la fiche de la livraison
-continue](documentation/livraison_continue_pour_docu.md)).
+continue](documentation/livraison-continue.md)).
 
 ## Utilisation
 
@@ -113,9 +113,9 @@ uv run pytest --cov --cov-report=term-missing
 La première commande lance la suite sans les tests marqués `postgresql` et `e2e`, qui ne tournent que si `-m` les
 nomme. La seconde y ajoute la couverture des lignes et des branches de `src/k_b/`, et échoue sous le seuil du
 `pyproject.toml`. Le lint, le format et le typage : `uv run ruff check`, `uv run ruff format --check` et
-`uv run mypy --strict`. Le détail est dans [la fiche des tests](documentation/tests_pour_docu.md), et la CI, qui les
+`uv run mypy --strict`. Le détail est dans [la fiche des tests](documentation/tests.md), et la CI, qui les
 lance sur chaque demande de fusion vers `main`, dans [la fiche de l'intégration
-continue](documentation/integration_continue_pour_docu.md).
+continue](documentation/integration-continue.md).
 
 ## Documentation
 

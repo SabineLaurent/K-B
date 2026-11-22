@@ -31,7 +31,7 @@ Une fusion ne déploie rien. La chaîne a trois temps.
 1. **La CI**, sur chaque PR vers `main` et sur chaque push sur `main`: `ci.yml` (tests, lint, typage, audit),
     `image.yml` (l'image se construit et se contrôle, sans être poussée), et `infra.yml` (le Bicep se compile, sur
     toute PR depuis #496). Son détail est l'affaire de
-    [la fiche de l'intégration continue](integration_continue_pour_docu.md).
+    [la fiche de l'intégration continue](integration-continue.md).
 2. **Le tag**: une administratrice du dépôt pose `vX.Y.Z` sur un commit de `main` et le pousse.
 3. **Le workflow `Deploy`** (`.github/workflows/deploy.yml`): le job `check` vérifie le tag et la CI de son commit,
     puis le job `deploy` construit l'image du tag, migre la base, met les trois apps (les deux API et le site,
@@ -85,7 +85,7 @@ comme celle de `CI`. Pour livrer ce commit malgré tout, relancer `Docs`
 ce contrôle a été écarté: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou
 ADR, 2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »,
 `docs/ADR/journal-decisions-projet.md:7307-7310`). Le même fait est écrit dans
-[la section « Après la CI » de la fiche de l'intégration continue](integration_continue_pour_docu.md#apres-la-ci).
+[la section « Après la CI » de la fiche de l'intégration continue](integration-continue.md#apres-la-ci).
 
 Le SHA du commit passe ensuite à `deploy`.
 

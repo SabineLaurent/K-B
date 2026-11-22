@@ -17,7 +17,7 @@ le même jour (#167), et d'après les réglages du dépôt lus le même jour; la
 contrôles requis, d'après la demande de fusion de #684 et le ruleset lu le 2026-11-22. Les exécutions citées se relisent
 par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du dépôt
 (`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en ligne
-d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison_continue_pour_docu.md).
+d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison-continue.md).
 
 ## La chaîne en bref
 
@@ -268,7 +268,7 @@ gh api repos/SabineLaurent/K-B/rulesets/25257125 --jq '{name, enforcement, bypas
 
 Le 2026-11-14, la seconde commande rend les règles de la liste, et la première trois rulesets actifs: celui-ci,
 25257125, et les deux des tags, « tags v » et « tags v immuables », qui servent la livraison
-([la fiche de la livraison continue](livraison_continue_pour_docu.md)).
+([la fiche de la livraison continue](livraison-continue.md)).
 
 ### Les réglages de Dependabot
 
@@ -290,13 +290,13 @@ gh api -i repos/SabineLaurent/K-B/pages | head -1   # lu le 2026-11-14: HTTP/2.0
 ```
 
 Les gestes de la première publication, et pourquoi pas avant que le dépôt soit public, sont dans
-[la section Publier de la fiche de l'accessibilité](accessibilite_pour_docu.md#publier).
+[la section Publier de la fiche de l'accessibilité](accessibilite.md#publier).
 
 ### Sur le poste
 
-Pour reproduire un job: l'environnement de développement de [la fiche de l'installation](installation_pour_docu.md),
+Pour reproduire un job: l'environnement de développement de [la fiche de l'installation](installation.md),
 uv 0.13.6 compris (`uv self update 0.13.6`), et, pour `tests-postgresql`, un serveur PostgreSQL
-([la fiche des tests](tests_pour_docu.md)).
+([la fiche des tests](tests.md)).
 
 ## Configurer la chaîne
 
@@ -338,7 +338,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
     (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:29-32`). Avant de
     changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
-    [la section Limites de la fiche de l'accessibilité](accessibilite_pour_docu.md#limites).
+    [la section Limites de la fiche de l'accessibilité](accessibilite.md#limites).
 - **Dependabot**: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, `dependabot.yml:8-9` et
     `:15-16`), sauf une mise à jour de sécurité (l. 9) et `astral-sh/uv`, dont ghcr.io ne donne pas la date, à vérifier
     à la main avant la fusion (l. 17-19). Pour `python` et `astral-sh/uv`, ni version mineure ni majeure (l. 24-28).
@@ -498,7 +498,7 @@ parade a été vérifiée à la source le 2026-11-10, celles de #498 le 2026-11-
     « <span lang="en">Pending</span> » et bloque la fusion.
     Pour réduire le risque: ajouter ces quatre contrôles aux contrôles requis du ruleset (faisable avec nos droits).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
-    services; ils se lancent sur le poste ([la fiche des tests](tests_pour_docu.md)).
+    services; ils se lancent sur le poste ([la fiche des tests](tests.md)).
     Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
     `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
     tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une

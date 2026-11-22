@@ -676,7 +676,7 @@ de la requête.
   (`core/api_keys.py`, `core/api_access.py`) ; `kb digest` (#209) est le client `KB_DIGEST`,
   `kb trend-report` (#366) le client `KB_TREND_REPORT` ([tendances.md](tendances.md)). Sans
   clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans
-  `documentation/api_ia_pour_docu.md` (« Expiration et changement d'une clé »).
+  `documentation/api-ia.md` (« Expiration et changement d'une clé »).
 - **Une route, un client** (OWASP API5:2023) : `POST /digests` s'ouvre à `KB_DIGEST` seul,
   `POST /trend-reports` à `KB_TREND_REPORT` seul (`AI_API_CLIENT_BY_ROUTE`, `core/config.py`). Tout
   autre client à clé valide reçoit 403 `client_not_allowed` ; une route absente de la table est refusée
@@ -1135,7 +1135,7 @@ limite. Aucune entrée n'est non tenue.
   (décision de Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ;
   les essais de clé ne sont pas limités. Il n'est pas nécessaire :
   - la recherche exhaustive d'une clé est impraticable. La commande de
-    `documentation/api_ia_pour_docu.md` (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
+    `documentation/api-ia.md` (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
     minimum, 32 caractères de l'alphabet, soit 192 bits. Le NIST définit sa catégorie 5, la plus
     haute face à un ordinateur quantique, par la recherche d'une clé AES de 256 bits (NIST IR
     8547, tableau 1), et juge que doubler la longueur d'une clé suffit contre l'algorithme de
@@ -1149,7 +1149,7 @@ limite. Aucune entrée n'est non tenue.
 
   **Limite** : une clé qui n'est pas tirée au hasard (le code contrôle sa longueur et son alphabet,
   pas son hasard), ou une entrée externe, qui ouvrirait les essais au réseau.
-  **Pour réduire le risque** : tirer chaque clé par la commande de `documentation/api_ia_pour_docu.md`, et la
+  **Pour réduire le risque** : tirer chaque clé par la commande de `documentation/api-ia.md`, et la
   changer (« Expiration et changement d'une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
   ci-dessus).
 

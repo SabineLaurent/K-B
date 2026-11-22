@@ -12,7 +12,7 @@
 
 Cette fiche dit comment installer l'environnement de développement de K-B sur une machine, le configurer, quelles
 dépendances il installe, puis comment y ajouter l'environnement de test, dont le détail est dans
-[la fiche des tests](tests_pour_docu.md). Elle est écrite d'après `main` au commit `fd956430` (2026-11-18). Les
+[la fiche des tests](tests.md). Elle est écrite d'après `main` au commit `fd956430` (2026-11-18). Les
 chemins du code de K-B (`commands/…`, `core/…`, `database/…`) partent de `src/k_b/`, les autres de la racine du
 dépôt.
 
@@ -167,7 +167,7 @@ les variables des commandes qu'ils enchaînent; avec `--dry-run`, ils ne lisent 
 
 `pyproject.toml` déclare les 17 dépendances de K-B (`[project]`, `dependencies`) et deux groupes
 (`[dependency-groups]`): `dev`, qui ne sert qu'au développement et aux tests, et `docs`, qui construit le site de la
-documentation ([la fiche de l'accessibilité de la documentation](accessibilite_pour_docu.md)). `uv.lock` fixe la
+documentation ([la fiche de l'accessibilité de la documentation](accessibilite.md)). `uv.lock` fixe la
 version exacte de chaque paquet, dépendances indirectes comprises: 110 paquets, K-B compris. Chacun porte
 l'empreinte `sha256` de ses fichiers, sauf K-B, installé depuis le dépôt (`source = { editable = "." }`). L'image
 n'installe ni l'un ni l'autre groupe: ses deux `uv sync` portent `--no-dev` (`Dockerfile`), et `docs` n'est pas un
@@ -194,7 +194,7 @@ Le tableau suivant donne chaque dépendance, son plancher et sa borne haute dans
 | `requests` | 2.34.2 | — | 2.34.2 | la session HTTP des exportateurs OTLP, qui ne lit ni proxy, ni certificat, ni `.netrc` de l'environnement (`build_session`, `ai_api/connectors/metrics_export.py`) |
 | `uvicorn` | 0.54.0 | — | 0.54.0 | le serveur des deux API et du site (`commands/serve_data_command.py`, `commands/serve_ai_command.py`, `commands/serve_web_command.py`) |
 
-Les paquets du groupe `dev` (pytest, ruff, mypy…) et leur rôle sont dans [la fiche des tests](tests_pour_docu.md),
+Les paquets du groupe `dev` (pytest, ruff, mypy…) et leur rôle sont dans [la fiche des tests](tests.md),
 « Les dépendances installées ».
 
 ## L'environnement de test
@@ -214,7 +214,7 @@ uv run mypy --strict
 `uv run pytest` lance toute la suite, sauf les tests marqués `e2e` et `postgresql` (`MARKERS_LEFT_OUT_BY_DEFAULT`,
 `tests/conftest.py`). Les trois commandes qui le suivent dans ce bloc sont le lint, le format et le typage, que la CI
 vérifie aussi; elle lance `uv run ruff check` sans `--no-cache`, une précaution prise sur la machine
-([la fiche des tests](tests_pour_docu.md), « Lancer les tests »).
+([la fiche des tests](tests.md), « Lancer les tests »).
 
 Les tests marqués `postgresql` demandent un serveur PostgreSQL de test, jamais la base de production. En local, sous macOS,
 c'est le PostgreSQL de Homebrew, sans conteneur; la formule `postgresql@18` (18.6 selon
@@ -230,7 +230,7 @@ KB_TEST_POSTGRESQL_URL=postgresql://<rôle>@127.0.0.1:5432/postgres uv run pytes
 `<rôle>` est un rôle du serveur qui peut créer et supprimer une base, et créer des rôles. Sans
 `KB_TEST_POSTGRESQL_URL`, chaque test marqué `postgresql` échoue: il n'est jamais sauté.
 
-Le détail est dans [la fiche des tests](tests_pour_docu.md): l'installation de l'environnement de test, dont les tests
+Le détail est dans [la fiche des tests](tests.md): l'installation de l'environnement de test, dont les tests
 de bout en bout et leur `.env.e2e_test` (« Installer l'environnement de test »), les dépendances installées, les
 commandes et les rapports (« Lancer les tests »), la couverture, et ce que lance la CI.
 

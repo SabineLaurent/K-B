@@ -69,7 +69,7 @@ Le schéma se lit ainsi:
     le README de chaque dépôt choisi, par `/readme` (`ai_api/connectors/github_client.py:1-2`).
 - **Elle envoie ses mesures et ses traces en OpenTelemetry** vers Grafana Cloud, par OTLP (le protocole d'export
     d'OpenTelemetry), quand l'export est réglé. Ce qu'elles contiennent et comment les lire:
-    [la fiche du monitorage](monitoring_pour_docu.md).
+    [la fiche du monitorage](monitorage.md).
 - **Les deux commandes écrivent le coffre** à partir de la réponse. Le paquet `ai_api` n'écrit aucun fichier
     (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:120` et `:144`;
     son écriture se vérifie à la main par la commande `grep` de la règle 7 (section
@@ -245,7 +245,7 @@ demandes admises par le débit comptent: une demande refusée avant lui (413, 42
 429 de concurrence) ou par lui ne compte pas; un 422 d'un corps hors de son schéma, contrôlé après, compte
 (`core/api_rate_limit.py:32-44`, `ai_api/app.py:62-67`).
 
-Les tests qui prouvent ces règles sont dans [la fiche des tests](tests_pour_docu.md), section « 7. Accès ». Un
+Les tests qui prouvent ces règles sont dans [la fiche des tests](tests.md), section « 7. Accès ». Un
 test prouve que le 401, le 403 et le 429 de concurrence ne comptent pas dans le débit. Pour le 413 et le 422 d'un
 corps illisible, qui ne comptent pas, et pour le 422 d'un corps hors de son schéma, qui compte, aucun test ne lit
 le compte: c'est l'ordre du code. Le 413 vient d'un <span lang="en">middleware</span>, avant la route

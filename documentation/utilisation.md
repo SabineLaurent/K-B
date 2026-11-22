@@ -5,7 +5,7 @@ comptes rendus, le site, puis les commandes des jobs en ligne. Pour chacune, ell
 affiche et ses codes de sortie, et renvoie à la fiche qui la détaille. Elle est écrite d'après `main` au commit
 `39cb5eb9` (2026-11-22). Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
 racine du dépôt. L'installation et chaque variable d'environnement sont dans
-[la fiche de l'installation](installation_pour_docu.md).
+[la fiche de l'installation](installation.md).
 
 ## Lancer une commande
 
@@ -44,7 +44,7 @@ uv run --env-file .env kb create-db
 
 `kb create-db` crée le fichier SQLite `<KB_DATA_DIR>/k-b.sqlite`, ou, avec `KB_DATABASE_URL`, les tables de la base
 PostgreSQL de l'URL, qui doit déjà exister. Une base qui existe n'est jamais touchée: pour repartir de zéro, supprimer
-le fichier SQLite. Ses étapes et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md), « Installer le
+le fichier SQLite. Ses étapes et ses codes sont dans [la fiche des données](donnees.md), « Installer le
 système de gestion de base de données ».
 
 ### Collecter: `kb collect`
@@ -86,7 +86,7 @@ Ses codes de sortie:
 - 143, 130: SIGTERM, SIGINT. Ce qui a été fait avant le signal est gardé; reçu avant l'écriture de l'état de la
     collecte, le signal laisse l'état inchangé, et la collecte suivante repart des mêmes dates.
 
-La collecte, pas à pas, est dans [la fiche des données](import_et_base_pour_docu.md), « La commande qui précède
+La collecte, pas à pas, est dans [la fiche des données](donnees.md), « La commande qui précède
 l'import: `kb collect` »; l'accès à chaque source et ses limites, dans
 [les spécifications de la collecte](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md).
 
@@ -97,7 +97,7 @@ uv run --env-file .env kb import
 ```
 
 `kb import` lit le brut pas encore importé et écrit ses items dans la base, qui écarte les doublons. Son bilan, son
-journal et ses codes sont dans [la fiche des données](import_et_base_pour_docu.md), « Le script d'agrégation et
+journal et ses codes sont dans [la fiche des données](donnees.md), « Le script d'agrégation et
 d'import: `kb import` ». Pour reconstruire une base SQLite depuis tout le brut: supprimer `k-b.sqlite`, puis lancer
 `kb create-db` et `kb import`.
 
@@ -139,7 +139,7 @@ uv run --env-file .env kb write-tops
 une fiche par jour de relevé encore dans le brut: `<KB_VAULT_DIR>/veille/tops/most_starred/AAAA-MM-JJ.md` et
 `.../most_forked/AAAA-MM-JJ.md`, nommées par le jour UTC du relevé. À côté de chaque fiche, il écrit son jumeau JSON,
 `AAAA-MM-JJ.json`, que l'API de données lit en ligne (`post/top_sheets.py:1-6`). Ses étapes et ses codes 0, 1, 2 et 4
-sont dans [la fiche des données](import_et_base_pour_docu.md), « La commande qui suit l'import: `kb write-tops` ».
+sont dans [la fiche des données](donnees.md), « La commande qui suit l'import: `kb write-tops` ».
 
 - Une fiche qui existe n'est jamais réécrite, même par deux lancements qui se chevauchent: deux collectes le même
     jour ne donnent qu'une fiche, celle du premier relevé de ce jour encore dans le brut.
@@ -240,8 +240,8 @@ qui répond 500 `database_error`.
 
 L'API IA rédige les comptes rendus de veille d'une fenêtre, par sujet, et le compte rendu des tendances. Elle lit la
 veille par l'API de données, qui doit donc tourner, et appelle le modèle; elle ne garde rien entre deux demandes. Son
-détail est dans [la fiche de l'API IA](api_ia_pour_docu.md), celui du modèle dans
-[la fiche du service d'IA](service_ia_pour_docu.md).
+détail est dans [la fiche de l'API IA](api-ia.md), celui du modèle dans
+[la fiche du service d'IA](service-ia.md).
 
 ### La lancer et lui demander des comptes rendus
 
@@ -300,7 +300,7 @@ relance reçoit 429 tant qu'elle n'a pas fini, environ 200 s au plus.
 ### Changer une clé
 
 Une clé est fixe, sans date d'expiration. La faire, puis la changer en local ou en ligne: [la fiche de l'API
-IA](api_ia_pour_docu.md), « Expiration et changement d'une clé ». Ce que chaque côté voit pendant le changement:
+IA](api-ia.md), « Expiration et changement d'une clé ». Ce que chaque côté voit pendant le changement:
 
 - l'ancienne clé d'un client de l'API IA est refusée dès le redémarrage de `kb serve-ai`, pas avant;
 - tant que `kb serve-data` ou `kb serve-ai` garde l'ancienne `KB_DATA_API_KEY_AI_DIGEST`, chaque demande de comptes
@@ -509,7 +509,7 @@ Ce que la commande laisse à l'opératrice:
 ## Les commandes des jobs en ligne
 
 En ligne, les commandes tournent dans des jobs d'Azure Container Apps, déclarés dans `infra/`
-([la fiche de l'architecture](architecture_pour_docu.md), « L'hébergement »). Chacune se lance aussi en local, avec
+([la fiche de l'architecture](architecture.md), « L'hébergement »). Chacune se lance aussi en local, avec
 les réglages du job.
 
 ### Le test de fumée: `kb smoke-test`
@@ -593,11 +593,11 @@ dans l'image: elle se donne au lancement, avec le volume, et sans elle `kb` refu
 sortie d'erreur (`KB_LOG_TO_FILE=false`). Chaque variable se change au lancement (`-e`). `.dockerignore` refuse tout
 par défaut: la construction ne reçoit que `pyproject.toml`, `uv.lock`, `README.md` et `src/`, sans les fichiers
 d'environnement, les bases `*.sqlite` et leurs fichiers annexes, ni les caches de `src/`. Le contrôle de l'image
-par l'intégration continue (CI) est dans [la fiche de l'intégration continue](integration_continue_pour_docu.md), « Le workflow `Image` ».
+par l'intégration continue (CI) est dans [la fiche de l'intégration continue](integration-continue.md), « Le workflow `Image` ».
 
 ## Lire la base, lancer les tests
 
-- Lire la base sans l'API, en local et en ligne: [la fiche des données](import_et_base_pour_docu.md), « Lire la base
+- Lire la base sans l'API, en local et en ligne: [la fiche des données](donnees.md), « Lire la base
     sans l'API ».
-- Lancer les tests, leurs rapports et la couverture: [la fiche des tests](tests_pour_docu.md).
-- La CI de chaque demande de fusion: [la fiche de l'intégration continue](integration_continue_pour_docu.md).
+- Lancer les tests, leurs rapports et la couverture: [la fiche des tests](tests.md).
+- La CI de chaque demande de fusion: [la fiche de l'intégration continue](integration-continue.md).

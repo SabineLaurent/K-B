@@ -3,7 +3,7 @@ name: Docs
 # The site of documentation/ (mkdocs.yml): built in strict mode on each pull request, so a broken link, a
 # missing anchor or a sheet left out of the navigation fails it; published on GitHub Pages at each push to
 # main once the repository variable PAGES_PUBLISH is true, set when Pages is turned on, and by hand
-# (documentation/accessibilite_pour_docu.md, "Publier"). Before, the deployment is skipped: it would fail.
+# (documentation/accessibilite.md, "Publier"). Before, the deployment is skipped: it would fail.
 on:
   pull_request:
     branches: [main]
@@ -28,7 +28,7 @@ jobs:
       - run: uv run --locked --only-group docs mkdocs build --strict
       # The privacy plugin downloads Mermaid from unpkg, in its moving version 11 (mermaid@11): the build
       # fails unless the file is the one of the npm package of mermaid 11.17.2, checked on 2026-11-14 against
-      # the integrity npm publishes for it (documentation/accessibilite_pour_docu.md, "Limites").
+      # the integrity npm publishes for it (documentation/accessibilite.md, "Limites").
       - run: echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js" | sha256sum --check
       - if: >-
           github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch'
@@ -44,7 +44,7 @@ jobs:
       || (github.event_name == 'push' && vars.PAGES_PUBLISH == 'true'))
     needs: build
     # One deployment at a time, never cancelled once running; GitHub keeps one pending and cancels it when a newer
-    # one comes (documentation/accessibilite_pour_docu.md, "Publier").
+    # one comes (documentation/accessibilite.md, "Publier").
     concurrency:
       group: pages
       cancel-in-progress: false

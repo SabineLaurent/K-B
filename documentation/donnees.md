@@ -92,7 +92,7 @@ forkés, et écrit leurs fiches dans le coffre Obsidian, sous `veille/tops/`.
 ### Langage et outils
 
 - **Python 3.13 ou plus récent**: `requires-python = ">=3.13"` (`pyproject.toml`).
-- **uv**, qui installe Python, K-B et ses dépendances ([la fiche de l'installation](installation_pour_docu.md)).
+- **uv**, qui installe Python, K-B et ses dépendances ([la fiche de l'installation](installation.md)).
 - **La commande `kb`**: le point d'entrée `kb = "k_b.cli:main"` (`pyproject.toml`, `[project.scripts]`). `create-db`,
     `migrate-database`, `import`, `purge`, `write-tops` et `daily-routine` en sont des sous-commandes, que lance la
     table `RUN_BY_COMMAND` (`cli.py:95-103`).
@@ -182,7 +182,7 @@ Le tableau suivant donne les codes de sortie de `kb create-db`.
 
 ### En local: PostgreSQL, pour essayer la branche en ligne
 
-Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL ([la fiche des tests](tests_pour_docu.md), « Pour les tests marqués `postgresql` »),
+Facultatif. Le dépôt nomme un PostgreSQL de Homebrew pour les tests sur PostgreSQL ([la fiche des tests](tests.md), « Pour les tests marqués `postgresql` »),
 sans décrire son installation: c'est une limite de cette fiche. K-B ne crée pas la base PostgreSQL,
 seulement ses tables. Elle se crée à la main, en UTF8 et en collation C, comme la base en ligne
 (`infra/postgresql/create-principals.sql:19`):
@@ -248,7 +248,7 @@ KB_DATA_DIR=~/.knowledge_base uv run kb collect
 ```
 
 `KB_COLLECT_ONLY` choisit les sources d'une collecte; Zotero, les clips et GH Archive ne tournent que si leur variable
-est posée ([la fiche de l'installation](installation_pour_docu.md), « Les variables d'environnement »). En ligne, `kb collect` est une étape de `kb daily-routine`, et `kb import`
+est posée ([la fiche de l'installation](installation.md), « Les variables d'environnement »). En ligne, `kb collect` est une étape de `kb daily-routine`, et `kb import`
 ne la suit pas si elle sort en 1 ou en 2 (`commands/daily_routine_command.py:52-59`).
 
 ### La collecte, pas à pas

@@ -8,20 +8,20 @@ titre.
 
 ## Les fiches
 
-- [L'accessibilité de cette documentation](accessibilite_pour_docu.md): les recommandations suivies, leurs règles et
+- [L'accessibilité de cette documentation](accessibilite.md): les recommandations suivies, leurs règles et
     ce qui n'est pas vérifié.
 - [Le produit](produit.md): ce que fait K-B, ce qu'il ne fait pas, ses contraintes et ses moyens.
-- [L'installation et l'environnement de développement](installation_pour_docu.md)
+- [L'installation et l'environnement de développement](installation.md)
 - [Utiliser K-B](utilisation.md): les commandes, leurs réglages, leur sortie et leurs codes.
-- [L'architecture de l'application](architecture_pour_docu.md)
+- [L'architecture de l'application](architecture.md)
 - [Les maquettes du site et le parcours de l'opératrice](maquettes-et-parcours.md)
-- [L'agrégation, l'import et la base](import_et_base_pour_docu.md)
-- [L'API IA](api_ia_pour_docu.md)
-- [Le service d'IA: le déploiement du modèle](service_ia_pour_docu.md)
-- [Le monitorage du modèle et de l'application](monitoring_pour_docu.md)
-- [Les tests](tests_pour_docu.md)
-- [L'intégration continue](integration_continue_pour_docu.md)
-- [La livraison continue](livraison_continue_pour_docu.md)
+- [L'agrégation, l'import et la base](donnees.md)
+- [L'API IA](api-ia.md)
+- [Le service d'IA: le déploiement du modèle](service-ia.md)
+- [Le monitorage du modèle et de l'application](monitorage.md)
+- [Les tests](tests.md)
+- [L'intégration continue](integration-continue.md)
+- [La livraison continue](livraison-continue.md)
 
 ## Lire une fiche
 

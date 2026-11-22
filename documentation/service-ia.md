@@ -14,7 +14,7 @@ portail web de Foundry. Le code de K-B ne le décrit donc pas.
 
 La fiche dit qui accède au service, comment l'installer et le tester, de quoi il dépend, et quelles données il
 reçoit. Le programme de K-B qui appelle ce service est l'API IA. Cette API a sa propre fiche,
-[la fiche de l'API IA](api_ia_pour_docu.md).
+[la fiche de l'API IA](api-ia.md).
 
 Le code cité est celui de K-B dans sa version du 2026-11-18. Ce qui est hors du code vient de trois relevés.
 
@@ -435,7 +435,7 @@ flowchart LR
 - **Grafana Cloud** reçoit les mesures de chaque appel au modèle. Il les reçoit par OTLP, le protocole d'export
     d'OpenTelemetry, un standard ouvert de mesure des programmes. Sous un réglage, Grafana Cloud reçoit aussi le
     contenu de l'appel (« Les données envoyées au modèle »). Le monitorage du modèle a sa propre fiche,
-    [la fiche du monitorage](monitoring_pour_docu.md).
+    [la fiche du monitorage](monitorage.md).
 - **Le quota** de 250 000 jetons par minute est partagé. Un compte rendu des tendances et un `kb digest` lancés dans
     la même minute le consomment donc ensemble.
 - **Ce dont dépend le service lui-même** tient en trois points.

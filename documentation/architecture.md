@@ -15,10 +15,10 @@ mise à jour le 2026-11-18 (#623). « Déployé » y veut dire déclaré en lign
 autres de la racine du dépôt.
 
 L'installation de l'environnement de développement, les dépendances et leur configuration sont dans
-[la fiche de l'installation](installation_pour_docu.md); l'exécution des tests, dans
-[la fiche des tests](tests_pour_docu.md). Le détail de l'API IA est dans [la fiche de l'API IA](api_ia_pour_docu.md),
-celui du modèle de langage dans [la fiche du service d'IA](service_ia_pour_docu.md), et celui de la livraison sur Azure
-dans [la fiche de la livraison continue](livraison_continue_pour_docu.md).
+[la fiche de l'installation](installation.md); l'exécution des tests, dans
+[la fiche des tests](tests.md). Le détail de l'API IA est dans [la fiche de l'API IA](api-ia.md),
+celui du modèle de langage dans [la fiche du service d'IA](service-ia.md), et celui de la livraison sur Azure
+dans [la fiche de la livraison continue](livraison-continue.md).
 
 ## Le flux en bref
 
@@ -486,7 +486,7 @@ Les deux API n'écrivent rien de durable, hors du journal de fonctionnement que 
 (`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:28`, `:30`): l'API de données ne peut pas
 importer les écrivains de la base (`tests/architecture/test_apis.py:42`), et l'API IA ne peut importer ni la base ni
 l'écriture d'un fichier (`:120`). Le parcours d'une demande à l'API IA, ses contrôles et ses couches sont dans
-[la fiche de l'API IA](api_ia_pour_docu.md).
+[la fiche de l'API IA](api-ia.md).
 
 ## Le coffre
 
@@ -551,7 +551,7 @@ quand `exposeWeb` l'ouvre (`infra/main.bicep:347`;
 (#571) »). Les apps et les jobs déclarés en ligne sont ceux d'`infra/deployment.json`: `ca-kb-data-api`,
 `ca-kb-ai-api`, `ca-kb-web`, `caj-kb-smoke-test`, `caj-kb-migrate-database`, `caj-kb-daily-routine` et
 `caj-kb-digest-watch`. Un tag de version sur `main` les met à jour
-([la fiche de la livraison continue](livraison_continue_pour_docu.md)).
+([la fiche de la livraison continue](livraison-continue.md)).
 
 ### Le déploiement sur Azure
 
@@ -645,7 +645,7 @@ Les flèches du schéma, une à une:
 - Entre `ca-kb-ai-api` et le modèle de langage (« chat/completions »), dans les deux sens: déployé. Le Bicep de
     `main` règle l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:301-304`); l'adresse et le nom du
     déploiement viennent de la seconde passe. L'état en ligne n'est pas relu ici: selon
-    [la fiche du service d'IA](service_ia_pour_docu.md), l'API IA en ligne appelle `gpt-6.1-sol` depuis le passage
+    [la fiche du service d'IA](service-ia.md), l'API IA en ligne appelle `gpt-6.1-sol` depuis le passage
     de la production, le 2026-11-18, et appelait `gpt-6-luna` avant.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
     API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
@@ -706,7 +706,7 @@ Le détail de chaque partie:
 - **Hors du Bicep**: le modèle `gpt-6.1-sol` est déployé à la main dans Microsoft Foundry (anciennement Azure AI
     Foundry), en France Central, en zone de données de l'Union européenne; `gpt-6-luna`, le modèle d'avant, y reste
     déployé, et l'API IA en ligne l'a appelé jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18, selon
-    [la fiche du service d'IA](service_ia_pour_docu.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
+    [la fiche du service d'IA](service-ia.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
     `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
     paramètres, les secrets et l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:22-29`, `:301-304`).
 - **Prévu**: l'envoi depuis le poste de travail viendra avec #542 (la relecture de `watch` est codée par #424), la copie de

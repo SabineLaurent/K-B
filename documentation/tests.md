@@ -201,7 +201,7 @@ scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclen
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
 `cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
-Sabine: [la fiche du monitorage](monitoring_pour_docu.md), sections « Le bac à sable » et « Relevé des alertes du
+Sabine: [la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
 bac à sable ».
 
 ### Ce que lance la CI

@@ -222,7 +222,7 @@ COMPOSE_HOSTS = ("api-donnees", "api-ia")
 # The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve-data
 # for each client and by the AI API for the key it sends. secrets.token_urlsafe(32) gives 43
 # characters: 32 is the minimum checked. The alphabet of token_urlsafe, the way of making a key
-# documentation/api_ia_pour_docu.md gives ("Faire une clé"). HTTPBearer strips the spaces around the key received
+# documentation/api-ia.md gives ("Faire une clé"). HTTPBearer strips the spaces around the key received
 # (fastapi/security/utils.py): a key that starts or ends with one would be accepted at the start
 # and never match.
 MIN_API_KEY_LENGTH = 32
