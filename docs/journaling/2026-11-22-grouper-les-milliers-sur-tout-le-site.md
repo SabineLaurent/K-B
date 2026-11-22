@@ -50,14 +50,14 @@ of the site ».
 ### Le fil : le total, la longueur d'une recherche refusée, les pages
 
 ```python
-# src/k_b/web/feed.py:400
+# src/k_b/web/feed.py:421
     items = "1 item" if total == 1 else f"{write_count(total)} items"
 ```
 
 C'est la ligne des résultats (Opquast 13) : « 12 345 items depuis le 10 novembre 2026 … ».
 
 ```python
-# src/k_b/web/feed.py:285-286
+# src/k_b/web/feed.py:306-307
             f"La recherche fait {write_count(len(q))} caractères:"
             f" {DATA_API_MAX_SEARCH_LENGTH} au plus.",
 ```
@@ -68,13 +68,13 @@ message dirait sinon « 1500 ». Le message ne cite que la **longueur** de la re
 ### Les numéros de page, par une valeur déjà écrite
 
 ```python
-# src/k_b/web/feed.py:370-371
+# src/k_b/web/feed.py:391-392
     page_text = write_count(page)
     pages_text = write_count(pages)
 ```
 
-`FeedListing` porte maintenant `page_text` et `pages_text` (`feed.py:192` et `:194`), que le gabarit affiche
-(`feed.html:73` et `:94`) ; `pages` reste un entier, car le gabarit s'en sert pour un test (`listing.pages > 1`).
+`FeedListing` porte maintenant `page_text` et `pages_text` (`feed.py:196` et `:198`), que le gabarit affiche
+(`feed.html:76` et `:97`) ; `pages` reste un entier, car le gabarit s'en sert pour un test (`listing.pages > 1`).
 Les numéros de page n'atteignent jamais 1 000 : `PAGE_NUMBER` accepte 3 chiffres au plus et `MAX_PAGE` vaut 501
 (`feed.py:80` et `:82`). Ils passent quand même par la fonction, parce que l'issue le demande : un nombre du site
 s'écrit d'une seule façon, et rien ne dépend d'une borne qui pourrait changer.
@@ -115,10 +115,10 @@ relevé (A2), et le Second a tranché qu'il entre dans le périmètre de #614.
 |---|---|
 | Rouge avant le code : 5 échecs dans `test_feed.py` et `test_feed_page.py`, `ImportError` de `write_count` dans `test_trends.py` | Les tests vérifiaient bien le changement : ils échouaient sur l'ancien code |
 | Rouge avant le code : `'… n° 1234'.endswith(', n° 1 234')` faux | Le test du rang échouait avant sa correction |
-| `test_a_count_is_grouped_by_thousands_with_a_narrow_no_break_space` (`tests/web/test_trends.py:126`) : 0, 999, 1 000, 1 500, 1 234 567 | La fonction déplacée groupe dès 1 000, pas avant |
-| `test_the_line_of_the_results_groups_the_thousands_of_the_total` (`tests/web/test_feed.py:317`) : 999, 1 000, 12 345 | Le total de la ligne des résultats est groupé |
+| `test_a_count_is_grouped_by_thousands_with_a_narrow_no_break_space` (`tests/web/test_trends.py:140`) : 0, 999, 1 000, 1 500, 1 234 567 | La fonction déplacée groupe dès 1 000, pas avant |
+| `test_the_line_of_the_results_groups_the_thousands_of_the_total` (`tests/web/test_feed.py:333`) : 999, 1 000, 12 345 | Le total de la ligne des résultats est groupé |
 | `test_the_length_of_a_search_refused_groups_its_thousands` (`tests/web/test_feed.py:112`) : 999, 1 000, 1 500 | La longueur d'une recherche refusée est groupée |
-| `test_the_feed_groups_the_thousands_of_its_total` (`tests/web/test_feed_page.py:333`) | La page rendue contient « 12 345 items depuis le », le caractère brut et pas une entité |
+| `test_the_feed_groups_the_thousands_of_its_total` (`tests/web/test_feed_page.py:356`) | La page rendue contient « 12 345 items depuis le », le caractère brut et pas une entité |
 | `test_the_rank_of_a_newsletter_article_groups_its_thousands` (`tests/web/test_item_detail.py:234`) | Le rang est groupé dans le titre et sous la sorte |
 | Les tests existants « Page 2 sur 3 » et « Page 1 sur 501 » (`test_feed_page.py`) | Le gabarit lit bien `page_text` et `pages_text` ; un nom de champ absent ferait échouer la page (`StrictUndefined`, `rendering.py:25`), vérifié par un essai |
 | `ruff check --no-cache`, `ruff format --check`, `mypy --strict` (198 fichiers), `uv run pytest` (5673 passés), aucun caractère `Cc` ou `Cf` | Les contrôles du dépôt passent |
@@ -129,7 +129,7 @@ relevé (A2), et le Second a tranché qu'il entre dans le périmètre de #614.
    sur Azure n'est pas forcément en `fr_FR`, et changer la locale d'un processus touche tout le processus. Ici, le site
    écrit lui-même ses nombres, comme ses dates (`french_dates.py:38-39`).
 2. **Pourquoi grouper les numéros de page, s'ils ne dépassent jamais 501 ?** Parce que l'issue demande une seule
-   façon d'écrire les nombres. Si `MAX_PAGE` change un jour, rien d'autre n'est à modifier (`feed.py:370-371`).
+   façon d'écrire les nombres. Si `MAX_PAGE` change un jour, rien d'autre n'est à modifier (`feed.py:391-392`).
 3. **Un attaquant peut-il injecter du texte par ces nombres ?** Non. Chaque valeur vient d'un entier : `len(q)`, le
    numéro de page lu par une expression régulière, le total et le rang validés par Pydantic en mode strict.
    `write_count` ne rend que des chiffres ASCII et U+202F. Le gabarit échappe tout (`autoescape=True`). La revue de
