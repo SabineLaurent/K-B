@@ -7615,6 +7615,29 @@ les jetons du modèle (#501) »).
   comme celle de `budget-kb` ; elle est caviardée dans toute sortie et toute capture recopiées (décision de Sabine du
   2026-11-20). — PR #665
 
+## 2026-11-22
+
+### Documentation : le site publié à chaque fusion (#684)
+
+- **Le workflow `Docs` publie le site de `documentation/` sur GitHub Pages à chaque push sur `main`, donc à chaque
+  fusion, quand la variable de dépôt `PAGES_PUBLISH` vaut `true` ; il se lance toujours à la main, depuis `main`
+  seulement.** Revient sur l'entrée du 2026-11-14 (#167, « publié sur GitHub Pages à la main ») ; ce qui a changé :
+  la décision de Sabine du 2026-11-21 (« publication automatique », dans le périmètre de la PR du README, relayé par
+  tn-orchestrateur). Pourquoi, inféré et à faire valider par Sabine : le site suit `main` sans qu'une exécution à la
+  main soit oubliée. La variable, choisie par le Second le 2026-11-21 (option A) : tant que Pages n'est pas activé, le
+  job `deploy` échouerait à chaque fusion ; sans elle, il est sauté (`.github/workflows/docs.yml:33-35`, `:42-44`).
+  Options écartées : garder la publication à la main (le site prendrait du retard sur `main`, raison inférée) ;
+  `queue: max`, qui garderait en file chaque déploiement en attente, car la documentation de GitHub ne le montre qu'au
+  niveau du workflow et `deploy` le porterait au niveau du job (non vérifié, tri du Second du 2026-11-22) ; retirer
+  `docs.yml` du contrôle de `deploy.yml`, déjà écarté le 2026-11-14 (un contrôle de sécurité de la livraison).
+  Limites assumées : `Docs` tourne désormais sur chaque commit de `main`, et `deploy.yml:59-67` refuse le tag d'un
+  commit dont l'exécution `Docs` a échoué ou a été annulée, jusqu'à sa relance ; un seul déploiement tourne
+  (`concurrency` `pages`, sans `cancel-in-progress`), et GitHub annule celui qui attend quand un plus récent arrive
+  (« By default, any existing pending job or workflow in the same concurrency group will be canceled », GitHub Docs,
+  « Control the concurrency of workflows and jobs », lu le 2026-11-22) : le site publié est celui de la dernière
+  fusion ; la publication attend toujours que le dépôt soit public et Pages activé
+  (`documentation/accessibilite_pour_docu.md`, « Publier »). — PR de #684
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
