@@ -29,7 +29,8 @@ PAIRS = [
     ("--color-alert-deep", "--color-card", 4.5),
     ("--color-alert-deep", "--color-paper", 4.5),
     ("--color-field-border", "--color-card", 3),
-    # The banner of an item in the CISA KEV catalog: its title and its text on its background.
+    # The banner of an item in the CISA KEV catalog and the summary of the errors: their title, their
+    # text and the links of the summary on their background.
     ("--color-alert-deep", "--color-alert-wash", 4.5),
     ("--color-alert-ink", "--color-alert-wash", 4.5),
     # The focus ring of a link of the summary of the errors, on its pale peach.
@@ -311,8 +312,8 @@ def test_the_banner_and_the_packages_have_the_colours_of_their_mockups(
 
 def test_the_summary_of_the_errors_is_framed_as_the_box_of_the_chart():
     """Planche « Charte graphique », the box « Couleur signalée » (Sabine, 2026-11-22): bordered in
-    rust, on pale peach, its title in deep rust and its text in burnt brown; its links, underlined,
-    in deep rust."""
+    rust, on pale peach, its title in deep rust and its text, the bullets, in burnt brown; its links,
+    underlined, in deep rust."""
     rule = read_rule(".error-summary")
     box = strip_nested_rules(rule)
 

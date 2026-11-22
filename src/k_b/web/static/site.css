@@ -30,12 +30,13 @@
     --color-card: #FFFFFF;
     --color-stone: #DADCD6;
     --color-on-teal: #FFFFFF;
-    /* The mark Exploitée (KEV) and the messages of a field refused; #8A8F96 for the border of a
-       field only, never a text. */
+    /* The mark Exploitée (KEV), the messages of a field refused and the border of the summary of
+       the errors; #8A8F96 for the border of a field only, never a text. */
     --color-alert: #9A3412;
     --color-alert-deep: #7C2D12;
     --color-on-alert: #FFFFFF;
-    /* The banner of an item in the CISA KEV catalog (Maquette-faille.dc.html). */
+    /* The banner of an item in the CISA KEV catalog (Maquette-faille.dc.html) and the summary of the
+       errors (the box « Couleur signalée » of the chart). */
     --color-alert-wash: #FFF1E6;
     --color-alert-ink: #5B2410;
     /* The chip of a package (Maquette-alerte.dc.html). */
@@ -557,7 +558,8 @@
   }
 
   /* The box « Couleur signalée » of the planche « Charte graphique » (Sabine, 2026-11-22): bordered
-     in rust, on pale peach, its title in deep rust and its text in burnt brown. */
+     in rust, on pale peach, its title in deep rust and its text in burnt brown: its bullets, each
+     message being a link in deep rust. */
   .error-summary {
     padding: 1rem 1.25rem;
     color: var(--color-alert-ink);
