@@ -3,7 +3,7 @@
 {% block main_class %}page prose{% endblock %}
 {% block content %}
 <h1>Accessibilité</h1>
-<p>Déclaration établie le <time datetime="2026-11-11">11 novembre 2026</time>, mise à jour le <time datetime="2026-11-13">13 novembre 2026</time>.</p>
+<p>Déclaration établie le <time datetime="2026-11-11">11 novembre 2026</time>, mise à jour le <time datetime="2026-11-22">22 novembre 2026</time>.</p>
 <h2>État de conformité</h2>
 <p>Non conforme: aucun audit RGAA (référentiel général d’amélioration de l’accessibilité) n’a été mené, et sans audit le RGAA ne permet pas d’autre état.</p>
 <h2>Référentiel visé</h2>
@@ -21,7 +21,7 @@
 <li>à leur première occurrence, le sens des sigles des sources de la veille, des failles et des alertes, des référentiels d’accessibilité et de l’heure de la page d’erreur (TLDR, nom de la newsletter, n’est pas développé);</li>
 <li>sur le détail d’un item, ses faits en liste de termes, ses dates en éléments de temps, et l’état d’une faille ou d’une alerte au catalogue des failles exploitées dit en mots, pas par la couleur;</li>
 <li>le tableau des tendances, avec sa légende et l’en-tête de chaque colonne, et le champ de sa date, avec son aide et son message d’erreur;</li>
-<li>les contrastes des couleurs de la charte, et l’anneau de focus visible au clavier;</li>
+<li>les contrastes des couleurs de la charte, et l’anneau de focus au clavier (sa limite dans le tableau des tendances est dite plus bas);</li>
 <li>l’absence de script: le site fonctionne sans JavaScript.</li>
 </ul>
 <h2>Limites connues</h2>
@@ -30,6 +30,6 @@
 <li>Le zoom à 200 %, l’affichage sur 320 pixels de large, l’espacement du texte, la navigation au clavier et la lecture par un lecteur d’écran se contrôlent à la main.</li>
 <li>Les notes de version sont affichées en texte brut: leurs titres et leurs listes, écrits en Markdown, n’ont pas de structure.</li>
 <li>Les textes des sources (titres, résumés, descriptions, notes) sont marqués en anglais par hypothèse: un texte écrit dans une autre langue est mal marqué.</li>
-<li>Dans le tableau des tendances, sur un écran étroit, un lien en partie hors du cadre n’y est pas ramené quand il prend le focus: une partie du lien et un côté de son anneau de focus restent cachés. Les flèches du clavier font défiler le cadre, et le focus reste sur le lien.</li>
+<li>Dans le tableau des tendances qui défile dans son cadre, un lien en partie hors du cadre n’y est pas ramené quand il prend le focus, constaté dans Chrome (Firefox et Safari ne sont pas vérifiés): une partie du lien et un côté de son anneau de focus restent cachés. Les flèches du clavier font défiler le cadre, et le focus reste sur le lien.</li>
 </ul>
 {% endblock %}

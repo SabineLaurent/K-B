@@ -218,9 +218,9 @@ défilé au bout, le lien de la première ligne va de −138 à 130 px pour un c
 défilement, il va de 81 à 349 px pour un cadre de 17 à 288 px. Une partie du lien et un côté de son anneau restent
 cachés ; l'anneau se voit sur ses autres côtés (WCAG 2.4.7). Les flèches font défiler le cadre, le focus restant sur
 le lien (à 390 px, le cadre revient au début). La déclaration d'accessibilité le dit dans ses limites connues.
-Écarté : `scroll-padding-inline` et `scroll-margin-inline`, appliqués mais sans effet au Tab, ne jouent que pour
-`scrollIntoView` ([MDN](https://developer.mozilla.org/docs/Web/CSS/scroll-padding), lu le 2026-11-22 ; partiels dans
-Safari, bug WebKit 179379), et le site n'a pas de JavaScript ; `scroll-padding-inline: 50%` ne ramène que le lien
+Écarté : `scroll-padding-inline` sur le cadre et `scroll-margin-inline` sur le lien, appliqués (16 px calculés),
+n'ont aucun effet au Tab sur un lien en partie visible ; ils déplacent `scrollIntoView` (mesuré en contrôle), que le
+site, sans JavaScript, n'appelle pas ; `scroll-padding-inline: 50%` ne ramène que le lien
 qui ne touche pas le milieu du cadre ; aimanter le cadre sur la colonne « Dépôt » tant qu'un lien a le focus
 (`:has(a:focus-visible)` et `scroll-snap-type: x mandatory`) ne tient pas à 320 px et bloque le défilement du
 cadre ; figer la colonne (`position: sticky`) change le défilement dans le cadre, décidé le 2026-11-14 (#596).
