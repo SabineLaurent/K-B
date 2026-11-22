@@ -231,6 +231,14 @@ def test_the_page_of_a_newsletter_article():
     assert [text.heading for text in page.texts] == ["Résumé"]
 
 
+def test_the_rank_of_a_newsletter_article_groups_its_thousands():
+    """The data API bounds the rank from below only."""
+    page = build(NEWSLETTER_ARTICLE, rank=1234)
+
+    assert page.page_title.endswith(f", n° 1{chr(0x202F)}234")
+    assert page.line[-1] == LinePart(f"n° 1{chr(0x202F)}234")
+
+
 def test_a_link_out_of_https_is_no_link():
     assert build(PAPER, url="http://arxiv.org/abs/2609.31282").link is None
 

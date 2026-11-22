@@ -59,7 +59,7 @@ comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
 M et les 20 items par page (Opquast 13), les milliers groupés par une espace fine insécable (U+202F) comme dans
-tout le site, par `write_count` (`web/french_dates.py`) : « 12 345 items » ; au-delà de 10 020 items, une phrase dit d'affiner
+le tableau des tendances, par `write_count` (`web/french_dates.py`) : « 12 345 items » ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page, des boutons
 encadrés comme les maquettes, « Page suivante » à droite même quand la ligne se replie, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
 du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Cette ligne porte
