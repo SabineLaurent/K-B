@@ -102,7 +102,7 @@ la macro fait échouer la seconde.
 |---|---|
 | `test_the_button_back_to_the_feed_is_written_by_its_macro_only`, rouge avant la macro : `['404.html', … 'error.html'] == ['links.html']` | Le test voyait les trois copies : il échouait pour la bonne raison |
 | Le même test, vert après | Le libellé n'est plus écrit que dans `links.html`, et les trois pages appellent la macro |
-| Les 24 pages rendues par `fetch_every_page` (`tests/web/test_accessibility.py:150`), écrites avant et après, puis `diff -r` : 0 différence | Le rendu de chaque page est inchangé, octet pour octet, et pas seulement celui des trois pages d'erreur. L'heure et l'identifiant de la demande de la page 500 sont masqués des deux côtés. Deux rendus avant le changement ne différaient pas : la comparaison est stable |
+| Les 24 pages rendues par `fetch_every_page` (`tests/web/test_accessibility.py:152`), écrites avant et après, puis `diff -r` : 0 différence | Le rendu de chaque page est inchangé, octet pour octet, et pas seulement celui des trois pages d'erreur. L'heure et l'identifiant de la demande de la page 500 sont masqués des deux côtés. Deux rendus avant le changement ne différaient pas : la comparaison est stable |
 | `uv run pytest --cov --cov-report=term-missing:skip-covered`, la commande du job `tests` : 5 709 réussis, 365 écartés (`e2e`, `postgresql`), couverture 98,55 % pour un seuil de 96 % | Les tests existants des pages, dont celui des flèches et celui de la page 404, passent sans changement |
 | `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | Contrôles du dépôt verts |
 | Les jobs `audit`, `tests-postgresql`, `tests-data` et `digests-reference` de `ci.yml`, rejoués sur le Mac : aucune vulnérabilité connue (pip-audit 2.10.1, 109 paquets) ; 350 tests sur `postgres:18.6`, l'image de la CI par son digest, sous Docker ; 1 365 tests ; les trois seuils tenus | GitHub Actions est sans budget jusqu'au déploiement, et la PR est fusionnée sans CI : ces jobs n'ont pas d'autre lancement |
@@ -119,7 +119,7 @@ la macro fait échouer la seconde.
    que cette page reste hors de la macro. Les pages du fil, du détail, des sources et des tendances dépendaient déjà de
    `links.html`.
 3. **Pourquoi la page 403 n'appelle-t-elle pas la macro ?** Elle n'a pas ce bouton : son seul bouton déconnecte le
-   compte refusé (`403.html:12`), car le fil de veille lui est fermé.
+   compte refusé (`403.html:13`), car le fil de veille lui est fermé.
 4. **Pourquoi pas de `|safe` pour rendre le HTML de la macro ?** Une macro rend du balisage marqué comme sûr quand
    l'échappement automatique est actif. `|safe` est d'ailleurs interdit dans tout gabarit (`tests/web/test_templates.py`,
    `FORBIDDEN`).
