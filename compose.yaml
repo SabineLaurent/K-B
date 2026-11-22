@@ -11,8 +11,8 @@
 # template .env.<service>.example, filled in by the operator. Its other settings are below.
 # Departures from production: KB_DEPLOYMENT_ENVIRONMENT=sandbox for the AI API, the only
 # environment where kb calls a service of the compose in http (http://api-donnees:8000); one role,
-# owner of the base, and kb create-db rather than kb migrate-database, which grants the roles of
-# Azure; an init process; a read-only file system with /tmp in memory, where the file system of a
+# superuser of the server and owner of the base, and kb create-db rather than kb migrate-database,
+# which grants the roles of Azure; an init process; a read-only file system with /tmp in memory, where the file system of a
 # container online is writable.
 
 # The resources of each kb service: a combination of Azure Container Apps, the one of the apps
@@ -158,7 +158,7 @@ services:
       postgres:
         condition: service_healthy
 
-  # Every source that has its variable: neither Zotero nor the vault, mounted on the Mac only, nor
+  # Every source that has its variable: neither Zotero nor the vault, mounted on the host only, nor
   # GH Archive without its key; KB_COLLECT_ONLY is never set empty.
   collecte:
     <<: *kb

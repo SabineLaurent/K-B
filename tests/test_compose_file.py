@@ -21,7 +21,8 @@ API_SERVICES = (DATA_API_SERVICE, AI_API_SERVICE)
 JOB_SERVICES = ("create-db", "collecte", "import")
 KB_SERVICES = API_SERVICES + JOB_SERVICES
 SERVICES = (BASE_SERVICE, *KB_SERVICES)
-# The three jobs read the same secrets: one file.
+# One file for the three jobs: create-db and import read the URL of the base, collecte the GitHub
+# token.
 ENV_FILE_BY_SERVICE = {
     BASE_SERVICE: ".env.postgres",
     DATA_API_SERVICE: ".env.api-donnees",
@@ -96,7 +97,7 @@ def test_the_compose_holds_the_base_the_two_apis_and_the_three_jobs():
 
 
 @pytest.mark.parametrize("service", SERVICES)
-def test_a_published_port_listens_on_the_mac_only(service):
+def test_a_published_port_listens_on_the_host_only(service):
     for port in read_services()[service].get("ports", []):
         assert port.startswith("127.0.0.1:"), port
 

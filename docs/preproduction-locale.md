@@ -57,9 +57,10 @@ sur le socket (`docker_temp_server_start`, `docker-entrypoint.sh` de l'image).
   service du compose en `http`, ici `http://api-donnees:8000` (`find_internal_api_url_refusal`,
   `src/k_b/core/outbound.py`). En ligne, les apps se parlent en HTTPS. En `sandbox`, l'API IA sert
   `/docs` et `/openapi.json` sans clé ([fiches-veille.md](fiches-veille.md), API9).
-- **Un seul rôle, `kb`, propriétaire de la base `k_b`** : l'image de PostgreSQL le crée au premier
-  démarrage (`POSTGRES_USER`, `POSTGRES_DB`) ; il se connecte par mot de passe, sur le réseau du compose,
-  que `postgres` ne publie pas. La base se crée par `kb create-db`, et non par `kb migrate-database`, qui
+- **Un seul rôle, `kb`, superutilisateur du serveur et propriétaire de la base `k_b`** : l'image de
+  PostgreSQL le crée ainsi au premier démarrage (`POSTGRES_USER`, `POSTGRES_DB`) ; il se connecte par mot
+  de passe, sur le réseau du compose, que `postgres` ne publie pas. L'API de données s'y connecte, et
+  chaque connexion de son pool lit en `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`). La base se crée par `kb create-db`, et non par `kb migrate-database`, qui
   donne les tables aux rôles des identités d'Azure (`infra/postgresql/grant-roles.sql`), absents ici. En
   ligne, chaque identité qui ouvre la base y a son rôle, de lecture ou d'écriture, et s'y connecte par son
   jeton, en `sslmode=verify-full`.
@@ -98,7 +99,8 @@ Hors du compose : le site (`kb serve-web`), les autres jobs (`kb daily-routine`,
 Chaque service lit ses secrets dans son fichier, `.env.<service>`, ignoré par git
 (`git check-ignore -v .env.api-ia` rend `.gitignore:3:.env.*`) et tenu hors du contexte du build
 (`.dockerignore` : `**/.env*`). Chaque fichier est la copie d'un modèle suivi par git,
-`.env.<service>.example` ; les trois jobs partagent `.env.jobs`. Les copier, en `0600`, sans écraser une
+`.env.<service>.example`. Les trois jobs partagent `.env.jobs`, un seul fichier : `create-db` et `import`
+y lisent l'URL de la base, `collecte` le jeton GitHub. Les copier, en `0600`, sans écraser une
 copie qui existe :
 
 ```sh
@@ -165,18 +167,23 @@ Avec la clé de l'opératrice, l'API de données sert la base :
 
 ```sh
 KEY=$(sed -n 's/^KB_DATA_API_KEY_TERMINAL=//p' .env.api-donnees) \
-  && curl -fsS -H "Authorization: Bearer $KEY" '127.0.0.1:8000/items?limit=1' \
-  | python3 -c 'import json, sys; print(json.load(sys.stdin)["total"])'
+  && printf 'Authorization: Bearer %s\n' "$KEY" \
+  | curl -fsS -H @- '127.0.0.1:8000/items?limit=1' \
+  | python3 -c 'import json, sys; print(json.load(sys.stdin)["total"])'; unset KEY
 ```
+
+La clé passe à `curl` par son entrée standard (`-H @-`), jamais par ses arguments, que `ps` montre ;
+`unset KEY` la retire du shell.
 
 Attendu : le même nombre d'items. La chaîne entière, de la base au modèle, répond à une `POST /digests` :
 
 ```sh
 OUT=$(mktemp -d)/digests.json \
   && KEY=$(sed -n 's/^KB_AI_API_KEY_KB_DIGEST=//p' .env.api-ia) \
-  && curl -sS --max-time 240 -H "Authorization: Bearer $KEY" -H 'Content-Type: application/json' \
+  && printf 'Authorization: Bearer %s\n' "$KEY" \
+  | curl -sS --max-time 240 -H @- -H 'Content-Type: application/json' \
      -d '{}' -o "$OUT" -w '%{http_code} %{time_total}\n' 127.0.0.1:8001/digests \
-  && echo "$OUT"
+  && echo "$OUT"; unset KEY
 ```
 
 Attendu : `200` et sa durée, sous 200 s, puis le chemin de la réponse, dans un dossier temporaire hors du
@@ -190,7 +197,11 @@ comptent dans la journée de sa ressource, que surveille l'alerte des 400 000 je
 |---|---|
 | `docker compose stop` | arrête chaque service par le signal d'arrêt de son image : SIGTERM pour les API, qui sortent en `143` ; SIGINT pour la base, son arrêt rapide, qui sort en `0` ; les conteneurs et les volumes restent |
 | `docker compose down` | retire les conteneurs et le réseau, garde les volumes : `docker compose up -d` retrouve la base et le brut |
-| `docker compose down -v` | retire aussi les volumes, donc la base et le brut ; il ne sert qu'à finir un essai |
+| `docker compose down -v` | retire aussi les volumes, donc la base et le brut : la fin de chaque essai |
+
+Un essai finit par `docker compose down -v` : les volumes gardent la collecte réelle, données
+personnelles comprises, et le compose n'a pas de `kb purge`
+([registre-traitements.md](registre-traitements.md), « Préproduction locale »).
 
 ## L'essai du 2026-11-22
 
