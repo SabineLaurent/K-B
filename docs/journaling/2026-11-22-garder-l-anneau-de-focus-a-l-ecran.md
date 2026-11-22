@@ -9,8 +9,10 @@
   autre défilement, celui du cadre du tableau.
 
 Les commits de cette PR sont `1a3559d2` (la marge en bas, son test, la fiche), `91882c6b` (la marge des deux côtés,
-après la revue) et `df76ceae` (la fiche, après la revue), plus celui de cette note. Les autres commits et fichiers listés
-au lancement de la note sont l'histoire de `main` avant la branche, partie de `9658225a` : ils ne sont pas de cette PR.
+après la revue) et `df76ceae` (la fiche, après la revue), plus ceux de cette note. `eed103e5` prend `main` (`a1a01efd`,
+après la fusion de #702 et #703), qui n'avait changé que de la documentation ; les mesures restent celles de
+`9658225a`. Les autres commits et fichiers listés au lancement de la note sont l'histoire de `main` avant la branche,
+partie de `9658225a` : ils ne sont pas de cette PR.
 
 ## Le pourquoi
 
@@ -136,6 +138,7 @@ un contrôle à la main.
 | Le cadre des tendances, plus haut que l'écran à 200 % et à 320 px : anneau coupé de 1 à 2 px en haut au lieu de 6 à 7, de 5 px de plus en bas | Le seul autre effet, sur un élément qui ne peut pas tenir à l'écran. |
 | `explore-fin.mjs` sur le fil à 200 % : 46 arrêts, retour au premier, puis le focus hors de la page au premier Maj+Tab | La cause de l'erreur du plan. |
 | `uv run ruff check --no-cache`, `ruff format --check`, `mypy --strict` (199 fichiers), `uv run pytest` : 5 799 réussis | Les contrôles du dépôt sont verts sur `91882c6b`. |
+| Après la prise de `main` (`eed103e5`), les six contrôles requis rejoués en local, GitHub Actions ne tournant pas : `ruff check --no-cache` et `ruff format --check` ; `mypy --strict` (199 fichiers) ; `pytest --cov` : 5 799 réussis, couverture de 98,55 % ; `pip-audit@2.10.1` : « No known vulnerabilities found » ; `pytest -m postgresql` sur `postgres:18.6` de `ci.yml` par son digest : 350 réussis ; `bicep build` de `infra/main.bicep` en 0.48.1 : sans erreur | La branche à jour avec `main` passe les contrôles exigés à la fusion. |
 
 Les relevés datés et les captures sont hors du dépôt, dans le dossier de la session, transmis au Second.
 
