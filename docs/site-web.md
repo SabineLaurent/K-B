@@ -211,6 +211,22 @@ tombe à 4,5:1. En couleurs forcées, Chrome retire les dégradés, et le cadre 
 le 2026-11-22). À l'impression, le cadre ne défile plus : les caches restent sur les ombres, qui ne se voient pas
 (impression émulée dans Chrome 157, le 2026-11-22) ; la flèche et l'annonce des liens du tableau sont retirées.
 
+**Le focus dans le cadre** a une limite (#693, mesurée dans Chrome 157 sans interface, au clavier seul, sur
+`main` e8bbb5d2, le 2026-11-22) : au Tab, Chrome ne fait défiler le cadre que si le lien qui prend le focus en est
+entièrement sorti, et le centre alors ; un lien en partie visible laisse le cadre où il est. À 390 px, le cadre
+défilé au bout, le lien de la première ligne va de −138 à 130 px pour un cadre de 17 à 358 px ; à 320 px, sans
+défilement, il va de 81 à 349 px pour un cadre de 17 à 288 px. Une partie du lien et un côté de son anneau restent
+cachés ; l'anneau se voit sur ses autres côtés (WCAG 2.4.7). Les flèches font défiler le cadre, le focus restant sur
+le lien (à 390 px, le cadre revient au début). La déclaration d'accessibilité le dit dans ses limites connues.
+Écarté : `scroll-padding-inline` et `scroll-margin-inline`, appliqués mais sans effet au Tab, ne jouent que pour
+`scrollIntoView` ([MDN](https://developer.mozilla.org/docs/Web/CSS/scroll-padding), lu le 2026-11-22 ; partiels dans
+Safari, bug WebKit 179379), et le site n'a pas de JavaScript ; `scroll-padding-inline: 50%` ne ramène que le lien
+qui ne touche pas le milieu du cadre ; aimanter le cadre sur la colonne « Dépôt » tant qu'un lien a le focus
+(`:has(a:focus-visible)` et `scroll-snap-type: x mandatory`) ne tient pas à 320 px et bloque le défilement du
+cadre ; figer la colonne (`position: sticky`) change le défilement dans le cadre, décidé le 2026-11-14 (#596).
+Firefox et Safari ne sont pas mesurés ; le tableau d'[ally.js](https://allyjs.io/tests/scrolling/table.html) (non
+daté) rapporte le même comportement pour Gecko, Blink et WebKit.
+
 **L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
 *forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
 tableau (étoiles gagnées, puis *forks*). Pas de « jusqu'à 60 dépôts » (mission du 2026-11-11).

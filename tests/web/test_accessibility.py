@@ -686,6 +686,13 @@ def test_the_statement_says_its_limits_of_the_detail():
     assert "TLDR, nom de la newsletter, n’est pas développé" in text
 
 
+def test_the_statement_says_a_link_partly_out_of_the_trends_frame_stays_partly_hidden():
+    """WCAG 2.4.7 holds, but Chrome leaves the frame where it is on focus (docs/site-web.md)."""
+    text = outline(PAGES["/accessibilite"]).text
+
+    assert "un lien en partie hors du cadre n’y est pas ramené" in text
+
+
 @pytest.mark.parametrize("name", sorted(PAGES))
 def test_the_navigation_leads_to_the_feed_and_to_the_trends(name):
     """Sabine, 2026-11-11: both links in sight at every width, no menu folded."""
