@@ -10,8 +10,10 @@
   refusé, que cette PR partage avec le fil)
 
 Les commits de cette PR sont `8bdd1b6d` (le code et ses tests), `af54fd64` (les revues triées), `84212273`
-(la fusion d'`origin/main` 39cb5eb9, sans conflit), cette note (`f77195f7`) et la précision du journal des
-décisions (`6e277769`). Les autres commits de l'historique de la branche sont ceux de
+(la fusion d'`origin/main` 39cb5eb9, sans conflit), cette note (`f77195f7`), la précision du journal des
+décisions (`6e277769`), puis, le 22/11, la troisième phrase (`251a33cc`, `a528816a`), la fusion de `b21a87cd`
+(`a6de2ede`), la seconde revue de cette phrase (`eb461c6e`) et l'encadré de la charte (`2e0f591d`, et ses
+commentaires). Les autres commits de l'historique de la branche sont ceux de
 `main` qu'apporte cette fusion (#658, #662, #664, #665, #670, #679) : ils ont leur propre note.
 
 ## Le pourquoi
@@ -49,8 +51,8 @@ dans le gabarit, pas dans les constantes de `feed.py` : les mêmes messages serv
 serait de trop (section 2). Les tendances ont leur propre gabarit, avec le même mot
 (`src/k_b/web/templates/trends.html:14`).
 
-La feuille de style n'a pas changé : `.field-error` garde sa couleur et son demi-gras
-(`src/k_b/web/static/site.css:464-468`). Le mot s'ajoute à la couleur ; il ne la remplace pas.
+Pour le message d'un champ, la feuille de style n'a pas changé : `.field-error` garde sa couleur et son demi-gras
+(`src/k_b/web/static/site.css:465-469`). Le mot s'ajoute à la couleur ; il ne la remplace pas.
 
 ### 2. Le résumé garde les messages sans le mot
 
@@ -67,6 +69,23 @@ Le résumé « Filtre à corriger » liste un lien par champ refusé :
 chaque lien ne dirait rien de plus. C'est pourquoi le mot vit dans la macro du champ et `error.message` reste le
 texte seul. Un test vérifie que chaque lien du résumé porte exactement le message de son champ, mot retiré
 (section « Preuve »).
+
+Le 22/11, après son passage de WAVE et du clavier sur l'aperçu des quatre PR du site, Sabine a décidé que le résumé
+prend l'encadré « Couleur signalée » de la planche « Charte graphique » (« pour le filtre, tout est dans les planches
+de maquette ») :
+
+```css
+  .error-summary {
+    padding: 1rem 1.25rem;
+    color: var(--color-alert-ink);
+    background: var(--color-alert-wash);
+    border: 2px solid var(--color-alert);
+```
+
+(`src/k_b/web/static/site.css:563-567`). Bordure rouille, fond pêche pâle, titre et liens en rouille
+sombre (`--color-alert-deep`, 8,47:1 sur le fond), puces en brun brûlé (11,13:1) : chaque message étant un lien, le
+« texte » brun brûlé de la charte ne colore que les puces. Les jetons sont ceux de la feuille, aucune valeur en dur.
+En couleurs forcées, le fond devient noir et la bordure, blanche, reste.
 
 ### 3. Une seule fonction pour le message d'un jour refusé
 
@@ -161,6 +180,8 @@ mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
 | `test_a_start_of_a_year_of_5_digits_is_refused_without_a_format_the_field_does_not_show` (`tests/web/test_feed_page.py:241`) | Page entière : 422, aucun appel à l'API, ni `AAAA-MM-JJ` ni `20266` dans la page. |
 | Chrome 157, couleurs forcées émulées, 390 px (`wip/590/forced-colors-390.json`, captures `wip/590/shots/`, hors du dépôt) | En couleurs forcées, libellés et messages sont tous `rgb(255, 255, 255)` en 600 : seul « Erreur. » les distingue. Sans émulation (`normal-390.json`), message `rgb(124, 45, 18)` et libellé `rgb(28, 30, 33)`, 1,78:1. |
 | Chrome 157, frappes réelles (`wip/590/typed-in-chrome.txt`) | `30/02/2026` bloqué par le navigateur ; une année de 5 ou 6 chiffres envoyée. |
+| `test_the_summary_of_the_errors_is_framed_as_the_box_of_the_chart` (`tests/web/test_stylesheet.py:313`), rouge deux fois avant le CSS (le fond, puis la bordure) ; la paire de l'anneau de focus sur le fond pêche dans `PAIRS` | L'encadré a les couleurs de la charte ; l'anneau de focus y a 6,70:1. |
+| Chrome 157, fil refusé, 390 px, avant et après (`wip/590/summary/shots/`, hors du dépôt) | Après : fond `rgb(255, 241, 230)`, bordure `rgb(154, 52, 18)` de 2 px, puces `rgb(91, 36, 16)`, titre `rgb(124, 45, 18)` en 700, liens soulignés ; en couleurs forcées, fond noir et bordure blanche gardée. |
 | `/security-review` : aucun constat ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` (198 fichiers) verts ; aucun caractère `Cc` ni `Cf` | Les contrôles du dépôt. |
 
 ## Ce que tu dois pouvoir défendre
