@@ -46,6 +46,7 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
 - Le monitorage et l'outillage de l'environnement de l'application, leur installation et leur configuration:
     [Journaux de l'application](#journaux-de-lapplication), en local et en ligne.
 - Les métriques, les seuils et les valeurs d'alerte: [Ce que le monitorage suit](#ce-que-le-monitorage-suit).
+    Aucune alerte ne lit les journaux de l'application ([Limites des journaux](#limites-des-journaux)).
 - Les dépendances de l'outillage, leur installation et leur configuration: [Brancher l'export](#brancher-lexport)
     (la pile, la politique d'accès, le jeton, les variables de l'API IA) et
     [Journaux de l'application](#journaux-de-lapplication).
@@ -73,7 +74,7 @@ Le tableau suivant donne les cinq alertes: ce que chacune mesure, sa fenêtre, s
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source du seuil |
 |---|---|---|---|---|
 | `KbModelInvalidOutputs` | la part des appels refusés après leur nouvelle tentative (`llm_invalid_output`) | 24 h | au-dessus de 0 % | la grille de lecture du journal des décisions: <q>100 % de schémas valides après une nouvelle tentative</q> (`docs/ADR/journal-decisions-projet.md:3389`) |
-| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | la même grille: <q>au moins 95 % de fidélité</q> (`docs/ADR/journal-decisions-projet.md:3389-3390`); provisoire jusqu'au <span lang="en">benchmark</span> des modèles et à l'optimisation de la consigne |
+| `KbModelLowFidelity` | la part des faits retrouvés à la fois dans le texte où ils sont affirmés et dans leur source: l'item que chacun désigne, pour les fiches de veille, la source de leur texte, pour le compte rendu des tendances | 24 h | sous 95 % | la même grille: <q>au moins 95 % de fidélité</q> (`docs/ADR/journal-decisions-projet.md:3389-3390`); provisoire jusqu'au <span lang="en">benchmark</span> des modèles et à l'optimisation de la consigne (#674) |
 | `KbModelCostOverBudget` | le coût estimé des appels, aux prix de gpt-6.1-sol de `src/k_b/core/config.py` | 7 jours | au-dessus de 2 USD | au-dessus du maximum normal de gpt-6.1-sol, 1,55 USD par semaine: l'alerte signale une dépense anormale (`docs/ADR/journal-decisions-projet.md:7419-7421`) |
 | `KbModelCallFailures` | la part des appels en échec après leur nouvelle tentative: délai dépassé (`llm_timeout`), service indisponible (`llm_unavailable`), trop de requêtes (`llm_rate_limited`), filtre de contenu (`llm_content_filtered`), sortie coupée au plafond de jetons (`llm_truncated`) | 24 h | au-dessus de 0 % | un appel en échec est un sujet ou un compte rendu qui manque (`docs/ADR/journal-decisions-projet.md:7428-7433`) |
 | `KbRequestOverDuration` | la part des demandes de compte rendu (`POST /digests`, `POST /trend-reports`) de plus de 180 s, de l'entrée dans leur route à leur réponse, comme l'échéance de 200 s | 24 h | au-dessus de 0 % | 180 s, sous l'échéance de 200 s d'une demande (`docs/ADR/journal-decisions-projet.md:7436-7438`) |
@@ -90,8 +91,8 @@ et sa source dans le code. Toutes deux écrivent par e-mail à l'adresse du para
 
 | Alerte | Ce qu'elle mesure | Fenêtre | Seuil | Source |
 |---|---|---|---|---|
-| `budget-kb` | les coûts étiquetés `project=k-b`, hébergement et inférence | le mois (`Monthly`) | 40 € par mois; un e-mail à 50 % et à 100 % des coûts réels, et à 100 % des coûts prévus (`Forecasted`) | `infra/modules/budget.bicep:11-12`, `:20-22`, `:27-58`; `docs/ADR/journal-decisions-projet.md:7414-7418` |
-| `alert-kb-model-tokens` | les jetons (`TotalTokens`) de la ressource du modèle, en somme | 24 h glissantes (`P1D`), évaluées toutes les 15 minutes (`PT15M`) | au-dessus de 400 000 jetons | `infra/modules/model-token-alert.bicep:30`, `:41-42`, `:52-55`; `infra/main.bicep:176` |
+| `budget-kb` | les coûts étiquetés `project=k-b`, hébergement et inférence; l'inférence y entre quand la ressource du modèle porte l'étiquette | le mois (`Monthly`) | 40 € par mois; un e-mail à 50 % et à 100 % des coûts réels, et à 100 % des coûts prévus (`Forecasted`) | `infra/modules/budget.bicep:11-12`, `:20-22`, `:27-58`; `docs/ADR/journal-decisions-projet.md:7414-7418` |
+| `alert-kb-model-tokens` | les jetons (`TotalTokens`) de la ressource du modèle, en somme | 24 h glissantes (`P1D`), évaluées toutes les 15 minutes (`PT15M`) | au-dessus de 400 000 jetons | `infra/modules/model-token-alert.bicep:30`, `:41-42`, `:52-55`; `infra/main.bicep:176`; `docs/ADR/journal-decisions-projet.md:7613-7614` |
 
 ## Qui lit le tableau et l'alerte
 
@@ -277,8 +278,12 @@ Les chemins sont ceux de l'interface de Grafana 13.
     d'expiration d'un jeton est celle choisie à sa création, dans le champ
     <span lang="en">**Expiration date**</span> de la boîte <span lang="en">**Create new token**</span> (étape 3 de
     [Brancher l'export](#brancher-lexport)); un jeton expiré est marqué <span lang="en">Expired</span> sur la page
-    <span lang="en">**Access Policies**</span> du portail. Le jeton de la production est celui de la politique
-    `kb-production`. Avant l'expiration d'un jeton, Grafana écrit aux administrateurs de la pile de sa politique:
+    <span lang="en">**Access Policies**</span> du portail, qui liste toutes les politiques, celles d'une pile
+    comprises: <q lang="en">All access policies can be modified from the Access Policy page in the Cloud Portal</q>
+    ([Sources](#sources)). Le temps qui reste à un jeton s'affiche sur la page
+    <span lang="en">**Cloud access policies**</span> de la pile
+    (`docs/journaling/2026-11-20-relire-api10-depuis-le-jeton-de-production.md:24-29`, `:109-110`). Le jeton de la
+    production, de la politique `kb-production`, a une durée de 90 jours, choisie à sa création (#522). Avant l'expiration d'un jeton, Grafana écrit aux administrateurs de la pile de sa politique:
     <q lang="en">Warning emails are sent to the admins of the corresponding stack</q>. Ces e-mails partent par
     défaut; la case <span lang="en">**Enable token expiration emails**</span>, page
     <span lang="en">**Settings**</span> des <span lang="en">**Org Settings**</span> du portail, les coupe si elle
@@ -409,7 +414,8 @@ Sabine a lu Explore le 2026-11-21, entre 02:27 et 02:38 UTC, sur la plage du 202
 
 ## Journaux de l'application
 
-Le tableau de bord et les alertes suivent le modèle; l'application se suit par ses journaux: ceux de
+Le tableau de bord et les alertes de Grafana suivent le modèle, et les alertes d'Azure la dépense; l'application se
+suit par ses journaux: ceux de
 `kb`, de `kb serve-data` (l'API de données), de `kb serve-ai` (l'API IA) et de `kb serve-web` (le site). En local, ils ne demandent rien à
 installer: `kb` les écrit par le module `logging` de Python. En ligne, ils vont dans l'espace Log Analytics `log-kb`,
 qu'`infra/main.bicep` crée. Aucune alerte ne les lit ([Limites des journaux](#limites-des-journaux)).
@@ -424,7 +430,7 @@ son renvoi au code ou aux règles.
 | journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:21-23`, `:61-83` |
 | journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
 | journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-93`, `src/k_b/ai_api/app.py:96` |
-| journal de `kb serve-web` | son démarrage, le réveil de l'API de données, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-web.log` | sortie d'erreur de `ca-kb-web`, dans `log-kb` | au commit `54ba488c`: `src/k_b/cli.py:72-76`, `src/k_b/core/config.py:172`, `src/k_b/commands/serve_web_command.py:27-33`, `:49-50`, `:64-66`, `src/k_b/web/app.py:64` |
+| journal de `kb serve-web` | son démarrage, le réveil de l'API de données, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-web.log` | sortie d'erreur de `ca-kb-web`, dans `log-kb` | `src/k_b/cli.py:72-76`, `src/k_b/core/config.py:172`, `src/k_b/commands/serve_web_command.py:27-33`, `:49-50`, `:64-66`, `src/k_b/web/app.py:64` |
 | ligne de mesure d'un appel au modèle | une ligne JSON par appel: durée, jetons, coût estimé, états; ni texte ni clé | sortie standard de `kb serve-ai`, aucun fichier | sortie standard de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/ai_api/observability/metrics.py:1-2`, `:35-51` |
 | résultat d'une commande | ce que la commande affiche par `print`, le bilan d'un import par exemple | sortie standard | sortie standard du job, dans `log-kb` | `.claude/rules/conventions.md`, règle 3 |
 
@@ -542,16 +548,16 @@ Tout est posé par `infra/main.bicep`, qui s'applique à la main (`infra/README.
     de journal, la sortie d'erreur est le journal, et une ligne de la sortie standard part aussitôt. Aucune pièce
     d'`infra/` ne change `KB_LOG_TO_FILE`. Le `KB_DATA_DIR` en ligne est un dossier de l'image, vidé à chaque
     démarrage, sauf pour `caj-kb-daily-routine` et `caj-kb-digest-watch`, qui y montent le partage `job-data`
-    (`infra/main.bicep:69-71` au commit `54ba488c`): les journaux d'import de la routine y restent, pas le journal de
+    (`infra/main.bicep:69-71`): les journaux d'import de la routine y restent, pas le journal de
     fonctionnement d'un job.
 
 Y écrivent les deux API, `ca-kb-data-api` et `ca-kb-ai-api` (`infra/main.bicep:203`, `:238`), le site, `ca-kb-web`
-(au commit `54ba488c`: `infra/main.bicep:79`, `:349-354`), et les quatre jobs:
+(`infra/main.bicep:79`, `:349-354`), et les quatre jobs:
 `caj-kb-smoke-test` (`infra/modules/smoke-test-job.bicep:30`), `caj-kb-migrate-database`
 (`infra/modules/migrate-database-job.bicep:59`), `caj-kb-daily-routine`, qui lance `kb daily-routine` chaque jour
 à 08:00 UTC (`infra/modules/daily-routine-job.bicep:59`, `:77-78`), et `caj-kb-digest-watch`, qui lance
-`kb digest-watch` le lundi et le jeudi à 10:00 UTC par défaut (au commit `54ba488c`:
-`infra/modules/digest-watch-job.bicep:48`, `:58`, `:65`; `infra/main.bicep:32`, `:437`).
+`kb digest-watch` le lundi et le jeudi à 10:00 UTC par défaut
+(`infra/modules/digest-watch-job.bicep:48`, `:58`, `:65`; `infra/main.bicep:32`, `:437`).
 
 Pour lire `log-kb`: l'Azure CLI, connectée à l'abonnement (`az login`), et son extension `log-analytics`, qui porte
 `az monitor log-analytics query` (`az extension add --name log-analytics`; message
