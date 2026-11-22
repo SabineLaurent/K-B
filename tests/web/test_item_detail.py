@@ -232,7 +232,7 @@ def test_the_page_of_a_newsletter_article():
 
 
 def test_the_rank_of_a_newsletter_article_groups_its_thousands():
-    """The data API bounds the rank from below only."""
+    """The client of the data API bounds the rank from below only."""
     page = build(NEWSLETTER_ARTICLE, rank=1234)
 
     assert page.page_title.endswith(f", n° 1{chr(0x202F)}234")

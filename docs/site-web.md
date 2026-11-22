@@ -117,7 +117,7 @@ faits en `<dl>` ; les textes sous des `h2` ; le lien vers la source, en bouton, 
 | faille | « Ajoutée au catalogue le », « modification vue par K-B le » | CVE, usage par des rançongiciels, éditeur, produit | « Description » |
 | alerte | « Publiée le » | identifiant GitHub, CVE (« Aucune »), paquets touchés (« Aucun ») | — |
 | *release* | dépôt, version, « Publiée le » | — | « Notes de version, texte brut », ou « Aucune note de version. » |
-| newsletter | « TLDR AI », « édition du », n° | — | « Résumé » |
+| newsletter | « TLDR AI », « édition du », n° (milliers groupés, `write_count`) | — | « Résumé » |
 
 **Le bandeau** dit l'état en mots, la couleur ne fait que suivre (RGAA 3.1) ; seul un item au catalogue KEV prend
 le style d'alerte. Il lit `exploited` et `withdrawn_at`, sans rien supposer :
