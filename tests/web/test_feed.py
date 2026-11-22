@@ -154,6 +154,7 @@ def test_a_start_date_without_date_checked_is_ignored():
 
 START_MISSING = "Indiquez la date de début, ou choisissez 1, 3 ou 7 jours."
 START_NOT_A_DAY = "Date de début invalide: choisissez un jour dans le champ."
+START_LONG_YEAR = "Date de début invalide: l’année a plus de 4 chiffres."
 
 
 @pytest.mark.parametrize(
@@ -170,8 +171,11 @@ START_NOT_A_DAY = "Date de début invalide: choisissez un jour dans le champ."
             ),
         ),
         ("period=date&start=2026-1-7", START_NOT_A_DAY),
-        # A year of 5 digits, which a browser lets type in an input type=date.
-        ("period=date&start=20266-01-01", START_NOT_A_DAY),
+        # A year of 5 or 6 digits, which Chrome lets type in an input type=date and sends.
+        ("period=date&start=20266-01-01", START_LONG_YEAR),
+        ("period=date&start=202666-01-01", START_LONG_YEAR),
+        # 7 digits, which no field sends: HTML stops at the year 275760.
+        ("period=date&start=2026666-01-01", START_NOT_A_DAY),
     ],
 )
 def test_date_checked_without_a_valid_day_is_refused_on_the_start_field(query, message):

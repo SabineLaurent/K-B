@@ -57,8 +57,8 @@ def test_a_day_is_read_as_the_last_day_of_its_window():
         "2026-10-10%01",
         # A digit of full width, which Python reads as a digit.
         "%EF%BC%92026-10-10",
-        # A year of 5 digits, which a browser lets type in an input type=date.
-        "20266-01-01",
+        # 7 digits, which no field sends: HTML stops at the year 275760.
+        "2026666-01-01",
     ],
     ids=[
         "without-dashes",
@@ -68,7 +68,7 @@ def test_a_day_is_read_as_the_last_day_of_its_window():
         "long",
         "control",
         "full-width-digit",
-        "five-digit-year",
+        "seven-digit-year",
     ],
 )
 def test_a_value_that_is_not_a_day_is_refused_on_its_field(value):
@@ -91,6 +91,17 @@ def test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_messag
             WINDOW_END_ID,
             f"Date invalide: {value} n’existe pas. Choisissez un jour qui existe.",
         ),
+    )
+
+
+@pytest.mark.parametrize("value", ["20266-01-01", "202666-12-31", "20266-02-30"])
+def test_a_year_of_5_or_6_digits_is_said_in_its_message(value):
+    """The one refusal a browser sends: Chrome lets type a year of 5 or 6 digits in an input
+    type=date. The message says the nature of the error (Opquast 2025, rule 80), without the
+    value."""
+    assert read(f"window_end={value}") == TrendsForm(
+        None,
+        FieldError(WINDOW_END_ID, "Date invalide: l’année a plus de 4 chiffres."),
     )
 
 

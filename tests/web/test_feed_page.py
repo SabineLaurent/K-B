@@ -239,8 +239,8 @@ def test_a_search_of_200_characters_beyond_200_units_of_the_browser_drops_maxlen
 
 
 def test_a_start_of_a_year_of_5_digits_is_refused_without_a_format_the_field_does_not_show():
-    """A browser lets type 20266 in an input type=date, which shows the day in its own way: the
-    message names no format (Opquast 2025, rule 80; #617)."""
+    """Chrome lets type 20266 in an input type=date, which shows the day in its own way: the
+    message says the nature of the error, without a format (Opquast 2025, rule 80; #617)."""
     api = RecordingApi(ITEMS_PAGE)
 
     response = get_feed("period=date&start=20266-01-01", handler=api)
@@ -249,7 +249,7 @@ def test_a_start_of_a_year_of_5_digits_is_refused_without_a_format_the_field_doe
     assert api.requests == []
     assert (
         '<p id="start-error" class="field-error">Erreur. Date de début invalide:'
-        " choisissez un jour dans le champ.</p>" in response.text
+        " l’année a plus de 4 chiffres.</p>" in response.text
     )
     assert "AAAA-MM-JJ" not in response.text
     assert "20266" not in response.text

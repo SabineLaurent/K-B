@@ -83,6 +83,9 @@ MAX_PAGE = DATA_API_MAX_OFFSET // FEED_PAGE_SIZE + 1
 # The form input type=date sends, a day that exists: the rule of the routes of the data API
 # (items.py); another value is refused, never guessed.
 WRITTEN_DAY: TypeAdapter[date] = TypeAdapter(WrittenDay)
+# A day of a year of 5 or 6 digits, which Chrome lets type in an input type=date and sends: HTML
+# stops at the year 275760.
+LONG_YEAR_DAY = re.compile(r"[0-9]{5,6}-[0-9]{2}-[0-9]{2}")
 # The rule of the data API for q: neither a NUL nor a lone surrogate.
 SEARCH_TEXT: TypeAdapter[str] = TypeAdapter(NonEmptyText)
 
@@ -279,6 +282,8 @@ def write_day_refusal(field_in_messages: str, value: str) -> str:
             f"{field_in_messages} invalide: {value} n’existe pas."
             " Choisissez un jour qui existe."
         )
+    if LONG_YEAR_DAY.fullmatch(value):
+        return f"{field_in_messages} invalide: l’année a plus de 4 chiffres."
     return f"{field_in_messages} invalide: choisissez un jour dans le champ."
 
 
