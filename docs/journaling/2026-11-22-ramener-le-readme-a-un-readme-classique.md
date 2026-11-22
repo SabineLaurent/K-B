@@ -125,7 +125,7 @@ local, avec les commandes de `ci.yml`.
 | `uv run --locked --only-group docs mkdocs build --strict` vert | aucun lien ni aucune ancre cassés, aucune page hors du menu |
 | le contrôle du HTML construit : `lang`, un `h1`, aucun saut de titre, chaque tableau à en-têtes, aucun lien vague | les deux pages nouvelles tiennent les règles de la notice d'AcceDe Web que le HTML montre |
 | aucune espace avant « : » ni « ; » hors du code dans `documentation/`, aucun caractère `Cc` ou `Cf` | la règle typographique de Sabine, et aucun caractère invisible |
-| `uv run pytest --cov --cov-report=term-missing:skip-covered`, la commande du job `tests` : 5 717 réussis, couverture de 98,55 % pour un seuil de 96 % ; ruff, format et mypy verts | les commentaires changés dans `src/` ne cassent rien, et le tableau « Contenus de tiers » reste lu |
+| `uv run pytest --cov --cov-report=term-missing:skip-covered`, la commande du job `tests` : 5 797 réussis, couverture de 98,55 % pour un seuil de 96 % ; ruff, format et mypy verts | les commentaires changés dans `src/` ne cassent rien, et le tableau « Contenus de tiers » reste lu |
 | les commandes du job `audit` (`uv export` de tous les groupes, puis `uvx pip-audit@2.10.1 --require-hashes`) : « No known vulnerabilities found » | aucune version épinglée par `uv.lock` n'a de vulnérabilité connue |
 | `uv run pytest -m postgresql` sur `postgres:18.6`, l'image de `ci.yml` par son digest, sous Docker : 350 réussis | le job `tests-postgresql` passe sur le serveur de la CI |
 | `diff` de la fin du README contre l'ancienne | la licence, les contenus de tiers et les crédits sont inchangés |
