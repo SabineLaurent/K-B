@@ -13,6 +13,7 @@ nav:
       - 1. Démarrer:
           - installation_pour_docu.md
           - architecture_pour_docu.md
+          - maquettes-et-parcours.md
       # In the order of the data: collected, queried, imported, modelled, sorted, served (issue 685).
       - 2. Les données:
           - collecte.md
