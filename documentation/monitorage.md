@@ -24,6 +24,11 @@
 
     — C20
 
+    > La documentation explicite les arguments en faveur des choix techniques pour l'outillage du monitorage de
+    > l'application.
+
+    — C20
+
     > La documentation couvre la procédure d'installation et de configuration des dépendances pour l'outillage du
     > monitorage de l'application.
 
@@ -47,6 +52,7 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
     [Journaux de l'application](#journaux-de-lapplication), en local et en ligne.
 - Les métriques, les seuils et les valeurs d'alerte: [Ce que le monitorage suit](#ce-que-le-monitorage-suit).
     Aucune alerte ne lit les journaux de l'application ([Limites des journaux](#limites-des-journaux)).
+- Les arguments des choix techniques de l'outillage: [Les arguments du choix des outils](#les-arguments-du-choix-des-outils).
 - Les dépendances de l'outillage, leur installation et leur configuration: [Brancher l'export](#brancher-lexport)
     (la pile, la politique d'accès, le jeton, les variables de l'API IA) et
     [Journaux de l'application](#journaux-de-lapplication).
@@ -55,8 +61,9 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
 Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`. Le monitorage du modèle tient dans deux
 fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`,
 et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie
-en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »). Le choix de l'outil est
-écrit dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
+en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »).
+Les arguments du choix des outils sont dans la section [Les arguments du choix des outils](#les-arguments-du-choix-des-outils);
+la comparaison détaillée est dans `docs/outils-de-suivi.md`. Le monitorage de l'application, ses journaux, est dans la section
 [Journaux de l'application](#journaux-de-lapplication) (#165).
 
 ## Ce que le monitorage suit
@@ -93,6 +100,75 @@ et sa source dans le code. Toutes deux écrivent par e-mail à l'adresse du para
 |---|---|---|---|---|
 | `budget-kb` | les coûts étiquetés `project=k-b`, hébergement et inférence; l'inférence y entre quand la ressource du modèle porte l'étiquette | le mois (`Monthly`) | 40 € par mois; un e-mail à 50 % et à 100 % des coûts réels, et à 100 % des coûts prévus (`Forecasted`) | `infra/modules/budget.bicep:11-12`, `:20-22`, `:27-58`; `docs/ADR/journal-decisions-projet.md:7414-7418` |
 | `alert-kb-model-tokens` | les jetons (`TotalTokens`) de la ressource du modèle, en somme | 24 h glissantes (`P1D`), évaluées toutes les 15 minutes (`PT15M`) | au-dessus de 400 000 jetons | `infra/modules/model-token-alert.bicep:30`, `:41-42`, `:52-55`; `infra/main.bicep:176`; `docs/ADR/journal-decisions-projet.md:7613-7614` |
+
+## Les arguments du choix des outils
+
+Le monitorage de K-B repose sur deux outils, parce qu'il suit deux sortes de données. Les métriques du modèle sont des
+nombres émis par le code: elles demandent un tableau de bord et des alertes sur seuil. Les journaux de l'application
+sont des lignes de texte: l'hébergement en ligne les recueille sans code de plus. Grafana Cloud reçoit les premières,
+Log Analytics les secondes, et deux alertes d'Azure suivent la dépense. Cette section donne, pour chaque outil, ce
+qu'il devait faire et les arguments qui l'ont fait retenir.
+
+### Grafana Cloud, pour les signaux de l'API IA
+
+L'API IA émet trois signaux au format d'OpenTelemetry: les métriques, les traces, qui suivent une demande étape par
+étape, et les enregistrements de journal (<span lang="en">log records</span>). Le premier critère est donc un outil
+qui les reçoit tous les trois. Les critères suivants sont le temps réel, l'alerte sur seuil, l'accessibilité de
+l'interface, l'hébergement dans l'Union européenne et le coût (`docs/outils-de-suivi.md:9-17`). Cinq outils ont été
+comparés sur ces critères: Application Insights, Grafana Cloud, Langfuse, LangSmith et Honeycomb
+(`docs/outils-de-suivi.md:60-72`).
+
+Grafana Cloud est retenu pour ces arguments:
+
+- **il reçoit les trois signaux**: les métriques, les traces (Tempo) et les journaux (Loki) (`docs/outils-de-suivi.md:63-65`);
+- **son offre gratuite suffit au volume de K-B** (`docs/outils-de-suivi.md:72`);
+- **le temps réel**: l'API IA envoie ses métriques toutes les 60 secondes (`src/k_b/core/config.py:636`), et Grafana
+    évalue les cinq règles d'alerte toutes les 5 minutes (`observability/grafana/alert-rules.yaml:23`);
+- **la pile est hébergée en Allemagne**, dans l'Union européenne (`docs/registre-traitements.md:128`);
+- **l'accessibilité**: Grafana Labs déclare son interface <q><span lang="en">partially conformant with WCAG 2.1 level
+    AA</span></q>, c'est-à-dire partiellement conforme au niveau AA des règles d'accessibilité des contenus web
+    (`docs/outils-de-suivi.md:70`).
+
+Les outils écartés, et pourquoi:
+
+- **Langfuse et LangSmith**, deux outils de suivi des modèles de langage: leur documentation ne décrit que la
+    réception des traces (`docs/outils-de-suivi.md:63`);
+- **Honeycomb**: son offre gratuite ne permet que deux règles d'alerte, quand K-B en compte cinq
+    (`docs/outils-de-suivi.md:68`);
+- **Application Insights**, l'outil de suivi d'Azure: il dépend de deux services d'Azure, `Microsoft.Monitor` et
+    `Microsoft.AlertsManagement`, qui ne sont pas enregistrés sur l'abonnement où K-B est déployé, et que le rôle
+    Lecteur (<span lang="en">Reader</span>) du compte ne permet pas d'enregistrer (`docs/outils-de-suivi.md:74`);
+- **la sortie standard des conteneurs envoyée vers Log Analytics**, avec un classeur et une alerte: pour les mesures
+    du modèle, rien n'y est visible avant la mise en ligne, alors que Grafana Cloud reçoit aussi les mesures du bac à
+    sable (`docs/ADR/journal-decisions-projet.md:3337-3338`);
+- **Grafana et Loki en local, par compose**: il faudrait ensuite un second outil en ligne, ou réécrire les tableaux
+    dans un autre langage de requête (`docs/ADR/journal-decisions-projet.md:3339-3340`).
+
+### Log Analytics, pour les journaux de l'application
+
+Log Analytics est le service de journaux d'Azure Monitor. Il est retenu parce qu'Azure Container Apps, le service
+d'Azure qui fait tourner les conteneurs de K-B, y envoie leur sortie sans code ni secret de plus: la destination
+`azure-monitor` passe par un paramètre de diagnostic de l'environnement, sans la clé partagée de l'espace de journaux
+(`docs/ADR/journal-decisions-projet.md:5688-5691`). En local, chaque commande et chaque serveur écrit son journal sur
+la sortie d'erreur et dans un fichier; en conteneur, Log Analytics recueille déjà la sortie d'erreur, et le fichier en
+double ne servirait à rien ([Journaux de l'application](#journaux-de-lapplication)).
+
+L'espace de journaux de K-B garde les lignes 30 jours et plafonne leur volume à 0,2 Go par jour, ce qui borne le coût
+d'un emballement; au-delà du plafond, la collecte s'arrête jusqu'à l'heure de remise à zéro de l'espace
+(`infra/modules/log-analytics.bicep:13-22`). Ce choix tient à l'intégration de Log Analytics à Azure Container Apps:
+aucun autre outil n'a été comparé pour les journaux.
+
+### Les alertes d'Azure, pour la dépense
+
+Deux alertes d'Azure suivent ce que coûte K-B, hors de Grafana Cloud:
+
+- **le budget de K-B**, 40 euros par mois pour l'hébergement et, quand la ressource du modèle porte l'étiquette
+    `project=k-b`, l'inférence; il écrit à la moitié et à la totalité de la dépense du mois, et sur prévision quand la
+    dépense prévue atteint le budget (`infra/modules/budget.bicep:11`, `:28-57`;
+    `docs/ADR/journal-decisions-projet.md:7417-7418`);
+- **l'alerte sur les jetons du modèle**, `alert-kb-model-tokens`, qui lit la métrique `TotalTokens` du déploiement et
+    prévient au-delà de 400 000 jetons sur 24 heures glissantes, évaluée toutes les 15 minutes
+    (`infra/modules/model-token-alert.bicep:41-55`, `infra/README.md:578-579`).
 
 ## Qui lit le tableau et l'alerte
 
