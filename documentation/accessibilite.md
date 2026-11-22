@@ -156,14 +156,14 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les vingt et une pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
+Les vingt-deux pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
 Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
 2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base de
 nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son écriture
 (#512), les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et de l'API de
-données le 2026-11-22 (#685), les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684), et la
-fiche de l'incident le 2026-11-22, à son écriture (#510). Le tableau suivant donne chaque règle de la notice, son
-résultat sur les vingt et une pages, et comment il a été vérifié.
+données le 2026-11-22 (#685), les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684), la fiche
+de l'incident le 2026-11-22, à son écriture (#510), et celle des user stories le 2026-11-22, à sa création (#705). Le
+tableau suivant donne chaque règle de la notice, son résultat sur les vingt-deux pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
