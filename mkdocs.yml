@@ -17,8 +17,14 @@ nav:
           - utilisation.md
           - architecture.md
           - maquettes-et-parcours.md
+      # In the order of the data: collected, queried, imported, modelled, sorted, served (issue 685).
       - 2. Les données:
+          - collecte.md
+          - requetes.md
           - donnees.md
+          - modele-de-donnees.md
+          - donnees-personnelles.md
+          - api-donnees.md
       - 3. La brique d'intelligence artificielle:
           - api-ia.md
           - service-ia.md
@@ -27,6 +33,8 @@ nav:
           - tests.md
           - integration-continue.md
           - livraison-continue.md
+      - 5. Conduite du projet:
+          - conduite-du-projet.md
       # Without a number, and in the footer too, so the page keeps its table of contents (Sabine's choice, issue 654).
       - Accessibilité: accessibilite.md
   - Le dépôt GitHub: https://github.com/SabineLaurent/K-B

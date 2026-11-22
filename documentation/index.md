@@ -15,13 +15,19 @@ titre.
 - [Utiliser K-B](utilisation.md): les commandes, leurs réglages, leur sortie et leurs codes.
 - [L'architecture de l'application](architecture.md)
 - [Les maquettes du site et le parcours de l'opératrice](maquettes-et-parcours.md)
+- [La collecte des données](collecte.md)
+- [Les requêtes d'extraction](requetes.md)
 - [L'agrégation, l'import et la base](donnees.md)
+- [Le modèle de données](modele-de-donnees.md)
+- [Les données personnelles](donnees-personnelles.md)
+- [L'API de données](api-donnees.md)
 - [L'API IA](api-ia.md)
 - [Le service d'IA: le déploiement du modèle](service-ia.md)
 - [Le monitorage du modèle et de l'application](monitorage.md)
 - [Les tests](tests.md)
 - [L'intégration continue](integration-continue.md)
 - [La livraison continue](livraison-continue.md)
+- [La conduite du projet](conduite-du-projet.md)
 
 ## Lire une fiche
 
