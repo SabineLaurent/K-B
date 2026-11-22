@@ -72,7 +72,7 @@ texte seul. Un test vérifie que chaque lien du résumé porte exactement le mes
 
 Le fil (la date de début, `start`) et les tendances (le dernier jour de la fenêtre, `window_end`) lisent un jour
 par la même fonction, `read_written_day`, qui applique `WrittenDay`, le type des routes de l'API de données
-(`src/k_b/web/feed.py:262-268`). Ils partagent maintenant aussi le message du refus :
+(`src/k_b/web/feed.py:265-271`). Ils partagent maintenant aussi le message du refus :
 
 ```python
 def write_day_refusal(field_in_messages: str, value: str) -> str:
@@ -81,24 +81,29 @@ def write_day_refusal(field_in_messages: str, value: str) -> str:
             f"{field_in_messages} invalide: {value} n’existe pas."
             " Choisissez un jour qui existe."
         )
+    if LONG_YEAR_DAY.fullmatch(value):
+        return f"{field_in_messages} invalide: l’année a plus de 4 chiffres."
     return f"{field_in_messages} invalide: choisissez un jour dans le champ."
 ```
 
-(`src/k_b/web/feed.py:271-282`, docstring et commentaire retirés de l'extrait). Chaque page donne le nom de son
-champ : `START_IN_MESSAGES = "Date de début"` (`feed.py:94`), `WINDOW_END_IN_MESSAGES = "Date"` (`trends.py:32`).
+(`src/k_b/web/feed.py:274-287`, docstring et commentaire retirés de l'extrait). Chaque page donne le nom de son
+champ : `START_IN_MESSAGES = "Date de début"` (`feed.py:97`), `WINDOW_END_IN_MESSAGES = "Date"` (`trends.py:32`).
 La fonction était `write_refusal`, dans `trends.py` ; elle est déplacée dans `feed.py`, que `trends.py` importait
 déjà (`trends.py:12-17`). Le sens de la dépendance ne change pas.
 
-### 4. Deux phrases, et une valeur nommée seulement si elle a la forme d'un jour
+### 4. Trois phrases, et une valeur nommée seulement si elle a la forme d'un jour
 
-`write_day_refusal` n'est appelée qu'après un refus de `WrittenDay` (`feed.py:257-258`, `trends.py:88-93`). Deux
+`write_day_refusal` n'est appelée qu'après un refus de `WrittenDay` (`feed.py:260-261`, `trends.py:88-93`). Trois
 cas :
 
 - **La valeur a la forme d'un jour** (`DAY_FORM`, `[0-9]{4}-[0-9]{2}-[0-9]{2}`, `src/k_b/items.py:69`) : elle a
   quatre chiffres, deux, deux, et `WrittenDay` l'a pourtant refusée. C'est donc un jour qui n'existe pas
   (`2026-02-30`, `2026-13-01`). Le message le nomme, puisque le champ `type=date` ne peut pas le réafficher
   (sa valeur est un jour valide ou rien, WHATWG ; Opquast 81).
-- **Toute autre valeur** (`07/10/2026`, `2026-1-7`, `20266-01-01`, un caractère de contrôle) : une phrase vraie
+- **Une année de 5 ou 6 chiffres** (`LONG_YEAR_DAY`, `[0-9]{5,6}-[0-9]{2}-[0-9]{2}`, `feed.py:88`) : « … invalide:
+  l’année a plus de 4 chiffres. », sans la valeur. C'est le seul refus que Chrome envoie (section 5) ; HTML s'arrête
+  à l'année 275760, d'où 6 chiffres au plus. Troisième phrase décidée par Sabine le 2026-11-22 (constat CR1).
+- **Toute autre valeur** (`07/10/2026`, `2026-1-7`, `2026666-01-01`, un caractère de contrôle) : une phrase vraie
   dans tous les cas, sans la valeur et sans format.
 
 Nommer seulement une valeur de cette forme est une mesure de sécurité autant qu'une aide : une valeur qui a passé
@@ -119,9 +124,9 @@ hors du dépôt) ont montré ce que le champ laisse partir :
 - `30/02/2026` : bloqué par le navigateur (`badInput`, « Veuillez saisir une valeur valide… ») ; rien n'est envoyé.
 - une année de 5 ou 6 chiffres (`20266`, `202666`) : acceptée et envoyée, `window_end=20266-01-01`.
 
-Le seul refus qu'un vrai navigateur envoie au site est donc l'année de plus de 4 chiffres. Elle n'a pas la forme
-d'un jour : elle reçoit « … invalide: choisissez un jour dans le champ. ». La phrase « n’existe pas » ne sert qu'à
-une adresse modifiée à la main, ou à un navigateur sans calendrier.
+Le seul refus qu'un vrai navigateur envoie au site est donc l'année de plus de 4 chiffres. Elle reçoit sa phrase,
+« … invalide: l’année a plus de 4 chiffres. » (section 4). La phrase « n’existe pas » ne sert qu'à une adresse
+modifiée à la main, ou à un navigateur sans calendrier.
 
 Le journal des décisions disait le contraire : son entrée du 2026-11-14 sur le jour des tendances (#596) écrivait
 que le sélecteur de date n'envoie qu'un jour valide, et qu'une valeur refusée ne vient que d'une adresse écrite à
@@ -136,7 +141,7 @@ mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
 | La forme du mot | « Erreur. » (choix de Sabine, 21/11) | « Erreur: » : deux deux-points de suite (« Erreur: Date de début invalide: … »), et une majuscule après le premier. |
 | Où écrire le mot | Dans les gabarits (choix de Sabine, 21/11) | Dans les constantes de `feed.py` : le résumé, sous son titre « Filtre à corriger », l'aurait répété devant chaque lien. |
 | Le mot dans deux gabarits | Gardé en deux copies, `feed.html` et `trends.html` : chacune est tenue par un test (`test_accessibility.py`). Constat CR5 de la revue, laissé par time-knight. | Une macro commune : `code.md` factorise à la troisième occurrence, pas à la deuxième. |
-| Le texte du message d'une date | Les deux phrases proposées et validées par Sabine (21/11) | « avec son année en 4 chiffres » : faux pour `2026-02-30` ou `2026-1-7`, dont l'année a 4 chiffres. « JJ/MM/AAAA » : faux dans un autre navigateur, et faux pour l'adresse. |
+| Le texte du message d'une date | Les deux phrases proposées et validées par Sabine (21/11), et une troisième pour l'année de 5 ou 6 chiffres, que Chrome envoie (Sabine, 22/11, constat CR1) | « avec son année en 4 chiffres » : faux pour `2026-02-30` ou `2026-1-7`, dont l'année a 4 chiffres. « JJ/MM/AAAA » : faux dans un autre navigateur, et faux pour l'adresse. |
 | Où vit la fonction | `feed.py`, que `trends.py` importe déjà (décision de Sabine) | Garder une fonction par page : elles divergeaient déjà, le fil n'ayant qu'une phrase fixe, sans la valeur. |
 | Un second contrôle dans `write_day_refusal` | Aucun : la docstring dit qu'elle prend une valeur que `WrittenDay` a refusée (constat CR4, corrigé ainsi) | Relire le jour dans la fonction : chaque appelant le lit déjà par `read_written_day`, juste avant. |
 | `max="9999-12-31"` sur les champs | Non ajouté (constat CR2, laissé) | Vérifié dans Chrome : avec `max`, `20266` devient `0266-01-01`, envoyé sans erreur. Un jour faux, en silence, est pire qu'un refus. |
@@ -150,8 +155,9 @@ mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
 | `test_the_message_of_each_field_refused_opens_with_a_word_that_says_an_error` (`tests/web/test_accessibility.py:523`), sur le fil refusé et les tendances refusées | Chaque message sous un champ commence par « Erreur. », sur les deux pages. |
 | `test_the_summary_says_the_message_of_each_field_without_its_word` (`test_accessibility.py:534`) | Le résumé a un lien par champ refusé (`q`, `kinds`, `start`), chacun avec le message de son champ, sans le mot. |
 | `FEED_REFUSED` avec `&start=2026-02-30` (`test_accessibility.py:33`, constat A4) | Les contrôles d'accessibilité du fil refusé passent aussi par `write_day_refusal`. |
-| `test_date_checked_without_a_valid_day_is_refused_on_the_start_field` (`tests/web/test_feed.py:177`) | Chaque valeur refusée de la date de début reçoit sa phrase : manquante, pas un jour (`07/10/2026`, `2026-1-7`, `20266-01-01`), jour qui n'existe pas (`2026-02-30`, nommé). |
-| `test_a_value_that_is_not_a_day_is_refused_on_its_field` et `test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_message` (`tests/web/test_trends.py:74`, `:82`) | Les mêmes phrases sur les tendances, avec « Date » ; huit valeurs qui ne sont pas un jour, dont l'année à 5 chiffres. |
+| `test_date_checked_without_a_valid_day_is_refused_on_the_start_field` (`tests/web/test_feed.py:181`) | Chaque valeur refusée de la date de début reçoit sa phrase : manquante, pas un jour (`07/10/2026`, `2026-1-7`, `2026666-01-01`), une année de 5 ou 6 chiffres (`20266-01-01`, `202666-01-01`), jour qui n'existe pas (`2026-02-30`, nommé). |
+| `test_a_year_of_5_or_6_digits_is_said_in_its_message` (`tests/web/test_trends.py:98`) ; rouge montré avant le correctif de CR1 (6 échecs, 21/11), puis `uv run pytest` : 5675 passed sur `251a33cc` | La troisième phrase, sans la valeur, sur les tendances. |
+| `test_a_value_that_is_not_a_day_is_refused_on_its_field` et `test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_message` (`tests/web/test_trends.py:74`, `:82`) | Les mêmes phrases sur les tendances, avec « Date » ; huit valeurs qui ne sont pas un jour, dont l'année à 7 chiffres. |
 | `test_a_start_of_a_year_of_5_digits_is_refused_without_a_format_the_field_does_not_show` (`tests/web/test_feed_page.py:241`) | Page entière : 422, aucun appel à l'API, ni `AAAA-MM-JJ` ni `20266` dans la page. |
 | Chrome 157, couleurs forcées émulées, 390 px (`wip/590/forced-colors-390.json`, captures `wip/590/shots/`, hors du dépôt) | En couleurs forcées, libellés et messages sont tous `rgb(255, 255, 255)` en 600 : seul « Erreur. » les distingue. Sans émulation (`normal-390.json`), message `rgb(124, 45, 18)` et libellé `rgb(28, 30, 33)`, 1,78:1. |
 | Chrome 157, frappes réelles (`wip/590/typed-in-chrome.txt`) | `30/02/2026` bloqué par le navigateur ; une année de 5 ou 6 chiffres envoyée. |
@@ -167,13 +173,12 @@ mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
    les messages (`feed.html:23-26`).
 3. **Un lien piégé peut-il faire afficher un texte au site ?** Non : seule une valeur de la forme d'un jour
    (`DAY_FORM`, 10 caractères, chiffres ASCII et tirets) est nommée dans le message ; toute autre valeur reçoit une
-   phrase fixe. Jinja2 échappe en plus chaque valeur (`feed.py:271-282`, `items.py:69`).
+   phrase fixe. Jinja2 échappe en plus chaque valeur (`feed.py:274-287`, `items.py:69`).
 4. **Pourquoi ne pas écrire le format attendu, puisque l'adresse attend `AAAA-MM-JJ` ?** Parce que la personne ne
    tape jamais dans l'adresse : elle tape dans le champ, qui montre le jour à la façon de son navigateur. Donner
    `AAAA-MM-JJ`, c'est lui demander un format qu'elle ne voit pas (Opquast 80).
-5. **Que voit la personne qui tape une année à 5 chiffres ?** « Erreur. Date de début invalide: choisissez un jour
-   dans le champ. » La phrase est vraie, mais ne dit pas la cause : c'est le constat CR1, présenté à Sabine (section
-   suivante).
+5. **Que voit la personne qui tape une année à 5 chiffres ?** « Erreur. Date de début invalide: l’année a plus de 4
+   chiffres. » La phrase dit la cause (WCAG 3.3.3), sans la valeur et sans format (`feed.py:285-286`).
 
 ## Zones non vérifiées
 
@@ -183,15 +188,12 @@ mesuré, comme les « Révisée le » du journal (tri de time-knight du 22/11).
 - **Les couleurs forcées réelles de Windows** : la preuve est l'émulation de Chrome (`forced-colors: active`), pas
   un poste Windows en contraste élevé.
 - **Les autres navigateurs** : seul Chrome 157 a été essayé au clavier. Firefox et Safari peuvent laisser passer
-  d'autres valeurs du champ ; elles recevraient l'une des deux phrases, vraies dans tous les cas.
+  d'autres valeurs du champ ; elles recevraient l'une des trois phrases, vraies dans tous les cas.
 - **Les maquettes du 09/11** n'ont pas pu être relues par le relecteur d'accessibilité (`read_artifact` a répondu
   « not found ») : leur accord avec le mot ajouté n'est pas vérifié.
 
 ## Ce qui reste
 
-- **CR1, le message d'une année de plus de 4 chiffres.** C'est le seul refus qu'envoie un vrai navigateur, et la
-  phrase actuelle n'en dit pas la cause (WCAG 3.3.3). Une troisième phrase est prête (« … invalide: l’année a plus
-  de 4 chiffres. »), sans être commitée : elle change les deux phrases que Sabine a validées, et attend sa réponse.
 - **A5** : les groupes « Sortes » et « Depuis » (des `fieldset`) n'ont pas d'`aria-invalid`, l'attribut étant
   déprécié sur le rôle `group` en ARIA 1.2 ; hors de ces deux issues.
 - **A7** : la déclaration d'accessibilité du site (`accessibilite.html`) ne dit pas que les messages du fil ont
