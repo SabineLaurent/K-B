@@ -65,9 +65,9 @@
   :focus-visible {
     outline: 3px solid var(--color-teal);
     outline-offset: 2px;
-    /* Chrome scrolls an element that Tab reaches at the foot of the screen only up to its bottom
-       edge. This margin keeps the ring under it in sight, the width of the outline plus its offset. */
-    scroll-margin-block-end: 5px;
+    /* Chrome scrolls an element partly out of the screen that Tab or Shift+Tab reaches only up to
+       its edge. This margin keeps the ring in sight above and below it, the outline plus its offset. */
+    scroll-margin-block: 5px;
   }
 
   /* The paper of the pages, on the canvas: the body, a container, would no longer give it its
