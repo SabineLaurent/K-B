@@ -33,9 +33,11 @@ draw.io dessine la notation de Merise, qu'un `flowchart` Mermaid ne faisait qu'i
 
 ### Concevoir, puis corriger
 
-Le MCD et le MLD ont été conçus d'abord, puis corrigés quand ils n'étaient plus en phase avec le besoin. Leur dernière
-correction date du 2026-10-20 (#211), comme le dit le cartouche du MCD et
+Le MCD et le MLD ont été conçus d'abord, puis corrigés quand ils n'étaient plus en phase avec le besoin. Le modèle a été
+corrigé pour la dernière fois le 2026-10-20 (#211), comme le disent le cartouche du MCD et
 [la spécification de stockage](https://github.com/SabineLaurent/K-B/blob/main/docs/stockage.md), « MCD et MLD ». Le
+2026-11-22 (#685), les schémas ont été mis à jour sans changer le modèle: la cascade de `item_has_tag.item_id` marquée
+au MLD, la purge dite codée, et les renvois recalés sur `main`. Le
 dossier `docs/merise/` garde aussi la version du 2026-10-12 (`mcd-k-b_20261012.drawio`, `mld-k-b_20261012.drawio`):
 elle portait déjà, marquées « prévu », des entités que le code n'avait pas encore, l'article de newsletter (#57) et la
 tendance (#142, #143).
@@ -204,8 +206,9 @@ Le cartouche du MCD écrit les règles que la base tient en plus des cardinalit�
 - **COMPRENDRE**: un dépôt suivi comprend un paquet au moins (`:167-169`);
 - **Surlignage**: un surlignage a un texte ou un commentaire, l'un au moins (`:98`).
 
-Un auteur est une place dans la liste des auteurs d'une publication, dans l'ordre d'arXiv, pas une personne: K-B
-n'identifie pas les personnes et ne relie pas deux publications par un nom (`database/schema.sql:62`). Un rang
+Un auteur est une place dans la liste des auteurs d'une publication, dans l'ordre d'arXiv
+(`database/schema.sql:62`), pas une personne: K-B n'identifie pas les personnes et ne relie pas deux publications par
+un nom. Un rang
 n'apparaît qu'une fois par publication, comme un rang de paquet suivi par dépôt suivi: c'est l'ordre d'une liste.
 
 ## Le MLD
@@ -270,6 +273,50 @@ traduisent, et ce qui la porte dans le MPD, avec ses lignes de `database/schema.
 | `author` | `id` | `publication_id` → `publication`, obligatoire (ÉCRIRE) | absente: la liste JSON `publication.authors`, 62-66 |
 | `ranking` | `id` | `raw_data_id` → `raw_data`, obligatoire (PRODUIRE) | absente: les colonnes `raw_data_id` et `window_end` de `trend`, 110-113 |
 | `trend` | `id` | `ranking_id` → `ranking`, obligatoire (COMPTER) | la table `trend`, 108-122 |
+
+### Les colonnes de chaque relation
+
+Le tableau suivant donne les colonnes de chaque relation du MLD, telles que le schéma les écrit, avec leurs
+contraintes: PK, la clé primaire; FK, une clé étrangère, avec la relation et la colonne qu'elle vise; `NOT NULL`;
+`UNIQUE`. Les lignes « MPD » de chaque relation sont décrites dans
+[Ce que le MPD écrit autrement que le MLD](#ce-que-le-mpd-ecrit-autrement-que-le-mld).
+
+| Relation | Colonnes et contraintes |
+|---|---|
+| `source` | `id` (PK); `source_code` (UNIQUE, NOT NULL); `label` (NOT NULL); `source_type` (NOT NULL); `acquisition_mode` (NOT NULL) |
+| `raw_data` | `id` (PK); `source_id` (FK → source (id), NOT NULL); `raw_file_path` (UNIQUE, NOT NULL); `stream` (NOT NULL); `collected_at` (NOT NULL) |
+| `item` | `id` (PK); `raw_data_id` (FK → raw_data (id), NOT NULL) |
+| `release` | `item_id` (PK, FK → item (id)); `tracked_repository_id` (FK → tracked_repository (id), NOT NULL); `release_id` (UNIQUE, NOT NULL); `tag_name` (NOT NULL); `name`; `body`; `published_at` (NOT NULL); `url` (NOT NULL) |
+| `clip` | `item_id` (PK, FK → item (id)); `url` (UNIQUE, NOT NULL); `title` (NOT NULL); `body` (NOT NULL); `saved_at` (NOT NULL); `published_at`; `revised_at` |
+| `advisory` | `item_id` (PK, FK → item (id)); `ghsa_id` (UNIQUE, NOT NULL); `vulnerability_id` (FK → vulnerability (id)); `summary` (NOT NULL); `published_at` (NOT NULL); `url` (NOT NULL) |
+| `newsletter_article` | `item_id` (PK, FK → item (id)); `edition` (NOT NULL); `edition_date` (NOT NULL); `rank` (NOT NULL); `title` (NOT NULL); `summary` (NOT NULL); `url` (NOT NULL); `publication_id` (FK → publication (id)); `UNIQUE (edition, edition_date, rank)` |
+| `zotero_entry` | `item_id` (PK, FK → item (id)); `zotero_key` (UNIQUE, NOT NULL); `item_type` (NOT NULL); `title` (NOT NULL); `url`; `saved_at` (NOT NULL); `publication_id` (FK → publication (id)); `revised_at`; `withdrawn_at` |
+| `publication` | `id` (PK); `arxiv_id` (UNIQUE, NOT NULL); `item_id` (UNIQUE, FK → item (id)); `title`; `summary`; `submitted_at`; `revised_at` |
+| `vulnerability` | `id` (PK); `cve_id` (UNIQUE, NOT NULL); `item_id` (UNIQUE, FK → item (id)); `name`; `description`; `vendor`; `product`; `date_added`; `ransomware_use`; `revised_at`; `withdrawn_at` |
+| `highlight` | `id` (PK); `zotero_key` (UNIQUE, NOT NULL); `text`; `comment`; `highlighted_at` (NOT NULL); `revised_at`; `withdrawn_at`; `zotero_entry_id` (FK → zotero_entry (item_id), NOT NULL) |
+| `tag` | `id` (PK); `name` (UNIQUE, NOT NULL) |
+| `item_has_tag` | `item_id` (PK, FK → item (id), ON DELETE CASCADE); `tag_id` (PK, FK → tag (id)) |
+| `tracked_repository` | `id` (PK); `repository_name` (UNIQUE, NOT NULL); `ecosystem` (NOT NULL) |
+| `tracked_package` | `id` (PK); `tracked_repository_id` (FK → tracked_repository (id), NOT NULL); `rank` (NOT NULL); `name` (NOT NULL); `UNIQUE (tracked_repository_id, rank)` |
+| `affected_package` | `id` (PK); `advisory_id` (FK → advisory (item_id), NOT NULL); `name` (NOT NULL); `UNIQUE (advisory_id, name)` |
+| `author` | `id` (PK); `publication_id` (FK → publication (id), NOT NULL); `rank` (NOT NULL); `name` (NOT NULL); `UNIQUE (publication_id, rank)` |
+| `ranking` | `id` (PK); `window_end` (UNIQUE, NOT NULL); `raw_data_id` (FK → raw_data (id), NOT NULL) |
+| `trend` | `id` (PK); `ranking_id` (FK → ranking (id), NOT NULL); `repository_id` (NOT NULL); `repository_name` (NOT NULL); `stars_gained` (NOT NULL); `forks_gained` (NOT NULL); `UNIQUE (ranking_id, repository_id)` |
+
+### Ce que le code tient
+
+Le cartouche du MCD dit aussi les règles que le code d'écriture tient, et non une contrainte de la base. C'est un
+choix de conception: chaque sorte d'item a un seul écrivain, qui écrit ensemble l'item et ce qui en dépend
+(`WRITER_BY_KIND`, `database/writing.py:53-61`). Le tableau suivant donne chaque règle et le code qui la tient.
+
+| Règle | Code qui la tient |
+|---|---|
+| L'item de DÉCRIRE est de type `paper`, celui de RECENSER de type `vulnerability` | `database/writers/paper_writer.py:35-39`, `database/writers/vulnerability_writer.py:70-74` |
+| Un item a sa sous-entité, ou sa publication, ou sa vulnérabilité: un seul écrivain par type écrit les deux ensemble | `database/writing.py:53-61`, `database/writers/shared_rows.py:44-50` |
+| ANNOTER: seule l'écriture d'une entrée Zotero écrit un surlignage, avec l'item de l'entrée | `database/writers/zotero_entry_writer.py:92-103`, `:139` |
+| PORTER: un clip de page web porte les étiquettes; une étiquette dont le dernier lien est retiré est supprimée (cardinalité 1,N) | `database/writers/clip_writer.py:194-197`, `:60-64`, `:179-182` |
+| Paquet touché: chaque nom une fois dans l'alerte | `etl/sources/github/advisories.py:177-191` |
+| Classement: toutes les tendances d'une fenêtre viennent de la même donnée brute | `database/writers/trend_writer.py:20-29` |
 
 ## Du MLD aux deux MPD
 
@@ -354,7 +401,8 @@ Les deux scripts portent les mêmes contraintes, chaque `CHECK` traduit d'un mot
 - **les formes**: un numéro CVE, une référence GHSA, un nom de dépôt `propriétaire/nom`, une URL en `https://` (ou en
     `http://` pour une entrée Zotero et un clip), une clé Zotero de 8 caractères `0-9A-Z`, une édition en lettres
     minuscules. SQLite les écrit par `GLOB`, PostgreSQL par une expression régulière `~`, ancrée par `^`
-    (`database/schema.sql:132`, `database/schema_postgresql.sql:122`);
+    (`database/schema.sql:132`, `database/schema_postgresql.sql:122`). L'URL d'un clip se contrôle par `substr` sur
+    les deux moteurs (`database/schema.sql:300`, `database/schema_postgresql.sql:244`);
 - **les dates**: la forme `AAAA-MM-JJTHH:MM:SSZ`, en UTC, et un jour qui existe;
 - **les longueurs maximales**: un `CHECK (length(colonne) <= n)` par texte qu'une source écrit. La même valeur est tenue
     par l'item à la lecture du brut (`MAX_LENGTH_BY_KIND`, `items.py`), et un test garde les deux égales

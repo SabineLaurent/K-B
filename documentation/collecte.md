@@ -29,7 +29,9 @@ rendu sous `raw/`, dans le dossier de données `KB_DATA_DIR`, et la date de sa d
 `collection_state.json` (`etl/pipeline.py:45-48`, `etl/raw_store.py:13-22`). C'est la commande par défaut de `kb`
 (`cli.py:286`).
 
-Les sept sources sont écrites dans la base à sa création (`database/seed_sources.sql:5-11`). Le tableau suivant donne,
+Les sept sources sont écrites dans la base à sa création (`database/seed_sources.sql:5-11`). L'une d'elles, CISA KEV,
+est le catalogue des vulnérabilités exploitées (<span lang="en">Known Exploited Vulnerabilities</span>) de l'agence
+américaine de cybersécurité (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>). Le tableau suivant donne,
 pour chacune, son type et son mode d'acquisition tels que la base les nomme, et les sources de `kb collect` qui la
 lisent, chacune nommée par son dossier de `raw/`.
 
@@ -43,8 +45,7 @@ lisent, chacune nommée par son dossier de `raw/`.
 | Zotero | base de données (`database`) | bibliothèque (`library`) | `zotero` |
 | GH Archive sur BigQuery | <span lang="en">big data</span> (`big_data`) | veille (`watch`) | `gh_archive` |
 
-CISA KEV est le catalogue des vulnérabilités exploitées (<span lang="en">Known Exploited Vulnerabilities</span>) de
-l'agence américaine de cybersécurité (<span lang="en">Cybersecurity and Infrastructure Security Agency</span>). Les
+Les
 quatorze premières sources de collecte sont déclarées une fois, dans `SOURCE_KINDS` (`etl/source_kinds.py:46-95`);
 Zotero, les clips et GH Archive s'y ajoutent quand leur variable est posée, `KB_ZOTERO_DIR`, `KB_VAULT_DIR` et
 `GOOGLE_APPLICATION_CREDENTIALS` (`etl/collected_sources.py:18-30`, `:110-131`). `KB_COLLECT_ONLY` choisit les
@@ -81,11 +82,19 @@ chaque source une seule fois dans `raw/`, puis la date de chaque source réussie
 `kb import` lit ensuite `raw/`.
 
 **La frontière avec l'import.** La collecte s'arrête au brut: le module de la collecte, `etl/extract.py`, n'importe
-que le magasin du brut, le contrat des sources et la citation des valeurs (`etl/extract.py:11-20`), et un test
-refuse qu'une étape de l'ETL (extraction, transformation, chargement) en importe une autre (`tests/architecture/test_layers.py:130`). `kb import` lit ensuite
-les fichiers bruts que la base n'a pas encore inscrits, les convertit en items et les écrit dans la base
-([L'agrégation, l'import et la base](import_et_base_pour_docu.md)). Les deux classements GitHub n'ont pas de
-lecteur: ils n'entrent pas dans la base, et `kb write-tops` les lit dans le brut (`etl/source_kinds.py:66-77`).
+de l'ETL (extraction, transformation, chargement) que le magasin du brut, le format des noms de collection et le
+contrat des sources (`etl/extract.py:12-20`), et un test refuse qu'une étape de l'ETL en importe une autre
+(`tests/architecture/test_layers.py:130`). Les deux classements GitHub n'ont pas de lecteur: ils n'entrent pas dans
+la base, et `kb write-tops` les lit dans le brut (`etl/source_kinds.py:66-77`).
+
+**Le jeu de données brutes final et son agrégation.** Le jeu de données brutes final est `raw/`: les sept sources y
+sont rangées dans une seule arborescence, sous un seul nommage daté, avec un seul état de collecte
+([Le jeu de données brutes](#le-jeu-de-donnees-brutes)). `kb import` l'agrège ensuite en un seul jeu d'items, par
+trois étapes: la lecture de chaque fichier brut pas encore importé par le lecteur de sa source (`etl/raw_reading.py`,
+`etl/transform.py:1-2`), la normalisation de chaque item dans un seul modèle, quelle que soit sa source
+(`etl/normalize.py:1`, `items.py`), puis l'écriture dans la base, en une transaction, où la clé naturelle de chaque
+sorte écarte les doublons (`etl/load.py:1-2`, par exemple `database/writers/paper_writer.py:16`). Le détail est dans
+[L'agrégation, l'import et la base](import_et_base_pour_docu.md).
 
 **En ligne**, `kb collect` est une étape de `kb daily-routine`, après le miroir des clips
 (`commands/daily_routine_command.py:44-54`), que le job `caj-kb-daily-routine` lance chaque jour à 08:00 UTC
@@ -192,7 +201,7 @@ même ordre, tenu par cinq tests (`tests/architecture/test_source_modules.py:66-
 
 - **À la collecte, une source lit sa page comme l'import la lira**, avant de la garder (par exemple
     `etl/sources/cisa_kev.py:76-78`, `etl/sources/arxiv.py:84-86`, `etl/sources/github/releases.py:53-56`).
-- **Une source n'échoue que pour une page refusée**, `PageRefusedError` (`etl/source_contract.py:33-35`): une page
+- **Pour le contenu de sa page, une source n'échoue que par un refus**, `PageRefusedError` (`etl/source_contract.py:33-35`): une page
     illisible, des entrées toutes invalides, `all_items_invalid` (`:79-86`), ou un catalogue d'état sans entrée,
     `empty_catalog` (`:89-93`), pour CISA KEV et Zotero (`etl/sources/cisa_kev.py:77`,
     `etl/sources/zotero.py:215`). Un classement refuse sa page entière: un dépôt retiré décalerait les rangs
@@ -240,8 +249,8 @@ l'import (`etl/raw_store.py:120-132`).
 
 ### L'arrêt sur SIGTERM et les codes de sortie nommés
 
-- **Des codes nommés**: `ExitCode` (`commands/exit_codes.py:7-85`). `kb collect` sort en 0, 1, 2 ou 4 selon ses
-    sources et son état (`commands/collect_command.py:115-124`), en 143 sur SIGTERM et en 130 sur Ctrl-C
+- **Des codes nommés**: `ExitCode` (`commands/exit_codes.py:7-85`). `kb collect` sort en 0, 1 ou 4 selon ses
+    sources et son état (`commands/collect_command.py:115-124`), en 2 s'il ne démarre pas (`:45-46`, `:54-56`), en 143 sur SIGTERM et en 130 sur Ctrl-C
     (`cli.py:249-260`). Le sens de chaque code est dans
     [la fiche de l'import et de la base](import_et_base_pour_docu.md#la-commande-qui-precede-limport-kb-collect).
 - **L'arrêt sur SIGTERM**: le signal devient `StoppedBySigtermError`, qui défait le travail en cours comme toute
@@ -278,7 +287,7 @@ jour manqué.
 | tldr.tech | chaque jour, du jour de la dernière collecte, relu, à aujourd'hui en UTC (`etl/sources/tldr.py:173-185`) | les 7 jours précédents et aujourd'hui (`core/config.py:37`) | rattrapé jour par jour |
 | arXiv | les papiers soumis depuis 7 jours avant la dernière collecte (`etl/sources/arxiv.py:66-74`, `core/config.py:26`) | les papiers soumis depuis le 2026-05-01 (`core/config.py:29`) | rattrapé dans la même page (paragraphe qui suit le tableau) |
 | CISA KEV | le catalogue entier, s'il a changé depuis la dernière collecte; une réponse 304 n'écrit rien (`etl/sources/cisa_kev.py:58-79`) | le catalogue entier | chaque catalogue est complet |
-| GitHub, releases | la première page de 100 releases de chaque dépôt; rien n'est écrit si aucune n'est plus récente que la dernière collecte (`etl/sources/github/releases.py:33`, `:48-73`) | la première page | rattrapé dans les 100 dernières releases; au-delà, un avertissement au journal (`:74-86`) |
+| GitHub, <span lang="en">releases</span> | la première page de 100 <span lang="en">releases</span> de chaque dépôt; rien n'est écrit si aucune n'est plus récente que la dernière collecte (`etl/sources/github/releases.py:33`, `:48-73`) | la première page | rattrapé dans les 100 dernières <span lang="en">releases</span>; au-delà, un avertissement au journal (`:74-86`) |
 | GitHub, alertes | les alertes relues par GitHub, mises à jour depuis la veille de la dernière collecte, 100 par écosystème, puis comparées à leur date de revue (`etl/sources/github/advisories.py:50-83`) | la première page de 100 | rattrapé dans la page de 100; au-delà, un avertissement au journal (`:84-97`) |
 | GitHub, classements | un instantané du top 100, à chaque collecte (`etl/sources/github/most_starred.py:33-43`, `core/config.py:74`) | un instantané | chaque instantané est celui de sa collecte |
 | Zotero | toute la bibliothèque, écrite seulement si l'extrait diffère, octet pour octet, du dernier (`etl/sources/zotero.py:201-228`) | toute la bibliothèque | chaque extrait est complet |
@@ -341,7 +350,7 @@ fichier, monté dans `/mnt/secrets`, hors du partage où le job garde ses donné
     son texte (`post/trend_report_sheets.py:110-114`); la page des tendances du site, qui montre les comptes, les dit
     tirés de cet échantillon (`web/templates/trends.html:7`, `:27`). Mesure du 2026-10-29: sur trois dépôts, les
     étoiles d'une fenêtre de trois jours dans GH Archive font 1,0 à 1,8 % de celles que GitHub compte pour la même
-    fenêtre; les <span lang="en">forks</span>, 0,8 à 4,2 %.
+    fenêtre; les <span lang="en">forks</span>, 0,8 à 1,3 %, jusqu'à 4,2 % (`docs/specs-collecte.md:711-723`).
 
 ## Le jeu de données brutes
 
@@ -357,7 +366,7 @@ dossier de source, la forme d'une collection et ce qu'elle contient.
 | Dossier | Une collection | Ce qu'elle contient |
 |---|---|---|
 | `raw/automated_watch/cisa_kev/` | `<instant>.csv` | le catalogue, tel que servi |
-| `raw/automated_watch/github_releases_<dépôt>/` | `<instant>.json` | la première page de releases du dépôt |
+| `raw/automated_watch/github_releases_<dépôt>/` | `<instant>.json` | la première page de <span lang="en">releases</span> du dépôt |
 | `raw/automated_watch/github_advisories_pip/`, `raw/automated_watch/github_advisories_npm/` | `<instant>.json` | la page d'alertes des paquets suivis de l'écosystème |
 | `raw/automated_watch/github_most_starred/`, `raw/automated_watch/github_most_forked/` | `<instant>.json` | la réponse de la recherche: le top 100 |
 | `raw/automated_watch/arxiv_cscr_x_csai/` | `<instant>.xml` | le flux Atom de la fenêtre |
@@ -387,7 +396,7 @@ Un fichier brut est gardé 6 mois après sa collecte (`RAW_RETENTION_MONTHS`, `c
 supprimé par `kb purge` (`purge/raw.py:17-48`), qui suit `kb import` dans la routine quotidienne
 (`commands/daily_routine_command.py:55-64`). Deux règles s'y ajoutent:
 
-- d'un catalogue d'état, CISA KEV ou Zotero, le brut ne garde que le dernier fichier importé, quel que soit son âge
+- d'un catalogue d'état, CISA KEV ou Zotero, le brut ne garde que le dernier fichier importé, et ceux pas encore importés, quel que soit son âge
     (`commands/purge_command.py:30-41`, `purge/catalogs.py:13-35`, `purge/raw.py:28-30`);
 - d'un classement GitHub, le brut ne garde que le dernier relevé lisible, une fois ses fiches écrites par
     `kb write-tops` (`post/top_sheets.py:58-85`).

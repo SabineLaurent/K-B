@@ -74,7 +74,7 @@ par l'API de données, `GET /items`, `GET /items/{item_id}` et `GET /trends`
 local, un terminal, un script ou un agent appelle avec sa propre clé, par exemple celle du client `TERMINAL` du
 README. Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
 (`commands/smoke_test_command.py:94-101`, `commands/digest_watch_command.py:43-48`); `kb smoke-test` y ajoute des
-sondes sans clé, qui attendent chacune son refus (`jobs/api_probes.py:75-84`). L'API de données lit la base, SQLite
+sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`). L'API de données lit la base, SQLite
 ou PostgreSQL, en lecture seule, et le conteneur `watch` du stockage d'échange pour les tops et les comptes rendus
 (`data_api/watch_reading.py:1-4`).
 
@@ -211,7 +211,8 @@ Le tableau suivant donne les champs que le détail sert en plus de la liste, pou
 ### `GET /trends`
 
 Le classement des dépôts GitHub d'une fenêtre de 3 jours, par les étoiles et les <span lang="en">forks</span> qu'y compte GH Archive. Ces
-comptes sont un échantillon, comme le dit [La collecte des données de K-B](collecte.md).
+comptes sont un échantillon, comme le dit [La collecte des données de K-B](collecte.md). Le tableau suivant donne son
+paramètre.
 
 | Paramètre | Forme | Défaut |
 |---|---|---|
@@ -230,7 +231,7 @@ comptes sont un échantillon, comme le dit [La collecte des données de K-B](col
 Le top d'un jour des dépôts GitHub les plus étoilés ou les plus forkés. La route lit le jumeau JSON que
 `kb write-tops` écrit à côté de chaque fiche d'un top, `tops/<top>/<AAAA-MM-JJ>.json` dans `watch`
 (`data_api/watch_reading.py:49-51`, `:90-99`). Elle est réservée au client `WEB` (section
-[Authentification et autorisation](#authentification-et-autorisation)).
+[Authentification et autorisation](#authentification-et-autorisation)). Le tableau suivant donne ses paramètres.
 
 | Paramètre | Forme | Bornes | Défaut |
 |---|---|---|---|
@@ -262,7 +263,7 @@ et `total`, leur nombre, toutes pages comptées (`data_api/schemas/top_schema.py
 
 Le compte rendu de veille d'un sujet d'un jour. La route lit le jumeau JSON que `kb digest` écrit à côté de chaque
 fiche, `<sujet>/<AAAA-MM-JJ>.json` à la racine de `watch` (`data_api/watch_reading.py:100-110`). Elle est réservée au
-client `WEB`.
+client `WEB`. Le tableau suivant donne ses paramètres.
 
 | Paramètre | Forme | Bornes | Défaut |
 |---|---|---|---|
@@ -521,8 +522,8 @@ chaque environnement, la base, ses réglages, la connexion, la lecture seule et 
 | Environnement | Base | Réglages | Connexion | Lecture seule | Borne de temps |
 |---|---|---|---|---|---|
 | En local, SQLite | le fichier `<KB_DATA_DIR>/k-b.sqlite` | `KB_DATA_DIR` | une connexion neuve par requête, fermée après | le fichier ouvert en `mode=ro` | 5 s par requête, toutes ses lectures comptées (`set_query_timeout`) |
-| En local, PostgreSQL | une base d'un serveur PostgreSQL local | `KB_DATABASE_URL` | un pool de 1 à 4 connexions | chaque transaction en `REPEATABLE READ READ ONLY` | 5 s par instruction (`statement_timeout`, posé par `configure_reader`) |
-| En ligne, PostgreSQL sur Azure | la base `kb` du serveur PostgreSQL d'Azure | `KB_DATABASE_URL` avec `sslmode=verify-full`, `KB_DATABASE_AUTH=entra`, `AZURE_CLIENT_ID` | le même pool, un jeton Entra pour chaque connexion neuve | la même, et le rôle `kb_reader`, qui n'a que `SELECT` | la même |
+| En local, PostgreSQL | une base d'un serveur PostgreSQL local | `KB_DATABASE_URL` | un <span lang="en">pool</span> de 1 à 4 connexions | chaque transaction en `REPEATABLE READ READ ONLY` | 5 s par instruction (`statement_timeout`, posé par `configure_reader`) |
+| En ligne, PostgreSQL sur Azure | la base `kb` du serveur PostgreSQL d'Azure | `KB_DATABASE_URL` avec `sslmode=verify-full`, `KB_DATABASE_AUTH=entra`, `AZURE_CLIENT_ID` | le même <span lang="en">pool</span>, un jeton Entra pour chaque connexion neuve | la même, et le rôle `kb_reader`, qui n'a que `SELECT` | la même |
 
 ### En local: le fichier SQLite
 
@@ -554,7 +555,7 @@ La base se crée à la main, puis ses tables par `kb create-db`, comme le dit
 KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:5432/kb uv run --env-file .env kb serve-data
 ```
 
-- **Le pool.** `kb serve-data` ouvre au démarrage un pool de 1 à 4 connexions, par `psycopg-pool`, qui se connecte
+- **Le <span lang="en">pool</span>.** `kb serve-data` ouvre au démarrage un <span lang="en">pool</span> de 1 à 4 connexions, par `psycopg-pool`, qui se connecte
     en arrière-plan: l'API démarre sans attendre la base (`database/postgresql.py:236-268`,
     `core/config.py:207-208`). Une requête attend une connexion 2 s au plus (`core/config.py:209`,
     `database/postgresql.py:286-290`), puis reçoit 500 `database_error`.
@@ -575,14 +576,14 @@ KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:543
     `postgresql://id-kb-data-api@<serveur>:5432/kb?sslmode=verify-full&sslrootcert=…`
     (`infra/main.bicep:285-286`, `:463-464`), avec `KB_DATABASE_AUTH=entra` et l'`AZURE_CLIENT_ID` de son identité
     managée (`infra/main.bicep:287-288`).
-- **L'authentification par Entra.** Chaque connexion neuve du pool reçoit pour mot de passe un jeton de l'identité
-    managée; le pool garde son jeton et en demande un nouveau avant qu'il expire (`database/postgresql.py:195-213`,
+- **L'authentification par Entra.** Chaque connexion neuve du <span lang="en">pool</span> reçoit pour mot de passe un jeton de l'identité
+    managée; le <span lang="en">pool</span> garde son jeton et en demande un nouveau avant qu'il expire (`database/postgresql.py:195-213`,
     `database/entra.py:39-43`). K-B refuse alors, avant de demander un jeton, une URL qui porte un mot de passe ou qui
     ne pose pas `sslmode=verify-full` (`database/postgresql.py:161-192`).
 - **Les droits.** L'identité `id-kb-data-api` est membre du rôle `kb_reader` (`infra/postgresql/grant-roles.sql:58`),
     qui n'a que `SELECT` sur les tables (`database/grants_postgresql.sql:6`): la lecture seule est tenue aussi par les
     droits de la base.
-- **Le pool, la lecture seule et la borne de temps** sont ceux de la section
+- **Le <span lang="en">pool</span>, la lecture seule et la borne de temps** sont ceux de la section
     [En local: une base PostgreSQL](#en-local-une-base-postgresql).
 
 Pour lire la base sans passer par l'API, en local ou en ligne, la fiche de l'import décrit les voies permises:
@@ -591,8 +592,8 @@ Pour lire la base sans passer par l'API, en local ou en ligne, la fiche de l'imp
 ## En ligne
 
 - L'app `ca-kb-data-api` lance `kb serve-data` depuis l'image de K-B (`infra/main.bicep:270-305`).
-- Son entrée est interne, en HTTPS: elle n'a pas d'adresse publique, et HTTP n'est pas servi
-    (`infra/modules/api-container-app.bicep:39-40`, `:118-125`). Ses clients la joignent à
+- Son entrée est interne, en HTTPS: elle n'a pas d'adresse publique, une requête HTTP est redirigée vers HTTPS, et
+    les clients de K-B ne suivent aucune redirection (`infra/modules/api-container-app.bicep:39-40`, `:118-125`). Ses clients la joignent à
     `https://ca-kb-data-api.internal.<domaine de l'environnement>` (`infra/main.bicep:186-190`), et ce nom est son
     seul hôte permis (`infra/main.bicep:293-294`). Le trafic entre les apps de l'environnement est chiffré
     (`infra/modules/container-apps-environment.bicep:30-36`).
