@@ -156,15 +156,9 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les vingt-deux pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
-Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
-2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base de
-nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son écriture
-(#512), les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et de l'API de
-données le 2026-11-22 (#685), les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684), la fiche
-de l'incident le 2026-11-22, à son écriture (#510), et celle du choix de l'outil de suivi le 2026-11-22, à sa création
-(#705). Le tableau suivant donne chaque règle de la notice, son résultat sur les vingt-deux pages, et comment il a été
-vérifié.
+Les pages du site sont vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe Web, sur le HTML
+construit par `mkdocs build --strict` et à la relecture. Le tableau suivant donne chaque règle de la notice, son
+résultat sur les pages du site, et comment il est vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -309,9 +303,8 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.
-- **Le site ne se publie pas à chaque fusion**: il est en ligne depuis le 2026-11-22, publié à la main, et la
-    variable `PAGES_PUBLISH` n'est pas posée (`gh variable list` ne rend aucune variable le 2026-11-22; section
-    [Publier](#publier)).
+- **Le site ne se publie pas à chaque fusion**: il est publié à la main, par le workflow `Docs`, et la variable de
+    dépôt `PAGES_PUBLISH` n'est pas posée (section [Publier](#publier)).
 
 ## Sources
 

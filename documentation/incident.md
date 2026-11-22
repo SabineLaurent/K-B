@@ -102,8 +102,8 @@ processus par SIGINT: c'est le -2 du tableau.
     ni l'autre. Les serveurs n'ont pas de trace, parce que `uvicorn.run` attrape l'interruption
     (`uvicorn/main.py:633-634`, uvicorn 0.54.0).
 4. **Chercher la pratique courante.** Le guide des interfaces en ligne de commande [clig.dev](https://clig.dev/), lu
-    le 2026-10-28 et relu le 2026-11-22, demande sur Ctrl-C de <q><span lang="en">exit as soon as possible</span></q>
-    et de <q><span lang="en">Say something immediately</span></q> (section « <span lang="en">Signals and control
+    le 2026-10-28, demande sur Ctrl-C de <q><span lang="en">exit as soon as possible</span></q> et de
+    <q><span lang="en">Say something immediately</span></q> (section « <span lang="en">Signals and control
     characters</span> »). Ses principes écartent les <q><span lang="en">scary-looking stack traces</span></q> des
     erreurs courantes (section « <span lang="en">Robustness</span> »), et il demande la trace pour une erreur
     inattendue (section « <span lang="en">Errors</span> »). Depuis Python 3.8, un Ctrl-C qui n'est pas attrapé finit le
