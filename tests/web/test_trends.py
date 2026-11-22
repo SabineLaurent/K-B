@@ -10,6 +10,7 @@ from trends_fixture import TRENDS, make_trends
 
 from k_b.web.data_api_client import TREND_WINDOW, DataApiError
 from k_b.web.feed import FieldError
+from k_b.web.french_dates import write_count
 from k_b.web.trends import (
     TRENDS_PATH,
     WINDOW_END_ID,
@@ -21,7 +22,6 @@ from k_b.web.trends import (
     find_api_window_end_error,
     find_window_start,
     read_trends_form,
-    write_count,
 )
 
 NARROW_NO_BREAK_SPACE = chr(0x202F)
@@ -129,7 +129,13 @@ def test_a_window_of_three_days_starts_two_days_before_its_last_day(end, start):
 
 @pytest.mark.parametrize(
     ("count", "text"),
-    [(0, "0"), (999, "999"), (1500, "1 500"), (1_234_567, "1 234 567")],
+    [
+        (0, "0"),
+        (999, "999"),
+        (1000, "1 000"),
+        (1500, "1 500"),
+        (1_234_567, "1 234 567"),
+    ],
 )
 def test_a_count_is_grouped_by_thousands_with_a_narrow_no_break_space(count, text):
     assert write_count(count) == text.replace(" ", NARROW_NO_BREAK_SPACE)
