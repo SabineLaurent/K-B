@@ -15,7 +15,7 @@ from k_b.web.feed import (
     read_written_day,
     write_day_refusal,
 )
-from k_b.web.french_dates import write_day
+from k_b.web.french_dates import write_count, write_day
 
 TRENDS_PATH = "/tendances"
 # The name of the field in the address, as GET /trends of the data API names it.
@@ -24,9 +24,6 @@ WINDOW_END_ID = "window-end"
 GITHUB_URL = "https://github.com"
 # The announcement of each link to GitHub (C13 of #564; Opquast 2025, rules 131, 142 and 146).
 GITHUB_LINK_NOTE = f"en anglais, {NEW_TAB_NOTE}"
-# Groups the thousands of a count, as French writes them: 1 500 (chr, never an escape in the
-# source, which a tool can turn into the character itself).
-THOUSANDS_SEPARATOR = chr(0x202F)
 
 # The field of the window, as a message of a day refused names it.
 WINDOW_END_IN_MESSAGES = "Date"
@@ -107,10 +104,6 @@ def find_api_window_end_error(error: DataApiError) -> FieldError | None:
 def find_window_start(window_end: date) -> date:
     """The first day of a window of GH_ARCHIVE_WINDOW_DAYS full days, which ends on window_end."""
     return window_end - timedelta(days=GH_ARCHIVE_WINDOW_DAYS - 1)
-
-
-def write_count(count: int) -> str:
-    return f"{count:,}".replace(",", THOUSANDS_SEPARATOR)
 
 
 def build_trends_page(window: TrendWindow) -> TrendsPage:

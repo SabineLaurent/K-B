@@ -58,7 +58,8 @@ comme tout texte reçu, par `clean_received_text` (`web/received_text.py`). Une 
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
-M et les 20 items par page (Opquast 13) ; au-delà de 10 020 items, une phrase dit d'affiner
+M et les 20 items par page (Opquast 13), les milliers groupés par une espace fine insécable (U+202F) comme dans
+le tableau des tendances, par `write_count` (`web/french_dates.py`) : « 12 345 items » ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page, des boutons
 encadrés comme les maquettes, « Page suivante » à droite même quand la ligne se replie, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
 du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Cette ligne porte
@@ -124,7 +125,7 @@ faits en `<dl>` ; les textes sous des `h2` ; le lien vers la source, en bouton, 
 | faille | « Ajoutée au catalogue le », « modification vue par K-B le » | CVE, usage par des rançongiciels, éditeur, produit | « Description » |
 | alerte | « Publiée le » | identifiant GitHub, CVE (« Aucune »), paquets touchés (« Aucun ») | — |
 | *release* | dépôt, version, « Publiée le » | — | « Notes de version, texte brut », ou « Aucune note de version. » |
-| newsletter | « TLDR AI », « édition du », n° | — | « Résumé » |
+| newsletter | « TLDR AI », « édition du », n° (milliers groupés, `write_count`) | — | « Résumé » |
 
 **Le bandeau** dit l'état en mots, la couleur ne fait que suivre (RGAA 3.1) ; seul un item au catalogue KEV prend
 le style d'alerte. Il lit `exploited` et `withdrawn_at`, sans rien supposer :
@@ -183,7 +184,7 @@ même fonction (`write_day_refusal`, `web/feed.py`). Limite
 le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
 Archive. Ses colonnes sont en `th scope="col"`, avec les mots de la maquette : « Rang » (la position dans l'ordre
 de l'API), « Dépôt », « Étoiles gagnées » et « *Forks* gagnés », ces deux derniers alignés à droite en chiffres
-tabulaires, les milliers groupés par une espace fine insécable (U+202F). Le dépôt de chaque ligne est son en-tête
+tabulaires, les milliers groupés par une espace fine insécable (U+202F), par `write_count` comme dans le fil. Le dépôt de chaque ligne est son en-tête
 (`th scope="row"`, RGAA 5.7), écrit comme les autres cellules : un lien vers `https://github.com/<owner>/<repo>`,
 bâti d'un `RepositoryName` validé, par la macro `external_link` (nouvel onglet, « (en anglais, site externe, nouvel
 onglet) », gardée visible : décision de Sabine du 2026-11-14). Le tableau a 560 px de large au moins (`35rem`),
@@ -191,8 +192,24 @@ comme la maquette (décision de Sabine du 2026-11-14) : sur un écran plus étro
 élargir la page. Le cadre prend le focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ;
 WCAG 2.1.1) ; il est le conteneur de la légende (`container-type: inline-size`), qui garde sa largeur
 (`max-inline-size: 100cqi`) et reste lisible sans défiler ; sous le tableau, 6 px gardent en vue l'anneau de focus du
-dernier lien, que le cadre couperait. À l'impression, le cadre ne défile plus, et la flèche et l'annonce des liens
-du tableau sont retirées.
+dernier lien, que le cadre couperait. Une ombre au bord du cadre dit que le tableau continue de ce côté (#618) :
+deux caches de la couleur du cadre défilent avec le tableau (`background-attachment: local`) et couvrent les deux
+ombres, fixées au cadre, tant que le tableau s'arrête à leur bord ([Lea Verou, 2012](https://lea.verou.me/2012/04/background-attachment-local/)).
+L'ombre a la couleur des bordures (`--color-stone`) : chaque texte du tableau y garde 4,5:1 au moins, 5,36:1 pour un
+lien (WCAG 1.4.3). Chaque dégradé finit sur sa propre couleur rendue transparente (`--color-card-clear`,
+`--color-stone-clear`), jamais sur le noir transparent de `transparent` : un moteur qui n'interpole pas en alpha
+prémultiplié en ferait une bande grise, plus sombre que l'ombre. Firefox interpole en alpha prémultiplié depuis sa
+version 36 ([bug 591600](https://bugzilla.mozilla.org/show_bug.cgi?id=591600)) ; un cas resté faux en Firefox 120 à
+122 ([bug 1869681](https://bugzilla.mozilla.org/show_bug.cgi?id=1869681), encore ouvert) ; le cas « Premultiplied
+alpha » corrigé en Firefox 137 ([bug 1904106](https://bugzilla.mozilla.org/show_bug.cgi?id=1904106), qui ne cite pas
+1869681) ; tous lus le 2026-11-22. Les deux couleurs transparentes ne dépendent d'aucune version. L'ombre n'a pas de 3:1 à tenir (WCAG 1.4.11) : ce qu'elle dit est aussi donné ailleurs, la
+légende nomme les étoiles et les *forks* gagnés ([Understanding 1.4.11](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast),
+« The information is available in another form »), et la charte classe `--color-stone` sur blanc en décor. Choix
+(time-knight, 2026-11-22) : l'ombre garde la couleur de la charte. Elle est discrète, 1,36:1 au plus sombre sur 12 px
+(mesuré dans Chrome 157), et tout le monde ne la voit pas ; la foncer serait borné à 1,65:1 environ, où le lien
+tombe à 4,5:1. En couleurs forcées, Chrome retire les dégradés, et le cadre garde sa bordure (mesuré dans Chrome 157
+le 2026-11-22). À l'impression, le cadre ne défile plus : les caches restent sur les ombres, qui ne se voient pas
+(impression émulée dans Chrome 157, le 2026-11-22) ; la flèche et l'annonce des liens du tableau sont retirées.
 
 **L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
 *forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
@@ -330,7 +347,10 @@ Les gabarits sont lus dans le paquet. `tests/web/test_templates.py` vérifie qu'
 3.45.0, lues le 2026-11-11) : l'imbrication, les couches (`@layer`), les propriétés logiques, `:where()`,
 les unités `dvb` et la syntaxe d'intervalle des media queries ; les requêtes de conteneur, « Widely available »
 depuis le 2025-08-14 (web-features explorer, lu le 2026-11-21). `text-wrap: balance`, « Newly available »,
-ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. Les trois largeurs des maquettes
+ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. De même `background-attachment: local`, « Widely
+available » par sa propre clé (web-features 3.47.0, lu le 2026-11-22), alors que la fonction `background-attachment`
+ne l'est plus depuis le 2026-01-29, à cause de `fixed` sur iOS : un navigateur qui ne la connaît pas ne montre pas
+d'ombre au bord du tableau des tendances. Les trois largeurs des maquettes
 (390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Le formulaire du fil suit chacune
 (Sabine, 2026-11-11) : sur un téléphone, les sortes et les boutons radio en deux colonnes ; sur une tablette,
 les sortes en trois, et « Date de début » à droite des boutons radio ; sur un ordinateur, les sortes sur une
