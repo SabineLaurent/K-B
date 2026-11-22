@@ -349,16 +349,16 @@ porte:
 
 Chaque affirmation et chaque titre est écrit en texte: ni lien, ni image, ni balise, ni code, ni requête Dataview ne
 peut s'y activer. Une fiche n'est jamais réécrite, même par deux lancements qui se chevauchent: s'il en existe une du
-jour, aucune demande n'est faite. Une demande s'arrête vers 200 s: l'échéance que l'API IA donne à ses appels au
-modèle raccourcit chaque délai au temps qui reste (`core/config.py:575`, `ai_api/deadline.py:37-49`). `kb digest`
-attend 240 s au plus, une réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai court depuis
-l'envoi, et n'est contrôlé qu'après chaque morceau décodé de la réponse; avant le premier, chaque lecture attend 240 s
-au plus, mais pas leur somme ([les fiches de
-veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches dans le coffre », « Limites
-»). Il montre qu'il attend: une ligne qui tourne dans un terminal, une ligne datée toutes les 10 s ailleurs. Il
-journalise son début et sa fin, avec la durée, puis affiche un bilan: la fenêtre et le nombre d'items lus, un tableau
-par sujet (statut, chemin de la fiche), le total, puis le modèle et le `request_id`, que `logs/kb-serve-ai.log`
-reprend.
+jour, aucune demande n'est faite. Une demande s'arrête vers 200 s: l'échéance que l'API IA donne à ses appels au modèle
+raccourcit chaque délai au temps qui reste (`core/config.py:575`, `ai_api/deadline.py:37-49`).
+`kb digest` attend 240 s au plus, une
+réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai court depuis l'envoi, et n'est contrôlé
+qu'après chaque morceau décodé de la réponse; avant le premier, chaque lecture attend 240 s au plus, mais pas leur
+somme ([les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches
+dans le coffre », « Limites »). Il montre qu'il attend: une ligne qui tourne dans un terminal, une ligne datée toutes
+les 10 s ailleurs. Il journalise son début et sa fin, avec la durée, puis affiche un bilan: la fenêtre et le nombre
+d'items lus, un tableau par sujet (statut, chemin de la fiche), le total, puis le modèle et le `request_id`, que
+`logs/kb-serve-ai.log` reprend.
 
 Ses codes de sortie, l'unité étant le sujet:
 
