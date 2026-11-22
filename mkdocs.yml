@@ -29,6 +29,7 @@ nav:
           - api-ia.md
           - service-ia.md
           - monitorage.md
+          - outils-de-suivi.md
       - 4. Qualité et livraison:
           - tests.md
           - integration-continue.md

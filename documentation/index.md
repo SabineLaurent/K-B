@@ -24,6 +24,8 @@ titre.
 - [L'API IA](api-ia.md)
 - [Le service d'IA: le déploiement du modèle](service-ia.md)
 - [Le monitorage du modèle et de l'application](monitorage.md)
+- [Le choix de l'outil de suivi du monitorage](outils-de-suivi.md): les critères, la comparaison de cinq outils et
+    les arguments du choix de Grafana Cloud.
 - [Les tests](tests.md)
 - [L'intégration continue](integration-continue.md)
 - [La livraison continue](livraison-continue.md)
