@@ -14,6 +14,7 @@ titre.
 - [L'installation et l'environnement de développement](installation_pour_docu.md)
 - [Utiliser K-B](utilisation.md): les commandes, leurs réglages, leur sortie et leurs codes.
 - [L'architecture de l'application](architecture_pour_docu.md)
+- [Les maquettes du site et le parcours de l'opératrice](maquettes-et-parcours.md)
 - [L'agrégation, l'import et la base](import_et_base_pour_docu.md)
 - [L'API IA](api_ia_pour_docu.md)
 - [Le service d'IA: le déploiement du modèle](service_ia_pour_docu.md)

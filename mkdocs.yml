@@ -16,6 +16,7 @@ nav:
           - installation_pour_docu.md
           - utilisation.md
           - architecture_pour_docu.md
+          - maquettes-et-parcours.md
       - 2. Les données:
           - import_et_base_pour_docu.md
       - 3. La brique d'intelligence artificielle:

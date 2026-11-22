@@ -150,7 +150,7 @@ tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lanc
 - `build` (l. 19-38) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
     construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 27-28): le groupe `docs` seul, aux
     versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
-    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:88-94`). Puis
+    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:89-95`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
     11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 29-32). Depuis `main`, sur un push
     quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin `site/` en artefact de
