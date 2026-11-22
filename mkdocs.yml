@@ -1,5 +1,6 @@
 # The site of the sheets of documentation/: built by `uv run --locked --only-group docs mkdocs build --strict`
-# (docs.yml), published on GitHub Pages by hand (documentation/accessibilite_pour_docu.md).
+# (docs.yml), published on GitHub Pages at each merge once PAGES_PUBLISH is true
+# (documentation/accessibilite_pour_docu.md, "Publier").
 site_name: Documentation de K-B
 # The address GitHub Pages gives the repository; with it, Mermaid is loaded only by a page with a diagram.
 site_url: https://sabinelaurent.github.io/K-B/
@@ -10,8 +11,10 @@ docs_dir: documentation
 nav:
   - Documentation:
       - K-B, mon outil de veille tech: index.md
+      - produit.md
       - 1. Démarrer:
           - installation_pour_docu.md
+          - utilisation.md
           - architecture_pour_docu.md
       - 2. Les données:
           - import_et_base_pour_docu.md
