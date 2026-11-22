@@ -308,7 +308,9 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.
-- **Le site n'est pas en ligne** le 2026-11-14 (section [Publier](#publier)).
+- **Le site ne se publie pas à chaque fusion**: il est en ligne depuis le 2026-11-22, publié à la main, et la
+    variable `PAGES_PUBLISH` n'est pas posée (`gh variable list` ne rend aucune variable le 2026-11-22; section
+    [Publier](#publier)).
 
 ## Sources
 

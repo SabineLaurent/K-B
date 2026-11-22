@@ -101,11 +101,13 @@ processus par SIGINT: c'est le -2 du tableau.
     a traversé `kb` sans être attrapée. `cli.py` traite SIGTERM et `Exception`, mais `KeyboardInterrupt` n'est ni l'un
     ni l'autre. Les serveurs n'ont pas de trace, parce que `uvicorn.run` attrape l'interruption
     (`uvicorn/main.py:633-634`, uvicorn 0.54.0).
-4. **Chercher la pratique courante.** Le guide des interfaces en ligne de commande
-    [clig.dev](https://clig.dev/), lu le 2026-10-28, demande sur Ctrl-C de
-    <q><span lang="en">exit as soon as possible</span></q> et de <q><span lang="en">Say something immediately</span></q>,
-    sans <q><span lang="en">scary-looking stack traces</span></q> pour un cas attendu. Depuis Python 3.8, un Ctrl-C qui
-    n'est pas attrapé finit le processus par le signal ([bpo-1054041](https://bugs.python.org/issue1054041)).
+4. **Chercher la pratique courante.** Le guide des interfaces en ligne de commande [clig.dev](https://clig.dev/), lu
+    le 2026-10-28 et relu le 2026-11-22, demande sur Ctrl-C de <q><span lang="en">exit as soon as possible</span></q>
+    et de <q><span lang="en">Say something immediately</span></q> (section « <span lang="en">Signals and control
+    characters</span> »). Ses principes écartent les <q><span lang="en">scary-looking stack traces</span></q> des
+    erreurs courantes (section « <span lang="en">Robustness</span> »), et il demande la trace pour une erreur
+    inattendue (section « <span lang="en">Errors</span> »). Depuis Python 3.8, un Ctrl-C qui n'est pas attrapé finit le
+    processus par le signal ([bpo-1054041](https://bugs.python.org/issue1054041)).
 5. **Concevoir.** `kb` attrape l'interruption à un seul endroit, `cli.py`, pour toutes les commandes. Il écrit une ligne
     datée du journal, `kb stopped by SIGINT`, au niveau `ERROR` comme pour SIGTERM, puis sort normalement avec un code
     nommé, 130. Les options écartées sont dans le tableau suivant.
@@ -124,9 +126,10 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
 
 1. **Les tests d'abord.** Trois tests dans `tests/commands/test_sigint.py`, neuf: une source qui lève
     `KeyboardInterrupt` pendant `kb collect`, la fausse API IA qui lève pendant l'attente de `kb digest`, et un vrai
-    SIGINT envoyé à `kb collect` dans son propre processus. Chacun attend le code 130 et la ligne datée; le premier et
-    le troisième, aucune trace. Le code 130 entre dans `tests/commands/test_exit_codes.py`. Avant le code, ces tests
-    sont rouges: l'interruption arrête pytest lui-même.
+    SIGINT envoyé à `kb collect` dans son propre processus. Chacun attend le code 130, la ligne datée, sur la sortie
+    d'erreur et dans `kb.log`, et aucune trace (`assert_stopped_in_one_line`, `test_sigint.py:42-45`). Le code 130
+    entre dans `tests/commands/test_exit_codes.py`. Avant le code, ces tests sont rouges: l'interruption arrête pytest
+    lui-même.
 2. **Le code.** Un bloc `except KeyboardInterrupt`, entre celui de SIGTERM et celui d'`Exception`, dans le même `try`:
     le journal est encore ouvert, la ligne y est écrite, datée comme les autres (`cli.py:127-131` à `d76b731a`). Le
     membre `STOPPED_BY_SIGINT = 130` de `ExitCode` (`commands/exit_codes.py`) donne le code à `kb --help`.

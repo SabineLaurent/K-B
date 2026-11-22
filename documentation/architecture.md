@@ -366,11 +366,15 @@ K-B est écrit en Python, version 3.13 au moins (`pyproject.toml:9`). Les deux A
 FastAPI (`data_api/app.py:49`, `ai_api/app.py:55`, `web/app.py:38`), servies par uvicorn
 (`commands/serve_data_command.py:67`, `commands/serve_ai_command.py:98`, `commands/serve_web_command.py:41`).
 
-Le code est rangé en trois couches (`.claude/rules/conventions.md`, règle 5): la présentation (`cli.py`,
-`commands/`, les routes des deux API et les pages du site), le métier et l'ETL, l'extraction, la transformation et le
-chargement des données (`etl/`), puis l'accès aux données (`database/`). Une couche n'appelle que celle du dessous.
-`items.py` et `core/` sont le vocabulaire commun: chaque couche peut les importer. Les tests de `tests/architecture/`
-lisent les imports de chaque module et tiennent ces règles.
+Le code est rangé en trois couches (`.claude/rules/conventions.md`, règle 5): la présentation (`cli.py`, `commands/`,
+les routes des deux API et les pages du site), le métier et l'ETL, l'extraction, la transformation et le chargement
+des données (`etl/`), puis l'accès aux données (`database/`). Une couche n'appelle jamais celle du dessus: `database/`
+n'importe que `items` et `core` (`tests/architecture/test_layers.py:28`), et `etl/` n'importe aucune des deux API
+(`:200`). Une couche peut en sauter une: les routes de l'API de données lisent la base par `database/`, sans passer
+par `etl/` (`data_api/routers/item_router.py:18`, `tests/architecture/test_apis.py:22`). L'API IA et le site
+n'importent pas `database/` (`test_apis.py:107`, `test_layers.py:471`): ils lisent la base par l'API de données, en
+HTTP. `items.py` et `core/` sont le vocabulaire commun: chaque couche peut les importer. Les tests de
+`tests/architecture/` lisent les imports de chaque module et tiennent ces règles.
 
 La liste suivante donne chaque paquet de `src/k_b/`, son rôle, puis ce que les tests lui interdisent.
 

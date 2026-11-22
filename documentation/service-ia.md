@@ -574,7 +574,9 @@ la section « Envoi des mesures à Grafana Cloud ».
     « <span lang="en">Automatic upgrades</span> », qui ne fait pas d'exception pour `NoAutoUpgrade`.
 - **La durée de conservation de la surveillance des abus** n'est pas publiée par Microsoft.
 - **La date de retrait de `gpt-6.1-sol`** n'a pas été lue.
-- **Les métriques du déploiement dans Azure Monitor**, l'outil de mesure d'Azure, n'ont pas été consultées. Le suivi
+- **Une seule métrique du déploiement est lue dans Azure Monitor**, l'outil de mesure d'Azure: `TotalTokens`, par
+    l'alerte `alert-kb-model-tokens` (#501), au-dessus de 400 000 jetons sur 24 heures glissantes, évaluée toutes les 15
+    minutes, active et essayée le 2026-11-20 (`infra/README.md`, « L'alerte sur les jetons du modèle (#501) »). Le suivi
     du modèle passe par les mesures que l'API IA envoie à Grafana Cloud.
 
 ## Vérifier cette fiche
