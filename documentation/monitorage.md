@@ -18,7 +18,8 @@
 Écrit le 2026-11-08 pour #164; le compte des instruments et des noms de séries revu le 2026-11-18 d'après `main` au
 commit `1bef80f2` (#623); mis en forme le 2026-11-21 (#669), avec le réimport du 2026-11-18, le relevé de la
 production du 2026-11-19 et les trois noms de la durée d'une demande, lus le même jour; l'étape
-[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d` (#620). Le
+[Brancher l'export](#brancher-lexport) ajoutée le 2026-11-21 d'après `main` au commit `36c1e02d`, ses renvois relus
+le 2026-11-22 sur `main` au commit `9658225a` (#620). Le
 monitorage du modèle tient dans deux fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord,
 `observability/grafana/dashboard.json`, et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les
 mesures viennent de l'API IA, qui les envoie en
@@ -88,7 +89,7 @@ l'alerte, son environnement, sa valeur et son seuil.
 ## Brancher l'export
 
 L'API IA envoie ses mesures et ses traces à Grafana Cloud par OTLP (le protocole d'export d'OpenTelemetry) sur HTTP
-quand ses variables d'export sont posées; sans elles, rien n'est exporté (`docs/fiches-veille.md:1882-1886`). Les
+quand ses variables d'export sont posées; sans elles, rien n'est exporté (`docs/fiches-veille.md:1892-1896`). Les
 chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2026-11-21 ([Sources](#sources)).
 
 1. **La pile**: dans le portail Grafana Cloud, <span lang="en">**Add Stack**</span>, un nom, puis une région de
@@ -170,7 +171,7 @@ chemins de l'interface viennent de la documentation de Grafana Cloud, relue le 2
     `k_b_llm_calls_total{deployment_environment_name="sandbox"}`, <span lang="en">**Run query**</span>: la série de
     la demande y paraît. Le test n'envoie que les mesures (`tests/e2e/test_real_export.py:96-97`): les traces se
     vérifient après une demande à `kb serve-ai`, dans <span lang="en">**Explore**</span>, la source Tempo, par la
-    requête `{resource.service.name="k-b-ai-api"}` (`docs/fiches-veille.md:1991`). En ligne, les séries arrivent
+    requête `{resource.service.name="k-b-ai-api"}` (`docs/fiches-veille.md:2004`). En ligne, les séries arrivent
     avec la première demande à l'API IA: la durée de lecture des données se mesure à chaque `POST /digests` lu, que
     le modèle soit appelé ou non (`src/k_b/ai_api/routers/digest_router.py:177-178`;
     [Relevé de la production du 2026-11-19](#releve-de-la-production-du-2026-11-19)).
@@ -227,7 +228,7 @@ Relevé le 2026-11-08 sur la pile de Sabine (Grafana 13).
     <q lang="en">Warning emails are sent to the admins of the corresponding stack</q>. Ces e-mails partent par
     défaut, et la case <span lang="en">**Enable token expiration emails**</span> des
     <span lang="en">**Org Settings**</span> du portail est cochée (lue par Sabine le 2026-11-20,
-    `docs/fiches-veille.md:1690-1691`; [Sources](#sources)).
+    `docs/fiches-veille.md:1700-1701`; [Sources](#sources)).
 
 ## Le bac à sable
 

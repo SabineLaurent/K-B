@@ -3,7 +3,7 @@
 - Date : 2026-11-21
 - Branche : `docs/monitoring-export-step`
 - Issue : #620 (et le reste de #621, l'expiration du jeton de la production)
-- Fichier : `documentation/monitoring_pour_docu.md`
+- Fichier : `documentation/monitorage.md`
 - Série : [la mise en forme de la fiche (#669)](2026-11-21-mettre-en-forme-la-fiche-du-monitorage.md), [la relecture
   d'API10 depuis le jeton de la production (#611)](2026-11-20-relire-api10-depuis-le-jeton-de-production.md)
 
@@ -22,7 +22,7 @@ Le jeton de la production expire : la fiche dit quand, et qui Grafana prévient 
 ### Une étape, six parties, avant « Installer »
 
 La section est placée entre « Lire le tableau » et « Installer », car l'import du tableau suppose une pile qui reçoit
-déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitoring_pour_docu.md:180`) :
+déjà les mesures. « Installer » part d'elle par un lien nommé (`documentation/monitorage.md:181`) :
 
 ```markdown
 Sur la pile qui reçoit les mesures ([Brancher l'export](#brancher-lexport)), par l'interface, sans jeton ni outil à
@@ -35,7 +35,7 @@ variables, la vérification. Chaque libellé de l'interface de Grafana Cloud est
 
 ### Le jeton : une politique de la pile, trois droits d'écriture
 
-`documentation/monitoring_pour_docu.md:105-113` crée la politique depuis le Grafana de la pile, et non depuis le
+`documentation/monitorage.md:106-114` crée la politique depuis le Grafana de la pile, et non depuis le
 portail de l'organisation :
 
 ```markdown
@@ -50,7 +50,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
 
 ### L'en-tête : un jeton qui ne passe ni par l'écran ni par l'historique
 
-`documentation/monitoring_pour_docu.md:122-128` :
+`documentation/monitorage.md:123-129` :
 
 ```sh
 {
@@ -73,7 +73,7 @@ Grafana, citée dans les sources). Les trois droits, `metrics:write`, `logs:writ
   y reste sur la ligne de commande jusqu'à Entrée ; un jeton collé à ce moment rejoindrait la ligne de commande,
   affiché et gardé dans l'historique. L'invite dit quand coller le jeton : seulement une fois `Jeton:` affiché, donc
   une fois `read` en attente. La fiche le dit en clair : coller le bloc, Entrée s'il reste sur la ligne de commande,
-  puis le jeton quand `Jeton:` s'affiche (`documentation/monitoring_pour_docu.md:117-120`).
+  puis le jeton quand `Jeton:` s'affiche (`documentation/monitorage.md:118-121`).
 
 ### Les variables, en local et en ligne
 
@@ -85,7 +85,7 @@ que `kb serve-ai` refuse au démarrage, « par exemple » : la liste complète e
 
 ### La vérification : le test, puis Explore
 
-`documentation/monitoring_pour_docu.md:165-168` :
+`documentation/monitorage.md:166-169` :
 
 ```markdown
     Un jeton refusé fait échouer le test (`tests/e2e/test_real_export.py:119`). Le test vérifie que chaque envoi est
@@ -99,10 +99,10 @@ séries sont arrivées. Le test n'envoie que les mesures (`:96-97`) : les traces
 
 ### L'expiration du jeton de la production
 
-`documentation/monitoring_pour_docu.md:225-230` : 90 jours depuis le 2026-11-11, jusqu'au 2027-02-09 (#522). Le
+`documentation/monitorage.md:226-231` : 90 jours depuis le 2026-11-11, jusqu'au 2027-02-09 (#522). Le
 destinataire des e-mails d'avant expiration est cité mot pour mot de Grafana, en `<q lang="en">` : pour une politique
 de pile, « the admins of the corresponding stack ». La case qui les active est cochée, lue par Sabine le 2026-11-20
-(`docs/fiches-veille.md:1690-1691`).
+(`docs/fiches-veille.md:1700-1701`).
 
 ## Choix faits et options écartées
 
@@ -126,7 +126,7 @@ de pile, « the admins of the corresponding stack ». La case qui les active est
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| Les 20 renvois `fichier:ligne` de la section, relus sur `main` au commit `36c1e02d` | Chaque phrase dit ce que la ligne citée contient |
+| Les 20 renvois `fichier:ligne` de la section, relus sur `main` au commit `36c1e02d`, puis de nouveau le 2026-11-22 sur `9658225a` après la fusion de `main` (trois renvois vers `docs/fiches-veille.md` décalés de 10 à 13 lignes, corrigés) | Chaque phrase dit ce que la ligne citée contient |
 | `uv run --locked --only-group docs mkdocs build --strict` : sortie 0 | Aucun lien ni ancre cassé |
 | Le HTML construit : une liste ordonnée de six étapes, les deux blocs de code dans leur étape, les ancres `#brancher-lexport`, `#limites`, `#sources` présentes | La section se lit comme une suite d'étapes, au clavier comme au lecteur d'écran |
 | Contrôle du HTML de la déclaration d'accessibilité sur la section : `lang="fr"`, un seul `h1`, aucun saut de niveau, aucun lien nommé par une adresse, « ici » ou « plus haut » | La section tient la vérification d'AcceDe du 2026-11-21 |
@@ -138,7 +138,7 @@ de pile, « the admins of the corresponding stack ». La case qui les active est
 
 1. **Pourquoi pas le jeton de la tuile OpenTelemetry ?** Ses droits ne se choisissent pas à l'étape où on le
    génère ; celui de la politique ne porte que les trois droits d'écriture, sur cette pile seule
-   (`documentation/monitoring_pour_docu.md:105-113`).
+   (`documentation/monitorage.md:106-114`).
 2. **Le jeton peut-il fuiter pendant l'installation ?** Ni à l'écran (`read -s`), ni dans l'historique, ni dans la
    liste des processus (`printf` interne), même collé d'un coup sous zsh : l'invite `Jeton:` dit quand le coller. Il
    reste dans le presse-papiers, que l'étape vide, et dans l'historique de Spotlight s'il est activé, que l'étape
