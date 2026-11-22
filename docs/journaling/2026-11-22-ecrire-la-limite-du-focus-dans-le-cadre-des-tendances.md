@@ -11,7 +11,8 @@
   (l'ombre au bord du cadre, #618).
 
 Le changement tient dans deux commits de la PR, `b0fdf73b` (la limite, son test, la fiche) et `84d0c821` (le tri de la
-revue) ; ses autres commits ajoutent cette note et la corrigent. Les autres commits et fichiers listés au lancement de
+revue) ; ses autres commits ajoutent cette note et la corrigent, et `22cd2315` prend `main` (`2da20b16`, après la
+fusion de #695). Les autres commits et fichiers listés au lancement de
 la note sont l'histoire de `main` avant la branche, partie de `bbfb6510` : ils ne sont pas de cette PR.
 
 ## Le pourquoi
@@ -159,6 +160,7 @@ que pour `scrollIntoView` » en citant MDN, une déduction que MDN ne dit pas.
 | 390 px, dix ArrowLeft sur le lien : `scrollLeft` 0, focus sur la ligne 1, anneau dans le cadre | Les flèches font défiler le cadre et gardent le focus sur le lien. |
 | `scroll-padding-inline: 1rem` : Tab sans effet ; `scrollIntoView` en contrôle : lien de 33 à 301 | La règle s'applique, mais pas au Tab sur un lien en partie visible. |
 | `uv run ruff check --no-cache`, `ruff format --check`, `mypy --strict` (199 fichiers), `uv run pytest` : 5726 passed | Les contrôles du dépôt sont verts sur `84d0c821`. |
+| Après la prise de `main` (`22cd2315`), les six contrôles requis rejoués en local, GitHub Actions ne tournant pas : `ruff check --no-cache` et `ruff format --check` ; `mypy --strict` (199 fichiers) ; `pytest --cov` : 5 798 réussis, couverture de 98,55 % ; `pip-audit@2.10.1` : « No known vulnerabilities found » ; `pytest -m postgresql` sur `postgres:18.6` de `ci.yml` par son digest : 350 réussis ; `bicep build` de `infra/main.bicep` en 0.48.1 : sans erreur | La branche à jour avec `main` passe les contrôles exigés à la fusion. |
 
 ## Ce que tu dois pouvoir défendre
 
