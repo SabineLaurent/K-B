@@ -10,9 +10,9 @@
   [`2026-11-22-montrer-que-le-tableau-des-tendances-continue.md`](2026-11-22-montrer-que-le-tableau-des-tendances-continue.md)
   (l'ombre au bord du cadre, #618).
 
-Les deux commits de la PR sont `b0fdf73b` (la limite, son test, la fiche) et `84d0c821` (le tri de la revue). Les
-autres commits et fichiers listés au lancement de la note sont l'histoire de `main` avant la branche, partie de
-`bbfb6510` : ils ne sont pas de cette PR.
+Le changement tient dans deux commits de la PR, `b0fdf73b` (la limite, son test, la fiche) et `84d0c821` (le tri de la
+revue) ; ses autres commits ajoutent cette note et la corrigent. Les autres commits et fichiers listés au lancement de
+la note sont l'histoire de `main` avant la branche, partie de `bbfb6510` : ils ne sont pas de cette PR.
 
 ## Le pourquoi
 
