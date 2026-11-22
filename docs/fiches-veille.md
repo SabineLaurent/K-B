@@ -1094,7 +1094,8 @@ limite. Aucune entrée n'est non tenue.
   - limitation des essais et défenses contre les attaques automatisées : écart voulu, justifié,
     c'est l'anti-force brute ci-dessous ;
   - transport sous TLS : tenu en ligne ; sur la machine, `http` sur `127.0.0.1`, joignable de la
-    machine seule (API8, « TLS, même pour une API interne ») ;
+    machine seule ; dans la préproduction locale, `http` sur le réseau du projet compose, en `sandbox`
+    seulement (API8, « TLS, même pour une API interne ») ;
   - authentification TLS mutuelle entre programmes : non appliquée, écart voulu, justifié. Elle
     n'est pas nécessaire : ACA la propose pour un client du dehors (« When your apps are
     communicating with a client outside of the environment, two-way authentication with mTLS is
@@ -1106,7 +1107,7 @@ limite. Aucune entrée n'est non tenue.
     (`infra/modules/container-apps-environment.bicep:32-36`) : l'autorisation reste à la clé et au
     droit par route. Le mTLS de l'environnement, `peerAuthentication.mtls`, reste désactivé
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
-    (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
+    (`infra/modules/api-container-app.bicep:118-124`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
     l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
     jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
@@ -1458,9 +1459,13 @@ dépend que du code garde son état et sa preuve.
   scannerait `main` sans attendre une PR : faisables avec nos droits, le second sur les minutes du
   compte.
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
-  `127.0.0.1`, joignable de la machine seule.
+  `127.0.0.1`, joignable de la machine seule. Dans la préproduction locale, elle sert en `http` dans son
+  conteneur, sur le réseau du projet compose, et se joint depuis le poste par son port publié sur
+  `127.0.0.1` ; elle appelle l'API de données en `http` sur le réseau du compose, ce que seul `sandbox`
+  permet (`find_internal_api_url_refusal`, `core/outbound.py` ;
+  [preproduction-locale.md](preproduction-locale.md)).
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
-    `infra/modules/api-container-app.bicep:74-80`) : « Internal: Makes the app's own fully qualified
+    `infra/modules/api-container-app.bicep:118-124`) : « Internal: Makes the app's own fully qualified
     domain name (FQDN) directly reachable only from within the same Container Apps environment, such
     as from other container apps. » (page de l'entrée, relue le 2026-11-10). La documentation de
     l'entrée nomme une seule exception, une route HTTP de l'environnement qui viserait l'app : il
@@ -1637,13 +1642,18 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   que la production (« If this is unavoidable, these endpoints should get the same security
   treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
   le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
-  et refusée au démarrage si elle manque à la règle, les mêmes limites. Trois différences. Deux sont
-  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  et refusée au démarrage si elle manque à la règle, les mêmes limites. Quatre différences. Deux sont
+  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule, et, dans la préproduction
+  locale, sur le réseau du projet compose (API8, « TLS, même pour une API
   interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
   (« Documentation réservée aux utilisateurs autorisés »). La troisième porte des données :
   `KB_TRACE_CONTENT=all`, refusé en production seulement
   (`ai_api/connectors/metrics_export.py:186-187`), enverrait de la machine le contenu des appels au
-  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`).
+  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`). La
+  quatrième tient à l'environnement d'essai de la préproduction locale : l'API de données y lit la base
+  sous le rôle `kb`, superutilisateur du serveur, et non sous `kb_reader` comme en ligne ; chaque
+  connexion de son pool lit en `READ ONLY`, ce qui protège d'une écriture par erreur du code de K-B, et
+  l'API n'envoie que son propre SQL paramétré (journal ADR, 2026-11-22, « Préproduction locale »).
   **Limite** : une base de la machine servie au-delà de `127.0.0.1` ; `KB_TRACE_CONTENT` à `all` ou
   `anomalies` sur la machine.
   **Pour réduire le risque** : garder les hôtes d'écoute par défaut, `127.0.0.1`
