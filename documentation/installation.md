@@ -116,12 +116,13 @@ les variables des commandes qu'ils enchaînent; avec `--dry-run`, ils ne lisent 
 
 - **`KB_DATA_DIR`**: lue par toutes les commandes, sauf `kb openapi`. Obligatoire.
 - **`KB_LOG_TO_FILE`**: lue par toutes les commandes, sauf `kb openapi`. Facultative.
-- **`KB_DATABASE_URL`, `KB_DATABASE_AUTH`**: lues par `kb create-db`, `kb migrate-database`, `kb import`,
-    `kb purge` et `kb serve-data` (`read_database_location_or_refusal`, `database/location.py`). Facultatives: sans
-    `KB_DATABASE_URL`, la base est `<KB_DATA_DIR>/k-b.sqlite`.
-- **`KB_ZOTERO_DIR`, `GOOGLE_APPLICATION_CREDENTIALS`, `KB_GITHUB_TOKEN`, `KB_COLLECT_ONLY`**: lues par
-    `kb collect`. Facultatives: sans les deux premières, Zotero et GH Archive sont sautés; sans le jeton, l'API GitHub
-    accepte 60 requêtes par heure au lieu de 5 000.
+- **`KB_DATABASE_URL`, `KB_DATABASE_AUTH`**: lues par `kb create-db`, `kb migrate-database`, `kb import`, `kb purge`
+    et `kb serve-data`, et par `kb daily-routine`, qui lance `kb import` et `kb purge`
+    (`read_database_location_or_refusal`, `database/location.py`). Facultatives: sans `KB_DATABASE_URL`, la base est
+    `<KB_DATA_DIR>/k-b.sqlite`.
+- **`KB_ZOTERO_DIR`, `GOOGLE_APPLICATION_CREDENTIALS`, `KB_GITHUB_TOKEN`, `KB_COLLECT_ONLY`**: lues par `kb collect`,
+    et par `kb daily-routine`, qui le lance. Facultatives: sans les deux premières, Zotero et GH Archive sont sautés;
+    sans le jeton, l'API GitHub accepte 60 requêtes par heure au lieu de 5 000.
 - **`KB_VAULT_DIR`**: lue par `kb collect`, `kb write-tops`, `kb digest`, `kb trend-report`, `kb daily-routine`,
     `kb digest-watch` et `kb download-watch-sheets`. Facultative pour `kb collect`, qui saute alors les clips;
     obligatoire pour les six autres (`read_vault_dir_or_refusal`, `etl/collected_sources.py`).

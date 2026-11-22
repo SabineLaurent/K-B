@@ -14,10 +14,11 @@ Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comm
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
 `main` au commit `57ff235` (2026-11-14), avec le workflow `Docs` et l'audit de tous les groupes de dépendances ajoutés
 le même jour (#167), et d'après les réglages du dépôt lus le même jour; la publication du site à chaque fusion et les
-contrôles requis, d'après la demande de fusion de #684 et le ruleset lu le 2026-11-22. Les exécutions citées se relisent
-par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du dépôt
-(`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en ligne
-d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison-continue.md).
+contrôles requis, d'après la demande de fusion de #684 et le ruleset lu le 2026-11-22. Les renvois de `docs.yml`, de
+`dependabot.yml` et des étapes de Grype d'`image.yml` visent `main` au commit `a1a01efd`. Les exécutions citées se
+relisent par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du
+dépôt (`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en
+ligne d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison-continue.md).
 
 ## La chaîne en bref
 
@@ -150,7 +151,7 @@ tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lanc
 - `build` (l. 19-38) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
     construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 27-28): le groupe `docs` seul, aux
     versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
-    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:97-103`). Puis
+    ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:99-105`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
     11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 29-32). Depuis `main`, sur un push
     quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin `site/` en artefact de

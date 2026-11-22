@@ -178,7 +178,7 @@ make sandbox-alerts
 ```
 
 La cible lance les seuls tests de `tests/e2e/test_sandbox_alerts.py`, avec le `.env.e2e_test` de la copie de
-travail principale du dépôt, et écrit le rapport `reports/sandbox-alerts.html` (`Makefile:3`, `:64-66`). Les deux
+travail principale du dépôt, et écrit le rapport `reports/sandbox-alerts.html` (`Makefile:3`, `:73-75`). Les deux
 variables à y mettre sont `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`; sans elles, chaque test est sauté
 (`read_sandbox_export_settings`). Chaque test pose lui-même `KB_DEPLOYMENT_ENVIRONMENT=sandbox` avant de lire ces
 réglages, à la place de toute valeur du terminal (`tests/e2e/test_sandbox_alerts.py:96-98`).

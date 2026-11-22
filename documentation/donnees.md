@@ -43,17 +43,17 @@ c'est l'URL `postgresql://` ou `postgres://` d'une base PostgreSQL ([Réglages](
     serveur à installer, et, en mode WAL (<span lang="en">write-ahead logging</span>), l'API lit pendant que le
     pipeline écrit ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-10-02, « Base des items »).
 - **En ligne, PostgreSQL**: les API et les jobs tournent chacun dans son conteneur (`infra/main.bicep:270`, `:307`,
-    `:386`, `:406`, `:433`, `:480`). SQLite y demanderait un fichier sur un partage Azure Files monté: la page de
-    Microsoft sur les volumes de Container Apps, relue le 2026-11-22, ne dit rien des verrous de fichiers sur un
-    partage SMB (<span lang="en">Server Message Block</span>), et des sources de la communauté les jugent peu fiables;
-    un conteneur Blob, lui, ne se monte pas: <q lang="en">Azure Container Apps doesn't support mounting file shares
-    from Azure NetApp Files or Azure Blob Storage</q>
-    ([<span lang="en">Use storage mounts in Azure Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts),
-    Microsoft Learn, mise à jour le 2026-10-26;
-    [journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-    2026-11-06, « Base: PostgreSQL en ligne, par un adaptateur maison (#417) »). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
-    connexion sans mot de passe, par Entra (même journal, « Base en ligne: trois rôles, posés par l'administratrice
-    (#421) » et « Base en ligne: Entra seul, un jeton à chaque connexion (#421) »).
+    `:386`, `:406`, `:433`, `:480`, à `main` au commit `a1a01efd`). SQLite y demanderait un fichier sur un partage Azure
+    Files monté: la page de Microsoft sur les volumes de Container Apps, relue le 2026-11-22, ne dit rien des verrous de
+    fichiers sur un partage SMB (<span lang="en">Server Message Block</span>), et des sources de la communauté les
+    jugent peu fiables; un conteneur Blob, lui, ne se monte pas: <q lang="en">Azure Container Apps doesn't support
+    mounting file shares from Azure NetApp Files or Azure Blob Storage</q> ([<span lang="en">Use storage mounts in Azure
+    Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts), Microsoft Learn, mise
+    à jour le 2026-10-26; [journal des
+    décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-11-06, « Base:
+    PostgreSQL en ligne, par un adaptateur maison (#417) »). PostgreSQL donne aussi à chaque identité son rôle, l'API de
+    données en lecture seule, et une connexion sans mot de passe, par Entra (même journal, « Base en ligne: trois rôles,
+    posés par l'administratrice (#421) » et « Base en ligne: Entra seul, un jeton à chaque connexion (#421) »).
 
 ## Vue d'ensemble
 

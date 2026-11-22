@@ -7,24 +7,24 @@
 
     — C8.5, C9.11, C11.9, C12.7, C13.8, C17.12, C18.7, C19.7, C20.7
 
-Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
-elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
-`.github/workflows/docs.yml` et `mkdocs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
-`mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
+Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité elle
+suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne` visent
+le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
+`.github/workflows/docs.yml` et `mkdocs.yml`, dont les renvois visent le commit `38ae9df5`. `mkdocs.yml`,
+`documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
 Les fiches sont écrites en Markdown dans `documentation/`. MkDocs 1.6.1, avec le thème Material for MkDocs 9.8.1, en
 fait un site HTML statique: une page par fiche, une page d'accueil ([La documentation de K-B](index.md)) et un
-champ de recherche (`mkdocs.yml:4-41`, `:83-84`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
+champ de recherche (`mkdocs.yml:4-43`, `:85-86`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
 seul menu, à gauche, donne la page d'accueil et la page du produit, puis les cinq parties numérotées de la
 documentation et leurs fiches.
-La table des matières de la page ouverte est sous son lien (`mkdocs.yml:50-56`). Sur un écran plus étroit, le bouton
+La table des matières de la page ouverte est sous son lien (`mkdocs.yml:52-58`). Sur un écran plus étroit, le bouton
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
-n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:38-39`). Le
+n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:40-41`). Le
 pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
 (`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
 (`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
@@ -32,7 +32,7 @@ une ligne « K-B », résultats de la recherche compris, et dans un tableau une 
 (`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
-(`mkdocs.yml:57-73`). Le site se publie sur
+(`mkdocs.yml:59-75`). Le site se publie sur
 GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée à `true`, ou à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
@@ -73,16 +73,16 @@ vérifie.
 |---|---|---|---|
 | Des titres hiérarchisés | AVH; Microsoft; RGAA 9.1 | Un seul titre de niveau 1 par fiche, puis `##` à `####` sans saut de niveau. Un paragraphe en gras n'est pas un titre. | Le contrôle du HTML construit |
 | De vraies listes | AVH; RGAA 9.3 | Les listes Markdown, rendues en `ul` et `ol`. Chaque niveau est en retrait de quatre espaces: Python-Markdown, qui construit les pages, ne rattache à un point de liste que ce qui est en retrait de quatre espaces. | Le HTML construit |
-| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:56`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
+| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:58`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les huit images, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, ont chacune un texte de remplacement court qui nomme la section de leur description, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche; chaque logigramme comparé au code; chaque schéma Merise comparé aux deux scripts de la base |
-| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:48-49`). | La configuration |
+| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:50-51`). | La configuration |
 | Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:88-90`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
-| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:45`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:105-107`). | Le contrôle du HTML construit |
-| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:85-86`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:90-92`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:47`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:107-109`). | Le contrôle du HTML construit |
+| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:87-88`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
@@ -198,7 +198,7 @@ peut y paraître avant le texte qui le développe.
     ```
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-    (`mkdocs.yml:97-103`). Le workflow `docs.yml` la lance sur chaque demande de fusion
+    (`mkdocs.yml:99-105`). Le workflow `docs.yml` la lance sur chaque demande de fusion
     (PR, <span lang="en">pull request</span>) et sur chaque push sur `main`
     (`.github/workflows/docs.yml:7-12`, `:28`).
 
