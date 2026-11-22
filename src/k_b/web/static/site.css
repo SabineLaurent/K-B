@@ -5,7 +5,8 @@
    Only features Baseline "widely available" (web-features 3.45.0, read on 2026-11-11): nesting,
    cascade layers, logical properties, :where(), the dynamic viewport units, the range syntax of
    media queries. text-wrap: balance, "newly available", only adds: a browser without it loses
-   nothing (docs/site-web.md, "Feuille de style"). */
+   nothing (docs/site-web.md, "Feuille de style"). So does background-attachment: local, "widely
+   available" by its own key (web-features 3.47.0, read on 2026-11-22): without it, no shadow. */
 
 @layer reset, base, layout, components;
 
@@ -900,9 +901,22 @@
     padding-block-end: 0.375rem;
     overflow-x: auto;
     container-type: inline-size;
-    background: var(--color-card);
     border: 1px solid var(--color-stone);
     border-radius: 8px;
+    /* A shadow at each edge the table continues past (Lea Verou, 2012): two covers of the colour of
+       the frame scroll with the table (local) and hide the two shadows, fixed to the frame, while
+       the table ends at their edge. In the colour of the borders, the shadow keeps each text of the
+       table at 4.5:1 (WCAG 1.4.3). Forced colours drop a gradient: the frame keeps its border. */
+    background-color: var(--color-card);
+    background-image:
+      linear-gradient(to right, var(--color-card) 50%, transparent),
+      linear-gradient(to left, var(--color-card) 50%, transparent),
+      linear-gradient(to right, var(--color-stone), transparent),
+      linear-gradient(to left, var(--color-stone), transparent);
+    background-position: 0 0, 100% 0, 0 0, 100% 0;
+    background-size: 1.5rem 100%, 1.5rem 100%, 0.75rem 100%, 0.75rem 100%;
+    background-repeat: no-repeat;
+    background-attachment: local, local, scroll, scroll;
   }
 
   /* 560 px at least, as the mockup (Sabine, 2026-11-14). */
@@ -1005,9 +1019,11 @@
       display: none;
     }
 
-    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns. */
+    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns, and
+       the shadows of its edges would fall on it. */
     .table-frame {
       overflow: visible;
+      background-image: none;
     }
 
     /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */

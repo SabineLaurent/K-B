@@ -382,6 +382,37 @@ def test_the_frame_keeps_the_focus_ring_of_its_last_link_in_sight():
     )
 
 
+def read_frame_shadows():
+    """The colours of the two shadows of the frame of the table, its gradients that fade from a
+    colour of the chart to transparent at the edges; its covers stop at 50 %."""
+    return re.findall(
+        r"linear-gradient\(to (?:left|right), var\((--color-[a-z-]+)\), transparent\)",
+        strip_nested_rules(read_rule(".table-frame")),
+    )
+
+
+def test_the_frame_shows_a_shadow_at_each_edge_the_table_continues_past():
+    """Lea Verou, 2012: two covers that scroll with the table (local) hide the two shadows fixed to
+    the frame (scroll) while the table ends at their edge; a table that fits shows none."""
+    rule = strip_nested_rules(read_rule(".table-frame"))
+
+    assert "background-attachment: local, local, scroll, scroll;" in rule
+    assert len(read_frame_shadows()) == 2
+
+
+@pytest.mark.parametrize(
+    "text", ["--color-ink", "--color-slate", "--color-teal", "--color-teal-deep"]
+)
+def test_each_text_of_the_table_keeps_its_contrast_on_the_shadows_of_its_frame(text):
+    """WCAG 1.4.3: the cells, the rank, the links, visited and hovered, pass over a shadow as the
+    table scrolls. The shadow, a hint no criterion asks for, has no 3:1 of 1.4.11 to meet."""
+    colours = read_colours()
+
+    assert read_frame_shadows()
+    for shadow in read_frame_shadows():
+        assert measure_contrast(colours[text], colours[shadow]) >= 4.5
+
+
 def test_a_table_wider_than_the_page_prints_all_its_columns():
     """Opquast 2025, rules 195 and 196: on paper, the frame no longer scrolls."""
     rule = read_block(
@@ -389,6 +420,15 @@ def test_a_table_wider_than_the_page_prints_all_its_columns():
     )
 
     assert "overflow: visible;" in rule
+
+
+def test_a_table_printed_drops_the_shadows_of_its_frame():
+    """On paper, the frame no longer scrolls: its shadows would fall on the table."""
+    rule = read_block(
+        read_block(STYLESHEET, r"@media print\s*\{"), r"\.table-frame\s*\{"
+    )
+
+    assert "background-image: none;" in rule
 
 
 def test_a_table_printed_drops_the_announcement_of_its_links():
