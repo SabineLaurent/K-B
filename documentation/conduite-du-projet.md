@@ -158,7 +158,7 @@ Chaque PR vers `main`, et chaque push sur `main`, lance l'intégration continue 
 (`.github/workflows/image.yml`) et `bicep-build` (`.github/workflows/infra.yml`). Chaque PR construit aussi le site de
 ces fiches (`build`, `.github/workflows/docs.yml`). Une PR ne fusionne que si six contrôles sont verts, sur une
 branche à jour avec `main`: `audit`, `tests`, `lint`, `types`, `tests-postgresql` et `bicep-build`. Le détail est dans
-[la fiche de l'intégration continue](integration_continue_pour_docu.md).
+[la fiche de l'intégration continue](integration-continue.md).
 
 ```sh
 gh api repos/SabineLaurent/K-B/rules/branches/main \

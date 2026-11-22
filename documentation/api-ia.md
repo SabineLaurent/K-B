@@ -26,7 +26,7 @@ demande à l'autre, sauf ce que sa mémoire tient jusqu'au redémarrage: le comp
 mesures, traces et enregistrements de journal pas encore envoyés (`ai_api/app.py:1-4`). Seul `kb` écrit dans le
 coffre.
 
-Elle se lance par `kb serve-ai`. Sur le Mac, elle écoute par défaut sur `127.0.0.1:8001`, la machine seule
+Elle se lance par `kb serve-ai`. En local, elle écoute par défaut sur `127.0.0.1:8001`, la machine seule
 (`core/config.py:307-308`). En ligne, c'est l'app `ca-kb-ai-api` d'Azure Container Apps, sans adresse publique
 (section [En ligne](#en-ligne)).
 
@@ -69,7 +69,7 @@ Le schéma se lit ainsi:
     le README de chaque dépôt choisi, par `/readme` (`ai_api/connectors/github_client.py:1-2`).
 - **Elle envoie ses mesures et ses traces en OpenTelemetry** vers Grafana Cloud, par OTLP (le protocole d'export
     d'OpenTelemetry), quand l'export est réglé. Ce qu'elles contiennent et comment les lire:
-    [la fiche du monitorage](monitoring_pour_docu.md).
+    [la fiche du monitorage](monitorage.md).
 - **Les deux commandes écrivent le coffre** à partir de la réponse. Le paquet `ai_api` n'écrit aucun fichier
     (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:120` et `:144`;
     son écriture se vérifie à la main par la commande `grep` de la règle 7 (section
@@ -245,7 +245,7 @@ demandes admises par le débit comptent: une demande refusée avant lui (413, 42
 429 de concurrence) ou par lui ne compte pas; un 422 d'un corps hors de son schéma, contrôlé après, compte
 (`core/api_rate_limit.py:32-44`, `ai_api/app.py:62-67`).
 
-Les tests qui prouvent ces règles sont dans [la fiche des tests](tests_pour_docu.md), section « 7. Accès ». Un
+Les tests qui prouvent ces règles sont dans [la fiche des tests](tests.md), section « 7. Accès ». Un
 test prouve que le 401, le 403 et le 429 de concurrence ne comptent pas dans le débit. Pour le 413 et le 422 d'un
 corps illisible, qui ne comptent pas, et pour le 422 d'un corps hors de son schéma, qui compte, aucun test ne lit
 le compte: c'est l'ordre du code. Le 413 vient d'un <span lang="en">middleware</span>, avant la route
@@ -263,13 +263,13 @@ rotation est documentée (journal des décisions d'architecture, ou ADR, « POC 
 
 ### Faire une clé
 
-Une clé de 43 caractères, par la commande du README:
+Une clé de 43 caractères, par cette commande:
 
 ```sh
 uv run python -c "import secrets; print(secrets.token_urlsafe(32))"
 ```
 
-### La changer sur le Mac
+### La changer en local
 
 1. Ranger la nouvelle clé dans sa variable du `.env`: `KB_AI_API_KEY_KB_DIGEST` ou
     `KB_AI_API_KEY_KB_TREND_REPORT`. Le client lit la même variable que le serveur
@@ -382,7 +382,7 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
     profil du shell reste valide même retirée du `.env`.
 - **`uv run --env-file .env kb serve-ai` charge tout le `.env`**, donc aussi des secrets dont l'API IA n'a pas
     besoin.
-- **Sur le Mac, la clé passe en clair**, en HTTP sur `127.0.0.1`: la machine seule l'écoute. En ligne, le
+- **En local, la clé passe en clair**, en HTTP sur `127.0.0.1`: la machine seule l'écoute. En ligne, le
     transport est en HTTPS.
 - **En ligne, les comptes rendus ne sont demandés qu'à l'horaire de `caj-kb-digest-watch` ou par un lancement du
     job à la main, sans nouvelle tentative.** Le job part le lundi et le jeudi à 10:00 UTC par défaut

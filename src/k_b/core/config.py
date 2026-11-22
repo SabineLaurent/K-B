@@ -222,7 +222,7 @@ COMPOSE_HOSTS = ("api-donnees", "api-ia")
 # The key of a client of the data API (docs/specs-api.md, "Accès par clé"), checked by kb serve-data
 # for each client and by the AI API for the key it sends. secrets.token_urlsafe(32) gives 43
 # characters: 32 is the minimum checked. The alphabet of token_urlsafe, the way of making a key
-# the README gives. HTTPBearer strips the spaces around the key received
+# documentation/api-ia.md gives ("Faire une clé"). HTTPBearer strips the spaces around the key received
 # (fastapi/security/utils.py): a key that starts or ends with one would be accepted at the start
 # and never match.
 MIN_API_KEY_LENGTH = 32
@@ -355,7 +355,7 @@ AI_API_CLIENT_BY_ROUTE = {
     "/trend-reports": TREND_REPORT_CLIENT,
 }
 # The routes of the AI API call a paid model: 20 requests a day, about 3 times the most measured
-# (7, in the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (README.md).
+# (7, in the trial logs of 2026-10-26 to 29), about 420,000 tokens each at worst (documentation/produit.md).
 # Counted in memory: not a budget, a restart empties the count (docs/fiches-veille.md, "Accès").
 AI_API_RATE_LIMITS = {
     "/digests": RateLimit(requests=20, window_seconds=86_400),

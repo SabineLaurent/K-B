@@ -72,7 +72,7 @@ post/                   # post-traitement, hors de l'ETL
    kb collect (stage 1) et kb import (stages 2 et 3) tournent séparément.
    pipeline.py nomme les deux parcours et en est la porte unique pour
    commands/ ; leur enchaînement reste la suite de commandes
-   (kb collect ; kb import, README) tant qu'aucun job en conteneur ne
+   (kb collect ; kb import, documentation/utilisation.md) tant qu'aucun job en conteneur ne
    l'appelle.
 6. etl n'importe jamais post (déjà en vigueur, tests/architecture/).
 
