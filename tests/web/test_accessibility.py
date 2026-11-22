@@ -30,7 +30,7 @@ HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
 LANDMARKS = ("header", "main", "footer")
 SKIP_TARGET = "contenu"
 # The feed refused on its three fields: a search too long, a kind out of the five, date without day.
-FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date"
+FEED_REFUSED = "/?q=" + "a" * 201 + "&kind=clip&period=date&start=2026-02-30"
 FEED_PAGES = ("/", "/?page=2", "feed-empty", "feed-refused")
 # The detail of each kind and of each state of its banner, by name; the variants have an identifier
 # of their own, as each page has a title of its own.
@@ -517,6 +517,35 @@ def test_each_field_refused_says_why_under_it_and_in_the_summary():
         if attributes.get("aria-invalid") == "true"
     ]
     assert invalid == ["q", "start"]
+
+
+@pytest.mark.parametrize("name", ["feed-refused", "trends-refused"])
+def test_the_message_of_each_field_refused_opens_with_a_word_that_says_an_error(name):
+    """RGAA 11.10; WCAG 3.3.1: in forced colors, the message takes the colour of the text, as the
+    label above it; its first word says the error without a colour (#590)."""
+    messages = re.findall(
+        r'<p id="[a-z-]+-error" class="field-error">([^<]*)</p>', PAGES[name]
+    )
+
+    assert messages
+    assert all(message.startswith("Erreur. ") for message in messages)
+
+
+def test_the_summary_says_the_message_of_each_field_without_its_word():
+    """The summary is under its own title, Filtre à corriger: each link says the message of its
+    field, without Erreur."""
+    page = PAGES["feed-refused"]
+    message_by_field = dict(
+        re.findall(
+            r'<p id="([a-z]+)-error" class="field-error">Erreur\. ([^<]*)</p>', page
+        )
+    )
+    summary_by_field = dict(
+        re.findall(r'<li><a href="#([a-z]+)">([^<]*)</a></li>', page)
+    )
+
+    assert summary_by_field.keys() == {"q", "kinds", "start"}
+    assert summary_by_field == message_by_field
 
 
 def test_the_feed_refused_shows_no_card():

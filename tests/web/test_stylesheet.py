@@ -29,9 +29,12 @@ PAIRS = [
     ("--color-alert-deep", "--color-card", 4.5),
     ("--color-alert-deep", "--color-paper", 4.5),
     ("--color-field-border", "--color-card", 3),
-    # The banner of an item in the CISA KEV catalog: its title and its text on its background.
+    # The banner of an item in the CISA KEV catalog and the summary of the errors: their title, their
+    # text and the links of the summary on their background.
     ("--color-alert-deep", "--color-alert-wash", 4.5),
     ("--color-alert-ink", "--color-alert-wash", 4.5),
+    # The focus ring of a link of the summary of the errors, on its pale peach.
+    ("--color-teal", "--color-alert-wash", 3),
     # The packages of an advisory, each in its chip.
     ("--color-ink", "--color-chip", 4.5),
     # A card under the pointer or holding the focus: its texts and its links, visited or hovered,
@@ -305,6 +308,22 @@ def test_the_banner_and_the_packages_have_the_colours_of_their_mockups(
     """Maquette-alerte.dc.html and Maquette-faille.dc.html; the alert only for an item in the
     catalog (C4)."""
     assert declaration in strip_nested_rules(read_rule(selector))
+
+
+def test_the_summary_of_the_errors_is_framed_as_the_box_of_the_chart():
+    """Planche « Charte graphique », the box « Couleur signalée » (Sabine, 2026-11-22): bordered in
+    rust, on pale peach, its title in deep rust and its text, the bullets, in burnt brown; its links,
+    underlined, in deep rust."""
+    rule = read_rule(".error-summary")
+    box = strip_nested_rules(rule)
+
+    assert "background: var(--color-alert-wash);" in box
+    assert "border: 2px solid var(--color-alert);" in box
+    assert "color: var(--color-alert-ink);" in box
+    assert "color: var(--color-alert-deep);" in read_block(rule, r"&\s*h2\s*\{")
+    link = read_block(rule, r"&\s*a\s*\{")
+    assert "color: var(--color-alert-deep);" in link
+    assert "text-decoration" not in link
 
 
 @pytest.mark.parametrize("selector", [".card-title a", ".back-link", ".trends-table a"])

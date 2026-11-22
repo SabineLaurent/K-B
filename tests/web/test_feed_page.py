@@ -196,7 +196,10 @@ def test_a_kind_out_of_the_five_is_refused_in_html_without_asking_the_api():
         '<fieldset id="kinds" aria-describedby="kinds-error kinds-help">'
         in response.text
     )
-    assert '<p id="kinds-error" class="field-error">Sorte inconnue' in response.text
+    assert (
+        '<p id="kinds-error" class="field-error">Erreur. Sorte inconnue'
+        in response.text
+    )
     assert '<li class="card">' not in response.text
 
 
@@ -214,7 +217,10 @@ def test_a_search_too_long_is_refused_on_its_field_its_value_kept():
     assert 'aria-describedby="q-error q-help"' in field
     # A value longer than maxlength is no valid HTML (WHATWG, RGAA 8.2).
     assert "maxlength" not in field
-    assert '<p id="q-error" class="field-error">' in response.text
+    assert (
+        '<p id="q-error" class="field-error">Erreur. La recherche fait 201 caractères'
+        in response.text
+    )
     assert '<a href="#q">La recherche fait 201 caractères' in response.text
     assert "<title>Quoi de neuf, filtre à corriger · K-B</title>" in response.text
 
@@ -230,6 +236,23 @@ def test_a_search_of_200_characters_beyond_200_units_of_the_browser_drops_maxlen
 
     assert response.status_code == 200
     assert "maxlength" not in find_input(response.text, "q")
+
+
+def test_a_start_of_a_year_of_5_digits_is_refused_without_a_format_the_field_does_not_show():
+    """Chrome lets type 20266 in an input type=date, which shows the day in its own way: the
+    message says the nature of the error, without a format (Opquast 2025, rule 80; #617)."""
+    api = RecordingApi(ITEMS_PAGE)
+
+    response = get_feed("period=date&start=20266-01-01", handler=api)
+
+    assert response.status_code == 422
+    assert api.requests == []
+    assert (
+        '<p id="start-error" class="field-error">Erreur. Date de début invalide:'
+        " l’année a plus de 4 chiffres.</p>" in response.text
+    )
+    assert "AAAA-MM-JJ" not in response.text
+    assert "20266" not in response.text
 
 
 def test_neither_a_control_character_nor_a_long_start_comes_back_in_the_page():
