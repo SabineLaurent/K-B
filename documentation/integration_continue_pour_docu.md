@@ -27,7 +27,7 @@ chaque PR, elle construit aussi le site des fiches de `documentation/` ([Le work
 PR ne fusionne que si ses six contrôles requis sont verts sur une branche à jour avec `main`
 ([Le ruleset de `main`](#le-ruleset-de-main)). La CI ne pousse rien et ne déploie rien sur Azure, où elle n'a aucun
 droit. Seul `Docs` publie quelque chose: le site des fiches, sur GitHub Pages, à chaque fusion une fois la variable
-de dépôt `PAGES_PUBLISH` posée, ou lancé à la main depuis `main`.
+de dépôt `PAGES_PUBLISH` posée à `true`, ou lancé à la main depuis `main`.
 
 ### Les outils
 
@@ -48,7 +48,7 @@ de dépôt `PAGES_PUBLISH` posée, ou lancé à la main depuis `main`.
 | Ruleset « Basic-rules-main-protect » | dit quels contrôles une PR doit passer pour fusionner | réglages du dépôt ([Le ruleset de `main`](#le-ruleset-de-main)) |
 
 Les actions épinglées sont `actions/checkout` v7.0.1 et `astral-sh/setup-uv` v10.3.3 dans les workflows, et en plus,
-dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:36`, `:60`).
+dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:36`, `:61`).
 
 La chaîne tourne sur GitHub Actions, et ces faits l'y attachent: le dépôt est sur GitHub (`git remote get-url origin`
 → `git@github.com:SabineLaurent/K-B.git`); son ruleset exige des contrôles rendus par GitHub Actions (`integration_id`
@@ -168,7 +168,7 @@ voir [GitHub Pages](#github-pages).
 `Deploy` ne met en ligne qu'un commit dont toutes les exécutions des workflows du dépôt sont finies et vertes, `Image`
 et `Infra` comprises (`deploy.yml:51-67`). Un contrôle non requis à la fusion compte donc à la livraison.
 
-`Docs` compte aussi. Il tourne sur chaque commit de `main` (`docs.yml:10-11`), et son exécution en échec, ou pas
+`Docs` compte aussi. Il tourne sur chaque commit de `main` (`docs.yml:10-11`), et son exécution en échec, annulée ou pas
 encore finie, fait refuser le tag de ce commit. Pour livrer ce commit malgré tout, relancer
 `Docs` jusqu'à ce qu'il passe (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant. `Deploy`
 n'écarte pas `Docs` de son contrôle: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou ADR,

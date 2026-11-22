@@ -79,7 +79,7 @@ suivant. Le premier qui refuse arrête l'exécution, et `deploy` est `skipped`.
 
 Les exécutions de `Docs` (`.github/workflows/docs.yml`) comptent aussi: ce contrôle n'écarte que `deploy.yml`
 (`.github/workflows/deploy.yml:60-62`). `Docs` tourne sur chaque push sur `main`
-(`.github/workflows/docs.yml:10-11`): son exécution en échec, ou pas encore finie, fait refuser le tag de ce commit,
+(`.github/workflows/docs.yml:10-11`): son exécution en échec, annulée ou pas encore finie, fait refuser le tag de ce commit,
 comme celle de `CI`. Pour livrer ce commit malgré tout, relancer `Docs`
 (`gh run rerun <id> --repo SabineLaurent/K-B`), ou livrer un commit suivant de `main`. Retirer `Docs` de
 ce contrôle a été écarté: c'est un contrôle de sécurité de la livraison (journal des décisions d'architecture, ou

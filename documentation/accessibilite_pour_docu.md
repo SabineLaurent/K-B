@@ -33,7 +33,7 @@ une ligne « K-B », résultats de la recherche compris, et dans un tableau une 
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:48-64`). Le site se publie sur
-GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée, ou à la main (section [Publier](#publier)).
+GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée à `true`, ou à la main (section [Publier](#publier)).
 
 Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
 l'outil, MkDocs avec Material, la sienne du 2026-11-12 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),

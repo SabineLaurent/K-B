@@ -350,8 +350,9 @@ porte:
 Chaque affirmation et chaque titre est écrit en texte: ni lien, ni image, ni balise, ni code, ni requête Dataview ne
 peut s'y activer. Une fiche n'est jamais réécrite, même par deux lancements qui se chevauchent: s'il en existe une du
 jour, aucune demande n'est faite. Une demande dure jusqu'à environ 220 s. `kb digest` attend 240 s au plus, une
-réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai court depuis l'envoi, mais n'est contrôlé
-qu'après chaque morceau de la réponse: rien ne borne l'attente avant le premier ([les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches
+réponse de 8 000 000 d'octets au plus, sans nouvelle tentative; le délai court depuis l'envoi, et n'est contrôlé
+qu'après chaque morceau décodé de la réponse; avant le premier, chaque lecture attend 240 s au plus, mais pas leur
+somme ([les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches
 dans le coffre », « Limites »). Il montre qu'il attend: une ligne qui tourne dans un terminal, une ligne datée toutes
 les 10 s ailleurs. Il journalise son début et sa fin, avec la durée, puis affiche un bilan: la fenêtre et le nombre
 d'items lus, un tableau par sujet (statut, chemin de la fiche), le total, puis le modèle et le `request_id`, que
@@ -500,9 +501,9 @@ Ce que la commande laisse à l'opératrice:
     celles-ci.
 - **L'écriture du coffre** (`post/vault_files.py`) contrôle chaque dossier et chaque fiche avant d'écrire: un lien
     posé après ce contrôle est suivi, et une fiche qu'un autre programme écrit entre le contrôle et le renommage est
-    remplacée. Ce choix et sa vérification sont dans
+    remplacée. Le lien suivi est décrit dans
     [les fiches de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md), « Fiches dans le
-    coffre », « Limites ».
+    coffre », « Limites »; la fiche remplacée, dans le code (`post/vault_files.py:6-9`).
 - **Le disque**: au pire, 20 000 blobs de 4 000 000 octets par passage.
 
 ## Les commandes des jobs en ligne

@@ -93,7 +93,7 @@ Les outils des tests sont le groupe `dev` du `pyproject.toml` (versions plancher
 | `pytest-cov` | 7.1.0 | mesure la couverture (`--cov`) et fait échouer la commande sous le seuil |
 | `pytest-html` | 4.2.0 | écrit le rapport HTML d'une exécution (`--html`) |
 | `openapi-spec-validator` | 0.9.0 | valide l'OpenAPI de chaque API (`tests/data_api/test_openapi.py`, `tests/ai_api/test_ai_api_openapi.py`) |
-| `ruff` | 0.16.10 | le lint et le format |
+| `ruff` | 0.16.10 | le <span lang="en">lint</span> et le format |
 | `mypy` | 2.4.0 | le typage strict |
 | `types-defusedxml`, `types-pyyaml` | 0.7.0.20260504, 6.0.12.20260906 | les annotations de `defusedxml` et de `pyyaml`, pour mypy |
 
@@ -113,7 +113,7 @@ en mémoire du SDK (le kit de développement, <span lang="en">software developme
 | `make test` | comme `uv run pytest`, avec le rapport `reports/test.html` |
 | `make test-ai-api`, `make test-data-api` | `tests/ai_api` ou `tests/data_api`, puis les tests du code commun aux deux API (`API_COMMON_TESTS` du `Makefile`); rapports `reports/test-ai-api.html` ou `reports/test-data-api.html`, puis `reports/test-api-common.html` |
 | `make test-etl` | `tests/etl`, rapport `reports/test-etl.html` |
-| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le lint, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache`; sur la machine, `--no-cache` est une précaution: `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie |
+| `uv run ruff check --no-cache`, `uv run ruff format --check`, `uv run mypy --strict` | le <span lang="en">lint</span>, le format et le typage. La CI lance `uv run ruff check` sans `--no-cache`; sur la machine, `--no-cache` est une précaution: `uv run ruff check` a déjà passé là où `uv run ruff check --no-cache` a trouvé trois imports non triés, cause non établie |
 
 ### Sur PostgreSQL
 
