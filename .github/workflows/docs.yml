@@ -43,7 +43,8 @@ jobs:
       github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch'
       || (github.event_name == 'push' && vars.PAGES_PUBLISH == 'true'))
     needs: build
-    # One deployment at a time, never cancelled: a merge that follows waits for the one under way.
+    # One deployment at a time, never cancelled once running; GitHub keeps one pending and cancels it when a newer
+    # one comes (documentation/accessibilite_pour_docu.md, "Publier").
     concurrency:
       group: pages
       cancel-in-progress: false
