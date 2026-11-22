@@ -30,7 +30,7 @@ from k_b.web.data_api_client import (
     FeedRelease,
     FeedVulnerability,
 )
-from k_b.web.french_dates import write_day
+from k_b.web.french_dates import write_count, write_day
 from k_b.web.received_text import clean_received_text, clean_received_value
 
 FEED_PATH = "/"
@@ -189,8 +189,9 @@ class FeedListing:
     title: str
     line: str
     cards: tuple[FeedCard, ...]
-    page: int
+    page_text: str
     pages: int
+    pages_text: str
     previous_link: str | None
     next_link: str | None
     # What the feed without item proposes: 7 days, from a shorter period.
@@ -281,7 +282,8 @@ def find_search_error(q: str) -> FieldError | None:
     if len(q) > DATA_API_MAX_SEARCH_LENGTH:
         return FieldError(
             SEARCH_ID,
-            f"La recherche fait {len(q)} caractères: {DATA_API_MAX_SEARCH_LENGTH} au plus.",
+            f"La recherche fait {write_count(len(q))} caractères:"
+            f" {DATA_API_MAX_SEARCH_LENGTH} au plus.",
         )
     if not q:
         return None
@@ -365,13 +367,18 @@ def build_listing(
 ) -> FeedListing:
     """The page of the feed of a form without error, page at most count_pages(total)."""
     pages = count_pages(total)
+    page_text = write_count(page)
+    pages_text = write_count(pages)
     is_shorter = form.period in DAYS_BY_PERIOD and form.period != WIDER_PERIOD
     return FeedListing(
-        title=f"Quoi de neuf, page {page} sur {pages}" if total else NO_ITEM_TITLE,
+        title=f"Quoi de neuf, page {page_text} sur {pages_text}"
+        if total
+        else NO_ITEM_TITLE,
         line=write_results_line(total, query.since_day, page, pages),
         cards=tuple(build_card(item) for item in items),
-        page=page,
+        page_text=page_text,
         pages=pages,
+        pages_text=pages_text,
         previous_link=f"{build_page_link(form, page - 1)}#{RESULTS_ID}"
         if page > 1
         else None,
@@ -390,10 +397,10 @@ def write_results_line(total: int, since_day: date, page: int, pages: int) -> st
     day = write_day(since_day)
     if total == 0:
         return f"Aucun item depuis le {day}."
-    items = "1 item" if total == 1 else f"{total} items"
+    items = "1 item" if total == 1 else f"{write_count(total)} items"
     return (
         f"{items} depuis le {day}, du plus récent au plus ancien."
-        f" Page {page} sur {pages}, {FEED_PAGE_SIZE} items par page."
+        f" Page {write_count(page)} sur {write_count(pages)}, {FEED_PAGE_SIZE} items par page."
     )
 
 

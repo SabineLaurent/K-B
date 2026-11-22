@@ -33,6 +33,7 @@ from k_b.web.french_dates import write_day
 NOW = datetime(2026, 11, 11, 17, 40, tzinfo=UTC)
 # validate_json: in strict mode, a date is read from the text of JSON only.
 ITEMS = {item.id: item for item in PAGE.validate_json(json.dumps(ITEMS_PAGE)).items}
+NARROW_NO_BREAK_SPACE = chr(0x202F)
 
 
 def read(query):
@@ -98,6 +99,21 @@ def test_a_search_of_200_characters_is_kept_201_refused():
     assert error.field == "q"
     assert "201" in error.message
     assert "200" in error.message
+
+
+@pytest.mark.parametrize(
+    ("length", "written"),
+    [
+        (999, "999"),
+        (1000, f"1{NARROW_NO_BREAK_SPACE}000"),
+        (1500, f"1{NARROW_NO_BREAK_SPACE}500"),
+    ],
+)
+def test_the_length_of_a_search_refused_groups_its_thousands(length, written):
+    """q is not bounded before its message: an address can send 1 500 characters."""
+    [error] = read("q=" + "a" * length).errors
+
+    assert error.message == f"La recherche fait {written} caractères: 200 au plus."
 
 
 @pytest.mark.parametrize("control", ["%00", "%01", "%1F", "%7F", "%0A", "%09"])
@@ -288,6 +304,20 @@ def test_the_line_of_the_results_gives_the_items_the_period_and_the_page(
     since = date(2026, 11, 10)
 
     assert write_results_line(total, since, page, pages) == line
+
+
+@pytest.mark.parametrize(
+    ("total", "items"),
+    [
+        (999, "999 items"),
+        (1000, f"1{NARROW_NO_BREAK_SPACE}000 items"),
+        (12_345, f"12{NARROW_NO_BREAK_SPACE}345 items"),
+    ],
+)
+def test_the_line_of_the_results_groups_the_thousands_of_the_total(total, items):
+    line = write_results_line(total, date(2026, 11, 10), 1, count_pages(total))
+
+    assert line.startswith(f"{items} depuis le 10 novembre 2026,")
 
 
 def test_the_line_of_no_result_gives_the_period():
