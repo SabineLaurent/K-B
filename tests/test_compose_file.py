@@ -1,5 +1,5 @@
-"""The compose of the local preproduction (#419) keeps the rules of the containers online: each rule
-is read in compose.yaml, its templates and .gitignore, without Docker (the trial proves the run)."""
+"""The compose of the local preproduction keeps its rules: each rule is read in compose.yaml, its
+templates, the Dockerfile and .gitignore, without Docker (the trial proves the run)."""
 
 import re
 from pathlib import Path
@@ -10,19 +10,21 @@ import yaml
 REPOSITORY_DIR = Path(__file__).parents[1]
 COMPOSE_PATH = REPOSITORY_DIR / "compose.yaml"
 CI_PATH = REPOSITORY_DIR / ".github" / "workflows" / "ci.yml"
+DOCKERFILE_PATH = REPOSITORY_DIR / "Dockerfile"
 ENV_EXAMPLE_PATH = REPOSITORY_DIR / ".env.example"
 GITIGNORE_PATH = REPOSITORY_DIR / ".gitignore"
 
 BASE_SERVICE = "postgres"
+DATA_API_SERVICE = "api-donnees"
 AI_API_SERVICE = "api-ia"
-API_SERVICES = ("api-donnees", AI_API_SERVICE)
+API_SERVICES = (DATA_API_SERVICE, AI_API_SERVICE)
 JOB_SERVICES = ("create-db", "collecte", "import")
 KB_SERVICES = API_SERVICES + JOB_SERVICES
 SERVICES = (BASE_SERVICE, *KB_SERVICES)
 # The three jobs read the same secrets: one file.
 ENV_FILE_BY_SERVICE = {
     BASE_SERVICE: ".env.postgres",
-    "api-donnees": ".env.api-donnees",
+    DATA_API_SERVICE: ".env.api-donnees",
     AI_API_SERVICE: ".env.api-ia",
     **dict.fromkeys(JOB_SERVICES, ".env.jobs"),
 }
@@ -33,11 +35,21 @@ DATA_VOLUME = f"kb-data:{DATA_DIR}"
 # (infra/modules/api-container-app.bicep:154-155).
 CONTAINER_APP_CPUS = 0.5
 CONTAINER_APP_MEMORY = "1g"
-# Below the 30 s of the issue; the AI API waits as online (infra/main.bicep:339): a request lasts
-# up to 200 s (DIGEST_REQUEST_TIMEOUT_SECONDS).
+# The server of the base online, Standard_B1ms: 1 vCore, 2 GiB
+# (infra/modules/postgresql-server.bicep:21).
+BASE_CPUS = 1
+BASE_MEMORY = "2g"
+# Below the 30 s of the issue; the AI API waits as online (infra/main.bicep:337-339): the longest
+# request the ingress lets through, 240 s, and a margin.
 MAX_STOP_SECONDS = 30
 AI_API_STOP_SECONDS = 250
-ROOT_USERS = {"0", "root", "0:0", "root:root"}
+ROOT_USERS = {"0", "root"}
+# The AI API calls the data API in http, which only the sandbox allows (core/outbound.py); the data
+# API runs as online (infra/main.bicep:296).
+DEPLOYMENT_ENVIRONMENT_BY_API = {
+    DATA_API_SERVICE: "production",
+    AI_API_SERVICE: "sandbox",
+}
 # The mount point of a tmpfs in a container, not a temporary file of the tests.
 TMPFS_PATH = "/tmp"  # noqa: S108
 # A secret is known by its name; KB_DATABASE_URL carries the password of the base of the compose.
@@ -45,6 +57,9 @@ SECRET_NAME = re.compile(
     r"KB_DATA_API_KEY_\w+|KB_AI_API_KEY_\w+|\w+_TOKEN|KB_LLM_API_KEY|KB_OTLP_HEADERS"
     r"|KB_DATABASE_URL|POSTGRES_PASSWORD"
 )
+# A user and a password in a URL, whatever the name of its variable.
+CREDENTIALS_IN_URL = re.compile(r"://[^/@\s]*:[^/@\s]*@")
+HEALTHCHECK_HOST = re.compile(r"'Host': '([^']+)'")
 # A line NAME=value of an example, set or commented out, as tests/architecture/test_environment.py
 # reads it.
 VARIABLE_LINE = re.compile(r"^#?[ \t]*([A-Z][A-Z0-9_]*)=", re.MULTILINE)
@@ -58,6 +73,16 @@ def read_services():
 
 def read_template(env_file):
     return (REPOSITORY_DIR / f"{env_file}.example").read_text(encoding="utf-8")
+
+
+def read_image_user():
+    users = [
+        line.split()[1]
+        for line in DOCKERFILE_PATH.read_text(encoding="utf-8").splitlines()
+        if line.startswith("USER ")
+    ]
+    assert users, DOCKERFILE_PATH
+    return users[-1]
 
 
 def read_seconds(duration):
@@ -89,14 +114,20 @@ def test_each_service_runs_with_an_init_on_a_read_only_file_system(service):
     assert TMPFS_PATH in settings["tmpfs"]
 
 
-@pytest.mark.parametrize("service", SERVICES)
-def test_each_service_has_the_resources_of_a_container_app(service):
+@pytest.mark.parametrize("service", KB_SERVICES)
+def test_each_kb_service_has_the_resources_of_a_container_app(service):
     settings = read_services()[service]
 
     assert (settings["cpus"], settings["mem_limit"]) == (
         CONTAINER_APP_CPUS,
         CONTAINER_APP_MEMORY,
     )
+
+
+def test_the_base_has_the_resources_of_the_server_online():
+    settings = read_services()[BASE_SERVICE]
+
+    assert (settings["cpus"], settings["mem_limit"]) == (BASE_CPUS, BASE_MEMORY)
 
 
 @pytest.mark.parametrize("service", SERVICES)
@@ -113,11 +144,9 @@ def test_no_service_runs_as_root():
     services = read_services()
 
     assert services[BASE_SERVICE]["user"] == "postgres"
-    # The kb services keep the user of the image, 10001 (Dockerfile).
+    # The kb services keep the user of the image.
     assert all("user" not in services[service] for service in KB_SERVICES)
-    assert all(
-        str(settings.get("user")) not in ROOT_USERS for settings in services.values()
-    )
+    assert read_image_user().split(":")[0] not in ROOT_USERS
 
 
 def test_the_base_runs_the_image_and_the_settings_of_the_ci():
@@ -147,7 +176,14 @@ def test_each_service_reads_its_secrets_from_its_file_beside_its_template(servic
 def test_no_secret_is_written_in_the_compose_file(service):
     environment = read_services()[service].get("environment", {})
 
+    # A list of NAME=value would hide the names from the checks below.
+    assert isinstance(environment, dict)
     assert [name for name in environment if SECRET_NAME.fullmatch(name)] == []
+    assert [
+        name
+        for name, value in environment.items()
+        if CREDENTIALS_IN_URL.search(str(value))
+    ] == []
 
 
 @pytest.mark.parametrize("env_file", sorted(set(ENV_FILE_BY_SERVICE.values())))
@@ -179,8 +215,8 @@ def test_the_template_of_the_base_holds_its_password_only():
 def test_git_ignores_the_files_of_secrets_and_follows_their_templates():
     lines = GITIGNORE_PATH.read_text(encoding="utf-8").splitlines()
 
-    assert ".env.*" in lines
-    assert "!.env.*.example" in lines
+    # The last pattern that matches decides: the templates come back after the files are ignored.
+    assert lines.index("!.env.*.example") > lines.index(".env.*")
 
 
 @pytest.mark.parametrize("service", SERVICES)
@@ -201,28 +237,49 @@ def test_only_the_jobs_keep_the_data_directory(service):
 
 
 @pytest.mark.parametrize("service", API_SERVICES)
-def test_an_api_is_checked_by_python_with_a_host_it_allows(service):
+def test_an_api_is_checked_by_python(service):
     command = " ".join(read_services()[service]["healthcheck"]["test"])
 
     assert command.startswith("CMD python -c ")
-    assert "'Host': '127.0.0.1'" in command
 
 
-def test_the_base_is_checked_by_pg_isready():
-    assert read_services()[BASE_SERVICE]["healthcheck"]["test"][:2] == [
-        "CMD",
-        "pg_isready",
-    ]
+def test_the_data_api_is_checked_with_a_host_it_allows():
+    settings = read_services()[DATA_API_SERVICE]
+    host = HEALTHCHECK_HOST.search(" ".join(settings["healthcheck"]["test"]))
+
+    assert host
+    assert host.group(1) in settings["environment"]["KB_DATA_API_ALLOWED_HOSTS"].split(
+        ","
+    )
+
+
+def test_the_base_is_checked_by_pg_isready_over_tcp():
+    test = read_services()[BASE_SERVICE]["healthcheck"]["test"]
+
+    assert test[:2] == ["CMD", "pg_isready"]
+    # The temporary server of the first start answers on the socket only.
+    assert "--host" in test
+    assert test[test.index("--host") + 1] == "127.0.0.1"
+
+
+@pytest.mark.parametrize("service", API_SERVICES)
+def test_only_the_ai_api_runs_in_the_sandbox(service):
+    environment = read_services()[service]["environment"]
+
+    assert (
+        environment["KB_DEPLOYMENT_ENVIRONMENT"]
+        == DEPLOYMENT_ENVIRONMENT_BY_API[service]
+    )
 
 
 @pytest.mark.parametrize(
     ("service", "dependency"),
     [
-        ("api-donnees", BASE_SERVICE),
+        (DATA_API_SERVICE, BASE_SERVICE),
         ("create-db", BASE_SERVICE),
         ("import", BASE_SERVICE),
         # The AI API reads the base through the data API only.
-        (AI_API_SERVICE, "api-donnees"),
+        (AI_API_SERVICE, DATA_API_SERVICE),
     ],
 )
 def test_a_service_waits_for_what_it_reads_to_be_healthy(service, dependency):

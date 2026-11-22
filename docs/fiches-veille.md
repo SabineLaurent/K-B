@@ -1094,7 +1094,8 @@ limite. Aucune entrée n'est non tenue.
   - limitation des essais et défenses contre les attaques automatisées : écart voulu, justifié,
     c'est l'anti-force brute ci-dessous ;
   - transport sous TLS : tenu en ligne ; sur la machine, `http` sur `127.0.0.1`, joignable de la
-    machine seule (API8, « TLS, même pour une API interne ») ;
+    machine seule ; dans la préproduction locale, `http` sur le réseau du compose, joignable de ses
+    seuls conteneurs, en `sandbox` seulement (API8, « TLS, même pour une API interne ») ;
   - authentification TLS mutuelle entre programmes : non appliquée, écart voulu, justifié. Elle
     n'est pas nécessaire : ACA la propose pour un client du dehors (« When your apps are
     communicating with a client outside of the environment, two-way authentication with mTLS is
@@ -1458,7 +1459,11 @@ dépend que du code garde son état et sa preuve.
   scannerait `main` sans attendre une PR : faisables avec nos droits, le second sur les minutes du
   compte.
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
-  `127.0.0.1`, joignable de la machine seule.
+  `127.0.0.1`, joignable de la machine seule. Dans la préproduction locale, elle sert en `http` dans son
+  conteneur, joignable des conteneurs du compose et, depuis le poste, par son port publié sur
+  `127.0.0.1` ; elle appelle l'API de données en `http` sur le réseau du compose, ce que seul `sandbox`
+  permet (`find_internal_api_url_refusal`, `core/outbound.py` ;
+  [preproduction-locale.md](preproduction-locale.md)).
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
     `infra/modules/api-container-app.bicep:74-80`) : « Internal: Makes the app's own fully qualified
     domain name (FQDN) directly reachable only from within the same Container Apps environment, such
@@ -1638,7 +1643,8 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
   le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
   et refusée au démarrage si elle manque à la règle, les mêmes limites. Trois différences. Deux sont
-  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule, et, dans la préproduction
+  locale, sur le réseau du compose, joignable de ses seuls conteneurs (API8, « TLS, même pour une API
   interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
   (« Documentation réservée aux utilisateurs autorisés »). La troisième porte des données :
   `KB_TRACE_CONTENT=all`, refusé en production seulement

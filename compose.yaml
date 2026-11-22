@@ -1,5 +1,5 @@
-# The local preproduction of K-B (issue #419): the image of production and PostgreSQL 18, on the
-# Mac, with the rules of the containers online. One image, built here, for every kb service.
+# The local preproduction of K-B (issue #419): the image of production and PostgreSQL 18, locally,
+# hardened beyond the containers online. One image, built here, for every kb service.
 #
 #   docker compose build
 #   docker compose run --rm create-db
@@ -9,14 +9,16 @@
 #
 # Each service reads its secrets from its file, .env.<service>, ignored by git: a copy of its
 # template .env.<service>.example, filled in by the operator. Its other settings are below.
-# Departures from production: KB_DEPLOYMENT_ENVIRONMENT=sandbox, the only environment where kb
-# calls another service in http (http://api-donnees:8000); one role, owner of the base, and
-# kb create-db rather than kb migrate-database, which grants the roles of Azure; an init process.
+# Departures from production: KB_DEPLOYMENT_ENVIRONMENT=sandbox for the AI API, the only
+# environment where kb calls a service of the compose in http (http://api-donnees:8000); one role,
+# owner of the base, and kb create-db rather than kb migrate-database, which grants the roles of
+# Azure; an init process; a read-only file system with /tmp in memory, where the file system of a
+# container online is writable.
 
-# The resources of each service: a combination of Azure Container Apps, the one of the apps
+# The resources of each kb service: a combination of Azure Container Apps, the one of the apps
 # online (infra/modules/api-container-app.bicep:154-155;
 # https://learn.microsoft.com/en-us/azure/container-apps/containers, "Allocations", read on
-# 2026-11-21). Below 30 s to stop (issue #419). An init process forwards SIGTERM and reaps.
+# 2026-11-21). Below 30 s to stop (issue #419). An init process forwards the stop signal and reaps.
 x-container: &container
   init: true
   read_only: true
@@ -43,12 +45,18 @@ x-api-healthcheck: &api-healthcheck
   retries: 12
 
 services:
-  # The server of the tests on PostgreSQL in the CI, same image and settings (ci.yml), the major
-  # version Azure runs. Reached by the compose network only: no port published.
+  # The server of the tests on PostgreSQL in the CI, same image and initdb settings (ci.yml), the
+  # major version Azure runs. Reached by the compose network only: no port published.
   postgres:
     <<: *container
     image: postgres:18.6@sha256:bd5dfa494a5a259704365813dbfa5fa6b3e69be7348d43b547f540c730478583
     user: postgres
+    # The server of the base online, Standard_B1ms: 1 vCore, 2 GiB
+    # (infra/modules/postgresql-server.bicep:21;
+    # https://learn.microsoft.com/en-us/azure/postgresql/compute-storage/concepts-compute, read on
+    # 2026-11-22).
+    cpus: 1
+    mem_limit: 2g
     tmpfs:
       - /tmp
       # Its socket and its lock file.
@@ -65,7 +73,9 @@ services:
       # The volume the image declares from PostgreSQL 18 on.
       - pg-data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD", "pg_isready", "--username", "kb", "--dbname", "k_b"]
+      # Over TCP: the temporary server of the first start, which creates the base, answers on the
+      # socket only (docker-entrypoint.sh, docker_temp_server_start).
+      test: ["CMD", "pg_isready", "--host", "127.0.0.1", "--username", "kb", "--dbname", "k_b"]
       interval: 2s
       timeout: 5s
       retries: 15
@@ -82,7 +92,8 @@ services:
       KB_DATA_API_HOST: 0.0.0.0
       KB_DATA_API_PORT: "8000"
       KB_DATA_API_ALLOWED_HOSTS: 127.0.0.1,localhost,api-donnees
-      KB_DEPLOYMENT_ENVIRONMENT: sandbox
+      # As online (infra/main.bicep:296): neither /docs nor /openapi.json.
+      KB_DEPLOYMENT_ENVIRONMENT: production
     env_file:
       - path: .env.api-donnees
         required: true
@@ -100,8 +111,9 @@ services:
   api-ia:
     <<: *kb
     command: ["serve-ai"]
-    # As online (infra/main.bicep:339): a request lasts up to 200 s
-    # (DIGEST_REQUEST_TIMEOUT_SECONDS), then the last exports of the lifespan.
+    # As online (infra/main.bicep:337-339): the longest request the ingress lets through, 240 s,
+    # and a margin. A digest request is bound to 200 s (DIGEST_REQUEST_TIMEOUT_SECONDS), plus the
+    # call to the model under way.
     stop_grace_period: 250s
     ports:
       - "127.0.0.1:8001:8001"
@@ -109,6 +121,7 @@ services:
       <<: *kb-environment
       KB_AI_API_HOST: 0.0.0.0
       KB_AI_API_PORT: "8001"
+      # The only environment where kb calls a service of the compose in http (core/outbound.py).
       KB_DEPLOYMENT_ENVIRONMENT: sandbox
       KB_DATA_API_URL: http://api-donnees:8000
       # The model and the effort of production (infra/main.bicep:327-331).
