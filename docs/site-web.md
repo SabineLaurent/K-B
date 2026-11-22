@@ -386,17 +386,25 @@ par une espace insécable, dans un seul élément du bouton avec son libellé ; 
 avait. Mesuré dans Chrome 157 le 2026-11-21, avec la police système de macOS : aucune des 24 pages de
 `tests/web/test_accessibility.py` ne défile en largeur, de 320 à 1280 px, à texte de 100 à 200 %.
 
-L'anneau de focus (`:focus-visible`, un contour de 3 px à 2 px de l'élément) a une marge de défilement en bas,
-`scroll-margin-block-end: 5px`, la place de l'anneau sous l'élément (#700). Au Tab, Chrome ne fait défiler la page
-vers un élément en partie sous l'écran que jusqu'au bord bas de l'élément : sans la marge, le bas de l'anneau restait
-caché, de 5 px au plus. Mesuré dans Chrome 157 sans interface, au clavier seul, sur les 24 pages de
-`tests/web/test_accessibility.py`, à 1280 px, à 200 % (640 px CSS à 2 px d'écran par px CSS) et à 320 px : 10, 41 et
-21 arrêts coupés sur `main` b35ad6c8, aucun avec la marge, sur `main` 9658225a (2026-11-22). Le reste de l'essai ne
-change pas. Le haut n'a pas de marge : Chrome centre un élément atteint par Maj+Tab depuis le bas (mesuré). Écarté :
-`scroll-padding-block` sur la page, qui vaut pour tout défilement et décale de 5 px la cible du lien d'évitement
-(mesuré avec les deux côtés) ; une marge sur chaque élément que le clavier atteint, qui jouerait hors du focus
-clavier. La marge ne ramène pas un lien en partie hors du cadre des tendances (plus haut, #693). Firefox et Safari ne
-sont pas mesurés.
+L'anneau de focus (`:focus-visible`, un contour de 3 px à 2 px de l'élément) a une marge de défilement en haut et en
+bas, `scroll-margin-block: 5px`, la place de l'anneau autour de l'élément (#700). Au clavier, Chrome ne fait défiler la
+page vers un élément en partie hors de l'écran que jusqu'au bord de l'élément, le bord bas au Tab, le bord haut au
+Maj+Tab : sans la marge, ce côté de l'anneau restait caché, de 5 px au plus. Mesuré dans Chrome 157 sans interface, au
+clavier seul, sur les 24 pages de `tests/web/test_accessibility.py`, à 1280 px, à 200 % (640 px CSS à 2 px d'écran par
+px CSS) et à 320 px, sur `main` 9658225a, sans puis avec la marge (2026-11-22) :
+
+- au Tab, du premier arrêt au dernier : 10, 41 et 21 bas d'anneau coupés sans la marge, aucun avec ;
+- au Maj+Tab, du dernier arrêt au premier : 6, 25 et 19 hauts coupés sans la marge, aucun avec ;
+- chaque arrêt placé à 1 px, puis à mi-hauteur, hors de l'écran, puis Tab ou Maj+Tab (544 essais de chaque côté par
+  réglage) : 144, 312 et 322 bas coupés, 149, 342 et 359 hauts coupés sans la marge, aucun avec.
+
+Le lien d'évitement mène au même endroit avec et sans la marge, et le reste de l'essai ne change pas, sauf le cadre des
+tendances, plus haut que l'écran à 200 % et à 320 px : son anneau est coupé de 1 à 2 px en haut au lieu de 6 à 7, et
+de 5 px de plus en bas. Le bouton du calendrier d'un champ de date porte l'anneau de Chrome, pas celui du site : il
+n'est pas compté. Écarté : `scroll-padding-block` sur la page, qui vaut pour tout défilement et décale de 5 px la
+cible du lien d'évitement (mesuré avec les deux côtés) ; une marge sur chaque élément que le clavier atteint, qui
+jouerait hors du focus clavier. La marge ne ramène pas un lien en partie hors du cadre des tendances (plus haut, #693).
+Firefox et Safari ne sont pas mesurés.
 
 ## Accessibilité
 
@@ -430,8 +438,8 @@ l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une r
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
-vérifie l'anneau de focus et sa marge de défilement en bas, la taille du lien d'évitement, les règles du fort zoom et
-la feuille d'impression.
+vérifie l'anneau de focus et sa marge de défilement, la taille du lien d'évitement, les règles du fort zoom et la
+feuille d'impression.
 `tests/web/test_accessibility.py` vérifie aussi la flèche de chaque bouton liée à son mot.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement
