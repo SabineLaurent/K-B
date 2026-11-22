@@ -34,7 +34,7 @@ Chaque page fait un seul `GET /items` (`web/data_api_client.py`), avec `kind` to
 | Rechercher | `q` | espaces autour retirées ; vide, aucune recherche ; 200 caractères au plus (la règle de `q` de l'API) ; un caractère de contrôle (catégorie Unicode `Cc`) est refusé, et la saisie réaffichée sans lui |
 | Sortes | `kind`, répété | les cinq cases cochées par défaut ; aucune cochée vaut les cinq, ce que dit l'aide du groupe ; une autre valeur est refusée, sans appel à l'API |
 | Depuis | `period` : `1`, `3`, `7` ou `date` | `1` par défaut (D3, Sabine, 2026-11-11) ; N jours donne minuit UTC du jour J−N : « 1 jour » prend hier et aujourd'hui |
-| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; un jour qui existe, lu par `WrittenDay` (`items.py`), le type des routes de l'API ; réaffichée seulement si c'est un jour (pas `2026-02-30`, #596), jamais brute |
+| Date de début | `start`, `AAAA-MM-JJ` | lue seulement si `date` est cochée (D4 : le bouton radio fait foi), ce que dit son aide (WCAG 3.3.2) ; son propre minuit UTC ; un jour qui existe, lu par `WrittenDay` (`items.py`), le type des routes de l'API ; réaffichée seulement si c'est un jour (pas `2026-02-30`, #596), jamais brute ; refusée, le message des tendances (`write_day_refusal`, #617) |
 | page | `page` | `[1-9][0-9]{0,2}`, 501 au plus (l'`offset` 10 000 de l'API) ; absente, la page 1 |
 
 La route lit `request.query_params` brut, jamais des paramètres typés par FastAPI : un `page=abc` partirait
@@ -58,7 +58,8 @@ comme tout texte reçu, par `clean_received_text` (`web/received_text.py`). Une 
 comme les maquettes ; time-knight, 2026-11-11), « TLDR » et son identifiant d'API sinon.
 
 **Les pages** : M = max(1, ⌈total ÷ 20⌉), 501 au plus ; la ligne des résultats donne le total, la page,
-M et les 20 items par page (Opquast 13) ; au-delà de 10 020 items, une phrase dit d'affiner
+M et les 20 items par page (Opquast 13), les milliers groupés par une espace fine insécable (U+202F) comme dans
+le tableau des tendances, par `write_count` (`web/french_dates.py`) : « 12 345 items » ; au-delà de 10 020 items, une phrase dit d'affiner
 les filtres. Une page au-delà de M, ou hors de sa forme, rend la page 404. Les liens de page, des boutons
 encadrés comme les maquettes, « Page suivante » à droite même quand la ligne se replie, gardent les filtres et mènent à la ligne des résultats (`#resultats`, décalée
 du bord par `scroll-margin`) : l'autre page s'ouvre sur ses items (Sabine, 2026-11-11). Cette ligne porte
@@ -69,7 +70,15 @@ et « Élargir à 7 jours », une nouvelle recherche, s'ouvrent en haut de la pa
 à 7 jours ».
 
 **Les erreurs** : un champ refusé par le site, ou `q` refusé par l'API (422 `invalid_parameter` sur `q`
-seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ. Tout autre
+seul), rend le fil en 422, sans liste, avec un résumé des erreurs et un message sous chaque champ, ouvert par
+« Erreur. » : le mot dit l'erreur sans couleur (#590). Sans lui, seule la couleur séparait le message du libellé
+au-dessus, `#7C2D12` et `#1C1E21`, 1,78:1 entre eux (RGAA 3.1, WCAG 1.4.1), et en couleurs forcées le message
+prend la couleur du texte, comme le libellé (RGAA 11.10). Le résumé, sous son titre « Filtre à corriger », dit chaque message
+sans ce mot. Il a l'encadré « Couleur signalée » de la planche « Charte graphique » (Sabine, 2026-11-22) : bordure
+rouille (`--color-alert`), fond pêche pâle (`--color-alert-wash`), titre en rouille sombre (`--color-alert-deep`, 8,47:1
+sur le fond), texte en brun brûlé (`--color-alert-ink`, 11,13:1), c'est-à-dire les puces, chaque message étant un lien,
+souligné, en rouille sombre (8,47:1) ; l'anneau de
+focus y a 6,70:1. Le mot est écrit dans les gabarits, jamais dans les messages de `web/feed.py`. Tout autre
 échec de l'API (5xx, 429, 401, délai, réponse hors schéma, 422 sur un paramètre que le site construit) rend
 la page 500, et le journal écrit `data_api_failed: <état> http_status=<n|-> request_id=<id>`, jamais `q`.
 
@@ -116,7 +125,7 @@ faits en `<dl>` ; les textes sous des `h2` ; le lien vers la source, en bouton, 
 | faille | « Ajoutée au catalogue le », « modification vue par K-B le » | CVE, usage par des rançongiciels, éditeur, produit | « Description » |
 | alerte | « Publiée le » | identifiant GitHub, CVE (« Aucune »), paquets touchés (« Aucun ») | — |
 | *release* | dépôt, version, « Publiée le » | — | « Notes de version, texte brut », ou « Aucune note de version. » |
-| newsletter | « TLDR AI », « édition du », n° | — | « Résumé » |
+| newsletter | « TLDR AI », « édition du », n° (milliers groupés, `write_count`) | — | « Résumé » |
 
 **Le bandeau** dit l'état en mots, la couleur ne fait que suivre (RGAA 3.1) ; seul un item au catalogue KEV prend
 le style d'alerte. Il lit `exploited` et `withdrawn_at`, sans rien supposer :
@@ -161,15 +170,21 @@ du 09/11 : `Maquette-tendances`. `web/trends.py` lit le jour et bâtit la page, 
 absent, la fenêtre la plus récente ; répété, sa dernière valeur. Le champ montre le dernier jour de la fenêtre
 affichée, ou le jour demandé d'une fenêtre absente ; jamais une valeur refusée (la valeur d'un `type=date` est un
 jour valide ou rien : WHATWG, RGAA 8.2). Le message nomme donc une valeur refusée qui a la forme d'un jour, chiffres
-ASCII et tirets seuls (`DAY_SHAPE`, « Date invalide: 2026-02-30 n’existe pas. ») ; toute autre valeur n'atteint
-jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Limite (Opquast 81) : la valeur refusée ne revient
-pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
+ASCII et tirets seuls (`DAY_FORM` d'`items.py`, « Date invalide: 2026-02-30 n’existe pas. Choisissez un jour qui
+existe. ») ; toute autre valeur n'atteint jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Une
+année de 5 ou 6 chiffres, que Chrome laisse taper et envoie, a sa phrase, sans la valeur (« Date invalide: l’année a
+plus de 4 chiffres. ») ; toute autre valeur reçoit « Date invalide: choisissez un jour dans le champ. ». Aucun
+message ne donne de format : le champ montre le jour à la façon du navigateur (`10/10/2026` dans Chrome en
+français), que le site ne connaît pas (Opquast 80, #617). La
+date de début du fil a les mêmes phrases, le champ nommé par chaque page (« Date de début », « Date »), par la
+même fonction (`write_day_refusal`, `web/feed.py`). Limite
+(Opquast 81) : la valeur refusée ne revient pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
 
 **Le tableau** a sa légende (`caption`) : la fenêtre, du premier au dernier jour en `<time>` au mois en lettres,
 le premier jour étant `window_end` − 2 jours (`GH_ARCHIVE_WINDOW_DAYS`), « sur GitHub » et l'échantillon de GH
 Archive. Ses colonnes sont en `th scope="col"`, avec les mots de la maquette : « Rang » (la position dans l'ordre
 de l'API), « Dépôt », « Étoiles gagnées » et « *Forks* gagnés », ces deux derniers alignés à droite en chiffres
-tabulaires, les milliers groupés par une espace fine insécable (U+202F). Le dépôt de chaque ligne est son en-tête
+tabulaires, les milliers groupés par une espace fine insécable (U+202F), par `write_count` comme dans le fil. Le dépôt de chaque ligne est son en-tête
 (`th scope="row"`, RGAA 5.7), écrit comme les autres cellules : un lien vers `https://github.com/<owner>/<repo>`,
 bâti d'un `RepositoryName` validé, par la macro `external_link` (nouvel onglet, « (en anglais, site externe, nouvel
 onglet) », gardée visible : décision de Sabine du 2026-11-14). Le tableau a 560 px de large au moins (`35rem`),
@@ -177,8 +192,40 @@ comme la maquette (décision de Sabine du 2026-11-14) : sur un écran plus étro
 élargir la page. Le cadre prend le focus (`tabindex="0"`), une région nommée par la légende (C7 de #564 ;
 WCAG 2.1.1) ; il est le conteneur de la légende (`container-type: inline-size`), qui garde sa largeur
 (`max-inline-size: 100cqi`) et reste lisible sans défiler ; sous le tableau, 6 px gardent en vue l'anneau de focus du
-dernier lien, que le cadre couperait. À l'impression, le cadre ne défile plus, et la flèche et l'annonce des liens
-du tableau sont retirées.
+dernier lien, que le cadre couperait. Une ombre au bord du cadre dit que le tableau continue de ce côté (#618) :
+deux caches de la couleur du cadre défilent avec le tableau (`background-attachment: local`) et couvrent les deux
+ombres, fixées au cadre, tant que le tableau s'arrête à leur bord ([Lea Verou, 2012](https://lea.verou.me/2012/04/background-attachment-local/)).
+L'ombre a la couleur des bordures (`--color-stone`) : chaque texte du tableau y garde 4,5:1 au moins, 5,36:1 pour un
+lien (WCAG 1.4.3). Chaque dégradé finit sur sa propre couleur rendue transparente (`--color-card-clear`,
+`--color-stone-clear`), jamais sur le noir transparent de `transparent` : un moteur qui n'interpole pas en alpha
+prémultiplié en ferait une bande grise, plus sombre que l'ombre. Firefox interpole en alpha prémultiplié depuis sa
+version 36 ([bug 591600](https://bugzilla.mozilla.org/show_bug.cgi?id=591600)) ; un cas resté faux en Firefox 120 à
+122 ([bug 1869681](https://bugzilla.mozilla.org/show_bug.cgi?id=1869681), encore ouvert) ; le cas « Premultiplied
+alpha » corrigé en Firefox 137 ([bug 1904106](https://bugzilla.mozilla.org/show_bug.cgi?id=1904106), qui ne cite pas
+1869681) ; tous lus le 2026-11-22. Les deux couleurs transparentes ne dépendent d'aucune version. L'ombre n'a pas de 3:1 à tenir (WCAG 1.4.11) : ce qu'elle dit est aussi donné ailleurs, la
+légende nomme les étoiles et les *forks* gagnés ([Understanding 1.4.11](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast),
+« The information is available in another form »), et la charte classe `--color-stone` sur blanc en décor. Choix
+(time-knight, 2026-11-22) : l'ombre garde la couleur de la charte. Elle est discrète, 1,36:1 au plus sombre sur 12 px
+(mesuré dans Chrome 157), et tout le monde ne la voit pas ; la foncer serait borné à 1,65:1 environ, où le lien
+tombe à 4,5:1. En couleurs forcées, Chrome retire les dégradés, et le cadre garde sa bordure (mesuré dans Chrome 157
+le 2026-11-22). À l'impression, le cadre ne défile plus : les caches restent sur les ombres, qui ne se voient pas
+(impression émulée dans Chrome 157, le 2026-11-22) ; la flèche et l'annonce des liens du tableau sont retirées.
+
+**Le focus dans le cadre** a une limite (#693, mesurée dans Chrome 157 sans interface, au clavier seul, sur
+`main` e8bbb5d2, le 2026-11-22) : au Tab, Chrome ne fait défiler le cadre que si le lien qui prend le focus en est
+entièrement sorti, et le centre alors ; un lien en partie visible laisse le cadre où il est. À 390 px, le cadre
+défilé au bout, le lien de la première ligne va de −138 à 130 px pour un cadre de 17 à 358 px ; à 320 px, sans
+défilement, il va de 81 à 349 px pour un cadre de 17 à 288 px. Une partie du lien et un côté de son anneau restent
+cachés ; l'anneau se voit sur ses autres côtés (WCAG 2.4.7). Les flèches font défiler le cadre, le focus restant sur
+le lien (à 390 px, le cadre revient au début). La déclaration d'accessibilité le dit dans ses limites connues.
+Écarté : `scroll-padding-inline` sur le cadre et `scroll-margin-inline` sur le lien, appliqués (16 px calculés),
+n'ont aucun effet au Tab sur un lien en partie visible ; ils déplacent `scrollIntoView` (mesuré en contrôle), que le
+site, sans JavaScript, n'appelle pas ; `scroll-padding-inline: 50%` ne ramène que le lien
+qui ne touche pas le milieu du cadre ; aimanter le cadre sur la colonne « Dépôt » tant qu'un lien a le focus
+(`:has(a:focus-visible)` et `scroll-snap-type: x mandatory`) ne tient pas à 320 px et bloque le défilement du
+cadre ; figer la colonne (`position: sticky`) change le défilement dans le cadre, décidé le 2026-11-14 (#596).
+Firefox et Safari ne sont pas mesurés ; le tableau d'[ally.js](https://allyjs.io/tests/scrolling/table.html) (non
+daté) rapporte le même comportement pour Gecko, Blink et WebKit.
 
 **L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
 *forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
@@ -314,14 +361,30 @@ Les gabarits sont lus dans le paquet. `tests/web/test_templates.py` vérifie qu'
 
 `web/static/site.css` n'emploie que des fonctions CSS Baseline « Widely available » (données web-features
 3.45.0, lues le 2026-11-11) : l'imbrication, les couches (`@layer`), les propriétés logiques, `:where()`,
-les unités `dvb` et la syntaxe d'intervalle des media queries. `text-wrap: balance`, « Newly available »,
-ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. Les trois largeurs des maquettes
+les unités `dvb` et la syntaxe d'intervalle des media queries ; les requêtes de conteneur, « Widely available »
+depuis le 2025-08-14 (web-features explorer, lu le 2026-11-21). `text-wrap: balance`, « Newly available »,
+ne fait qu'ajouter : un navigateur qui ne la connaît pas ne perd rien. De même `background-attachment: local`, « Widely
+available » par sa propre clé (web-features 3.47.0, lu le 2026-11-22), alors que la fonction `background-attachment`
+ne l'est plus depuis le 2026-01-29, à cause de `fixed` sur iOS : un navigateur qui ne la connaît pas ne montre pas
+d'ombre au bord du tableau des tendances. Les trois largeurs des maquettes
 (390, 820 et 1280 px) se lisent par deux seuils, `48rem` et `64rem`. Le formulaire du fil suit chacune
 (Sabine, 2026-11-11) : sur un téléphone, les sortes et les boutons radio en deux colonnes ; sur une tablette,
 les sortes en trois, et « Date de début » à droite des boutons radio ; sur un ordinateur, les sortes sur une
 ligne, et le champ de date après son libellé, sur la ligne des boutons radio. Les aides restent collées à leur
 libellé. Mesuré dans Chrome le 2026-11-11, il passe de 585 à 409 px de haut à 1280 px (334 px pour la
 maquette, sans les trois aides). Une page s'imprime sans en-tête, pied de page ni boutons (`@media print`).
+
+À fort zoom sur un petit écran, la mise en page s'adapte (#599) : sous 15em de la police du corps, soit 240 px à
+texte 100 %, jamais atteints dès 320 px, et 480 px à texte 200 %. Le corps est le conteneur de cette requête,
+nommé `body` (`@container body (inline-size < 15em)`) : l'`em` d'une requête de conteneur est la taille de police
+de son conteneur (CSS Conditional 5, 5.1), il suit donc le texte agrandi. Sans elle, aucune page ne débordait à
+14,5em et au-delà (mesuré le 2026-11-21). Les choix du fil passent en une colonne (Sabine, 2026-11-21), le titre
+des pages d'erreur prend la taille des autres titres sur un téléphone, en rem, et les marges (page, formulaire,
+cartes, champs, boutons) ne doublent plus avec le texte : un champ de date, qui ne peut être plus étroit que son
+jour et son calendrier sans les cacher, tient dans 320 px. La flèche d'un bouton (←, → et ↗) est liée à son mot
+par une espace insécable, dans un seul élément du bouton avec son libellé ; une marge lui rend l'espace qu'elle
+avait. Mesuré dans Chrome 157 le 2026-11-21, avec la police système de macOS : aucune des 24 pages de
+`tests/web/test_accessibility.py` ne défile en largeur, de 320 à 1280 px, à texte de 100 à 200 %.
 
 ## Accessibilité
 
@@ -342,19 +405,21 @@ qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 - aucune espace avant « : » ni « ; » dans le texte (règle de Sabine).
 
 Sur le fil (normal, page 2, vide et refusé), il vérifie aussi : un `label` pour chaque champ, un `fieldset` et
-sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément de la page, le message et
-`aria-invalid` d'un champ refusé, le résumé qui mène à chaque champ, les cartes en liste et leurs titres en
+sa `legend` pour chaque groupe, chaque `aria-describedby` qui nomme un élément de la page, le message d'un
+champ refusé, ouvert par « Erreur. », et son `aria-invalid`, le résumé qui mène à chaque champ et dit chaque
+message sans ce mot, les cartes en liste et leurs titres en
 `h2`, les titres en anglais marqués (`lang="en"`), la date de chaque carte en `<time>`, la pastille écrite en
 mots, et la pagination nommée.
 
 Sur les tendances (une fenêtre, un jour refusé, une fenêtre absente, la base vide), il vérifie : le `label` et
-l'aide du champ, le message et `aria-invalid` d'un jour refusé, la légende du tableau, un `th scope="col"`
+l'aide du champ, le message d'un jour refusé, ouvert par « Erreur. », et son `aria-invalid`, la légende du tableau, un `th scope="col"`
 par colonne et un `th scope="row"` par ligne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
 l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une région nommée par sa légende. Sur
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
-vérifie l'anneau de focus, la taille du lien d'évitement et la feuille d'impression.
+vérifie l'anneau de focus, la taille du lien d'évitement, les règles du fort zoom et la feuille d'impression.
+`tests/web/test_accessibility.py` vérifie aussi la flèche de chaque bouton liée à son mot.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement
 du texte, le clavier et le lecteur d'écran.

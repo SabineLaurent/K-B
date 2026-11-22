@@ -9,8 +9,9 @@
 <div class="field">
 <label for="window-end">Fenêtre se terminant le</label>
 <p id="window-end-help" class="field-help">Sans date: la fenêtre la plus récente.</p>
+{#- Erreur, as under a field of the feed (feed.html, field_error). -#}
 {% if trends.error %}
-<p id="window-end-error" class="field-error">{{ trends.error.message }}</p>
+<p id="window-end-error" class="field-error">Erreur. {{ trends.error.message }}</p>
 {% endif %}
 <input id="window-end" name="window_end" type="date" value="{{ trends.value }}" aria-describedby="{% if trends.error %}window-end-error {% endif %}window-end-help"{% if trends.error %} aria-invalid="true"{% endif %}>
 </div>

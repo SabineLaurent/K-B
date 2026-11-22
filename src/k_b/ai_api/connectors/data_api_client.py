@@ -12,6 +12,7 @@ from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
 
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.deadline import Deadline
+from k_b.ai_api.tracing import build_traceparent
 from k_b.ai_api.trajectories import RepositoryStars, StarWindow
 from k_b.ai_api.watch_items import (
     WATCH_KINDS,
@@ -34,6 +35,7 @@ from k_b.core.outbound import (
     open_http_client,
     read_bounded_body,
 )
+from k_b.core.trace_context import TRACEPARENT_HEADER
 from k_b.items import (
     TREND_REPOSITORY_NAME_MAX_LENGTH,
     Int64,
@@ -339,9 +341,16 @@ def send(
     as the error of httpx2 names the URL."""
     if deadline.is_passed():
         raise DataApiError("data_api_timeout")
+    # The trace of the request goes on in the data API, whose log lines carry its trace id.
+    traceparent = build_traceparent()
+    headers = {} if traceparent is None else {TRACEPARENT_HEADER: traceparent}
     try:
         with http_client.stream(
-            "GET", path, params=params, timeout=deadline.cap(http_client.timeout)
+            "GET",
+            path,
+            params=params,
+            headers=headers,
+            timeout=deadline.cap(http_client.timeout),
         ) as response:
             status = response.status_code
             try:

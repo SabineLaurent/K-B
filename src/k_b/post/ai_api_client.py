@@ -46,7 +46,7 @@ from k_b.core.retry_after import RETRY_AFTER_SECONDS
 from k_b.items import ItemKind, UtcDatetime
 
 AI_API_URL_VARIABLE = "KB_AI_API_URL"
-# The client KB_DIGEST of kb serve-ai: one value for both sides (README, "Changer une clé").
+# The client KB_DIGEST of kb serve-ai: one value for both sides (documentation/utilisation.md, "Changer une clé").
 DIGEST_KEY_VARIABLE = f"{AI_API_KEY_VARIABLE_PREFIX}{DIGEST_CLIENT}"
 DIGESTS_PATH = "digests"
 RETRY_AFTER_HEADER = "Retry-After"

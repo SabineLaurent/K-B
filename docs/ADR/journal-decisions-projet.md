@@ -7224,6 +7224,14 @@ points de revue tranchés par time-knight, sous la délégation de Sabine du 15/
   never sent back raw », `web/feed.py`). Limite assumée : Opquast 81 tenue en partie, la valeur ne revient pas dans
   le champ ; un jour valide que l'API refuserait (même règle `WrittenDay` que le site) vide aussi le champ, sans
   être nommé. — PR de #596
+  **Précisée le 2026-11-22** : le sélecteur de date envoie aussi une valeur que `WrittenDay` refuse. Dans Chrome 157,
+  une année de 5 ou 6 chiffres tapée au clavier part telle quelle (`window_end=20266-01-01`, frappes réelles du
+  2026-11-21) : une valeur refusée ne vient donc pas seulement d'une adresse écrite à la main. Elle n'est pas nommée,
+  et sa phrase dit la cause : « Date invalide: l’année a plus de 4 chiffres. » (décision de Sabine du 2026-11-22,
+  constat CR1 de la revue). Toute autre valeur qui n'a pas la forme d'un jour reçoit « Date invalide: choisissez un
+  jour dans le champ. ». La forme d'un jour est
+  désormais `DAY_FORM` d'`items.py`, qui remplace `DAY_SHAPE`, et un jour qui n'existe pas reçoit « Date invalide:
+  2026-02-30 n’existe pas. Choisissez un jour qui existe. » — PR de #590 et #617
 - **Le dépôt est l'en-tête de sa ligne (`th scope="row"`), en graisse normale ; les colonnes portent les mots de la
   maquette, « Étoiles gagnées » et « *Forks* gagnés ».** Tris de time-knight (relecture d'accessibilité). Pourquoi :
   RGAA 5.7, un lecteur d'écran annonce le dépôt avec chacun de ses comptes ; « gagnées » reste dit avec son
@@ -7614,6 +7622,136 @@ les jetons du modèle (#501) »).
   l'adresse est lisible par un lecteur du groupe de ressources, dans l'historique des déploiements et dans l'aperçu,
   comme celle de `budget-kb` ; elle est caviardée dans toute sortie et toute capture recopiées (décision de Sabine du
   2026-11-20). — PR #665
+
+## 2026-11-22
+
+### Site : l'ombre au bord du cadre du tableau des tendances (#618)
+
+Ce que la limite assumée de #596 (ci-dessus au 2026-11-14) proposait pour réduire son risque. Plan du 2026-11-19 ;
+les autres choix, tris de time-knight du 2026-11-22 (délégation du 15/10).
+
+- **Une ombre à chaque bord du cadre où le tableau continue, par quatre dégradés en fond, en CSS seul : deux ombres
+  fixées au cadre (`scroll`), deux caches de la couleur du cadre qui défilent avec le tableau (`local`).** Pourquoi : à
+  390 px, le cadre coupe juste entre « Dépôt » et les comptes, et une barre de défilement superposée (macOS, iOS)
+  n'apparaît qu'au défilement : rien ne disait que deux colonnes suivaient. La technique de Lea Verou (2012), citée par
+  l'issue, tient en une règle, sans élément ni script. Écartés (plan) : `container-type: scroll-state` et
+  `animation-timeline: scroll()`, pas Baseline. — PR de #618
+- **`background-attachment: local` est admis par sa propre clé web-features, Baseline « widely available » depuis le
+  2024-09-14, alors que la fonction `background-attachment` ne l'est plus depuis le 2026-01-29.** Précise la règle de
+  la feuille de style (ci-dessus, #562) sans l'inverser. Pourquoi : la fonction est déclassée par la seule valeur
+  `fixed`, sans effet sur iOS (`features/background-attachment.yml`, web-features 3.47.0, lu le 2026-11-22) ; `local`
+  est dans Safari et Safari iOS depuis 15.4 (browser-compat-data). Comme `text-wrap: balance`, elle ne fait qu'ajouter :
+  sans elle, les caches restent sur les ombres, et le tableau défile comme avant, sans ombre. — PR de #618
+- **L'ombre a la couleur des bordures de la charte (`--color-stone`), sans 3:1 à tenir.** Pourquoi : le texte du
+  tableau passe dessus et doit y garder 4,5:1 (WCAG 1.4.3 ; le lien y a 5,36:1) ; foncée, l'ombre serait bornée à
+  1,65:1 environ par le lien. WCAG 1.4.11 ne la soumet pas au 3:1 : ce qu'elle dit est aussi donné par la légende,
+  qui nomme les étoiles et les *forks* gagnés (Understanding 1.4.11, « The information is available in another
+  form », lu le 2026-11-22), et la charte classe `--color-stone` sur blanc en décor. La charte de Sabine reste telle
+  quelle (tri de time-knight du constat A1 du relecteur accessibilité : « L'ombre ne fonce pas : la charte de Sabine
+  reste telle quelle »). Écartée : une ombre foncée jusqu'à 1,65:1 environ, que le relecteur proposait en option.
+  Limite assumée : l'ombre est discrète,
+  1,36:1 au plus sombre (mesuré dans Chrome 157), et tout le monde ne la voit pas ; en couleurs forcées, le
+  navigateur la retire, et le cadre garde sa bordure. — PR de #618
+- **Chaque dégradé finit sur sa propre couleur rendue transparente, deux propriétés nouvelles de la charte
+  (`--color-card-clear`, `--color-stone-clear`), jamais sur `transparent`.** Pourquoi (tri de time-knight, constat
+  CR5 de la revue de code) : `transparent` est du noir transparent ; un moteur qui n'interpole pas en alpha
+  prémultiplié en ferait une bande grise sur un tableau qui tient, et un milieu d'ombre où le lien tomberait à 3,67:1.
+  Firefox interpole en prémultiplié depuis sa version 36 (bug 591600), mais un cas restait faux en 120 à 122 (bug
+  1869681, encore ouvert), et le cas « Premultiplied alpha » n'a été corrigé qu'en 137 (bug 1904106), lus le
+  2026-11-22. Peu coûteux, et sans dépendre d'aucune version. Écarté : garder `transparent` et l'écrire en limite. —
+  PR de #618
+- **Aucune règle d'impression pour l'ombre.** Revient sur le plan du 2026-11-19, qui la retirait à l'impression.
+  Pourquoi (tri de time-knight, constat CR1, sur mesure) : sur papier, le cadre ne défile plus, `local` s'y comporte
+  comme `scroll`, et les caches restent sur les ombres. En impression émulée dans Chrome 157, les captures avec et
+  sans la règle ne diffèrent que de 4 pixels, dans le texte d'un lien. Écarté : garder la règle, du code sans effet
+  dont la raison écrite était fausse. — PR de #618
+
+### Préproduction locale : compose, l'image de la production et PostgreSQL 18 (#419)
+
+Conception validée par Sabine le 2026-11-21 (« ok conception #419, clé du modèle », commentaire de conception de #419) ;
+écarts mineurs tranchés par time-knight (délégation de Sabine du 15/10) ; les points de sécurité et de données
+personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-essai du 2026-11-22 :
+`docs/preproduction-locale.md`.
+
+- **La préproduction locale se fait par compose : l'image du `Dockerfile` de la production, construite sur le poste
+  pour `linux/amd64`, et PostgreSQL 18.6, avec l'image et les réglages d'`initdb` de la CI.** Six services :
+  `postgres`, `api-donnees`, `api-ia`, et les jobs `create-db`, `collecte` et `import` dans le profil `jobs`.
+  Pourquoi : essayer une version dans les conteneurs de la production avant sa mise en ligne (I5 du plan de mise en
+  ligne du 06/11), sur la base des tests sur PostgreSQL. Écartés : le site, les autres jobs et le stockage d'échange,
+  que #419 ne nomme pas ; un job de CI qui lance compose, pour ses minutes d'Actions (tranché par time-knight). Un
+  test lit `compose.yaml` à chaque PR (`tests/test_compose_file.py`), et l'essai prouve le lancement. — PR de #419
+- **`sandbox` pour la seule API IA ; l'API de données en `production`, comme en ligne.** Pourquoi : l'API IA appelle
+  `http://api-donnees:8000`, que K-B n'admet qu'en `sandbox` (« API : `https` vers une API interne, `http` vers la
+  machine ou un service du compose (#473) », plus haut) ; l'API de données n'appelle personne, et en `sandbox` elle
+  servirait `/docs` et `/openapi.json` sans clé. Écarté : `sandbox` pour les deux API, celui de la conception, revu
+  après la revue de code du 2026-11-22 (tranché par time-knight). — PR de #419
+- **Un seul rôle, `kb`, superutilisateur du serveur et propriétaire de la base, créé par l'image de PostgreSQL ; la
+  base se crée par `kb create-db`.** Pourquoi : l'image crée `POSTGRES_USER` en superutilisateur, et
+  `kb migrate-database` donne les tables aux rôles des identités d'Azure, absents du compose (`src/k_b/cli.py`).
+  Écarté (Sabine, le 2026-11-22) : un rôle de lecture pour l'API de données, qui demanderait un script
+  d'initialisation monté dans `postgres` et une seconde URL de base. Limite assumée : l'API de données se connecte en
+  superutilisateur. Chaque connexion de son pool lit en `REPEATABLE READ READ ONLY` (`src/k_b/database/postgresql.py`),
+  ce qui protège d'une écriture par erreur du code de K-B, et l'API n'envoie que son propre SQL paramétré. — PR de
+  #419
+- **Un seul réseau, celui du projet compose.** Pourquoi : l'API IA n'a ni l'URL ni le mot de passe de la base, que son
+  modèle ne porte pas (`test_the_ai_api_holds_no_access_to_the_base`). Écarté (Sabine, le 2026-11-22) : deux
+  réseaux, un de plus à déclarer pour chaque service. — PR de #419
+- **`init: true` pour chaque service, sans revenir sur « Pas de processus d'init » du 2026-11-06 (#200) : l'image
+  reste sans init.** Pourquoi : le processus d'init transmet le signal d'arrêt à `kb` et récupère les processus fils,
+  et le critère de #419 le demande. Écarté : `kb` en PID 1, comme en ligne, qui essaierait l'arrêt de la production.
+  Limite assumée (revue de code du 2026-11-22) : l'arrêt essayé en préproduction n'est pas celui de `kb` en PID 1.
+  `kb serve-data` et `kb serve-ai` sortent en 143 ici, et une commande sans gestionnaire de SIGTERM s'y arrête, alors
+  qu'en ligne elle finit en SIGKILL. L'arrêt en ligne reste tenu par `COMMANDS_STOPPED_BY_SIGTERM` et
+  `tests/commands/test_sigterm.py`. — PR de #419
+- **Système de fichiers en lecture seule et `/tmp` en mémoire, plus stricts qu'en ligne.** Pourquoi : une écriture
+  hors du volume des données et de `/tmp` échoue ; seul `/tmp`, perdu à l'arrêt, s'écrit, ce qui vérifie la règle 4 de
+  `.claude/rules/poc.md` (aucun état hors de `KB_DATA_DIR`). Écarté : un système de fichiers inscriptible, comme en
+  ligne, qui laisserait passer une telle écriture (revue de code du 2026-11-22, tranché par time-knight). — PR de #419
+- **Les ressources : 0,5 CPU et 1 Gio par service `kb`, la combinaison des apps en ligne et de
+  `caj-kb-daily-routine` ; 1 CPU et 2 Gio pour la base, la taille du serveur en ligne (`Standard_B1ms`) ; 250 s
+  d'arrêt pour l'API IA, 20 s ailleurs.** Pourquoi : la base en ligne n'est pas une app, et la mesurer sur la moitié de
+  son serveur fausserait les délais (revue de code du 2026-11-22, tranché par time-knight) ; 250 s comme en ligne, la
+  plus longue demande que laisse passer l'entrée d'ACA (240 s) et une marge. Écartés : 0,5 CPU et 1 Gio pour la base,
+  ceux de la conception ; moins de 30 s d'arrêt partout, le texte de #419, qui couperait une demande de fiches.
+  Limite assumée : `create-db` a plus que `caj-kb-migrate-database` (0,25 CPU et 0,5 Gio). — PR de #419
+- **Aucune mesure ni trace vers Grafana Cloud : `compose.yaml` ne pose pas `KB_OTLP_*`.** Pourquoi : les demandes de
+  la préproduction ne se mêlent pas aux séries de la production (tranché par time-knight, 2026-11-22). Écarté :
+  l'export, qui les y mêlerait. — PR de #419
+- **Un fichier de secrets par service, ignoré par git, à côté de son modèle suivi ; un seul `.env.jobs` pour les trois
+  jobs.** Pourquoi : chaque API ne reçoit que ses secrets, et le modèle dit quoi remplir sans valeur ; un seul fichier
+  pour les jobs (tranché par time-knight, gardé par Sabine le 2026-11-22). Limite assumée : chaque job reçoit un
+  secret dont il ne se sert pas (`collecte` l'URL de la base, `create-db` et `import` le jeton GitHub). Dans le
+  how-to, une clé passe à `curl` par l'entrée standard, jamais par ses arguments, que `ps` montre (Sabine, le
+  2026-11-22). — PR de #419
+- **Pas de `.env.mac.example`.** Pourquoi : aucune commande `kb` du critère de fin de #419 ne se lance sur le poste
+  (conception validée par Sabine le 2026-11-21). Écarté : le modèle de l'issue pour les commandes du poste, sans
+  usage dans cette PR. — PR de #419
+- **Un essai finit par `docker compose down -v` et par le retrait de la réponse de `POST /digests` ; la préproduction
+  entre au registre des traitements.** Pourquoi : les volumes gardent la collecte réelle, données personnelles
+  comprises, et le compose n'a pas de `kb purge` (Sabine, le 2026-11-22 ; registre, « Préproduction locale (compose,
+  #419) »). Écarté : garder les volumes d'un essai au suivant, où ces données resteraient sans purge. — PR de #419
+
+### Documentation : le site publié à chaque fusion (#684)
+
+- **Le workflow `Docs` publie le site de `documentation/` sur GitHub Pages à chaque push sur `main`, donc à chaque
+  fusion, quand la variable de dépôt `PAGES_PUBLISH` vaut `true` ; il se lance toujours à la main, depuis `main`
+  seulement.** Revient sur l'entrée du 2026-11-14 (#167, « publié sur GitHub Pages à la main ») ; ce qui a changé :
+  la décision de Sabine du 2026-11-21 (« publication automatique », dans le périmètre de la PR du README, relayé par
+  tn-orchestrateur). Pourquoi : le site suit `main` sans qu'une exécution à la main soit oubliée (décision de Sabine
+  du 2026-11-21, pourquoi validé le 2026-11-22). La variable, choisie par le Second le 2026-11-21 (option A) : Pages
+  n'étant pas activé ce jour-là, le job `deploy` aurait échoué à chaque fusion ; sans elle, il est sauté
+  (`.github/workflows/docs.yml:33-35`, `:42-44`).
+  Options écartées : garder la publication à la main (une exécution oubliée laisse le site en retard sur `main`) ;
+  `queue: max`, qui garderait en file chaque déploiement en attente, car la documentation de GitHub ne le montre qu'au
+  niveau du workflow et `deploy` le porterait au niveau du job (non vérifié, tri du Second du 2026-11-22) ; retirer
+  `docs.yml` du contrôle de `deploy.yml`, déjà écarté le 2026-11-14 (un contrôle de sécurité de la livraison).
+  Limites assumées : `Docs` tourne désormais sur chaque commit de `main`, et `deploy.yml:59-67` refuse le tag d'un
+  commit dont l'exécution `Docs` a échoué ou a été annulée, jusqu'à sa relance ; un seul déploiement tourne
+  (`concurrency` `pages`, sans `cancel-in-progress`), et GitHub annule celui qui attend quand un plus récent arrive
+  (« By default, any existing pending job or workflow in the same concurrency group will be canceled », GitHub Docs,
+  « Control the concurrency of workflows and jobs », lu le 2026-11-22) : le site publié est celui de la dernière
+  fusion ; Pages est activé depuis le 2026-11-22 et la première publication faite à la main, et la publication à
+  chaque fusion attend que la variable soit posée (`documentation/accessibilite.md`, « Publier »). — PR de #684
 
 ## Décisions encore ouvertes
 

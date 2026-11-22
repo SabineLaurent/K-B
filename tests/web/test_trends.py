@@ -10,10 +10,10 @@ from trends_fixture import TRENDS, make_trends
 
 from k_b.web.data_api_client import TREND_WINDOW, DataApiError
 from k_b.web.feed import FieldError
+from k_b.web.french_dates import write_count
 from k_b.web.trends import (
     TRENDS_PATH,
     WINDOW_END_ID,
-    WINDOW_END_REFUSED,
     WINDOW_END_REFUSED_BY_API,
     TrendsForm,
     build_missing_window_page,
@@ -22,10 +22,11 @@ from k_b.web.trends import (
     find_api_window_end_error,
     find_window_start,
     read_trends_form,
-    write_count,
 )
 
 NARROW_NO_BREAK_SPACE = chr(0x202F)
+NOT_A_DAY = "Date invalide: choisissez un jour dans le champ."
+REFUSED = FieldError(WINDOW_END_ID, NOT_A_DAY)
 
 
 def read(query):
@@ -56,6 +57,8 @@ def test_a_day_is_read_as_the_last_day_of_its_window():
         "2026-10-10%01",
         # A digit of full width, which Python reads as a digit.
         "%EF%BC%92026-10-10",
+        # 7 digits, which no field sends: HTML stops at the year 275760.
+        "2026666-01-01",
     ],
     ids=[
         "without-dashes",
@@ -65,13 +68,14 @@ def test_a_day_is_read_as_the_last_day_of_its_window():
         "long",
         "control",
         "full-width-digit",
+        "seven-digit-year",
     ],
 )
 def test_a_value_that_is_not_a_day_is_refused_on_its_field(value):
-    """The rule of the route of the data API, WrittenDay: YYYY-MM-DD, a day that exists."""
-    assert read(f"window_end={value}") == TrendsForm(
-        None, FieldError(WINDOW_END_ID, WINDOW_END_REFUSED)
-    )
+    """The rule of the route of the data API, WrittenDay: YYYY-MM-DD, a day that exists. The
+    message gives no format, which the field shows as its browser does (Opquast 2025, rule 80;
+    #617)."""
+    assert read(f"window_end={value}") == TrendsForm(None, REFUSED)
 
 
 @pytest.mark.parametrize("value", ["2026-02-30", "2026-13-01", "0000-01-01"])
@@ -85,9 +89,19 @@ def test_a_value_of_the_form_of_a_day_that_does_not_exist_is_named_in_its_messag
         None,
         FieldError(
             WINDOW_END_ID,
-            f"Date invalide: {value} n’existe pas. Un jour attendu, sous la forme"
-            " AAAA-MM-JJ.",
+            f"Date invalide: {value} n’existe pas. Choisissez un jour qui existe.",
         ),
+    )
+
+
+@pytest.mark.parametrize("value", ["20266-01-01", "202666-12-31", "20266-02-30"])
+def test_a_year_of_5_or_6_digits_is_said_in_its_message(value):
+    """The one refusal a browser sends: Chrome lets type a year of 5 or 6 digits in an input
+    type=date. The message says the nature of the error (Opquast 2025, rule 80), without the
+    value."""
+    assert read(f"window_end={value}") == TrendsForm(
+        None,
+        FieldError(WINDOW_END_ID, "Date invalide: l’année a plus de 4 chiffres."),
     )
 
 
@@ -115,7 +129,13 @@ def test_a_window_of_three_days_starts_two_days_before_its_last_day(end, start):
 
 @pytest.mark.parametrize(
     ("count", "text"),
-    [(0, "0"), (999, "999"), (1500, "1 500"), (1_234_567, "1 234 567")],
+    [
+        (0, "0"),
+        (999, "999"),
+        (1000, "1 000"),
+        (1500, "1 500"),
+        (1_234_567, "1 234 567"),
+    ],
 )
 def test_a_count_is_grouped_by_thousands_with_a_narrow_no_break_space(count, text):
     assert write_count(count) == text.replace(" ", NARROW_NO_BREAK_SPACE)
@@ -146,10 +166,10 @@ def test_the_field_shows_the_last_day_of_the_window_shown():
 
 def test_a_day_refused_is_never_shown_again():
     """A value of an input type=date is a valid day or nothing (WHATWG; RGAA 8.2)."""
-    page = build_refused_page(FieldError(WINDOW_END_ID, WINDOW_END_REFUSED))
+    page = build_refused_page(REFUSED)
 
     assert (page.value, page.table) == ("", None)
-    assert page.error == FieldError(WINDOW_END_ID, WINDOW_END_REFUSED)
+    assert page.error == REFUSED
 
 
 def test_a_window_absent_says_its_day_and_leads_to_the_latest():
@@ -177,7 +197,7 @@ def test_each_state_has_a_title_of_its_own():
     """RGAA 8.6; WCAG 2.4.2."""
     assert [
         build_trends_page(read_window(TRENDS)).title,
-        build_refused_page(FieldError(WINDOW_END_ID, WINDOW_END_REFUSED)).title,
+        build_refused_page(REFUSED).title,
         build_missing_window_page(date(2026, 10, 11)).title,
         build_missing_window_page(None).title,
     ] == [

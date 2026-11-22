@@ -28,7 +28,7 @@ trend-report:
 	uv run --env-file $(ENV_FILE) kb trend-report
 
 # On the Mac, once az login --tenant <tenant> is done: each sheet of the container watch that veille
-# lacks is copied there, none replaced (README, "Les fiches en ligne sur le Mac").
+# lacks is copied there, none replaced (documentation/utilisation.md, "Les fiches publiées en ligne...").
 download-watch-sheets:
 	uv run --env-file $(ENV_FILE) kb download-watch-sheets
 
@@ -66,7 +66,7 @@ test-cov:
 	mkdir -p -m 700 reports
 	uv run pytest --cov --cov-report=term-missing:skip-covered --cov-report=markdown:reports/coverage.md
 
-# The sandbox of the alerts of the model (documentation/monitoring_pour_docu.md): four scenarios on
+# The sandbox of the alerts of the model (documentation/monitorage.md): four scenarios on
 # the replay, their measures sent to Grafana Cloud, labelled sandbox, by KB_OTLP_ENDPOINT and
 # KB_OTLP_HEADERS of the .env of the end-to-end tests. About 3 minutes; from a terminal without .env
 # exported, as every end-to-end test.

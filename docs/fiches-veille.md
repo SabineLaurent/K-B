@@ -675,8 +675,8 @@ de la requête.
   l'API de données ([specs-api.md](specs-api.md), « Accès par clé ») et le même module
   (`core/api_keys.py`, `core/api_access.py`) ; `kb digest` (#209) est le client `KB_DIGEST`,
   `kb trend-report` (#366) le client `KB_TREND_REPORT` ([tendances.md](tendances.md)). Sans
-  clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans le `README.md`
-  (« Changer une clé »).
+  clé valide, 401 `invalid_api_key`. La clé est fixe ; sa rotation est dans
+  `documentation/api-ia.md` (« Expiration et changement d'une clé »).
 - **Une route, un client** (OWASP API5:2023) : `POST /digests` s'ouvre à `KB_DIGEST` seul,
   `POST /trend-reports` à `KB_TREND_REPORT` seul (`AI_API_CLIENT_BY_ROUTE`, `core/config.py`). Tout
   autre client à clé valide reçoit 403 `client_not_allowed` ; une route absente de la table est refusée
@@ -1094,7 +1094,8 @@ limite. Aucune entrée n'est non tenue.
   - limitation des essais et défenses contre les attaques automatisées : écart voulu, justifié,
     c'est l'anti-force brute ci-dessous ;
   - transport sous TLS : tenu en ligne ; sur la machine, `http` sur `127.0.0.1`, joignable de la
-    machine seule (API8, « TLS, même pour une API interne ») ;
+    machine seule ; dans la préproduction locale, `http` sur le réseau du projet compose, en `sandbox`
+    seulement (API8, « TLS, même pour une API interne ») ;
   - authentification TLS mutuelle entre programmes : non appliquée, écart voulu, justifié. Elle
     n'est pas nécessaire : ACA la propose pour un client du dehors (« When your apps are
     communicating with a client outside of the environment, two-way authentication with mTLS is
@@ -1106,7 +1107,7 @@ limite. Aucune entrée n'est non tenue.
     (`infra/modules/container-apps-environment.bicep:32-36`) : l'autorisation reste à la clé et au
     droit par route. Le mTLS de l'environnement, `peerAuthentication.mtls`, reste désactivé
     (`infra/modules/container-apps-environment.bicep:38-42`). Son entrée est interne
-    (`infra/modules/api-container-app.bicep:74-80`), aucune route HTTP de l'environnement ne la vise
+    (`infra/modules/api-container-app.bicep:118-124`), aucune route HTTP de l'environnement ne la vise
     (API8, « TLS, même pour une API interne »), et seuls les apps et les jobs de l'environnement
     l'atteignent : trois apps, les deux API et le site, et quatre jobs (`infra/deployment.json`). Deux
     jobs l'appellent : `caj-kb-smoke-test`, sur `/health` et, par le code de #499, avec ses sondes sans clé ; et
@@ -1128,14 +1129,14 @@ limite. Aucune entrée n'est non tenue.
 
   La section « API Keys » de la REST Security Cheat Sheet, que la fiche ne cite pas, est tenue :
   clé exigée sur chaque point d'accès protégé, 429 au-delà du débit (#400), clé jamais dans l'URL,
-  révocation par rotation (`README.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
+  révocation par rotation (`documentation/utilisation.md`, « Changer une clé »). Elle demande de ne pas s'en remettre
   à la seule clé pour une ressource de valeur : la clé s'ajoute au droit par route, au débit et à
   l'écoute sur `127.0.0.1`, et en ligne à l'entrée interne (TLS mutuel, ci-dessus).
 - **Anti-force brute, plus strict que la limite de débit** : non appliqué, écart voulu, justifié
   (décision de Sabine du 2026-11-05). La limite de débit ne compte que les clients à clé valide ;
   les essais de clé ne sont pas limités. Il n'est pas nécessaire :
-  - la recherche exhaustive d'une clé est impraticable. La commande du `README.md`
-    (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
+  - la recherche exhaustive d'une clé est impraticable. La commande de
+    `documentation/api-ia.md` (`secrets.token_urlsafe(32)`) génère une clé de 256 bits ; le code n'en contrôle que le
     minimum, 32 caractères de l'alphabet, soit 192 bits. Le NIST définit sa catégorie 5, la plus
     haute face à un ordinateur quantique, par la recherche d'une clé AES de 256 bits (NIST IR
     8547, tableau 1), et juge que doubler la longueur d'une clé suffit contre l'algorithme de
@@ -1149,8 +1150,8 @@ limite. Aucune entrée n'est non tenue.
 
   **Limite** : une clé qui n'est pas tirée au hasard (le code contrôle sa longueur et son alphabet,
   pas son hasard), ou une entrée externe, qui ouvrirait les essais au réseau.
-  **Pour réduire le risque** : tirer chaque clé par la commande du `README.md`, et la changer
-  (« Changer une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
+  **Pour réduire le risque** : tirer chaque clé par la commande de `documentation/api-ia.md`, et la
+  changer (« Expiration et changement d'une clé ») dès qu'elle a pu fuir ; garder l'entrée interne (TLS mutuel,
   ci-dessus).
 
   **Pour la tenir**, si la limite est franchie : compter les 401 par adresse de client et rendre 429
@@ -1273,7 +1274,7 @@ limite. Aucune entrée n'est non tenue.
     « Limite »), une réponse du modèle de 1 000 000 d'octets au plus (#399). Dans la vie d'une réplique,
     l'ordre de grandeur que permettent les limites de débit, au prix de sortie (12 $ par million de jetons
     pour gpt-6.1-sol, le plus cher) et sur les estimations de pire cas de la doc : 20 demandes de fiches × 420
-    000 jetons (`README.md`), environ 100 $, et 20 comptes rendus × 80 000 jetons
+    000 jetons (`documentation/produit.md`), environ 100 $, et 20 comptes rendus × 80 000 jetons
     ([tendances.md](tendances.md)), environ 19 $. En ligne, ce n'est pas un plafond par jour : avec
     `minReplicas: 0`, une réplique s'arrête 300 s après la dernière requête (« Cool down period is how long
     after the last event KEDA waits before the application scales down to its minimum replica count. », 300
@@ -1458,9 +1459,13 @@ dépend que du code garde son état et sa preuve.
   scannerait `main` sans attendre une PR : faisables avec nos droits, le second sur les minutes du
   compte.
 - **TLS, même pour une API interne** : tenue en ligne ; sur la machine, l'API IA sert en `http` sur
-  `127.0.0.1`, joignable de la machine seule.
+  `127.0.0.1`, joignable de la machine seule. Dans la préproduction locale, elle sert en `http` dans son
+  conteneur, sur le réseau du projet compose, et se joint depuis le poste par son port publié sur
+  `127.0.0.1` ; elle appelle l'API de données en `http` sur le réseau du compose, ce que seul `sandbox`
+  permet (`find_internal_api_url_refusal`, `core/outbound.py` ;
+  [preproduction-locale.md](preproduction-locale.md)).
   - Les deux API n'ont qu'une entrée interne, en HTTPS (`external: false`, `allowInsecure: false`,
-    `infra/modules/api-container-app.bicep:74-80`) : « Internal: Makes the app's own fully qualified
+    `infra/modules/api-container-app.bicep:118-124`) : « Internal: Makes the app's own fully qualified
     domain name (FQDN) directly reachable only from within the same Container Apps environment, such
     as from other container apps. » (page de l'entrée, relue le 2026-11-10). La documentation de
     l'entrée nomme une seule exception, une route HTTP de l'environnement qui viserait l'app : il
@@ -1632,18 +1637,23 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   - Front Door Premium avec son WAF, par Private Link, sur un environnement « workload profiles ».
 - **Pas de données de production hors production** : tenue. La production tourne en ligne depuis
   `v0.1.0` (tag du 2026-11-08). Hors production, les deux API tournent sur la machine de Sabine, sur
-  une base que `kb collect` et `kb import` remplissent des mêmes sources (`README.md`, « Le POC du
-  25/10 et la suite ») : des données de la même sorte. La mesure demande alors le même traitement
+  une base que `kb collect` et `kb import` remplissent des mêmes sources (`documentation/utilisation.md`,
+  « La base et le brut ») : des données de la même sorte. La mesure demande alors le même traitement
   que la production (« If this is unavoidable, these endpoints should get the same security
   treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
   le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:34`), une clé exigée par client
-  et refusée au démarrage si elle manque à la règle, les mêmes limites. Trois différences. Deux sont
-  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule (API8, « TLS, même pour une API
+  et refusée au démarrage si elle manque à la règle, les mêmes limites. Quatre différences. Deux sont
+  sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule, et, dans la préproduction
+  locale, sur le réseau du projet compose (API8, « TLS, même pour une API
   interne ») ; `/docs` et `/openapi.json` sans clé quand `KB_DEPLOYMENT_ENVIRONMENT` vaut `sandbox`
   (« Documentation réservée aux utilisateurs autorisés »). La troisième porte des données :
   `KB_TRACE_CONTENT=all`, refusé en production seulement
   (`ai_api/connectors/metrics_export.py:186-187`), enverrait de la machine le contenu des appels au
-  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`).
+  modèle à Grafana Cloud, données personnelles comprises (règle 5 de `.claude/rules/poc.md`). La
+  quatrième tient à l'environnement d'essai de la préproduction locale : l'API de données y lit la base
+  sous le rôle `kb`, superutilisateur du serveur, et non sous `kb_reader` comme en ligne ; chaque
+  connexion de son pool lit en `READ ONLY`, ce qui protège d'une écriture par erreur du code de K-B, et
+  l'API n'envoie que son propre SQL paramétré (journal ADR, 2026-11-22, « Préproduction locale »).
   **Limite** : une base de la machine servie au-delà de `127.0.0.1` ; `KB_TRACE_CONTENT` à `all` ou
   `anomalies` sur la machine.
   **Pour réduire le risque** : garder les hôtes d'écoute par défaut, `127.0.0.1`
@@ -1913,8 +1923,8 @@ mesures non envoyées d'un arrêt pendant une demande seraient perdues ; le dél
 conteneur relève de #200. La télémétrie native de FastAPI (traces, métriques HTTP, journaux) est
 coupée dans les deux API (`core/api_telemetry.py`) : avec `FASTAPI_OTEL_AUTO_CONFIGURE=true`, elle
 poserait ses propres fournisseurs, et une trace de l'API de données porterait la requête brute d'un
-client. Les traces de `POST /digests` sont décrites ci-dessous ; le `traceparent` envoyé à l'API de
-données, et le `trace_id` dans les lignes de journal, restent l'objet de #281.
+client. Les traces de `POST /digests` sont décrites ci-dessous, avec le `traceparent` envoyé à l'API de
+données et le `trace_id` des lignes de journal (#281).
 
 ### Traces de `POST /digests` (#345)
 
@@ -1923,7 +1933,10 @@ raison de chaque affirmation retirée. Elles servent à suivre une demande étap
 sable, et à comprendre une anomalie en production. Les spans et les évaluations ne portent aucun
 texte : ni consigne, ni item, ni réponse du modèle. Le contenu d'un appel au modèle part à côté,
 sous réglage, dans un enregistrement à part (#347, « Contenu d'un appel au modèle » ci-dessous ;
-exception de la règle 5 de `poc.md`).
+exception de la règle 5 de `poc.md`). L'identifiant de la trace est celui de la demande, que l'API IA tire pour
+chacune, un `traceparent` reçu ignoré : chaque ligne de journal de la demande le porte (`trace_id=`), et l'API IA
+l'envoie à l'API de données dans l'en-tête `traceparent`, dont les lignes le portent aussi (#281,
+`core/trace_context.py`, `connectors/trace_export.py`, `RequestTraceIdGenerator`).
 
 ```
 POST /digests            SERVER   http.request.method, http.route, http.response.status_code, error.type, k_b.request_id
@@ -2413,7 +2426,7 @@ tronqué et échappé (règle 3 de `conventions.md`).
   Obsidian n'affiche pas un fichier caché. La fiche de ce jour est alors refusée
   (`temporary_file_found`) jusqu'à ce que le temporaire soit retiré à la main ; celle du lendemain a
   son propre nom. Pour les tops, le relevé est gardé et la même fiche réessayée : le top échoue à
-  chaque lancement (README, « `kb write-tops` »).
+  chaque lancement (`documentation/utilisation.md`, « Écrire les fiches des tops »).
 - **Un dossier remplacé par un lien** entre le dernier contrôle et l'écriture y fait écrire hors du
   coffre (CWE-59 ; limite acceptée par Sabine le 2026-11-10, registre, fiche 1, « Sécurité »). Seul
   un processus qui a déjà le compte de l'utilisatrice le peut ; un texte de source ou du modèle ne

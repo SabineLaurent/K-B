@@ -17,7 +17,7 @@ from k_b.core.config import (
     DATA_API_MAX_SEARCH_LENGTH,
     FEED_PAGE_SIZE,
 )
-from k_b.items import NonEmptyText, WrittenDay
+from k_b.items import DAY_FORM, NonEmptyText, WrittenDay
 from k_b.web.data_api_client import (
     FEED_KINDS,
     DataApiError,
@@ -30,7 +30,7 @@ from k_b.web.data_api_client import (
     FeedRelease,
     FeedVulnerability,
 )
-from k_b.web.french_dates import write_day
+from k_b.web.french_dates import write_count, write_day
 from k_b.web.received_text import clean_received_text, clean_received_value
 
 FEED_PATH = "/"
@@ -83,6 +83,9 @@ MAX_PAGE = DATA_API_MAX_OFFSET // FEED_PAGE_SIZE + 1
 # The form input type=date sends, a day that exists: the rule of the routes of the data API
 # (items.py); another value is refused, never guessed.
 WRITTEN_DAY: TypeAdapter[date] = TypeAdapter(WrittenDay)
+# A day of a year of 5 or 6 digits, which Chrome lets type in an input type=date and sends: HTML
+# stops at the year 275760.
+LONG_YEAR_DAY = re.compile(r"[0-9]{5,6}-[0-9]{2}-[0-9]{2}")
 # The rule of the data API for q: neither a NUL nor a lone surrogate.
 SEARCH_TEXT: TypeAdapter[str] = TypeAdapter(NonEmptyText)
 
@@ -90,7 +93,8 @@ SEARCH_REFUSED_BY_API = "La base de K-B refuse cette recherche: modifiez-la."
 KIND_REFUSED = "Sorte inconnue: cochez une ou plusieurs des cinq sortes."
 PERIOD_REFUSED = "Période inconnue: choisissez 1, 3 ou 7 jours, ou une date."
 START_MISSING = "Indiquez la date de début, ou choisissez 1, 3 ou 7 jours."
-START_REFUSED = "Date de début invalide: un jour attendu, sous la forme AAAA-MM-JJ."
+# The start field, as a message of a day refused names it.
+START_IN_MESSAGES = "Date de début"
 SEARCH_CONTROL_REFUSED = "La recherche contient un caractère de contrôle refusé."
 
 
@@ -189,8 +193,9 @@ class FeedListing:
     title: str
     line: str
     cards: tuple[FeedCard, ...]
-    page: int
+    page_text: str
     pages: int
+    pages_text: str
     previous_link: str | None
     next_link: str | None
     # What the feed without item proposes: 7 days, from a shorter period.
@@ -254,7 +259,7 @@ def find_start_error(start: str) -> FieldError | None:
     if not start:
         return FieldError(START_ID, START_MISSING)
     if read_written_day(start) is None:
-        return FieldError(START_ID, START_REFUSED)
+        return FieldError(START_ID, write_day_refusal(START_IN_MESSAGES, start))
     return None
 
 
@@ -265,6 +270,23 @@ def read_written_day(value: str) -> date | None:
         return WRITTEN_DAY.validate_python(value)
     except ValidationError:
         return None
+
+
+def write_day_refusal(field_in_messages: str, value: str) -> str:
+    """The message of a value WrittenDay refused, which names a value of the form of a day only,
+    ASCII digits and dashes: an input type=date cannot show it again (Opquast 2025, rule 81), and no
+    other text received reaches the page."""
+    # No format: the field shows the day as its browser does (Opquast 2025, rule 80). Of the form
+    # of a day and refused by WrittenDay, the value is a day that does not exist.
+    if DAY_FORM.fullmatch(value):
+        return (
+            f"{field_in_messages} invalide: {value} n’existe pas."
+            " Choisissez un jour qui existe."
+        )
+    # A year of 5 or 6 digits, the one refusal Chrome sends: its cause said, the value not named.
+    if LONG_YEAR_DAY.fullmatch(value):
+        return f"{field_in_messages} invalide: l’année a plus de 4 chiffres."
+    return f"{field_in_messages} invalide: choisissez un jour dans le champ."
 
 
 def is_control_character(character: str) -> bool:
@@ -281,7 +303,8 @@ def find_search_error(q: str) -> FieldError | None:
     if len(q) > DATA_API_MAX_SEARCH_LENGTH:
         return FieldError(
             SEARCH_ID,
-            f"La recherche fait {len(q)} caractères: {DATA_API_MAX_SEARCH_LENGTH} au plus.",
+            f"La recherche fait {write_count(len(q))} caractères:"
+            f" {DATA_API_MAX_SEARCH_LENGTH} au plus.",
         )
     if not q:
         return None
@@ -365,13 +388,18 @@ def build_listing(
 ) -> FeedListing:
     """The page of the feed of a form without error, page at most count_pages(total)."""
     pages = count_pages(total)
+    page_text = write_count(page)
+    pages_text = write_count(pages)
     is_shorter = form.period in DAYS_BY_PERIOD and form.period != WIDER_PERIOD
     return FeedListing(
-        title=f"Quoi de neuf, page {page} sur {pages}" if total else NO_ITEM_TITLE,
+        title=f"Quoi de neuf, page {page_text} sur {pages_text}"
+        if total
+        else NO_ITEM_TITLE,
         line=write_results_line(total, query.since_day, page, pages),
         cards=tuple(build_card(item) for item in items),
-        page=page,
+        page_text=page_text,
         pages=pages,
+        pages_text=pages_text,
         previous_link=f"{build_page_link(form, page - 1)}#{RESULTS_ID}"
         if page > 1
         else None,
@@ -390,10 +418,10 @@ def write_results_line(total: int, since_day: date, page: int, pages: int) -> st
     day = write_day(since_day)
     if total == 0:
         return f"Aucun item depuis le {day}."
-    items = "1 item" if total == 1 else f"{total} items"
+    items = "1 item" if total == 1 else f"{write_count(total)} items"
     return (
         f"{items} depuis le {day}, du plus récent au plus ancien."
-        f" Page {page} sur {pages}, {FEED_PAGE_SIZE} items par page."
+        f" Page {write_count(page)} sur {write_count(pages)}, {FEED_PAGE_SIZE} items par page."
     )
 
 

@@ -303,9 +303,9 @@ En ligne, l'API IA est l'app `ca-kb-ai-api`. Elle lance `kb serve-ai` depuis l'i
 
 **Ce qui appelle l'API IA en ligne.** Au commit `56d013b`, seul le job `caj-kb-smoke-test` l'appelle, et seulement
 par `GET /health` (`commands/smoke_test_command.py:118-127`, `infra/deployment.json`). La commande
-`kb digest-watch` existe (`commands/digest_watch_command.py` ; [README](../README.md), paragraphe « Les commandes
-des jobs planifiés ») : elle réveille les deux API par `GET /health`, lance `kb digest`, les réveille de nouveau,
-lance `kb trend-report`, puis publie `veille/` (même paragraphe du README). Depuis #423, d'après le code de sa PR, son
+`kb digest-watch` existe (`commands/digest_watch_command.py` ; [Utiliser K-B](../documentation/utilisation.md),
+section « Les jobs planifiés ») : elle réveille les deux API par `GET /health`, lance `kb digest`, les réveille de nouveau,
+lance `kb trend-report`, puis publie `veille/` (même section). Depuis #423, d'après le code de sa PR, son
 job, `caj-kb-digest-watch`, est déclaré dans `infra/` (`infra/modules/digest-watch-job.bicep`, `infra/deployment.json`)
 et la lance le lundi et le jeudi à 10:00 UTC, par le nom interne de l'API IA, en HTTPS, avec les clés des clients
 `KB_DIGEST` et `KB_TREND_REPORT` ([infra/README.md](../infra/README.md), « Les comptes rendus en ligne »).

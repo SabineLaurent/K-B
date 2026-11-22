@@ -3,7 +3,7 @@
    by light-dark(): Material sets color-scheme to light or dark with the scheme. The charter has no dark variant: the
    dark mode takes its colours where they exist, and adds --kb-night and the dark colours of Material's highlighted
    code. The ratio of each text on its background
-   is in documentation/accessibilite_pour_docu.md, « Les contrastes du thème ». Material declares its colours on
+   is in documentation/accessibilite.md, « Les contrastes du thème ». Material declares its colours on
    [data-md-color-scheme]: these declarations come after its own, with the same weight. */
 /* A browser without light-dark() (before Chrome 123, Firefox 120, Safari 17.5) skips this block and keeps the colours
    of Material: a colour written by light-dark() would be invalid there, and the white text of the header would stand
@@ -63,12 +63,12 @@
 
 /* The page wider, and the menu with it, so a title of the menu fits on fewer lines. */
 .md-grid {
-  max-inline-size: 70rem;
+  max-inline-size: 73rem;
 }
 
 @media screen and (width >= 76.25em) {
   .md-sidebar--primary {
-    inline-size: 15rem;
+    inline-size: 18rem;
 
     /* Material holds the menu at 11.5rem by a padding on its end side, whatever the width of its bar. */
     & .md-sidebar__inner {
@@ -206,4 +206,30 @@
    ones typed elsewhere in the sheets, with the same inner space. */
 .md-typeset q {
   quotes: "« " " »";
+}
+
+/* The text of the menu and of a table at the size of the text of the page, .8rem: Material sets the menu at .7rem and
+   a table at .64rem. Inherited, the text of a table also follows the page in print, where the theme sets it at .68rem;
+   the menu, at its .8rem, is also the size Material gives it on a narrow screen. */
+.md-nav {
+  font-size: 0.8rem;
+}
+
+.md-typeset table:not([class]) {
+  font-size: inherit;
+}
+
+/* « K-B », and in a table a date and each word of the code, kept on one line (documentation/javascripts/nowrap.js). */
+.kb-nowrap {
+  white-space: nowrap;
+}
+
+/* The skip link out of the screen until it has the focus, opaque, rather than transparent as Material sets it (WebAIM,
+   « Skip Navigation Links »): its text keeps its colours, and the focus brings it back where Material shows it. */
+.md-skip {
+  opacity: 1;
+}
+
+.md-skip:not(:focus) {
+  inset-inline-start: -10000px;
 }

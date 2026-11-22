@@ -1,6 +1,9 @@
 {%- macro field_error(field) -%}
+{#- Erreur says the error without a colour: the colour alone told the message from its label
+(RGAA 3.1, WCAG 1.4.1), and forced colors replace it (RGAA 11.10). The summary, under its own
+title, says the messages without it. -#}
 {%- if field in error_by_field %}
-<p id="{{ field }}-error" class="field-error">{{ error_by_field[field] }}</p>
+<p id="{{ field }}-error" class="field-error">Erreur. {{ error_by_field[field] }}</p>
 {%- endif -%}
 {%- endmacro -%}
 {%- macro invalid(field) -%}
@@ -70,7 +73,7 @@
 {% if listing %}
 <p id="{{ results_id }}" class="results-line" tabindex="-1">{{ listing.line }}</p>
 {% if listing.has_unlisted_items %}
-<p class="results-note">Au-delà de la page {{ listing.pages }}, les items ne sont pas servis: affinez les filtres pour les lire.</p>
+<p class="results-note">Au-delà de la page {{ listing.pages_text }}, les items ne sont pas servis: affinez les filtres pour les lire.</p>
 {% endif %}
 {% if listing.cards %}
 {#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
@@ -90,9 +93,9 @@
 {% endif %}
 {% if listing.pages > 1 %}
 <nav class="pagination" aria-label="Pagination">
-{% if listing.previous_link %}<a class="button-secondary" href="{{ listing.previous_link }}" rel="prev"><span aria-hidden="true">←</span> Page précédente</a>{% endif %}
-<p class="pagination-current">Page {{ listing.page }} sur {{ listing.pages }}</p>
-{% if listing.next_link %}<a class="button-secondary" href="{{ listing.next_link }}" rel="next">Page suivante <span aria-hidden="true">→</span></a>{% endif %}
+{% if listing.previous_link %}<a class="button-secondary" href="{{ listing.previous_link }}" rel="prev"><span><span class="arrow-start" aria-hidden="true">←&nbsp;</span>Page précédente</span></a>{% endif %}
+<p class="pagination-current">Page {{ listing.page_text }} sur {{ listing.pages_text }}</p>
+{% if listing.next_link %}<a class="button-secondary" href="{{ listing.next_link }}" rel="next"><span>Page suivante<span class="arrow-end" aria-hidden="true">&nbsp;→</span></span></a>{% endif %}
 </nav>
 {% endif %}
 {% endif %}

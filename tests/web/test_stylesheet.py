@@ -8,7 +8,10 @@ from importlib.resources import files
 import pytest
 
 STYLESHEET = (files("k_b.web") / "static" / "site.css").read_text(encoding="utf-8")
-CUSTOM_PROPERTY = re.compile(r"(--[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{6})\s*;")
+# A colour of the chart, opaque, or made transparent by its last two digits.
+CUSTOM_PROPERTY = re.compile(
+    r"(--[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{6}(?:[0-9A-Fa-f]{2})?)\s*;"
+)
 DECLARATION = re.compile(r"(?<![-\w])([a-z-]+)\s*:\s*([^;{}]+);")
 # The pairs of the chart (planche « Charte graphique ») the stylesheet uses, and their minimum: 4.5
 # for a text, 3 for a component of the interface (WCAG 2.1, 1.4.3 and 1.4.11).
@@ -29,9 +32,12 @@ PAIRS = [
     ("--color-alert-deep", "--color-card", 4.5),
     ("--color-alert-deep", "--color-paper", 4.5),
     ("--color-field-border", "--color-card", 3),
-    # The banner of an item in the CISA KEV catalog: its title and its text on its background.
+    # The banner of an item in the CISA KEV catalog and the summary of the errors: their title, their
+    # text and the links of the summary on their background.
     ("--color-alert-deep", "--color-alert-wash", 4.5),
     ("--color-alert-ink", "--color-alert-wash", 4.5),
+    # The focus ring of a link of the summary of the errors, on its pale peach.
+    ("--color-teal", "--color-alert-wash", 3),
     # The packages of an advisory, each in its chip.
     ("--color-ink", "--color-chip", 4.5),
     # A card under the pointer or holding the focus: its texts and its links, visited or hovered,
@@ -307,6 +313,22 @@ def test_the_banner_and_the_packages_have_the_colours_of_their_mockups(
     assert declaration in strip_nested_rules(read_rule(selector))
 
 
+def test_the_summary_of_the_errors_is_framed_as_the_box_of_the_chart():
+    """Planche « Charte graphique », the box « Couleur signalée » (Sabine, 2026-11-22): bordered in
+    rust, on pale peach, its title in deep rust and its text, the bullets, in burnt brown; its links,
+    underlined, in deep rust."""
+    rule = read_rule(".error-summary")
+    box = strip_nested_rules(rule)
+
+    assert "background: var(--color-alert-wash);" in box
+    assert "border: 2px solid var(--color-alert);" in box
+    assert "color: var(--color-alert-ink);" in box
+    assert "color: var(--color-alert-deep);" in read_block(rule, r"&\s*h2\s*\{")
+    link = read_block(rule, r"&\s*a\s*\{")
+    assert "color: var(--color-alert-deep);" in link
+    assert "text-decoration" not in link
+
+
 @pytest.mark.parametrize("selector", [".card-title a", ".back-link", ".trends-table a"])
 def test_a_link_of_a_detail_or_of_a_title_is_a_target_of_44_pixels(selector):
     """Opquast 2025, rule 186: by its padding, or its minimum height."""
@@ -323,6 +345,74 @@ def test_a_button_wraps_its_label_and_its_announcement_with_large_text():
     assert re.search(
         r"\.button,\s*\.button-secondary\s*\{[^}]*flex-wrap:\s*wrap;", STYLESHEET
     )
+
+
+def test_the_card_of_an_incident_never_has_a_column_wider_than_itself():
+    """WCAG 1.4.4 and 1.4.10: at 200 % text, 12rem is 384 px, wider than a phone of 320 px."""
+    rule = read_block(read_rule(".incident"), r"^\s*& dl\s*\{")
+
+    assert (
+        "grid-template-columns: repeat(auto-fit, minmax(min(12rem, 100%), 1fr));"
+        in strip_nested_rules(rule)
+    )
+
+
+def test_the_body_is_the_container_of_the_queries_of_a_strong_zoom():
+    """Named: the frame of the table is a container too, nearer to what it holds."""
+    assert "container: body / inline-size;" in strip_nested_rules(read_rule("body"))
+
+
+def test_the_canvas_takes_the_paper_of_the_pages():
+    """A container, the body no longer gives its background to the canvas: html gives it alone."""
+    assert "background: var(--color-paper);" in strip_nested_rules(read_rule("html"))
+    assert "background" not in strip_nested_rules(read_rule("body"))
+
+
+@pytest.mark.parametrize(
+    ("selectors", "declaration"),
+    [
+        # One column of choices (Sabine, 2026-11-21): « Releases » no longer widens the form.
+        ((".choices",), "grid-template-columns: minmax(0, 1fr);"),
+        # The size of the other titles on a phone, in rem: it still follows the text (WCAG 1.4.4).
+        ((".error-page h1",), "font-size: 1.625rem;"),
+        # The margins no longer double with the text: a date field holds in 320 px at 200 %.
+        ((".site-header", "main", ".site-footer"), "--gutter: 0.25rem;"),
+        ((".feed-filters",), "padding: 0.25rem;"),
+        ((".card",), "padding-inline: 0.5rem;"),
+        ((".button", ".button-secondary"), "padding-inline: 0.75rem;"),
+        (
+            (':where(input[type="search"], input[type="date"])',),
+            "padding-inline: 0.25rem;",
+        ),
+    ],
+)
+def test_a_narrow_screen_for_the_size_of_its_text_takes_one_column_and_thin_margins(
+    selectors, declaration
+):
+    """WCAG 1.4.4 and 1.4.10: no page scrolls sideways at 200 % text from 320 px (docs/site-web.md)."""
+    strong_zoom = read_block(STYLESHEET, r"@container body \(inline-size < 15em\)\s*\{")
+    opening = r"^\s*" + r",\s*".join(map(re.escape, selectors)) + r"\s*\{"
+
+    assert declaration in strip_nested_rules(read_block(strong_zoom, opening))
+
+
+@pytest.mark.parametrize(
+    ("selector", "declaration"),
+    [
+        (".arrow-start", "margin-inline-end: 0.25rem;"),
+        (".arrow-end", "margin-inline-start: 0.25rem;"),
+        (".external-arrow", "margin-inline-start: 0.5rem;"),
+    ],
+)
+def test_the_arrow_of_a_button_keeps_the_space_it_had_as_an_item_of_its_own(
+    selector, declaration
+):
+    """One item with its word, the arrow no longer has the gap of 8 px of the button: a margin
+    gives it back, with its no-break space, and nothing moves at 100 % text."""
+    buttons = read_block(STYLESHEET, r"^\s*:where\(\.button, \.button-secondary\)\s*\{")
+    rule = read_block(buttons, rf"^\s*& {re.escape(selector)}\s*\{{")
+
+    assert declaration in strip_nested_rules(rule)
 
 
 def test_the_counts_of_the_trends_are_aligned_as_numbers():
@@ -382,6 +472,79 @@ def test_the_frame_keeps_the_focus_ring_of_its_last_link_in_sight():
     )
 
 
+# A gradient of the frame of the table: its side, its colour, the stop of its plain part (a cover
+# only), the colour it fades to.
+FRAME_GRADIENT = re.compile(
+    r"linear-gradient\(to (left|right), var\((--color-[a-z-]+)\)(?: (\d+)%)?,"
+    r" var\((--color-[a-z-]+)\)\)"
+)
+
+
+def read_frame_gradients():
+    return FRAME_GRADIENT.findall(strip_nested_rules(read_rule(".table-frame")))
+
+
+def read_frame_shadows():
+    """The colours of the two shadows of the frame, its gradients without a plain part."""
+    return [colour for _, colour, stop, _ in read_frame_gradients() if not stop]
+
+
+def test_each_gradient_of_the_frame_fades_to_its_own_colour_made_transparent():
+    """Never to transparent black, which an engine that does not interpolate in premultiplied
+    alpha would turn into a grey band, darker than the shadow."""
+    colours = read_colours()
+
+    assert len(read_frame_gradients()) == 4
+    for _, colour, _, end in read_frame_gradients():
+        assert colours[end].upper() == f"{colours[colour]}00".upper()
+
+
+def test_the_covers_of_the_frame_hide_its_shadows_while_the_table_ends_at_their_edge():
+    """A cover lies on its shadow, from the same edge, and its plain part is as wide at least: a
+    table that fits shows no grey at its edges."""
+    declarations = dict(
+        DECLARATION.findall(strip_nested_rules(read_rule(".table-frame")))
+    )
+    positions = [
+        part.strip() for part in declarations["background-position"].split(",")
+    ]
+    widths = [
+        float(part.split()[0].removesuffix("rem"))
+        for part in declarations["background-size"].split(",")
+    ]
+    sides = [side for side, _, _, _ in read_frame_gradients()]
+    stops = [int(stop) for _, _, stop, _ in read_frame_gradients()[:2]]
+
+    assert sides[:2] == sides[2:]
+    # Each gradient starts at its edge: to the right from the left one, to the left from the right.
+    for side, position in zip(sides, positions, strict=True):
+        assert position == {"right": "0 0", "left": "100% 0"}[side]
+    for cover, stop, shadow in zip(widths[:2], stops, widths[2:], strict=True):
+        assert cover * stop / 100 >= shadow
+
+
+def test_the_frame_shows_a_shadow_at_each_edge_the_table_continues_past():
+    """Lea Verou, 2012: two covers that scroll with the table (local) hide the two shadows fixed to
+    the frame (scroll) while the table ends at their edge; a table that fits shows none."""
+    rule = strip_nested_rules(read_rule(".table-frame"))
+
+    assert "background-attachment: local, local, scroll, scroll;" in rule
+    assert len(read_frame_shadows()) == 2
+
+
+@pytest.mark.parametrize(
+    "text", ["--color-ink", "--color-slate", "--color-teal", "--color-teal-deep"]
+)
+def test_each_text_of_the_table_keeps_its_contrast_on_the_shadows_of_its_frame(text):
+    """WCAG 1.4.3: the cells, the rank, the links, visited and hovered, pass over a shadow as the
+    table scrolls. The shadow has no 3:1 of 1.4.11 to meet: what it tells, the caption says too."""
+    colours = read_colours()
+
+    assert read_frame_shadows()
+    for shadow in read_frame_shadows():
+        assert measure_contrast(colours[text], colours[shadow]) >= 4.5
+
+
 def test_a_table_wider_than_the_page_prints_all_its_columns():
     """Opquast 2025, rules 195 and 196: on paper, the frame no longer scrolls."""
     rule = read_block(
@@ -396,7 +559,7 @@ def test_a_table_printed_drops_the_announcement_of_its_links():
     they would repeat on each row."""
     print_rules = read_block(STYLESHEET, r"@media print\s*\{")
     rule = re.search(
-        r'\.trends-table a > span\[aria-hidden="true"\],\s*\.trends-table \.link-note\s*\{'
+        r"\.trends-table \.external-arrow,\s*\.trends-table \.link-note\s*\{"
         r"\s*display:\s*none;",
         print_rules,
     )

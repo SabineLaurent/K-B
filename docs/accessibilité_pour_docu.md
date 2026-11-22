@@ -5,7 +5,7 @@
 Les résultats de l'essai d'accessibilité de Grafana Cloud, l'outil de restitution choisi (`docs/outils-de-suivi.md`).
 La grille, ses critères WCAG 2.1 AA (RGAA 4.1.2), ce qui est bloquant et les outils de l'essai sont dans
 `docs/outils-de-suivi.md`, section « Accessibilité ». Les lecteurs du tableau et de l'alerte, et leurs outils
-d'assistance, sont dans `documentation/monitoring_pour_docu.md`, section « Qui lit le tableau et l'alerte ».
+d'assistance, sont dans `documentation/monitorage.md`, section « Qui lit le tableau et l'alerte ».
 
 **Ce qui est essayé**: Explore; le tableau de bord « K-B, modèle: qualité, coût, alertes » (`observability/grafana/dashboard.json`),
 environnement `sandbox`; la liste des règles d'alerte du dossier K-B, avec les trois alertes déclenchées par le bac à

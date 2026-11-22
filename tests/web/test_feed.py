@@ -33,6 +33,7 @@ from k_b.web.french_dates import write_day
 NOW = datetime(2026, 11, 11, 17, 40, tzinfo=UTC)
 # validate_json: in strict mode, a date is read from the text of JSON only.
 ITEMS = {item.id: item for item in PAGE.validate_json(json.dumps(ITEMS_PAGE)).items}
+NARROW_NO_BREAK_SPACE = chr(0x202F)
 
 
 def read(query):
@@ -100,6 +101,21 @@ def test_a_search_of_200_characters_is_kept_201_refused():
     assert "200" in error.message
 
 
+@pytest.mark.parametrize(
+    ("length", "written"),
+    [
+        (999, "999"),
+        (1000, f"1{NARROW_NO_BREAK_SPACE}000"),
+        (1500, f"1{NARROW_NO_BREAK_SPACE}500"),
+    ],
+)
+def test_the_length_of_a_search_refused_groups_its_thousands(length, written):
+    """q is not bounded before its message: an address can send 1 500 characters."""
+    [error] = read("q=" + "a" * length).errors
+
+    assert error.message == f"La recherche fait {written} caractères: 200 au plus."
+
+
 @pytest.mark.parametrize("control", ["%00", "%01", "%1F", "%7F", "%0A", "%09"])
 def test_a_search_holding_a_control_character_is_refused_on_its_field(control):
     """Sent back raw in value and in the links of the pages, it would make the HTML invalid."""
@@ -152,20 +168,36 @@ def test_a_start_date_without_date_checked_is_ignored():
     assert build_query(form, NOW, page=1).since_day == date(2026, 11, 8)
 
 
+START_MISSING = "Indiquez la date de début, ou choisissez 1, 3 ou 7 jours."
+START_NOT_A_DAY = "Date de début invalide: choisissez un jour dans le champ."
+START_LONG_YEAR = "Date de début invalide: l’année a plus de 4 chiffres."
+
+
 @pytest.mark.parametrize(
-    "query",
+    ("query", "message"),
     [
-        "period=date",
-        "period=date&start=",
-        "period=date&start=07/10/2026",
-        "period=date&start=2026-02-30",
-        "period=date&start=2026-1-7",
+        ("period=date", START_MISSING),
+        ("period=date&start=", START_MISSING),
+        ("period=date&start=07/10/2026", START_NOT_A_DAY),
+        (
+            "period=date&start=2026-02-30",
+            (
+                "Date de début invalide: 2026-02-30 n’existe pas. Choisissez un jour"
+                " qui existe."
+            ),
+        ),
+        ("period=date&start=2026-1-7", START_NOT_A_DAY),
+        # A year of 5 or 6 digits, which Chrome lets type in an input type=date and sends.
+        ("period=date&start=20266-01-01", START_LONG_YEAR),
+        ("period=date&start=202666-01-01", START_LONG_YEAR),
+        # 7 digits, which no field sends: HTML stops at the year 275760.
+        ("period=date&start=2026666-01-01", START_NOT_A_DAY),
     ],
 )
-def test_date_checked_without_a_valid_day_is_refused_on_the_start_field(query):
-    [error] = read(query).errors
-
-    assert error.field == "start"
+def test_date_checked_without_a_valid_day_is_refused_on_the_start_field(query, message):
+    """Opquast 2025, rule 80: the message helps without a format, which the field shows as its
+    browser does; it names a value of the form of a day only, as the trends do (#617)."""
+    assert read(query).errors == (FieldError("start", message),)
 
 
 @pytest.mark.parametrize("period", ["2", "date ", "30", "jour"])
@@ -288,6 +320,20 @@ def test_the_line_of_the_results_gives_the_items_the_period_and_the_page(
     since = date(2026, 11, 10)
 
     assert write_results_line(total, since, page, pages) == line
+
+
+@pytest.mark.parametrize(
+    ("total", "items"),
+    [
+        (999, "999 items"),
+        (1000, f"1{NARROW_NO_BREAK_SPACE}000 items"),
+        (12_345, f"12{NARROW_NO_BREAK_SPACE}345 items"),
+    ],
+)
+def test_the_line_of_the_results_groups_the_thousands_of_the_total(total, items):
+    line = write_results_line(total, date(2026, 11, 10), 1, count_pages(total))
+
+    assert line.startswith(f"{items} depuis le 10 novembre 2026,")
 
 
 def test_the_line_of_no_result_gives_the_period():
