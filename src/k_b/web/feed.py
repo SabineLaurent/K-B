@@ -282,6 +282,7 @@ def write_day_refusal(field_in_messages: str, value: str) -> str:
             f"{field_in_messages} invalide: {value} n’existe pas."
             " Choisissez un jour qui existe."
         )
+    # A year of 5 or 6 digits, the one refusal Chrome sends: its cause said, the value not named.
     if LONG_YEAR_DAY.fullmatch(value):
         return f"{field_in_messages} invalide: l’année a plus de 4 chiffres."
     return f"{field_in_messages} invalide: choisissez un jour dans le champ."

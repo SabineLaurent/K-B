@@ -166,10 +166,11 @@ absent, la fenêtre la plus récente ; répété, sa dernière valeur. Le champ 
 affichée, ou le jour demandé d'une fenêtre absente ; jamais une valeur refusée (la valeur d'un `type=date` est un
 jour valide ou rien : WHATWG, RGAA 8.2). Le message nomme donc une valeur refusée qui a la forme d'un jour, chiffres
 ASCII et tirets seuls (`DAY_FORM` d'`items.py`, « Date invalide: 2026-02-30 n’existe pas. Choisissez un jour qui
-existe. ») ; toute autre valeur n'atteint jamais la page, qu'un lien ferait sinon dire n'importe quel texte
-(« Date invalide: choisissez un jour dans le champ. »), sauf une année de 5 ou 6 chiffres, que Chrome laisse
-taper et envoie (« Date invalide: l’année a plus de 4 chiffres. », la valeur tue). Aucun message ne donne de format : le champ montre le jour
-à la façon du navigateur (`10/10/2026` dans Chrome en français), que le site ne connaît pas (Opquast 80, #617). La
+existe. ») ; toute autre valeur n'atteint jamais la page, qu'un lien ferait sinon dire n'importe quel texte. Une
+année de 5 ou 6 chiffres, que Chrome laisse taper et envoie, a sa phrase, sans la valeur (« Date invalide: l’année a
+plus de 4 chiffres. ») ; toute autre valeur reçoit « Date invalide: choisissez un jour dans le champ. ». Aucun
+message ne donne de format : le champ montre le jour à la façon du navigateur (`10/10/2026` dans Chrome en
+français), que le site ne connaît pas (Opquast 80, #617). La
 date de début du fil a les mêmes phrases, le champ nommé par chaque page (« Date de début », « Date »), par la
 même fonction (`write_day_refusal`, `web/feed.py`). Limite
 (Opquast 81) : la valeur refusée ne revient pas dans le champ. GH Archive est expliqué à sa première occurrence, dans les mots de `/sources` (Opquast 5).
