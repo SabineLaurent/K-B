@@ -46,6 +46,11 @@
     /* The line between two rows of a table (Maquette-tendances.dc.html), a decoration. */
     --color-row-rule: #EEF0EC;
     --color-field-border: #8A8F96;
+    /* The card and the borders made transparent, where a gradient of the frame of a table fades:
+       never to transparent black, which an engine that does not interpolate in premultiplied alpha
+       would turn into a grey band (Firefox, bug 1869681). */
+    --color-card-clear: #FFFFFF00;
+    --color-stone-clear: #DADCD600;
     --font-text: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
     --font-code: ui-monospace, Menlo, Consolas, monospace;
     --target-size: 2.75rem;
@@ -905,14 +910,15 @@
     border-radius: 8px;
     /* A shadow at each edge the table continues past (Lea Verou, 2012): two covers of the colour of
        the frame scroll with the table (local) and hide the two shadows, fixed to the frame, while
-       the table ends at their edge. In the colour of the borders, the shadow keeps each text of the
-       table at 4.5:1 (WCAG 1.4.3). Forced colours drop a gradient: the frame keeps its border. */
+       the table ends at their edge, on screen as on paper. In the colour of the borders, the shadow
+       keeps each text of the table at 4.5:1 (WCAG 1.4.3). Forced colours drop a gradient: the frame
+       keeps its border. */
     background-color: var(--color-card);
     background-image:
-      linear-gradient(to right, var(--color-card) 50%, transparent),
-      linear-gradient(to left, var(--color-card) 50%, transparent),
-      linear-gradient(to right, var(--color-stone), transparent),
-      linear-gradient(to left, var(--color-stone), transparent);
+      linear-gradient(to right, var(--color-card) 50%, var(--color-card-clear)),
+      linear-gradient(to left, var(--color-card) 50%, var(--color-card-clear)),
+      linear-gradient(to right, var(--color-stone), var(--color-stone-clear)),
+      linear-gradient(to left, var(--color-stone), var(--color-stone-clear));
     background-position: 0 0, 100% 0, 0 0, 100% 0;
     background-size: 1.5rem 100%, 1.5rem 100%, 0.75rem 100%, 0.75rem 100%;
     background-repeat: no-repeat;
@@ -1019,11 +1025,9 @@
       display: none;
     }
 
-    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns, and
-       the shadows of its edges would fall on it. */
+    /* On paper, the frame no longer scrolls: a table wider than the page keeps its columns. */
     .table-frame {
       overflow: visible;
-      background-image: none;
     }
 
     /* A link opens no tab on paper: in the table, its announcement would repeat on each row. */

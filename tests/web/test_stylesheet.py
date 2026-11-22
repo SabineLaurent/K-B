@@ -382,13 +382,54 @@ def test_the_frame_keeps_the_focus_ring_of_its_last_link_in_sight():
     )
 
 
+# A gradient of the frame of the table: its side, its colour, the stop of its plain part (a cover
+# only), the colour it fades to.
+FRAME_GRADIENT = re.compile(
+    r"linear-gradient\(to (left|right), var\((--color-[a-z-]+)\)(?: (\d+)%)?,"
+    r" var\((--color-[a-z-]+)\)\)"
+)
+
+
+def read_frame_gradients():
+    return FRAME_GRADIENT.findall(strip_nested_rules(read_rule(".table-frame")))
+
+
 def read_frame_shadows():
-    """The colours of the two shadows of the frame of the table, its gradients that fade from a
-    colour of the chart to transparent at the edges; its covers stop at 50 %."""
-    return re.findall(
-        r"linear-gradient\(to (?:left|right), var\((--color-[a-z-]+)\), transparent\)",
-        strip_nested_rules(read_rule(".table-frame")),
+    """The colours of the two shadows of the frame, its gradients without a plain part."""
+    return [colour for _, colour, stop, _ in read_frame_gradients() if not stop]
+
+
+def test_each_gradient_of_the_frame_fades_to_its_own_colour_made_transparent():
+    """Never to transparent black: an engine that does not interpolate in premultiplied alpha
+    would draw a grey band, darker than the shadow (Firefox, bug 1869681)."""
+    colours = read_colours()
+    clear_colours = dict(
+        re.findall(r"(--color-[a-z-]+)\s*:\s*(#[0-9A-Fa-f]{8})\s*;", STYLESHEET)
     )
+
+    assert len(read_frame_gradients()) == 4
+    for _, colour, _, end in read_frame_gradients():
+        assert clear_colours[end] == f"{colours[colour]}00"
+
+
+def test_the_covers_of_the_frame_hide_its_shadows_while_the_table_ends_at_their_edge():
+    """A cover lies on its shadow, and its plain part is as wide at least: a table that fits shows
+    no grey at its edges."""
+    declarations = dict(
+        DECLARATION.findall(strip_nested_rules(read_rule(".table-frame")))
+    )
+    positions = [
+        part.strip() for part in declarations["background-position"].split(",")
+    ]
+    widths = [
+        float(part.split()[0].removesuffix("rem"))
+        for part in declarations["background-size"].split(",")
+    ]
+    stops = [int(stop) for _, _, stop, _ in read_frame_gradients()[:2]]
+
+    assert positions[:2] == positions[2:]
+    for cover, stop, shadow in zip(widths[:2], stops, widths[2:], strict=True):
+        assert cover * stop / 100 >= shadow
 
 
 def test_the_frame_shows_a_shadow_at_each_edge_the_table_continues_past():
@@ -405,7 +446,7 @@ def test_the_frame_shows_a_shadow_at_each_edge_the_table_continues_past():
 )
 def test_each_text_of_the_table_keeps_its_contrast_on_the_shadows_of_its_frame(text):
     """WCAG 1.4.3: the cells, the rank, the links, visited and hovered, pass over a shadow as the
-    table scrolls. The shadow, a hint no criterion asks for, has no 3:1 of 1.4.11 to meet."""
+    table scrolls. The shadow has no 3:1 of 1.4.11 to meet: what it tells, the caption says too."""
     colours = read_colours()
 
     assert read_frame_shadows()
@@ -420,15 +461,6 @@ def test_a_table_wider_than_the_page_prints_all_its_columns():
     )
 
     assert "overflow: visible;" in rule
-
-
-def test_a_table_printed_drops_the_shadows_of_its_frame():
-    """On paper, the frame no longer scrolls: its shadows would fall on the table."""
-    rule = read_block(
-        read_block(STYLESHEET, r"@media print\s*\{"), r"\.table-frame\s*\{"
-    )
-
-    assert "background-image: none;" in rule
 
 
 def test_a_table_printed_drops_the_announcement_of_its_links():

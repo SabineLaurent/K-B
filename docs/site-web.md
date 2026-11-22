@@ -181,10 +181,17 @@ dernier lien, que le cadre couperait. Une ombre au bord du cadre dit que le tabl
 deux caches de la couleur du cadre défilent avec le tableau (`background-attachment: local`) et couvrent les deux
 ombres, fixées au cadre, tant que le tableau s'arrête à leur bord ([Lea Verou, 2012](https://lea.verou.me/2012/04/background-attachment-local/)).
 L'ombre a la couleur des bordures (`--color-stone`) : chaque texte du tableau y garde 4,5:1 au moins, 5,36:1 pour un
-lien (WCAG 1.4.3). C'est une aide, qu'aucun critère n'exige : elle n'a pas de 3:1 à tenir (WCAG 1.4.11). En
-couleurs forcées, Chrome retire les dégradés, et le cadre garde sa bordure (mesuré dans Chrome 157 le 2026-11-22).
-À l'impression, le cadre ne défile plus, ses ombres sont retirées, et la flèche et l'annonce des liens du tableau
-aussi.
+lien (WCAG 1.4.3). Chaque dégradé finit sur sa propre couleur rendue transparente (`--color-card-clear`,
+`--color-stone-clear`), jamais sur le noir transparent de `transparent` : un moteur qui n'interpole pas en alpha
+prémultiplié en ferait une bande grise, plus sombre que l'ombre (Firefox, [bug 1869681](https://bugzilla.mozilla.org/show_bug.cgi?id=1869681),
+ouvert, lu le 2026-11-22). L'ombre n'a pas de 3:1 à tenir (WCAG 1.4.11) : ce qu'elle dit est aussi donné ailleurs, la
+légende nomme les étoiles et les *forks* gagnés ([Understanding 1.4.11](https://www.w3.org/WAI/WCAG21/Understanding/non-text-contrast),
+« The information is available in another form »), et la charte classe `--color-stone` sur blanc en décor. Choix
+(time-knight, 2026-11-22) : l'ombre garde la couleur de la charte. Elle est discrète, 1,36:1 au plus sombre sur 12 px
+(mesuré dans Chrome 157), et tout le monde ne la voit pas ; la foncer serait borné à 1,65:1 environ, où le lien
+tombe à 4,5:1. En couleurs forcées, Chrome retire les dégradés, et le cadre garde sa bordure (mesuré dans Chrome 157
+le 2026-11-22). À l'impression, le cadre ne défile plus : les caches restent sur les ombres, qui ne se voient pas
+(impression émulée dans Chrome 157, le 2026-11-22) ; la flèche et l'annonce des liens du tableau sont retirées.
 
 **L'échantillon** est dit au-dessus du tableau : GH Archive ne voit qu'environ 1 % des étoiles et de 0,8 à 1,3 % des
 *forks*, jusqu'à 4,2 % (mesures du 29/10, `docs/specs-collecte.md`, « Limite mesurée le 2026-10-29 ») ; l'ordre, sous le
