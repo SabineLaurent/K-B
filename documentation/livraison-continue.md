@@ -122,7 +122,7 @@ Cette partie s'adresse à la personne qui livre une version.
 ### Qui peut livrer
 
 Une administratrice du dépôt, seule à pouvoir créer un tag `v*` (ruleset « tags v »). Un tag n'est posé et poussé que
-sur la demande explicite de Sabine.
+sur sa demande explicite.
 
 ### Avant de livrer
 
@@ -143,7 +143,7 @@ gh run list --repo "$REPO" --commit "$(git rev-parse origin/main)" \
 ### Poser le tag
 
 Un numéro nouveau à chaque version, jamais réutilisé. Le premier est `v0.1.0`: le 0 dit « avant la 1.0 »; `v1.0.0`
-est gardé pour la version de la soutenance (choix de Sabine, avec le plan de #415).
+est gardé pour la version de la soutenance (choix du plan de #415).
 
 ```sh
 VERSION=<vX.Y.Z, jamais posée>
@@ -269,7 +269,7 @@ session de #415, avec de faux `az` et `gh` ou un registre local
 | une révision jamais prête, à une autre image, ou restée l'ancienne | `deploy`, étape 8 | `not ready at the image of <tag> after 40 reads, 15 s apart: <apps>` | simulé |
 
 Le ruleset « tags v » n'a pas été essayé par un compte qui n'est pas administrateur. Le push de
-`v0.0.1` par Sabine, administratrice, a affiché <q lang="en">Bypassed rule violations… creations being restricted</q>
+`v0.0.1` par un compte administrateur a affiché <q lang="en">Bypassed rule violations… creations being restricted</q>
 (note).
 
 ### La livraison témoin `v0.1.0`
@@ -374,9 +374,9 @@ Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.
 
 - **Aucune validation humaine avant la mise en ligne.** L'environnement `production` n'a que sa règle des tags:
     aucun validateur, et `can_admins_bypass: true` (`gh api repos/SabineLaurent/K-B/environments/production`). L'étape
-    d'`infra/README.md` qui fait de Sabine la validatrice de chaque livraison (`reviewers`, `can_admins_bypass: false`)
-    n'est pas appliquée. Un tag poussé part donc en ligne sans autre geste. Ce risque a été accepté par Sabine
-    jusqu'au 2026-11-08 (`infra/README.md`).
+    d'`infra/README.md` qui fait de l'administratrice du dépôt la validatrice de chaque livraison (`reviewers`,
+    `can_admins_bypass: false`) n'est pas appliquée. Un tag poussé part donc en ligne sans autre geste. Ce risque a
+    été accepté jusqu'au 2026-11-08 (`infra/README.md`).
 - **Pas de retour automatique**: revenir en arrière, c'est livrer le tag précédent.
 - **Pas de cache entre deux tags**: une version nouvelle se construit en entier.
 - **Une passe 2 faite à la main** repose l'image par son tag (`k-b:<TAG>`), une référence que l'on peut réécrire, et

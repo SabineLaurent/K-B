@@ -51,9 +51,9 @@ commandes de la reproduction et leurs sorties entières sont dans l'issue de l'i
 
 ### Le déclenchement
 
-Un Ctrl-C pendant qu'une commande `kb` travaille. Sabine l'a vu le 2026-10-28, pendant l'essai de
+Un Ctrl-C pendant qu'une commande `kb` travaille. L'erreur est apparue le 2026-10-28, pendant l'essai de
 [l'issue n° 351](https://github.com/SabineLaurent/K-B/issues/351), qui affiche l'attente de `kb digest`: la commande
-s'est arrêtée aussitôt, mais Python a imprimé toute sa pile, de `cli.py` jusqu'à `sock.recv`. Elle l'a reproduit le
+s'est arrêtée aussitôt, mais Python a imprimé toute sa pile, de `cli.py` jusqu'à `sock.recv`. Elle s'est reproduite le
 même jour d'une seule touche: avec `nc` comme API IA, avant et après #351, et avec les vrais serveurs (#352).
 
 ### Le périmètre touché
@@ -93,9 +93,9 @@ processus par SIGINT: c'est le -2 du tableau.
 
 ## La résolution, étape par étape
 
-1. **Observer.** Le 2026-10-28, à l'essai de #351, Sabine voit la trace au lieu d'une ligne du journal. Le constat
+1. **Observer.** Le 2026-10-28, à l'essai de #351, la trace paraît au lieu d'une ligne du journal. Le constat
     ouvre [l'issue n° 352](https://github.com/SabineLaurent/K-B/issues/352).
-2. **Reproduire.** Elle le reproduit le même jour, d'une seule touche, avec `nc` comme API IA et avec les vrais
+2. **Reproduire.** La trace se reproduit le même jour, d'une seule touche, avec `nc` comme API IA et avec les vrais
     serveurs, avant et après #351: l'erreur ne vient pas de #351.
 3. **Trouver la cause.** La trace part de `cli.py` et finit sur `sock.recv`, l'attente de la réponse: l'interruption
     a traversé `kb` sans être attrapée. `cli.py` traite SIGTERM et `Exception`, mais `KeyboardInterrupt` n'est ni l'un
@@ -111,7 +111,7 @@ processus par SIGINT: c'est le -2 du tableau.
 5. **Concevoir.** `kb` attrape l'interruption à un seul endroit, `cli.py`, pour toutes les commandes. Il écrit une ligne
     datée du journal, `kb stopped by SIGINT`, au niveau `ERROR` comme pour SIGTERM, puis sort normalement avec un code
     nommé, 130. Les options écartées sont dans le tableau suivant.
-6. **Faire relire le plan, puis le faire valider.** Le plan est relu par un sous-agent, puis validé par Sabine le
+6. **Faire relire le plan, puis le faire valider.** Le plan est relu par un sous-agent, puis validé le
     2026-10-28. Il est écrit dans l'issue n° 352, sous « Conception ».
 
 Le tableau suivant donne chaque choix de la conception, l'option retenue et l'option écartée, avec leur raison.
@@ -143,11 +143,11 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
 5. **La revue.** Deux revues de code, chacune par un sous-agent sans contexte, sur la demande de fusion (PR,
     <span lang="en">pull request</span>) n° 353: la première relève 8 constats, la seconde aucun. Trois sont corrigés:
     le texte du code 130 pour `kb create-db`, qui supprime sa base; le code des serveurs interrompus pendant leur
-    démarrage; une phrase du README sur `kb import`. Les autres sont laissés ou écartés avec leur raison, par Sabine.
-6. **L'essai de Sabine.** `nc -lk 8099` comme API IA, `kb digest`, un Ctrl-C pendant l'attente: la ligne datée,
+    démarrage; une phrase du README sur `kb import`. Les autres sont laissés ou écartés avec leur raison.
+6. **L'essai à la main.** `nc -lk 8099` comme API IA, `kb digest`, un Ctrl-C pendant l'attente: la ligne datée,
     aucune trace, la ligne d'attente effacée, et le code de sortie 130.
-7. **La fusion.** Sabine fusionne la [PR n° 353](https://github.com/SabineLaurent/K-B/pull/353) le 2026-10-28
-    (commit `d76b731a`), qui ferme l'issue n° 352.
+7. **La fusion.** La [PR n° 353](https://github.com/SabineLaurent/K-B/pull/353) est fusionnée le 2026-10-28
+    (commit `d76b731a`); elle ferme l'issue n° 352.
 
 ## Ce que le code de main en garde
 
@@ -168,9 +168,9 @@ Le tableau suivant donne chaque choix de la conception, l'option retenue et l'op
 ## Les limites
 
 - **Un second Ctrl-C pendant le nettoyage peut le couper**: un fichier de base à moitié créé, un temporaire caché.
-    SIGTERM ignore un second signal, SIGINT non. Sabine l'a laissé ainsi le 2026-10-28, plutôt qu'un gestionnaire de
-    SIGINT qui ignore le second: un Ctrl-C suppose quelqu'un devant l'écran, qui voit l'erreur. Ce cas n'est pas
-    testé.
+    SIGTERM ignore un second signal, SIGINT non. Ce comportement est gardé, plutôt qu'un gestionnaire de
+    SIGINT qui ignore le second: un Ctrl-C suppose quelqu'un devant l'écran, qui voit l'erreur (journal des
+    décisions, `docs/ADR/journal-decisions-projet.md:4524-4527`). Ce cas n'est pas testé.
 - **Un Ctrl-C avant l'ouverture du journal**, pendant l'import des modules ou la lecture de l'environnement, et
     `kb openapi` gardent la trace de Python.
 - **Les serveurs pendant leur démarrage** sortent en 130 avec la ligne, en 3 ou en 0, selon le moment: c'est lu dans

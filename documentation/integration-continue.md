@@ -100,7 +100,7 @@ Le tableau suivant donne chaque job de `CI`, ses lignes, sa tâche, et s'il est 
 | `types` (l. 52-61) | `uv run mypy --strict` sur `src` | oui |
 | `tests-postgresql` (l. 63-93) | `uv run pytest -m postgresql`, contre le service `postgres:18.6` du job (utilisateur `kb`, base en UTF8 et collation C, l. 72-76), joint par `KB_TEST_POSTGRESQL_URL` (l. 85), sans mot de passe (`POSTGRES_HOST_AUTH_METHOD: trust`, un serveur que seul le runner joint) | oui |
 | `tests-data` (l. 95-109) | `uv run pytest tests/etl tests/test_schema.py tests/test_items.py tests/ai_api/test_watch_items.py`: les tests des données, à part, sans `--cov` (`tests` les lance aussi et garde le seuil) | non |
-| `digests-reference` (l. 111-131) | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests` (#479) et échoue sous un seuil du journal des décisions (`docs/ADR/journal-decisions-projet.md:3389`: 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), ou si le rejeu n'envoie pas tous les appels du jeu dans leur ordre, ou si la route ne répond pas 200; puis `actions/upload-artifact` v7.0.2 dépose le rapport, même en échec (`gh run download <id> -n digests-reference-report`, gardé 30 jours). Le jeu est rejoué, jamais envoyé au modèle: le job juge les contrôles de K-B sur des sorties enregistrées, et un changement de `prompt_version` le périme; le modèle se mesure à chaque enregistrement du jeu par Sabine (#520). | non |
+| `digests-reference` (l. 111-131) | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests` (#479) et échoue sous un seuil du journal des décisions (`docs/ADR/journal-decisions-projet.md:3389`: 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), ou si le rejeu n'envoie pas tous les appels du jeu dans leur ordre, ou si la route ne répond pas 200; puis `actions/upload-artifact` v7.0.2 dépose le rapport, même en échec (`gh run download <id> -n digests-reference-report`, gardé 30 jours). Le jeu est rejoué, jamais envoyé au modèle: le job juge les contrôles de K-B sur des sorties enregistrées, et un changement de `prompt_version` le périme; le modèle se mesure à chaque enregistrement du jeu, fait à la main (#520). | non |
 
 Depuis #167, `audit` lit aussi le groupe `docs`, MkDocs et Material (`pyproject.toml:45-47`), que `uv export` laisse
 de côté sans `--all-groups` (`ci.yml:23-25`). Sans l'option, `uv export --frozen --no-emit-project` ne
@@ -137,8 +137,8 @@ tag.
 
 `.github/workflows/infra.yml`, un job, `bicep-build`, requis à la fusion depuis #496: il récupère le dépôt (l. 19),
 demande à `az` d'utiliser son propre Bicep (l. 21), installe Bicep v0.48.1 (l. 22), vérifie son SHA256 (l. 24),
-affiche sa version (l. 25), puis compile `infra/main.bicep` (l. 26). Il ne se connecte pas à Azure: Sabine applique le
-Bicep à la main (`infra/README.md`).
+affiche sa version (l. 25), puis compile `infra/main.bicep` (l. 26). Il ne se connecte pas à Azure: la propriétaire
+du groupe de ressources applique le Bicep à la main (`infra/README.md`).
 
 #### Le workflow `Docs`
 
@@ -462,7 +462,7 @@ Dans cet ordre:
 4. Sinon, aucune des étapes 1 à 3 ne s'appliquant (par exemple un paquet Debian dont le correctif est encore dans
     `trixie-proposed-updates`, que `apt-get install` ne trouve pas, ou un CPython corrigé que l'image amont n'a pas
     encore): une entrée dans `.grype.yaml`, à la racine du dépôt, le premier fichier de réglages que Grype cherche
-    dans le dossier où il tourne. Chaque entrée est décidée par Sabine (« Une règle non tenue l'est par décision
+    dans le dossier où il tourne. Chaque entrée est une décision (« Une règle non tenue l'est par décision
     écrite », `.claude/rules/conformite.md`), avec sa raison, sa date et l'issue qui la retire dès que l'étape 2 ou 3
     apporte le correctif:
 
@@ -477,7 +477,7 @@ ignore:
 Le fichier n'existe pas tant qu'aucune entrée n'est décidée; `.dockerignore` le tient hors de l'image. Écarté:
 `apt-get upgrade` dans le `Dockerfile`, qui ferait dépendre l'image du jour de sa construction, et non plus du digest
 épinglé. L'étape 3 n'installe qu'un paquet, à une version écrite: elle révise, pour ce seul cas, la
-décision de Sabine du journal ADR (`docs/ADR/journal-decisions-projet.md:7294`, révisée à `:7486`).
+décision du journal ADR (`docs/ADR/journal-decisions-projet.md:7294`, révisée à `:7486`).
 
 ## Limites
 
@@ -485,7 +485,7 @@ Chaque parade a été vérifiée à la source (sources en fin de liste).
 
 - **Aucune relecture n'est exigée**: le ruleset demande une PR, mais aucune approbation
     (`required_approving_review_count: 0`). La relecture en PR est une pratique, pas une règle.
-    Pour réduire le risque: exiger une approbation dans le ruleset serait faisable avec nos droits (administratrice du
+    Pour réduire le risque: exiger une approbation dans le ruleset serait faisable sans droit de plus (administratrice du
     dépôt), mais <q lang="en">Pull request authors cannot approve their own pull requests</q>: avec une seule
     personne au dépôt et aucun contournement, plus aucune PR ouverte sous son compte ne fusionnerait; seules celles de
     Dependabot, d'un autre auteur, le pourraient. Ce n'est donc pas faisable sans une seconde personne.
@@ -493,11 +493,11 @@ Chaque parade a été vérifiée à la source (sources en fin de liste).
     `Docs` ne sont pas dans le ruleset. Tous comptent à la livraison (`deploy.yml:51-67`).
     `bicep-build` y est depuis #496: ni `infra.yml` ni `image.yml` n'ont de filtre de chemin, car un workflow sauté par son filtre laisse ses contrôles
     « <span lang="en">Pending</span> » et bloque la fusion.
-    Pour réduire le risque: ajouter ces quatre contrôles aux contrôles requis du ruleset (faisable avec nos droits).
+    Pour réduire le risque: ajouter ces quatre contrôles aux contrôles requis du ruleset (faisable sans droit de plus).
 - **Les tests de bout en bout ne tournent pas en CI**: les tests marqués `e2e` appellent les vraies sources et
     services; ils se lancent sur le poste ([la fiche des tests](tests.md)).
     Pour réduire le risque: un workflow planifié (`on: schedule`, sur la branche par défaut) lancerait
-    `pytest -m e2e`. C'est faisable avec nos droits, les clés des sources en secrets du dépôt, mais pas pour tout: les
+    `pytest -m e2e`. C'est faisable sans droit de plus, les clés des sources en secrets du dépôt, mais pas pour tout: les
     tests de Zotero et des clips lisent des fichiers du poste et seraient sautés. Le prix: des appels réels, dont une
     vraie requête BigQuery pour `gh_archive`, et des clés de plus dans GitHub. Le dépôt est privé
     (`gh api repos/SabineLaurent/K-B` → `"visibility":"private"`): un workflow planifié y prend sur l'usage inclus du
@@ -512,21 +512,21 @@ Chaque parade a été vérifiée à la source (sources en fin de liste).
     `grpc_core_dependencies.py`, qui ne compte que 11 fichiers de zlib, aucun `gz*.c` (l. 1562-1572 au tag v1.84.0).
     Pour réduire le risque: Dependabot propose chaque semaine le nouveau digest des images de base du `Dockerfile`
     (`dependabot.yml:10-16`), qui apporte les correctifs de Debian et de CPython, et la CI le scanne (déjà fait). Le
-    même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable avec nos droits. Un déclenchement planifié
-    d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une PR: faisable avec nos
-    droits, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`).
+    même scan dans `deploy.yml`, avant la mise en ligne (#626): faisable sans droit de plus. Un déclenchement planifié
+    d'`image.yml` (`on: schedule`, sur la branche par défaut) scannerait `main` sans attendre une PR: faisable sans droit
+    de plus, sur l'usage inclus du compte tant que le dépôt est privé (`"visibility":"private"`).
 - **Une vulnérabilité publiée rend rouges toutes les PR** (#498): une vulnérabilité haute ou critique corrigée qui
     entre dans la base de Grype rend rouge `image-build` sur toute PR, comme `audit` avec #606, et bloque la
     mise en ligne, jusqu'à la montée du digest, l'installation du paquet corrigé ou une entrée de `.grype.yaml`.
     Pour réduire le risque: la marche à suivre est écrite ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage));
-    faisable avec nos droits, une PR suffit.
+    faisable sans droit de plus, une PR suffit.
 - **Une version épinglée de Debian fait échouer la construction de l'image quand l'archive de sécurité la remplace**
     (#498): l'index de `trixie-security` ne porte qu'une version de zlib1g, la
     `+deb13u1` qu'installe le `Dockerfile` (l. 48-54). Quand une `+deb13u2` la remplacera, `apt-get install` ne
     trouvera plus la version écrite: `image-build` et la construction de `deploy.yml` échoueront, jusqu'à une PR.
     Pour réduire le risque: #647 retire le bloc dès qu'un digest de l'image de base porte le correctif. Le scan ne le
     dit pas, vert tant que le bloc est là: `docker run --rm python:3.13-slim-trixie@sha256:<digest> dpkg-query -W zlib1g`
-    le dit, sur le digest de chaque PR de Dependabot. Faisable avec nos droits, par une PR.
+    le dit, sur le digest de chaque PR de Dependabot. Faisable sans droit de plus, par une PR.
 - **Grype v0.121.3 porte un avis que v0.122.0 corrige**: GHSA-q7gw-24fr-5p69 (moyen), dans le
     SDK OpenTelemetry pour Go que Grype embarque: la borne de longueur d'un attribut de trace ou de journal ne coupe
     pas une valeur faite du caractère U+FFFD. Le job ne règle aucune variable `OTEL_*` (`image.yml`); que Grype
@@ -534,16 +534,16 @@ Chaque parade a été vérifiée à la source (sources en fin de liste).
     dans son code. v0.122.0 est publiée le 2026-11-16 à 20:41 UTC, et la CI se donne 7 jours
     d'attente avant de monter une version.
     Pour réduire le risque: monter Grype à v0.122.0 une fois ses 7 jours d'attente passés
-    ([Le détail des réglages](#le-detail-des-reglages), version de Grype); faisable avec nos droits, par une PR.
+    ([Le détail des réglages](#le-detail-des-reglages), version de Grype); faisable sans droit de plus, par une PR.
 - **Aucun délai propre aux jobs**: aucun `timeout-minutes` dans `ci.yml`, `image.yml`, `infra.yml` ni `docs.yml`; le
     délai par défaut de GitHub s'applique, 360 minutes par job, prises sur l'usage inclus du compte tant que le
     dépôt est privé.
     Pour réduire le risque: un `timeout-minutes` par job, à quelques fois sa durée observée (1 min 21 s au plus sur
-    la PR n° 533). Faisable avec nos droits, par un changement des workflows.
+    la PR n° 533). Faisable sans droit de plus, par un changement des workflows.
 - **Une PR vers une autre branche que `main`** ne lance aucune CI.
     Pour réduire le risque: rien n'entre dans `main` sans une PR vers `main` (règle `pull_request` du ruleset), qui
     lance la CI et attend ses six contrôles requis. Retirer `branches: [main]` du `pull_request` de chaque workflow
-    lancerait aussi la CI sur les autres PR (faisable avec nos droits).
+    lancerait aussi la CI sur les autres PR (faisable sans droit de plus).
 
 Sources: GitHub Docs,
 [« <span lang="en">Approving a pull request with required reviews</span> »](https://docs.github.com/en/pull-requests/how-tos/review-pull-requests/approving-a-pull-request-with-required-reviews),

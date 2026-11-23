@@ -159,7 +159,7 @@ a fermé #495: la fixture lui retirait `KB_DEPLOYMENT_ENVIRONMENT` (constaté au
 toute demande (`test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal`,
 `tests/test_e2e_selection.py:175-193`).
 
-Lancé par Sabine sur `9534048`, avec les vraies valeurs de `.env.e2e_test`
+Lancé sur `9534048`, avec les vraies valeurs de `.env.e2e_test`
 (`uv run --env-file .env.e2e_test pytest -m e2e -k real_export -rs`), il a passé: `1 passed, 4422 deselected`
 (commentaire de la PR #527). Ce qu'il ne prouve pas: le SDK d'OpenTelemetry compte une réponse 3xx comme un succès,
 et les séries de cette exécution n'ont pas été lues dans Grafana Explore (`tests/e2e/test_real_export.py:7-8`;
@@ -199,8 +199,8 @@ Les tests prouvent que chaque envoi est accepté et que les valeurs calculées s
 scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclenchement d'une alerte se lit dans
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
-`cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
-Sabine: [la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
+`cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable:
+[la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
 bac à sable ».
 
 ### Ce que lance la CI

@@ -438,7 +438,7 @@ Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
     (`etl/extract.py:53-100`, `etl/raw_store.py:22`). À la collecte suivante, chaque source reçoit sa date
     (`etl/extract.py:68-70`); une source en échec garde la sienne.
 - **Le brut est gardé tel que la source l'a rendu**, dans deux dossiers de `raw/`: `automated_watch/` pour ce que
-    la veille collecte, `selected_library/` pour ce que Sabine a choisi, Zotero et les clips
+    la veille collecte, `selected_library/` pour ce que l'opératrice a choisi, Zotero et les clips
     (`etl/raw_store.py:14-20`). Chaque fichier est écrit par un temporaire caché, renommé sur la cible
     (`.claude/rules/conventions.md`, règle 2).
 - **Zotero n'est jamais ouvert en place**: `zotero.sqlite` est copié, avec son journal d'écriture, dans un dossier
@@ -725,7 +725,7 @@ Le détail de chaque partie:
     avant le `until` d'un compte rendu mais collecté après lui n'entre dans aucun, comme les éditions de tldr.tech et
     les entrées du catalogue KEV de la CISA (<span lang="en">Known Exploited Vulnerabilities</span>) du lundi et du
     jeudi, datées de minuit et collectées le lendemain. Il attend la lecture par date d'arrivée dans K-B, prévue pour
-    plus tard par décision de Sabine
+    plus tard
     ([le README de l'infrastructure](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « Les comptes
     rendus en ligne (#423) »).
 - **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main du

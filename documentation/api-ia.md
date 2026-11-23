@@ -375,7 +375,7 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
     zéro réplique, le remet à zéro, et deux répliques tournent pendant un déploiement
     (`infra/modules/api-container-app.bicep:184-185`).
 - **Les essais de clé ne sont pas limités.** Le débit ne compte que les clients à clé valide; un 401 ne compte
-    pas. Écart voulu, décidé par Sabine: une clé de 32 caractères au moins ne se trouve pas par essais
+    pas. Écart voulu: une clé de 32 caractères au moins ne se trouve pas par essais
     ([la spécification des comptes rendus de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md),
     « <span lang="en">API2:2023 Broken Authentication</span> »).
 - **Un retrait ne prend effet qu'au redémarrage** de `kb serve-ai`. Une variable `KB_AI_API_KEY_*` exportée dans le

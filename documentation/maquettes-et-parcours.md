@@ -10,7 +10,7 @@
 
     — C17
 
-Cette fiche montre deux planches des maquettes du site, validées par Sabine: la charte graphique et les
+Cette fiche montre deux planches des maquettes validées du site: la charte graphique et les
 maquettes du fil de veille. Chacune vient en image, suivie de sa description textuelle, qui en donne tout le contenu.
 Les descriptions sont tirées des fichiers source des planches, pas lues sur l'image: les textes, les codes de couleur et
 les mesures sont ceux des maquettes. La fiche donne ensuite le parcours de l'opératrice sur le site, en schéma
@@ -223,7 +223,7 @@ La sorte, l'état « Exploitée » et la page courante s'écrivent en mots, jama
 
 ## Le parcours de l'opératrice
 
-Le site est privé: seule l'opératrice, Sabine, y entre. La plateforme Azure Container Apps demande la connexion
+Le site est privé: seule l'opératrice y entre. La plateforme Azure Container Apps demande la connexion
 Microsoft Entra, puis le site vérifie, à chaque requête, que la personne connectée est l'opératrice
 (`web/operator_check.py`). Le schéma suit ses écrans et les liens qui les relient, d'après les routes de
 `web/pages.py` et les gabarits de `web/templates/`. Un rectangle est un écran du site; un rectangle arrondi, le point
@@ -237,7 +237,7 @@ flowchart TD
     accDescr: Après la connexion Microsoft Entra, la plateforme puis le site vérifient que la personne connectée est l'opératrice, sinon ils la refusent. Depuis le fil de veille, elle va au détail d'un item, aux tendances, aux pages des sources et de l'accessibilité, à la source d'un item ou à la page GitHub d'un dépôt dans un nouvel onglet, et à la déconnexion. Une adresse inconnue donne la page 404, une erreur la page 500.
     open("L'opératrice ouvre l'adresse du site")
     entra("Connexion Microsoft Entra<br>(plateforme Container Apps)")
-    platform{"La plateforme admet-elle ce compte ?<br>(tenant du déploiement,<br>puis compte de Sabine seul)"}
+    platform{"La plateforme admet-elle ce compte ?<br>(tenant du déploiement,<br>puis compte de l'opératrice seul)"}
     platformRefused("Refus de la plateforme")
     check{"Le site: la personne connectée<br>est-elle l'opératrice ?"}
     refused["Accès réservé<br>(page 403 du site)"]

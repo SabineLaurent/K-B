@@ -205,8 +205,8 @@ vide.
 
 ### En ligne: PostgreSQL sur Azure
 
-L'installation se fait en quatre temps, par Sabine, à la main (`infra/README.md`, « Appliquer » et « La base
-PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
+L'installation se fait en quatre temps, par la propriétaire du groupe de ressources, à la main (`infra/README.md`,
+« Appliquer » et « La base PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
 
 1. **Le serveur**, créé par le Bicep (`infra/modules/postgresql-server.bicep`): PostgreSQL 18 (ligne 25), offre
     `Standard_B1ms` (ligne 21), 32 Gio (ligne 34), sauvegardes gardées 7 jours (ligne 39), connexion par Microsoft

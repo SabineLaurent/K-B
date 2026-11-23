@@ -34,8 +34,8 @@ prend le réglage du système; ensuite, il garde le mode affiché, que la lectri
 (`mkdocs.yml:59-75`). Le site se publie sur
 GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée à `true`, ou à la main (section [Publier](#publier)).
 
-Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine, et
-l'outil, MkDocs avec Material, la sienne ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
+Le format de remise est un site publié par MkDocs ou un outil équivalent, et l'outil retenu est MkDocs avec
+Material ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
 « Documentation publiée par un site MkDocs sur GitHub Pages », `docs/ADR/journal-decisions-projet.md:7335`). Les deux outils sont dans un groupe de
 dépendances à part, `docs` (`pyproject.toml`), que ni les tests ni l'image de K-B n'installent.
 
@@ -235,7 +235,7 @@ SHA, URL, ID).
     touche Tab avant que le focus ne bouge, et la liste repliée n'a plus de hauteur. Elle n'est plus un arrêt de la
     touche Tab (`documentation/javascripts/search-list.js`); les résultats s'atteignent par les flèches, depuis le
     champ de recherche. Sur un écran large, le parcours à la touche Tab suit l'ordre de la page, le bouton du mode
-    compris. Sabine a passé WAVE sur la fiche du monitorage en mode sombre, et l'a parcourue à la
+    compris. La fiche du monitorage a été passée à WAVE en mode sombre, et parcourue à la
     touche Tab. WAVE relevait les mêmes 15 erreurs de libellé, 7 libellés vides et 8 multiples, et un seul contraste
     très faible, sur le lien d'évitement du thème, « Aller au contenu ». Ce lien reste transparent tant qu'il n'a pas
     le focus (`opacity: 0`), et WAVE mesure son texte transparent sur la page. Il paraît au premier appui sur la
