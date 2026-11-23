@@ -80,7 +80,7 @@ version de Bicep ne connaît pas. La CI ne le vérifie pas encore (#452).
 
 ## Appliquer (Sabine, à la main)
 
-Ces fichiers donnent des rôles aux identités, ce qui demande le droit d'Owner sur le groupe : la CI ne l'a jamais.
+Ces fichiers donnent des rôles aux identités, ce qui demande le droit d'<span lang="en">Owner</span> sur le groupe : la CI ne l'a jamais.
 Chaque passe se fait en deux temps : l'aperçu (`what-if`), puis la création (`create`), par la même commande. Les
 commandes se lancent depuis la racine du dépôt. Toute nouvelle passe reprend **tous** les paramètres :
 - sans `imageTag`, les API et le job ne sont pas touchés, et restent tels quels ;
@@ -111,7 +111,7 @@ ressource du modèle, dans le même groupe : la règle `alert-kb-model-tokens` l
 elle n'est pas dans ce groupe, et `kb_check` le refuse.
 
 Chaque `<…>` se remplace par sa valeur. Une valeur laissée entre chevrons part telle quelle : le 2026-11-06, une
-adresse `<adresse>` a fait refuser le budget (« Notification cannot have invalid email addresses »), et le reste du
+adresse `<adresse>` a fait refuser le budget (<q lang="en">Notification cannot have invalid email addresses</q>), et le reste du
 déploiement a été créé sans lui. `kb_check` refuse aussi une variable vide, par exemple dans un nouveau terminal où
 elle n'a pas été posée.
 
@@ -132,10 +132,10 @@ for ns in Microsoft.App Microsoft.ContainerRegistry Microsoft.KeyVault Microsoft
 done
 ```
 
-Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un Contributor ou un Owner de l'abonnement peut
-l'enregistrer (Learn, « Quickstart: Create a policy assignment to identify non-compliant resources by using a Bicep
-file », lu le 2026-11-18). `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
-« `Microsoft.PolicyInsights` must be registered in your Azure subscription ».
+Les neuf doivent répondre `Registered`. Si l'un d'eux manque, seul un <span lang="en">Contributor</span> ou un <span lang="en">Owner</span> de l'abonnement peut
+l'enregistrer (Learn, « <span lang="en">Quickstart: Create a policy assignment to identify non-compliant resources by using a Bicep
+file</span> », lu le 2026-11-18). `Microsoft.PolicyInsights` (#497) donne les états de conformité des politiques d'audit :
+<q lang="en">`Microsoft.PolicyInsights` must be registered in your Azure subscription</q>.
 
 ### 2. Première passe : le socle
 
@@ -160,7 +160,7 @@ L'aperçu attendu à la première fois, sur un groupe où `cae-kb` existe déjà
     `id-kb-digest-watch` et `id-kb-migrate-database` ;
   - `pgsql-kb-…`, son administratrice Entra, ses deux paramètres et sa règle de pare-feu (« La base PostgreSQL ») ;
   - `stkbexchange…`, son service Blob, ses 4 conteneurs, leurs 8 rôles, la règle de cycle de vie et le verrou ;
-    `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle SMB MI Admin, le stockage `job-data`
+    `stkbjobfiles…`, son service de fichiers, le partage `job-data`, le rôle <span lang="en">SMB MI Admin</span> (SMB, <span lang="en">Server Message Block</span>, le protocole de partage de fichiers, et MI, <span lang="en">managed identity</span>, l'identité managée), le stockage `job-data`
     de `cae-kb` et le verrou (« Le stockage ») ;
   - les deux politiques d'audit, `audit-kb-ca-external-ingress` et `audit-kb-ca-https-only` (#497) ;
 - **à modifier** : `cae-kb` (les journaux, le chiffrement entre les apps et l'identité système), et `budget-kb`.
@@ -176,7 +176,7 @@ KV=$(az deployment group show -g "$RG" -n main --query properties.outputs.keyVau
 
 Une seconde création lancée pendant que la première tourne est refusée (`DeploymentActive`), sans effet.
 
-Si la création échoue sur le stockage `job-data` de `cae-kb`, c'est que le rôle SMB MI Admin, créé dans la même
+Si la création échoue sur le stockage `job-data` de `cae-kb`, c'est que le rôle <span lang="en">SMB MI Admin</span>, créé dans la même
 passe, n'est pas encore actif (jusqu'à 10 minutes) : relancer la même commande 10 minutes plus tard.
 
 ### 3. Pousser l'image
@@ -218,6 +218,8 @@ done
 az keyvault secret list --vault-name "$KV" --query "[].name" -o tsv    # les 6 noms, jamais les valeurs
 ```
 
+Le tableau suivant donne chaque secret, son contenu et ce qui le lit.
+
 | Secret | Contenu | Lu par |
 |---|---|---|
 | `kb-ai-api-key-kb-digest` | clé du client `KB_DIGEST` de l'API IA (généré) | `ca-kb-ai-api` |
@@ -225,13 +227,13 @@ az keyvault secret list --vault-name "$KV" --query "[].name" -o tsv    # les 6 n
 | `kb-data-api-key-ai-digest` | clé de l'API IA vers l'API de données (généré) | les deux API |
 | `kb-llm-api-key` | clé du modèle (Azure AI Foundry) | `ca-kb-ai-api` |
 | `kb-ai-github-token` | jeton GitHub des comptes rendus des tendances | `ca-kb-ai-api` |
-| `kb-otlp-headers` | en-tête OTLP de Grafana Cloud (`KB_OTLP_HEADERS`) | `ca-kb-ai-api` |
+| `kb-otlp-headers` | en-tête OTLP (<span lang="en">OpenTelemetry Protocol</span>) de Grafana Cloud (`KB_OTLP_HEADERS`) | `ca-kb-ai-api` |
 | `kb-data-api-key-web` | clé du site vers l'API de données, client `WEB` (généré, « Le site privé ») | `ca-kb-data-api`, `ca-kb-web` |
 | `kb-web-auth-client-secret` | secret client de l'inscription « K-B site », lu par la connexion Entra, jamais par le code (« Le site privé ») | `ca-kb-web` |
 
 Ce que dit chaque cas :
 - **Rien ne s'affiche** : le secret est posé.
-- **`ERROR: … Forbidden`** : le rôle Key Vault Secrets Officer de la passe 1 n'est pas encore actif. Il lui faut
+- **`ERROR: … Forbidden`** : le rôle <span lang="en">Key Vault Secrets Officer</span> de la passe 1 n'est pas encore actif. Il lui faut
   jusqu'à 10 minutes : relancer la commande.
 - **Jamais Entrée sur une invite vide.** Elle poserait une version vide par-dessus la bonne, et l'API IA refuserait
   de démarrer. Pour sortir sans rien poser : Ctrl-C.
@@ -297,7 +299,7 @@ lui, un `TAG` vide referait la passe 1 sans erreur, une adresse vide déploierai
 gabarit et laisserait le site en ingress interne (`api-container-app.bicep`, `hasSignIn`).
 
 L'aperçu attendu à la première passe 2, le 2026-11-06 (#414) :
-- **à créer** : `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, et 7 rôles Key Vault Secrets User, un par
+- **à créer** : `ca-kb-data-api`, `ca-kb-ai-api`, `caj-kb-smoke-test`, et 7 rôles <span lang="en">Key Vault Secrets User</span>, un par
   secret et par identité (`kb-data-api-key-ai-digest` en reçoit deux) ;
 - **à modifier** : du bruit. L'aperçu ne résout pas les `reference(…)` (identifiants des identités, URL du coffre),
   et il liste les valeurs par défaut qu'Azure renvoie sans que le Bicep les écrive.
@@ -308,7 +310,7 @@ rien ne montre que ce bruit, et l'image des apps et des jobs : après un déploi
 `k-b:<TAG>`, la même image si `TAG` est la version en ligne.
 
 Les rôles sur les secrets se créent dans le même déploiement que les apps. Si une app échoue sur
-« unable to fetch secret », c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
+<q lang="en">unable to fetch secret</q>, c'est qu'ils ne sont pas encore actifs : relancer la même commande 10 minutes plus tard.
 
 Une fois une version déployée par un tag (« Déployer une version »), `TAG` est la version en ligne, et non le SHA
 de l'étape 3. Sinon, la passe remettrait l'ancienne image. Après un déploiement par tag, les apps tiennent leur image
@@ -384,13 +386,13 @@ az policy state summarize -g "$RG" \
 
 Attendu : les deux assignations, `audit-kb-ca-external-ingress` avec l'identifiant de `ca-kb-web` dans `notScopes` ;
 `ca-kb-data-api` et `ca-kb-ai-api` en `Compliant` pour les deux (`complianceState` ; `isCompliant` est déprécié,
-référence REST « Policy States », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
+référence REST « <span lang="en">Policy States</span> », lue le 2026-11-18) ; `ca-kb-web` absent de `audit-kb-ca-external-ingress`, et en
 `Compliant` pour `audit-kb-ca-https-only` (`allowInsecure: false`, `api-container-app.bicep`) ; au `summarize`,
 `nonCompliantResources` 0 pour chacune des deux. Une
 app d'un autre projet du groupe y figurerait aussi ; le 2026-11-21, il n'y en a aucune (`audit-kb-ca-https-only` compte
 3 apps, celles de K-B). Une assignation nouvelle s'applique en cinq minutes environ ;
-la fin de l'évaluation n'a pas de délai garanti (page « Get compliance data of Azure resources », « Evaluation
-triggers », lue le 2026-11-18).
+la fin de l'évaluation n'a pas de délai garanti (page « <span lang="en">Get compliance data of Azure resources</span> », « <span lang="en">Evaluation
+triggers</span> », lue le 2026-11-18).
 
 Le job d'essai (critère de #414) :
 
@@ -489,7 +491,7 @@ EOF
 ```
 
 À vérifier ensuite :
-- dans Settings → Rules → Rulesets → « tags v », la liste des contournements montre « Repository admin ». La doc
+- dans <span lang="en">Settings → Rules → Rulesets</span> → « tags v », la liste des contournements montre « <span lang="en">Repository admin</span> ». La doc
   de GitHub ne donne pas le numéro de ce rôle : le 5 a été vérifié ainsi le 06/11 ;
 - `gh api "repos/$REPO/environments/production/deployment-branch-policies" -q '.branch_policies[] | [.name, .type]'`
   donne `["v*.*.*","tag"]`.
@@ -517,7 +519,7 @@ gh secret list --repo "$REPO"    # les 5 noms, jamais les valeurs
 
 Sur demande de Sabine seulement, et toujours sur un commit de `main` dont la CI est finie et verte. Un tag posé
 trop tôt, ou sur une CI annulée ou rouge, est refusé par `check`. On relance alors d'abord la CI du commit
-(« Re-run failed jobs » sur son exécution), puis, une fois verte, « Re-run all jobs » sur l'exécution du tag.
+(« <span lang="en">Re-run failed jobs</span> » sur son exécution), puis, une fois verte, « <span lang="en">Re-run all jobs</span> » sur l'exécution du tag.
 
 ```sh
 git -C ~/REPO_GIT/K-B pull --ff-only
@@ -534,7 +536,7 @@ celle qui tourne va jusqu'au bout.
 **Revenir en arrière**, c'est redéployer le tag précédent : l'image existe déjà, rien n'est reconstruit. Il n'y a
 pas de retour automatique : si une étape échoue en route, ou le test de fumée, celles déjà faites restent sur la
 nouvelle version (la base migrée, des apps ou des jobs) jusqu'à ce redéploiement.
-- Dans les 30 jours : « Re-run all jobs » sur l'exécution de ce tag.
+- Dans les 30 jours : « <span lang="en">Re-run all jobs</span> » sur l'exécution de ce tag.
 - Au-delà : `gh workflow run deploy.yml --repo "$REPO" --ref v0.1.0`.
 
 **Un job nouveau** (#421, #413) s'ajoute à `deployment.json`. Le Bicep lui donne le rôle de `id-kb-deploy`, et le
@@ -542,8 +544,8 @@ workflow met son image à jour.
 
 ### Le 08/11, une fois le dépôt public
 
-Jusque-là, un tag déploie sans validation : c'est un risque accepté par Sabine le 06/11 (journal ADR, registre).
-Les « required reviewers » ne s'ouvrent qu'aux dépôts publics. Le PUT remplace tout l'environnement, d'où la règle
+Jusque-là, un tag déploie sans validation : c'est un risque accepté par Sabine le 06/11 (journal ADR, <span lang="en">Architecture Decision Record</span>, et registre).
+Les « <span lang="en">required reviewers</span> » ne s'ouvrent qu'aux dépôts publics. Le PUT remplace tout l'environnement, d'où la règle
 des tags reprise dans le même corps.
 
 ```sh

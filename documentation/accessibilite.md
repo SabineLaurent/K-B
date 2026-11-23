@@ -188,6 +188,23 @@ AELE, RGPD, PR, ADR, CVE, DINUM, OSV, MCD, MLD, MPD, SGBD, CNIL) sont développ�
 courants (API, HTML, URL, UTC, SHA) ne le sont pas. Le libellé d'un schéma ne compte pas comme premier emploi: un sigle
 peut y paraître avant le texte qui le développe.
 
+Deux sections du guide d'infrastructure, `infra/README.md`, que GitHub affiche, sont vérifiées à part selon la même
+notice, le 2026-11-23: « Appliquer » et « Déployer une version », qui portent les commandes d'installation et de
+livraison auxquelles renvoie [la livraison continue](livraison-continue.md). Le tableau suivant donne le résultat de
+chaque règle sur ces deux sections.
+
+| Règle de la notice | Résultat sur les deux sections du guide |
+|---|---|
+| 1, 2, 3.2, 5, 6.3, 7.2, 9 | Tenues: aucun saut de ligne multiple, des titres sans niveau sauté, aucun attribut `title`, des listes Markdown, aucun renvoi par la seule position, aucune information par la couleur seule, aucun émoji. |
+| 3.1, 4, 8 | Sans objet: aucun lien, aucune image, aucun contenu riche ni en mouvement. |
+| 6.1. Citations déclarées | Tenue: chaque message d'erreur cité est un `q`. |
+| 6.2. Changements de langue | Tenue dans le fichier: chaque passage en anglais porte `lang="en"`, sur un `span` ou sur le `q` d'une citation. Limite: GitHub déclare sa page en anglais, et le fichier ne peut pas changer cette langue: le texte français y est annoncé comme de l'anglais. |
+| 7.1. Contrastes | Sans objet pour le fichier: les couleurs sont celles de GitHub. |
+
+Le tableau des secrets y est annoncé par une phrase et a sa ligne d'en-tête. Les sigles employés pour la première fois
+dans ces deux sections y sont développés (SMB, MI, OTLP, ADR), sauf les sigles techniques courants (TLS, REST, PUT,
+SHA, URL, ID).
+
 ## Vérifier
 
 1. Construire le site en mode strict:
