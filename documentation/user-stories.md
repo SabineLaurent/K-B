@@ -374,8 +374,9 @@ du compte autorisé ([les maquettes et le parcours](maquettes-et-parcours.md#le-
     `test_each_field_refused_says_why_under_it_and_in_the_summary` (`tests/web/test_accessibility.py:491`).
 - Accessibilité, WCAG 1.4.1: l'état d'une faille exploitée est dit en mots. Test:
     `test_the_exploited_mark_is_a_word_not_a_colour` (`tests/web/test_accessibility.py:587`).
-- Accessibilité, WCAG 1.4.4, 1.4.10 et 2.1.1: zoom à 200 %, affichage sur 320 pixels et clavier, contrôlés à la main,
-    ainsi que la lecture au lecteur d'écran.
+- Accessibilité, WCAG 1.4.4, 1.4.10 et 2.1.1: zoom à 200 %, affichage sur 320 pixels et clavier, contrôlés hors de la
+    suite de tests, par un relevé scripté du 22/11/2026 dans un navigateur piloté
+    ([PR n° 704](https://github.com/SabineLaurent/K-B/pull/704)).
 
 ## Sources
 
