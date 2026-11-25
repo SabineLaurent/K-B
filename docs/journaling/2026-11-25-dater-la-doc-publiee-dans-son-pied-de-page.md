@@ -179,9 +179,8 @@ Le repli mesuré par le navigateur (9,2:1 et 9,39:1) est un peu sous le calcul (
 
 ## Zones non vérifiées
 
-- **L'étape `docs.yml:46-56` n'a pas encore tourné sur GitHub** : elle a tourné sur le Mac, extraite du workflow, avec
-  le `bash` et l'`env -u` de macOS. `env -u` de GNU, sur `ubuntu-latest`, a la même option, et le défaut de
-  `bash -e` y est le même ; la CI de la PR le dira.
+- **L'étape `docs.yml:46-56` n'a été vue rouge que sur le Mac** : extraite du workflow, avec le `bash` et l'`env -u` de
+  macOS. Sur GitHub, elle a tourné verte (exécution `Docs` 45687089927, sur `83836c1e`), comme l'étape `docs.yml:42-45`.
 - **Le repli sans `light-dark()`** est mesuré dans Chrome 158, le bloc `@supports` rendu faux par une copie modifiée
   du site, pas dans un navigateur ancien.
 - **La relance du seul `deploy`** : tirée de la doc de GitHub (« Re-running workflows and jobs », lue le 2026-11-25) et
