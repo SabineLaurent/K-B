@@ -48,7 +48,7 @@ de dépôt `PAGES_PUBLISH` posée à `true`, ou lancé à la main depuis `main`.
 | Ruleset « Basic-rules-main-protect » | dit quels contrôles une PR doit passer pour fusionner | réglages du dépôt ([Le ruleset de `main`](#le-ruleset-de-main)) |
 
 Les actions épinglées sont `actions/checkout` v7.0.1 et `astral-sh/setup-uv` v10.3.3 dans les workflows, et en plus,
-dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:49`, `:74`).
+dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:60`, `:85`).
 
 La chaîne tourne sur GitHub Actions, et ces faits l'y attachent: le dépôt est sur GitHub (`git remote get-url origin`
 → `git@github.com:SabineLaurent/K-B.git`); son ruleset exige des contrôles rendus par GitHub Actions (`integration_id`
@@ -61,8 +61,8 @@ chaque action (`sha_pinning_required`, `gh api repos/SabineLaurent/K-B/actions/p
 | Déclencheur | Ce qui tourne |
 |---|---|
 | une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI`, `Image`, `Infra` et `Docs` (`ci.yml:3-7`, `image.yml:3-7`, `infra.yml:3-7`, `docs.yml:7-9`); `Infra` sans filtre de chemin depuis #496 |
-| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image`, `Infra` et `Docs`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`, `docs.yml:10-11`); `Docs` n'y publie le site que si la variable de dépôt `PAGES_PUBLISH` vaut `true` (`docs.yml:46-48`, `:55-57`) |
-| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:12`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:46-48`, `:55-57`) |
+| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image`, `Infra` et `Docs`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`, `docs.yml:10-11`); `Docs` n'y publie le site que si la variable de dépôt `PAGES_PUBLISH` vaut `true` (`docs.yml:57-59`, `:66-68`) |
+| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:12`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:57-59`, `:66-68`) |
 | « <span lang="en">Re-run all jobs</span> » ou « <span lang="en">Re-run failed jobs</span> » sur une exécution, ou `gh run rerun <id>` | la même exécution, sur le même commit |
 | le planning de Dependabot, chaque semaine (`dependabot.yml:6-7`, `:13-14`) | une PR de mise à jour, qui lance la CI comme toute PR |
 | une alerte de Dependabot, à tout moment (mises à jour de sécurité, activées dans [Les réglages de Dependabot](#les-reglages-de-dependabot)) | une PR de sécurité, sans attente, qui lance la CI comme toute PR |
@@ -79,10 +79,10 @@ première n'est pas annulée.
 ### Les jobs et leurs tâches
 
 Les jobs d'un même workflow tournent en parallèle, chacun sur un runner neuf, sauf un job qui en attend un autre: le
-`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:58`). Dans un job, les étapes s'enchaînent, et la première
+`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:69`). Dans un job, les étapes s'enchaînent, et la première
 qui échoue arrête le job. Chaque workflow n'a qu'un jeton qui lit le dépôt (`permissions: contents: read`,
 `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`, `docs.yml:14-15`), et aucun ne lit de secret. Seul le job `deploy`
-de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:66-68`), pour publier sur GitHub Pages.
+de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:77-79`), pour publier sur GitHub Pages.
 
 #### Le workflow `CI`
 
@@ -147,7 +147,7 @@ Bicep à la main (`infra/README.md`).
 tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lance à la main (`workflow_dispatch`)
 (`docs.yml:7-12`).
 
-- `build` (l. 19-51) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
+- `build` (l. 19-62) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
     nomme le commit qu'il a récupéré (`git rev-parse HEAD`) et le jour de la construction, en UTC (`date -u +%F`), dans
     `KB_DOCS_COMMIT` et `KB_DOCS_PUBLISHED_ON` (l. 27-33), que le pied de chaque page donne
     (`overrides/partials/copyright.html`); une PR les nomme aussi, pour que sa construction rende la ligne. Il
@@ -156,13 +156,15 @@ tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lanc
     ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:97-103`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
     11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 36-39). Il cherche ensuite, dans
-    `site/index.html`, la date de la construction et le lien vers son commit, et échoue sans eux (l. 40-45). Depuis
+    `site/index.html`, la date de la construction et le lien vers son commit, et échoue sans eux (l. 40-45). Il
+    construit encore le site trois fois, hors de `site/`: le commit vide, le jour vide, puis sans ces deux variables, et
+    échoue si l'une de ces pages d'accueil porte la ligne ou n'a pas son pied de page (l. 46-56). Depuis
     `main`, sur un push quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin
-    `site/` en artefact de Pages (l. 46-51), que `deploy` publie.
-- `deploy` (l. 53-74) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
-    (l. 55-57), après `build` (l. 58); un seul déploiement tourne à la fois (l. 61-63). Il a les droits
-    `pages: write` et `id-token: write` (l. 66-68), dans l'environnement `github-pages` (l. 69-71), et publie le site
-    par `actions/deploy-pages` (l. 73-74).
+    `site/` en artefact de Pages (l. 57-62), que `deploy` publie.
+- `deploy` (l. 64-85) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
+    (l. 66-68), après `build` (l. 69); un seul déploiement tourne à la fois (l. 72-74). Il a les droits
+    `pages: write` et `id-token: write` (l. 77-79), dans l'environnement `github-pages` (l. 80-82), et publie le site
+    par `actions/deploy-pages` (l. 84-85).
 
 Sur une PR, `deploy` est donc sauté. GitHub Pages est activé sur le dépôt depuis le 2026-11-22:
 voir [GitHub Pages](#github-pages).
@@ -194,7 +196,7 @@ gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin,
 
 Une PR reçoit onze contrôles: les sept jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
 depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Dix tournent; `deploy`
-est sauté sur une PR (`docs.yml:55-57`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
+est sauté sur une PR (`docs.yml:66-68`), et GitHub le liste comme tel: le 2026-11-18, `gh pr checks 637` donne `deploy`
 à `skipping`.
 
 ### Fusionner
@@ -307,7 +309,7 @@ uv 0.13.6 compris (`uv self update 0.13.6`), et, pour `tests-postgresql`, un ser
 
 Rien ne se règle hors du dépôt, en dehors des réglages d'[Installer la chaîne](#installer-la-chaine): aucun workflow de
 la CI ne lit de secret, et seul `docs.yml` lit une variable du dépôt, `PAGES_PUBLISH`, qui ouvre la publication du
-site à chaque push sur `main` (`.github/workflows/docs.yml:48`, `:57`).
+site à chaque push sur `main` (`.github/workflows/docs.yml:59`, `:68`).
 
 ### Ce qui se change, et où
 

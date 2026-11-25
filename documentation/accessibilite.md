@@ -25,11 +25,11 @@ La table des matières de la page ouverte est sous son lien (`mkdocs.yml:50-56`)
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
 n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:38-39`). Le
-pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Sous ces liens, il donne le jour de la publication, en UTC et le mois en lettres, et le commit publié, un lien vers sa page sur GitHub: `docs.yml` les nomme à la construction, et une construction locale sans eux n'a pas cette ligne. Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
-(`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
-(`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
+pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Sous ces liens, il donne le jour de la publication, en UTC et le mois en lettres, et le commit publié, un lien vers sa page sur GitHub: `docs.yml` les nomme à la construction, et une construction sans eux, ou avec l'un d'eux vide, n'a pas cette ligne. Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
+(`documentation/stylesheets/extra.css:1-64`). Le texte du menu et des tableaux est à la taille du texte courant
+(`:213-222`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:66-80`). Un script garde sur
 une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
-(`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
+(`documentation/javascripts/nowrap.js`, `extra.css:224-227`). Le site a un mode clair et un mode sombre. À la première
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
 (`mkdocs.yml:57-73`). Le site se publie sur
@@ -76,18 +76,18 @@ vérifie.
 | Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:56`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les huit images, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, ont chacune un texte de remplacement court qui nomme la section de leur description, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche; chaque logigramme comparé au code; chaque schéma Merise comparé aux deux scripts de la base |
 | Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:48-49`). | La configuration |
-| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
-| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
+| Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-64`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:196-199`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:174-188`). | Le calcul des rapports de contraste |
+| Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:82-91`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:159-172`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:190-194`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:88-90`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:207-211`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:88-90`, `documentation/stylesheets/extra.css:122-148`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
 | La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:45`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:105-107`). | Le contrôle du HTML construit |
 | Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:85-86`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
 Les rapports de contraste suivants sont calculés selon la formule des WCAG 2.1, le 2026-11-18, pour le mode clair et
-pour le mode sombre. Ils portent sur les couleurs de `documentation/stylesheets/extra.css:8-62` et, pour les blocs de
+pour le mode sombre. Ils portent sur les couleurs de `documentation/stylesheets/extra.css:8-64` et, pour les blocs de
 code et les schémas, sur celles de la feuille de style construite de Material 9.8.1. Une couleur transparente du
 thème est d'abord posée sur son fond, et c'est la couleur obtenue qui est mesurée. Ces couleurs composées sont
 calculées, non lues à l'écran. En mode clair, Chrome dessine `#00000012` sur `#F4F5F2` en `#E2E3E0`, et non en
@@ -123,7 +123,7 @@ schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisi
 | Le lien d'évitement | `#F4F5F2` sur `#1C1E21` | 15,27:1 | `#1C1E21` sur `#F4F5F2` | 15,27:1 |
 | Un lien du pied de page | `#0F5E6B` sur `#FFFFFF` | 7,41:1 | `#CFE3E6` sur `#121416` | 13,88:1 |
 | Un lien du pied de page sous le pointeur ou le focus | `#0A434C` sur `#FFFFFF` | 10,94:1 | `#FFFFFF` sur `#121416` | 18,46:1 |
-| Le jour de la publication et le commit, au pied de page (calculé le 2026-11-25) | `#4A4F57` sur `#FFFFFF` | 8,24:1 | `#DADCD6` sur `#121416` | 13,35:1 |
+| Le jour de la publication, au pied de page (calculé le 2026-11-25); le commit qui le suit est un lien du pied de page | `#4A4F57` sur `#FFFFFF` | 8,24:1 | `#DADCD6` sur `#121416` | 13,35:1 |
 | Le code en ligne | `#36464E` sur `#E6F0F1` | 8,45:1 | `#DADCD6` sur `#0A434C` | 7,91:1 |
 | Le code dans un lien d'une fiche | `#0F5E6B` sur `#E6F0F1` | 6,39:1 | `#CFE3E6` sur `#0A434C` | 8,22:1 |
 | Le code dans un lien d'une fiche sous le pointeur ou le focus | `#0A434C` sur `#DCE3E1` | 8,39:1 | `#FFFFFF` sur `#2E3235` | 12,93:1 |
@@ -147,7 +147,7 @@ Le troisième niveau est celui du schéma du déploiement sur Azure, dans
 [la fiche de l'architecture](architecture.md).
 
 Hors de l'en-tête, l'anneau de focus prend la couleur de l'accent (`documentation/stylesheets/extra.css:42-43`), y
-compris sur la liste des résultats de recherche (`:194-197`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur
+compris sur la liste des résultats de recherche (`:196-199`). En mode clair, c'est la sarcelle `#0F5E6B`, la couleur
 de focus de la charte, à 6,77:1 sur `#F4F5F2`. En mode sombre, c'est le canard givré `#CFE3E6`, à 12,56:1 sur
 `#1C1E21`. Les deux passent le seuil de 3:1 du RGAA 3.3 pour un composant d'interface. Sur l'en-tête, les onglets, le
 lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode, l'anneau est blanc, `#FFFFFF`: 16,71:1 sur
@@ -215,7 +215,7 @@ peut y paraître avant le texte qui le développe.
     sur un écran large et sur un écran étroit. Le 2026-11-18, sur le thème de #652, WAVE relevait 15 erreurs de
     libellé, sur les cases cachées du thème et sur les `label` des deux radios du mode (« Limites »), et un contraste
     très faible, sur l'en-tête caché des résultats de recherche: un fond transparent, que WAVE ne compose pas avec la
-    page. Cet en-tête a depuis un fond opaque, le même à l'œil (`documentation/stylesheets/extra.css:199-203`). La
+    page. Cet en-tête a depuis un fond opaque, le même à l'œil (`documentation/stylesheets/extra.css:201-205`). La
     liste des résultats de recherche recevait le focus sans rien montrer: la recherche de Material se ferme sur la
     touche Tab avant que le focus ne bouge, et la liste repliée n'a plus de hauteur. Elle n'est plus un arrêt de la
     touche Tab (`documentation/javascripts/search-list.js`); les résultats s'atteignent par les flèches, depuis le
@@ -230,7 +230,7 @@ peut y paraître avant le texte qui le développe.
     la page, le menu de gauche titre par titre. Le thème donne le focus à un bloc de code qui défile, pour le faire
     défiler au clavier (WCAG 2.1, critère 2.1.1). Depuis, le lien d'évitement est placé hors de l'écran tant qu'il n'a
     pas le focus, comme le recommande WebAIM, et non plus transparent: son texte garde ses couleurs
-    (`documentation/stylesheets/extra.css:227-235`). Au premier appui sur la touche Tab, il paraît en haut à gauche de
+    (`documentation/stylesheets/extra.css:229-237`). Au premier appui sur la touche Tab, il paraît en haut à gauche de
     la page, avec son anneau blanc, en mode clair comme en mode sombre (relevé le 2026-11-19 dans Chrome sans interface,
     à 1 512 et à 390 pixels).
 
@@ -238,12 +238,19 @@ peut y paraître avant le texte qui le développe.
 
 Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
 la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:10-12`, `:46-74`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
+(`.github/workflows/docs.yml:10-12`, `:57-85`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
 quand Pages n'était pas encore activé, et `deploy` aurait échoué à chaque fusion. Un seul déploiement tourne à la
 fois, jamais interrompu, et un seul attend: quand une fusion arrive
 pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
-([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:61-63`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
-annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`docs.yml:66-68`).
+([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:72-74`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
+annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`docs.yml:77-79`).
+
+Le pied de page dit « Documentation publiée le », le texte de la décision de Sabine du 2026-11-25, mais le jour qu'il
+donne est celui de la construction, nommé par `build` (`docs.yml:30-33`). Les deux diffèrent quand `deploy` publie
+plus tard: un déploiement qui attend son tour, ou `deploy` relancé seul, qui ne relance pas `build`
+([<span lang="en">Re-running workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs), lu le 2026-11-25)
+et publie le site déjà construit, tant que son artefact existe: un jour, le défaut de `retention-days` de
+`actions/upload-pages-artifact` v5.0.0 (son `action.yml`, lu le 2026-11-25).
 
 Pages est activé depuis le 2026-11-22, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
 `"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). La première publication a été lancée à
@@ -285,7 +292,9 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
 - **Un navigateur sans `light-dark()` garde les couleurs de Material.** Avant Chrome 123, Firefox 120 et Safari 17.5
     (mai 2024), le bloc des couleurs de K-B est sauté (`documentation/stylesheets/extra.css:8-11`): le site prend les
     couleurs par défaut du thème, qui ne sont pas mesurées ici. Les règles de K-B hors de ce bloc ont alors des valeurs
-    de repli, celles du thème.
+    de repli, celles du thème. Seule celle du jour de la publication, au pied de page, est calculée (le 2026-11-25): la
+    couleur d'un lien du pied de Material, `#FFFFFFB3`, à 9,26:1 sur son pied sombre en mode clair et 9,44:1 en mode
+    sombre; le texte secondaire du mode clair de Material y aurait donné 1,1:1 (`documentation/stylesheets/extra.css:239-246`).
 - **Le bouton du mode clair ou sombre est un bouton radio du thème.** À chaque chargement d'une page en mode sombre,
     la touche Tab atteint le radio nommé « Passer au mode sombre », sur une page déjà sombre: un lecteur d'écran
     annonce l'inverse de ce qui se passe. Entrée change toujours le mode. Espace et les flèches cochent un radio, dont

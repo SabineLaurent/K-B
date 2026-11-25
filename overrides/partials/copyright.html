@@ -8,11 +8,13 @@
       <li><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.fr">Licence CC BY-NC 4.0</a></li>
     </ul>
   </nav>
-  {#- The day and the commit of the build that published the site (docs.yml), in UTC; none on the machine. !ENV gives
-      a date its own type: |string reads it back as 2026-11-25. The day is written as on the site of K-B. #}
+  {#- The day and the commit of the build that published the site (docs.yml), in UTC; none on the machine, nor when
+      one of them is empty: !ENV reads an empty variable as None, which |string would write "None", so the values are
+      tested before. !ENV gives a date its own type: |string reads it back as 2026-11-25. The day is written as on the
+      site of K-B, by its twin write_day (src/k_b/web/french_dates.py). #}
+  {%- if config.extra.published_commit and config.extra.published_on %}
   {%- set published_commit = config.extra.published_commit | string %}
   {%- set published_on = config.extra.published_on | string %}
-  {%- if published_commit and published_on %}
   {%- set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
       "novembre", "décembre"] %}
   {%- set year, month, day = published_on.split("-") %}

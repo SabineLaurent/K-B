@@ -107,6 +107,6 @@ validation:
 extra:
   generator: false
   # The commit and the day (UTC) of the build, set by docs.yml, which the footer gives
-  # (overrides/partials/copyright.html); not set, on the machine: no line.
+  # (overrides/partials/copyright.html); not set, as on the machine, or empty: no line.
   published_commit: !ENV [KB_DOCS_COMMIT, ""]
   published_on: !ENV [KB_DOCS_PUBLISHED_ON, ""]

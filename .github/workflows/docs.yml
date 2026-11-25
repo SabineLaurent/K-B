@@ -43,6 +43,17 @@ jobs:
         run: |
           grep -qF "Documentation publiée le <time datetime=\"$KB_DOCS_PUBLISHED_ON\">" site/index.html
           grep -qF "href=\"https://github.com/SabineLaurent/K-B/commit/$KB_DOCS_COMMIT\"" site/index.html
+      # A commit or a day set but empty counts as one not set, as on the machine: no line, and the build goes on. Each
+      # case is built out of site/, the only folder published, and its footer must be there.
+      - name: Gives no line in the footer when the commit or the day is empty or not set
+        run: |
+          KB_DOCS_COMMIT= uv run --locked --only-group docs mkdocs build --strict --site-dir "$RUNNER_TEMP/empty-commit"
+          KB_DOCS_PUBLISHED_ON= uv run --locked --only-group docs mkdocs build --strict --site-dir "$RUNNER_TEMP/empty-day"
+          env -u KB_DOCS_COMMIT -u KB_DOCS_PUBLISHED_ON uv run --locked --only-group docs mkdocs build --strict --site-dir "$RUNNER_TEMP/not-set"
+          for site in empty-commit empty-day not-set; do
+            grep -qF 'aria-label="Pied de page"' "$RUNNER_TEMP/$site/index.html"
+            if grep -qF 'class="kb-footer-version"' "$RUNNER_TEMP/$site/index.html"; then echo "$site: line found"; exit 1; fi
+          done
       - if: >-
           github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch'
           || (github.event_name == 'push' && vars.PAGES_PUBLISH == 'true'))

@@ -54,10 +54,12 @@
     --md-footer-fg-color: var(--kb-link-hover);
     --md-footer-fg-color--light: var(--md-typeset-a-color);
 
-    /* K-B's own: a link under the pointer, the inline code, the rules of a code block and of the footer. */
+    /* K-B's own: a link under the pointer, the inline code, the rules of a code block and of the footer, the day of
+       the publication in the footer. */
     --kb-link-hover: light-dark(var(--kb-teal-deep), #FFFFFF);
     --kb-code-inline-bg: light-dark(var(--kb-mist), var(--kb-teal-deep));
     --kb-rule: light-dark(var(--kb-stone), var(--kb-slate));
+    --kb-footer-version: var(--md-default-fg-color--light);
   }
 }
 
@@ -234,9 +236,11 @@
   inset-inline-start: -10000px;
 }
 
-/* The day and the commit of the published site, under the links: the secondary text of the theme, 8.24:1 on the white
-   of the footer, 13.35:1 on its night. */
+/* The day of the publication, under the links of the footer: the secondary text of the theme, 8.24:1 on the white of
+   the footer, 13.35:1 on its night; the commit that follows is a link, in the colours of the links of the footer.
+   Without light-dark(), the colour of a link of Material's footer, 9.26:1 on its dark footer, 9.44:1 in the dark mode:
+   the secondary text of its light mode would give 1.1:1 there. */
 .md-typeset .kb-footer-version {
   margin: 0.4rem 0 0;
-  color: var(--md-default-fg-color--light);
+  color: var(--kb-footer-version, var(--md-footer-fg-color--light));
 }
