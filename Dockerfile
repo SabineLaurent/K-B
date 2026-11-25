@@ -7,7 +7,7 @@
 FROM ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 AS uv
 
 # Build stage: the virtual environment, from uv.lock, without the development dependencies.
-FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90 AS builder
+FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50 AS builder
 COPY --from=uv /uv /usr/local/bin/uv
 # The Python of the base image, never one uv downloads; .pyc compiled now, since the final image
 # cannot write them (owned by root).
@@ -24,7 +24,7 @@ COPY src/ src/
 RUN uv sync --locked --no-dev --no-editable
 
 # Final stage: the same base, the virtual environment only, without uv.
-FROM python:3.13-slim-trixie@sha256:e48f59cdba69a3cbd9ed2cf0f348d90d45a8d350d98134cf1070bc106ee9ed90
+FROM python:3.13-slim-trixie@sha256:7249d5587b78209a006dc4a3b5340678f84ea729239193aa559962cd8c1fce50
 # The base image ships its standard library without .pyc: compiled here, as root, or every start
 # compiles them again in memory.
 RUN python -m compileall -q /usr/local/lib/python3.13
