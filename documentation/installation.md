@@ -148,6 +148,9 @@ les variables des commandes qu'ils enchaînent; avec `--dry-run`, ils ne lisent 
     requête sauf `/health` porte l'identifiant d'objet de l'opératrice; avec `off`, aucun en-tête n'est vérifié
     (`web/settings.py`). `KB_WEB_OPERATOR_ID` est obligatoire, sauf avec `KB_WEB_AUTH=off`, que `kb serve-web` refuse
     hors de `127.0.0.1` ou dans Azure (`web/settings.py`).
+- **`KB_VERSION`**: lue par `kb serve-web`, jamais posée à la main. L'image d'une version porte son tag
+    (`deploy.yml`, `Dockerfile`), que le pied de chaque page donne. Vide ou absente, pas de ligne; posée, elle doit
+    être `vMAJEUR.MINEUR.CORRECTIF`, sinon `kb serve-web` refuse de démarrer (`web/settings.py`).
 - **`KB_OTLP_ENDPOINT`, `KB_OTLP_HEADERS`, `KB_TRACE_CONTENT`**: lues par `kb serve-ai`. Facultatives: sans les deux
     premières, rien n'est exporté, et `kb serve-ai` refuse de démarrer avec `KB_TRACE_CONTENT` autre que `none`
     (`find_content_without_export_refusal`, `ai_api/connectors/metrics_export.py`).

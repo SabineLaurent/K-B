@@ -300,6 +300,16 @@ du réseau pourrait poser l'en-tête.
 | `KB_DATA_API_KEY_WEB` | obligatoire : la clé que lit aussi `kb serve-data` pour son client `WEB` | un secret posé aux deux apps |
 | `KB_DATA_API_URL` | `http://127.0.0.1:8000` par défaut | l'URL interne de l'API de données, en `https` |
 | `KB_LOG_TO_FILE` | `true` par défaut : `logs/kb-serve-web.log` | `false` (image) : la sortie d'erreur |
+| `KB_VERSION` | non posée : pas de ligne de version | posée par l'image : le tag de sa construction |
+
+`KB_VERSION` ne se pose jamais à la main. `deploy.yml` construit l'image d'un tag avec
+`--build-arg KB_VERSION=<tag>`, et le `Dockerfile` garde cette valeur dans l'environnement de l'image : la version
+suit l'empreinte de l'image, en retour arrière comme en passe 2 de Bicep. Le pied de chaque page la donne après ses
+liens, « Version déployée: v0.1.9 ». Vide ou absente, pas de ligne : l'image a été construite hors de `deploy.yml`
+(`image.yml`, `compose.yaml`, à la main) ou avant le premier tag construit avec `KB_VERSION`. Posée, elle doit être `vMAJEUR.MINEUR.CORRECTIF`,
+sans zéro en tête (`VERSION_TAG`, `web/settings.py`), sinon `kb serve-web` refuse de démarrer. C'est la règle du job
+`check` de `deploy.yml`, qui refuse tout autre tag : les deux changent ensemble, sinon un tag livré empêcherait le
+site de démarrer.
 
 En ligne, l'app sert `serve-web` par une entrée externe en HTTPS seulement, avec l'authentification Entra
 en « Require authentication » : sans session, un navigateur reçoit un 302 vers la connexion de Microsoft Entra
@@ -386,6 +396,26 @@ par une espace insécable, dans un seul élément du bouton avec son libellé ; 
 avait. Mesuré dans Chrome 157 le 2026-11-21, avec la police système de macOS : aucune des 24 pages de
 `tests/web/test_accessibility.py` ne défile en largeur, de 320 à 1280 px, à texte de 100 à 200 %.
 
+L'anneau de focus (`:focus-visible`, un contour de 3 px à 2 px de l'élément) a une marge de défilement en haut et en
+bas, `scroll-margin-block: 5px`, la place de l'anneau autour de l'élément (#700). Au clavier, Chrome ne fait défiler la
+page vers un élément en partie hors de l'écran que jusqu'au bord de l'élément, le bord bas au Tab, le bord haut au
+Maj+Tab : sans la marge, ce côté de l'anneau restait caché, de 5 px au plus. Mesuré dans Chrome 157 sans interface, au
+clavier seul, sur les 24 pages de `tests/web/test_accessibility.py`, à 1280 px, à 200 % (640 px CSS à 2 px d'écran par
+px CSS) et à 320 px, sur `main` 9658225a, sans puis avec la marge (2026-11-22) :
+
+- au Tab, du premier arrêt au dernier : 10, 41 et 21 bas d'anneau coupés sans la marge, aucun avec ;
+- au Maj+Tab, du dernier arrêt au premier : 6, 25 et 19 hauts coupés sans la marge, aucun avec ;
+- chaque arrêt placé à 1 px, puis à mi-hauteur, hors de l'écran, puis Tab ou Maj+Tab (544 essais de chaque côté par
+  réglage) : 144, 312 et 322 bas coupés, 149, 342 et 359 hauts coupés sans la marge, aucun avec.
+
+Le lien d'évitement mène au même endroit avec et sans la marge, et le reste de l'essai ne change pas, sauf le cadre des
+tendances, plus haut que l'écran à 200 % et à 320 px : son anneau est coupé de 1 à 2 px en haut au lieu de 6 à 7, et
+de 5 px de plus en bas. Le bouton du calendrier d'un champ de date porte l'anneau de Chrome, pas celui du site : il
+n'est pas compté. Écarté : `scroll-padding-block` sur la page, qui vaut pour tout défilement et décale de 5 px la
+cible du lien d'évitement (mesuré avec les deux côtés) ; une marge sur chaque élément que le clavier atteint, qui
+jouerait hors du focus clavier. La marge ne ramène pas un lien en partie hors du cadre des tendances (plus haut, #693).
+Firefox et Safari ne sont pas mesurés.
+
 ## Accessibilité
 
 La cible est le RGAA 4.1.2, soit WCAG 2.1 AA, avec les règles du référentiel Opquast 2025 (version 5.0)
@@ -396,6 +426,7 @@ qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 - un seul `h1`, et des titres sans niveau sauté ;
 - les zones et le lien d'évitement ;
 - le lien courant, et les liens du pied de page en liste ;
+- la version déployée, au bas du pied de page, après ses liens ;
 - les SVG décoratifs ;
 - l'absence de script ;
 - un lien vers un autre site dit « site externe » et « nouvel onglet », s'ouvre dans un nouvel onglet
@@ -418,7 +449,8 @@ l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une r
 chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
-vérifie l'anneau de focus, la taille du lien d'évitement, les règles du fort zoom et la feuille d'impression.
+vérifie l'anneau de focus et sa marge de défilement, la taille du lien d'évitement, les règles du fort zoom et la
+feuille d'impression.
 `tests/web/test_accessibility.py` vérifie aussi la flèche de chaque bouton liée à son mot.
 
 Le reste se contrôle à la main : la validité du code, le zoom à 200 %, la largeur de 320 px, l'espacement

@@ -1,11 +1,25 @@
 """The settings of kb serve-web: where it listens, the hosts it answers, whose header it checks, and
 how it reads the data API; the check is off only on the machine, outside Azure Container Apps."""
 
+import re
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr
 from site_client import OPERATOR_ID, TEST_API_KEY
 
-from k_b.web.settings import DataApiAccess, WebSettings, read_web_settings_or_refusal
+from k_b.web.settings import (
+    VERSION_TAG,
+    DataApiAccess,
+    WebSettings,
+    read_web_settings_or_refusal,
+)
+
+DEPLOY_WORKFLOW_PATH = (
+    Path(__file__).parents[2] / ".github" / "workflows" / "deploy.yml"
+)
+# The test of the step "Refuses a ref that is not a version tag" of the job check.
+CHECKED_REF = re.compile(r'\[\[ "\$GITHUB_REF" =~ \^refs/tags/(\S+)\$ \]\]')
 
 # The key of the client WEB, which kb serve-web needs whatever its access.
 DATA_API_KEY = {"KB_DATA_API_KEY_WEB": TEST_API_KEY}
@@ -26,6 +40,7 @@ def test_the_defaults_listen_on_the_machine_and_check_the_operator():
         allowed_hosts=("127.0.0.1", "localhost"),
         operator_id=OPERATOR_ID,
         data_api=DEFAULT_DATA_API,
+        version=None,
     )
 
 
@@ -54,6 +69,7 @@ def test_the_check_on_every_address_in_azure_container_apps():
             "KB_WEB_ALLOWED_HOSTS": "ca-kb-web.example.azurecontainerapps.io,10.0.0.4",
             "CONTAINER_APP_NAME": "ca-kb-web",
             "KB_DATA_API_URL": "https://ca-kb-data-api.internal.example.azurecontainerapps.io",
+            "KB_VERSION": "v0.1.9",
             **DATA_API_KEY,
         }
     )
@@ -67,7 +83,63 @@ def test_the_check_on_every_address_in_azure_container_apps():
             base_url="https://ca-kb-data-api.internal.example.azurecontainerapps.io",
             api_key=SecretStr(TEST_API_KEY),
         ),
+        version="v0.1.9",
     )
+
+
+def test_an_empty_version_is_no_version():
+    """The image built without the argument of deploy.yml (image.yml, compose.yaml, by hand) has
+    KB_VERSION set, empty."""
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": "", **DATA_API_KEY}
+    )
+
+    assert isinstance(settings, WebSettings)
+    assert settings.version is None
+
+
+@pytest.mark.parametrize("version", ["v0.0.0", "v10.20.30"])
+def test_a_version_tag_of_deploy_yml_is_kept(version):
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": version, **DATA_API_KEY}
+    )
+
+    assert isinstance(settings, WebSettings)
+    assert settings.version == version
+
+
+def test_the_rule_of_a_version_is_the_one_of_the_job_check_of_deploy_yml():
+    """A tag deploy.yml accepts and the site refuses would keep the site from starting, after the
+    migration of the base."""
+    [checked_tag] = CHECKED_REF.findall(
+        DEPLOY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    )
+
+    assert checked_tag == VERSION_TAG.pattern
+
+
+# A digit of full width: \d would take it, [0-9] does not.
+FULL_WIDTH_ZERO = chr(0xFF10)
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        "0.1.9",
+        "v0.1",
+        "v01.1.9",
+        "v0.01.9",
+        "v0.1.09",
+        "v0.1.9-rc.1",
+        "v0.1.9\n",
+        " v0.1.9",
+        f"v{FULL_WIDTH_ZERO}.1.9",
+    ],
+)
+def test_a_version_that_is_not_a_tag_of_deploy_yml_is_refused_quoted(version):
+    assert read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": version, **DATA_API_KEY}
+    ) == (f"KB_VERSION: {version!r} not a version tag vMAJOR.MINOR.PATCH")
 
 
 @pytest.mark.parametrize(

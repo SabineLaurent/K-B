@@ -65,6 +65,9 @@
   :focus-visible {
     outline: 3px solid var(--color-teal);
     outline-offset: 2px;
+    /* Chrome scrolls an element partly out of the screen that Tab or Shift+Tab reaches only up to
+       its edge. This margin keeps the ring in sight above and below it, the outline plus its offset. */
+    scroll-margin-block: 5px;
   }
 
   /* The paper of the pages, on the canvas: the body, a container, would no longer give it its
@@ -252,6 +255,19 @@
     @media (width >= 64rem) {
       padding-block: 0.625rem;
       gap: 0.25rem 1.75rem;
+    }
+  }
+
+  /* The version deployed, a line under the links, in the colour of the help of a field. */
+  .site-footer-version {
+    max-inline-size: var(--page-width);
+    margin: 0 auto;
+    padding: 0 var(--gutter) 0.75rem;
+    color: var(--color-slate);
+    font-size: 0.875rem;
+
+    @media (width >= 64rem) {
+      padding-block-end: 0.625rem;
     }
   }
 
