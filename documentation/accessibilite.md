@@ -25,7 +25,7 @@ La table des matières de la page ouverte est sous son lien (`mkdocs.yml:50-56`)
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
 n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:38-39`). Le
-pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
+pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Sous ces liens, il donne le jour de la publication, en UTC et le mois en lettres, et le commit publié, un lien vers sa page sur GitHub: `docs.yml` les nomme à la construction, et une construction locale sans eux n'a pas cette ligne. Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
 (`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
 (`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
 une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
@@ -123,6 +123,7 @@ schéma y est de 8 %, et non des 12 % de Material: à 12 %, une boîte au troisi
 | Le lien d'évitement | `#F4F5F2` sur `#1C1E21` | 15,27:1 | `#1C1E21` sur `#F4F5F2` | 15,27:1 |
 | Un lien du pied de page | `#0F5E6B` sur `#FFFFFF` | 7,41:1 | `#CFE3E6` sur `#121416` | 13,88:1 |
 | Un lien du pied de page sous le pointeur ou le focus | `#0A434C` sur `#FFFFFF` | 10,94:1 | `#FFFFFF` sur `#121416` | 18,46:1 |
+| Le jour de la publication et le commit, au pied de page (calculé le 2026-11-25) | `#4A4F57` sur `#FFFFFF` | 8,24:1 | `#DADCD6` sur `#121416` | 13,35:1 |
 | Le code en ligne | `#36464E` sur `#E6F0F1` | 8,45:1 | `#DADCD6` sur `#0A434C` | 7,91:1 |
 | Le code dans un lien d'une fiche | `#0F5E6B` sur `#E6F0F1` | 6,39:1 | `#CFE3E6` sur `#0A434C` | 8,22:1 |
 | Le code dans un lien d'une fiche sous le pointeur ou le focus | `#0A434C` sur `#DCE3E1` | 8,39:1 | `#FFFFFF` sur `#2E3235` | 12,93:1 |
@@ -200,7 +201,7 @@ peut y paraître avant le texte qui le développe.
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
     (`mkdocs.yml:97-103`). Le workflow `docs.yml` la lance sur chaque demande de fusion
     (PR, <span lang="en">pull request</span>) et sur chaque push sur `main`
-    (`.github/workflows/docs.yml:7-12`, `:28`).
+    (`.github/workflows/docs.yml:7-12`, `:35`).
 
 2. Le contrôle du HTML construit, lancé sur `site/` pour chaque PR de mise en forme, compte dans chaque page: l'attribut
     `lang`, les titres de niveau 1 et les sauts de niveau, les tableaux sans `th`, les liens dont le texte est une
@@ -237,12 +238,12 @@ peut y paraître avant le texte qui le développe.
 
 Le workflow `docs.yml` publie le site sur GitHub Pages à chaque push sur `main`, c'est-à-dire à chaque fusion, quand
 la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la main, depuis `main` seulement
-(`.github/workflows/docs.yml:10-12`, `:33-61`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
+(`.github/workflows/docs.yml:10-12`, `:46-74`). Sans cette variable, son job `deploy` est sauté: elle a été choisie
 quand Pages n'était pas encore activé, et `deploy` aurait échoué à chaque fusion. Un seul déploiement tourne à la
 fois, jamais interrompu, et un seul attend: quand une fusion arrive
 pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
-([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
-annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`).
+([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:61-63`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
+annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`docs.yml:66-68`).
 
 Pages est activé depuis le 2026-11-22, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
 `"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). La première publication a été lancée à
@@ -304,7 +305,7 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
     qui bouge. Le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
     vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
-    (`.github/workflows/docs.yml:29-32`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
+    (`.github/workflows/docs.yml:36-39`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.
