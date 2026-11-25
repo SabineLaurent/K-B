@@ -24,7 +24,7 @@ terminaison, qui peut l'appeler, comment une clé se change, ce que dit son cont
 base dans chaque environnement de K-B. Le contrat de ses sept routes est
 [l'OpenAPI versionnée de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json),
 `docs/api/openapi-donnees.json`: la fiche y renvoie et ne la remplace pas. Elle est écrite d'après le code de `main`
-au commit `39cb5eb9` (2026-11-22). Les chemins du code de K-B (`data_api/…`, `core/…`, `database/…`, …) partent de
+au commit `39cb5eb9`. Les chemins du code de K-B (`data_api/…`, `core/…`, `database/…`, …) partent de
 `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API de données
@@ -140,9 +140,9 @@ bornes (`data_api/routers/item_router.py:38-44`, `:101-108`).
 - **Le filtre de date.** `since` porte sur la date que la source donne, propre à chaque sorte, `source_date` dans
     la réponse; il est converti en UTC, arrondi à la seconde supérieure, puis comparé en `>=`
     (`database/reading.py:94`, `:416-429`). Ni la date de collecte ni une date de révision n'y entrent: c'est la
-    décision du 2026-10-14 du
+    décision du
     [journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-    entrée « API de données ».
+    entrée « API de données » (`docs/ADR/journal-decisions-projet.md:1562`).
 - **La recherche.** `q` cherche un morceau de texte dans le titre et le résumé de chaque item, sans égard à la casse
     des lettres sans accent, par le même SQL sur les deux moteurs, `lower(champ) LIKE lower(q)`
     (`database/reading.py:86-98`); `%`, `_` et `\` y sont cherchés tels quels (`database/reading.py:432-440`). Le
@@ -440,9 +440,9 @@ aussi, le débit passant avant le client de la route. `/health`, `/docs` et `/op
 
 ## Expiration et changement d'une clé
 
-**Une clé de l'API de données n'expire pas.** C'est le choix du 2026-10-14, écrit au
+**Une clé de l'API de données n'expire pas.** C'est le choix écrit au
 [journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), entrée
-« API de données »: une clé fixe par client nommé, révocable seule, parce que la clé identifie le programme qui
+« API de données » (`docs/ADR/journal-decisions-projet.md:1562`): une clé fixe par client nommé, révocable seule, parce que la clé identifie le programme qui
 appelle et qu'aucune personne ne se connecte. Options écartées: une clé partagée, qui ne permet pas de retirer un
 client seul, et un jeton signé, avec renouvellement, que la même API délivrerait et vérifierait. La clé n'a ni
 durée de vie ni date de fin, et le client n'a pas d'étape de renouvellement: elle reste valide jusqu'à ce qu'on la

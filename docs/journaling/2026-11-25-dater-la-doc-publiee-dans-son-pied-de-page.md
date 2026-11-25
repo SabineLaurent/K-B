@@ -137,7 +137,11 @@ du pied, déjà au tableau des contrastes.
 - **Repli de couleur** (constat 1) : `--md-footer-fg-color--light`, 9,26:1. Écarté : `--md-footer-fg-color--lighter`,
   la couleur du texte de pied de Material, 4,52:1, trop près du seuil de 4,5:1.
 - **Les renvois `mkdocs.yml:N` en retard d'une ligne** (constat 3) : défaut antérieur, laissé à #720. La cause vérifiée
-  est `6a71c217` (#510), et non `3e5494b0` (#685) comme le disait la revue.
+  est `6a71c217` (#510), et non `3e5494b0` (#685) comme le disait la revue. #708, fusionnée le même jour, a recalé ces
+  renvois sur `main` : après l'intégration de `main` dans la branche, chacun tombe sur sa ligne, et #720 n'a plus d'objet.
+- **Les fiches à la règle de #708** (décisions de Sabine du 23/11, appliquées par #708) : ni date de lecture ou de calcul,
+  ni nom de personne. Les ajouts de cette branche aux fiches les suivent depuis l'intégration de `main` : la décision
+  de #719 y est citée par son issue, et « calculé le » ou « lu le » en sont retirés.
 
 ## Preuve
 
@@ -185,6 +189,7 @@ Le repli mesuré par le navigateur (9,2:1 et 9,39:1) est un peu sous le calcul (
 
 ## Ce qui reste
 
-- #720 : reporter d'une ligne les renvois `mkdocs.yml:N` des deux fiches.
+- #720 : sans objet depuis #708, à fermer.
+- Les renvois `deploy.yml:N` des fiches, en retard sur `main` depuis #717 : relevés dans la PR, à trancher.
 - Après la fusion : lire la ligne sur `https://sabinelaurent.github.io/K-B/`, une fois `deploy` passé.
 - L'anneau qui recouvre la virgule : à trancher (le laisser, ou espacer le lien), hors du tri de cette revue.

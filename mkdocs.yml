@@ -17,6 +17,7 @@ nav:
           - utilisation.md
           - architecture.md
           - maquettes-et-parcours.md
+          - user-stories.md
       # In the order of the data: collected, queried, imported, modelled, sorted, served (issue 685).
       - 2. Les données:
           - collecte.md

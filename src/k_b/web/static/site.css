@@ -258,6 +258,19 @@
     }
   }
 
+  /* The version deployed, a line under the links, in the colour of the help of a field. */
+  .site-footer-version {
+    max-inline-size: var(--page-width);
+    margin: 0 auto;
+    padding: 0 var(--gutter) 0.75rem;
+    color: var(--color-slate);
+    font-size: 0.875rem;
+
+    @media (width >= 64rem) {
+      padding-block-end: 0.625rem;
+    }
+  }
+
   @media (width >= 48rem) {
     :root {
       --gutter: 1.5rem;

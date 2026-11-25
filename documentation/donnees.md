@@ -22,8 +22,8 @@
 Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment installer la base en local et en ligne,
 ce que font la collecte qui précède l'import (`kb collect`) et le script d'agrégation et d'import (`kb import`), pas à
 pas, chacun avec son logigramme, comment l'import nettoie et homogénéise les données, la commande qui le suit
-(`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`
-(2026-11-11); la collecte et les logigrammes, d'après le commit `36c1e02` (2026-11-21). Les chemins du code de K-B (`etl/…`, `database/…`) partent de
+(`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`;
+la collecte et les logigrammes, d'après le commit `36c1e02`. Les chemins du code de K-B (`etl/…`, `database/…`) partent de
 `src/k_b/`, les autres de la racine du dépôt. [Utiliser K-B](utilisation.md) donne chaque commande de `kb` en bref;
 cette fiche détaille celles de la base.
 
@@ -41,17 +41,18 @@ c'est l'URL `postgresql://` ou `postgres://` d'une base PostgreSQL ([Réglages](
 
 - **En local, SQLite**: une utilisatrice, un seul écrivain, le pipeline, et quelques milliers d'items par an; aucun
     serveur à installer, et, en mode WAL (<span lang="en">write-ahead logging</span>), l'API lit pendant que le
-    pipeline écrit ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), 2026-10-02, « Base des items »).
+    pipeline écrit ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md), « Base des items », `docs/ADR/journal-decisions-projet.md:164`).
 - **En ligne, PostgreSQL**: les API et les jobs tournent chacun dans son conteneur (`infra/main.bicep:270`, `:307`,
-    `:386`, `:406`, `:433`, `:480`). SQLite y demanderait un fichier sur un partage Azure Files monté: la page de
-    Microsoft sur les volumes de Container Apps, relue le 2026-11-22, ne dit rien des verrous de fichiers sur un
+    `:386`, `:406`, `:433`, `:480`, à `main` au commit `a1a01efd`). SQLite y demanderait un fichier sur un partage
+    Azure Files monté: la page de
+    Microsoft sur les volumes de Container Apps ne dit rien des verrous de fichiers sur un
     partage SMB (<span lang="en">Server Message Block</span>), et des sources de la communauté les jugent peu fiables;
     un conteneur Blob, lui, ne se monte pas: <q lang="en">Azure Container Apps doesn't support mounting file shares
     from Azure NetApp Files or Azure Blob Storage</q>
     ([<span lang="en">Use storage mounts in Azure Container Apps</span>](https://learn.microsoft.com/en-us/azure/container-apps/storage-mounts),
-    Microsoft Learn, mise à jour le 2026-10-26;
+    Microsoft Learn;
     [journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-    2026-11-06, « Base: PostgreSQL en ligne, par un adaptateur maison (#417) »). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
+    « Base: PostgreSQL en ligne, par un adaptateur maison (#417) », `docs/ADR/journal-decisions-projet.md:5252`). PostgreSQL donne aussi à chaque identité son rôle, l'API de données en lecture seule, et une
     connexion sans mot de passe, par Entra (même journal, « Base en ligne: trois rôles, posés par l'administratrice
     (#421) » et « Base en ligne: Entra seul, un jeton à chaque connexion (#421) »).
 
@@ -168,7 +169,7 @@ KB_DATA_DIR=~/.knowledge_base uv run kb create-db
     l'air valide (`database/creation.py:48-49`, `database/creation.py:65-69`).
 
 Chaque connexion active les clés étrangères, que SQLite ignore sinon (`database/engine.py:36-40`). La commande
-affiche `database created: <chemin>` (`commands/create_db_command.py:53`). Essayé le 2026-11-11 sur un dossier neuf:
+affiche `database created: <chemin>` (`commands/create_db_command.py:53`). Essayé sur un dossier neuf:
 code 0, puis code 2 au second lancement (`… already exists`).
 
 Le tableau suivant donne les codes de sortie de `kb create-db`.
@@ -204,8 +205,8 @@ vide.
 
 ### En ligne: PostgreSQL sur Azure
 
-L'installation se fait en quatre temps, par Sabine, à la main (`infra/README.md`, « Appliquer » et « La base
-PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
+L'installation se fait en quatre temps, par la propriétaire du groupe de ressources, à la main (`infra/README.md`,
+« Appliquer » et « La base PostgreSQL (#421) »). Cette fiche n'en a lancé aucune commande.
 
 1. **Le serveur**, créé par le Bicep (`infra/modules/postgresql-server.bicep`): PostgreSQL 18 (ligne 25), offre
     `Standard_B1ms` (ligne 21), 32 Gio (ligne 34), sauvegardes gardées 7 jours (ligne 39), connexion par Microsoft
@@ -319,7 +320,7 @@ Sur une base PostgreSQL, `KB_DATABASE_URL` en plus. En ligne, `kb import` est un
 
 La commande journalise `import started`, `import finished in <durée>` et le nom de son journal
 (`commands/import_command.py:39`, `commands/import_command.py:60`, `commands/import_command.py:63`), puis affiche son
-bilan sur une ligne (`commands/import_command.py:77-84`). Essayé le 2026-11-11 sur une base neuve, sans brut:
+bilan sur une ligne (`commands/import_command.py:77-84`). Essayé sur une base neuve, sans brut:
 
 ```text
 import: 0 raw read, 0 written, 0 trend rows, 0 left out, 0 rejected, 0 withdrawn
@@ -457,7 +458,7 @@ UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
     `compared_with_revised_at` selon la règle) (`etl/import_journal.py:15-25`, `etl/import_journal.py:47-78`). Il est
     écrit par `write_file_atomically` (`etl/import_journal.py:82-85`), qui le remplace par un temporaire de
     `tempfile`: un fichier en mode `0600`, lisible par sa seule propriétaire (`core/atomic_write.py:16`,
-    `core/atomic_write.py:79-82`). Observé en `0600` le 2026-11-11.
+    `core/atomic_write.py:79-82`). Observé en `0600`.
 
 Le tableau suivant donne les codes de sortie de `kb import`.
 
@@ -517,7 +518,7 @@ règle est rejetée, avec son champ et le type d'erreur, sans sa valeur (étape 
     (`items.py:101-111`). L'URL est gardée comme la source l'a donnée (`items.py:183-192`), puis la normalisation
     retire ses paramètres `utm_*`, en minuscules seulement (`UTM_x` reste), les `&` en trop (`a=1&&b=2` devient
     `a=1&b=2`) et un `?` resté vide; elle garde les autres paramètres tels quels et dans leur ordre, un `x=` sans
-    valeur compris (`etl/normalize.py:7`, `etl/normalize.py:19-27`; essayé le 2026-11-11). L'item normalisé est validé
+    valeur compris (`etl/normalize.py:7`, `etl/normalize.py:19-27`; essayé). L'item normalisé est validé
     de nouveau; une erreur à cette étape arrête tout l'import (`etl/transform.py:108-112`, `etl/normalize.py:15-16`).
 - **Tags d'un clip**: sans espaces autour, sans le `#` initial, en minuscules (`items.py:127-130`), chacun une fois,
     rangés par nom, sans le tag vide ni le tag `clippings` que pose le gabarit du Web Clipper
@@ -622,7 +623,7 @@ for row in base.execute("SELECT kind, count(*) FROM item GROUP BY kind"):
 EOF
 ```
 
-Essayé le 2026-11-11 (Python 3.13.13 de uv, SQLite 3.50.4) sur une base neuve: la même forme lit les sept sources
+Essayé avec Python 3.13.13 de uv et SQLite 3.50.4 sur une base neuve: la même forme lit les sept sources
 (`SELECT source_code, label FROM source ORDER BY id`), et une écriture est refusée
 (`sqlite3.OperationalError: attempt to write a readonly database`).
 

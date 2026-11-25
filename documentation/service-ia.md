@@ -16,16 +16,16 @@ La fiche dit qui accède au service, comment l'installer et le tester, de quoi i
 reçoit. Le programme de K-B qui appelle ce service est l'API IA. Cette API a sa propre fiche,
 [la fiche de l'API IA](api-ia.md).
 
-Le code cité est celui de K-B dans sa version du 2026-11-18. Ce qui est hors du code vient de trois relevés.
+Le code cité est celui de `main` au commit `cc3d8eaf`. Ce qui est hors du code vient de trois relevés.
 
-- Quatre lectures de l'état d'Azure, faites le 2026-11-18 avec `az`, l'outil d'Azure en ligne de commande, en lecture
+- Quatre lectures de l'état d'Azure, faites avec `az`, l'outil d'Azure en ligne de commande, en lecture
     seule. Elles portent sur la ressource, ses déploiements, les rôles de l'opératrice et l'app de l'API IA en ligne
     (« Relire l'état »).
-- Des captures d'écran du portail Foundry, du 2026-11-17. Elles montrent le catalogue des modèles et le formulaire
+- Des captures d'écran du portail Foundry. Elles montrent le catalogue des modèles et le formulaire
     de déploiement de `gpt-6.1-sol`, avec son type, sa limite de jetons par minute et sa zone de données.
-- L'essai de bout en bout du 2026-11-17 (« Le test »).
+- L'essai de bout en bout (« Le test »).
 
-Une lecture plus ancienne, du 2026-11-09, n'est citée que pour le modèle `DeepSeek-V4-Flash`. Les pages de Microsoft
+Une lecture plus ancienne n'est citée que pour le modèle `DeepSeek-V4-Flash`. Les pages de Microsoft
 et les documents du dépôt de code sont listés à la fin, dans « Sources ».
 
 Les sources de chaque fait tiré du dépôt, avec leurs fichiers et leurs lignes, sont regroupées à la fin, dans
@@ -34,47 +34,44 @@ Les sources de chaque fait tiré du dépôt, avec leurs fichiers et leurs lignes
 ## Ce qu'est le service
 
 Le service est une ressource Foundry. Dans Azure, une ressource est un élément que l'on crée, que l'on règle et que
-l'on paie. Cette ressource est située dans la région France Central, que `az` nomme `francecentral` (lu le
-2026-11-18). Elle appartient à un groupe de ressources, c'est-à-dire un dossier d'Azure qui regroupe des ressources.
+l'on paie. Cette ressource est située dans la région France Central, que `az` nomme `francecentral`. Elle appartient à un groupe de ressources, c'est-à-dire un dossier d'Azure qui regroupe des ressources.
 Elle porte aussi un projet Foundry, l'espace de travail du portail. La fiche ne nomme ni la ressource ni le groupe.
 Ses commandes les écrivent donc `<ressource Foundry>` et `<groupe de ressources>` (« Relire l'état »).
 
-La ressource porte deux déploiements, d'après la lecture du 2026-11-18. Cette lecture ne montre pas leur type, parce
-que `az` ne l'affiche pas dans un tableau. Le type de `gpt-6.1-sol` vient donc de la capture de son déploiement, du
-2026-11-17. La production désigne ici K-B en ligne, sur Azure. Elle est passée de `gpt-6-luna` à `gpt-6.1-sol` le
-2026-11-18, à la seconde passe de l'infrastructure, avec des réglages posés à la main (« Le branchement de K-B »).
-Cette passe a réussi à 11:26 UTC. La lecture de l'app de l'API IA, vers 11:28 UTC, montre sa révision
+La ressource porte deux déploiements, d'après la lecture de ses déploiements. Cette lecture ne montre pas leur type, parce
+que `az` ne l'affiche pas dans un tableau. Le type de `gpt-6.1-sol` vient donc de la capture de son déploiement. La production désigne ici K-B en ligne, sur Azure. Elle est passée de `gpt-6-luna` à `gpt-6.1-sol` à la seconde passe de l'infrastructure, avec des réglages posés à la main (« Le branchement de K-B »).
+Cette passe a réussi. La lecture de l'app de l'API IA montre sa révision
 `ca-kb-ai-api--0000013`, l'image `k-b:v0.1.6` (écrite ici sans le nom du registre), le modèle `gpt-6.1-sol` et l'effort `low` (« Relire l'état »).
 
 Le tableau suivant décrit les deux déploiements.
 
 | Déploiement | Version | Type | Capacité | Mise à jour de la version | Filtre de contenu | Qui l'appelle |
 |---|---|---|---|---|---|---|
-| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, en local depuis le 2026-11-17, et en ligne depuis le 2026-11-18 |
-| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18; l'API IA en ligne ne l'appelle plus depuis |
+| `gpt-6.1-sol` | 2026-09-29 | `DataZoneStandard` | 250 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA, en local et en ligne |
+| `gpt-6-luna` | 2026-09-22 | non relu | 140 | `NoAutoUpgrade`: version figée | `Microsoft.DefaultV2` | l'API IA en ligne, jusqu'au passage de la production à `gpt-6.1-sol`; l'API IA en ligne ne l'appelle plus depuis |
 
 Les sections suivantes expliquent le type, la version figée et le filtre de contenu. Trois points complètent le
 tableau.
 
 - **La capacité** se compte en milliers de jetons par minute. Un jeton est un morceau de mot. Le modèle lit et
     écrit des jetons, et Microsoft les facture. Le portail a fixé 250 000 jetons par minute pour `gpt-6.1-sol`
-    (capture du 2026-11-17). Son nombre de requêtes par minute n'a pas été lu. Un en-tête HTTP est une ligne
+    (capture du portail). Son nombre de requêtes par minute n'a pas été lu. Un en-tête HTTP est une ligne
     d'information jointe à une requête ou à une réponse. Pour `gpt-6-luna`, les en-têtes des réponses donnaient
-    140 000 jetons et 140 requêtes par minute, lors de l'essai du 2026-10-17. Ces en-têtes sont
+    140 000 jetons et 140 requêtes par minute, lors de l'essai sur `gpt-6-luna`. Ces en-têtes sont
     `x-ratelimit-limit-tokens` et `x-ratelimit-limit-requests`.
-- **Le choix de `gpt-6.1-sol`** vient du banc d'essai des modèles du 2026-11-16. Ce banc préconise `gpt-6.1-sol`,
+- **Le choix de `gpt-6.1-sol`** vient du banc d'essai des modèles. Ce banc préconise `gpt-6.1-sol`,
     réglé à l'effort de raisonnement `low`. L'effort de raisonnement dit combien le modèle réfléchit avant de
     répondre. La valeur `low` est la plus faible que ce modèle accepte.
-- **`DeepSeek-V4-Flash`** a été essayé le 2026-10-17 comme candidat juge, c'est-à-dire pour vérifier les affirmations
-    des fiches. Une lecture du 2026-11-09 listait ce modèle, mais la ressource lue ce jour-là n'est pas établie. La
-    lecture du 2026-11-18 ne le liste pas sur cette ressource.
+- **`DeepSeek-V4-Flash`** a été essayé comme candidat juge, c'est-à-dire pour vérifier les affirmations
+    des fiches. Une lecture plus ancienne listait ce modèle, mais la ressource qu'elle a lue n'est pas établie. La
+    lecture des déploiements ne le liste pas sur cette ressource.
 
 ### Le type de déploiement: la zone de données de l'Union européenne
 
 Le type d'un déploiement fixe son mode de paiement et le lieu où le modèle traite les données. `DataZoneStandard` est
 le type « Zone de données standard ». Son prix se paie à la consommation, c'est-à-dire par jeton. Le traitement
 reste dans une zone de données que Microsoft définit. Pour une ressource en France, cette zone est celle de l'Union
-européenne. Le portail l'a écrit au déploiement de `gpt-6.1-sol`, sur la capture du 2026-11-17: <q>Votre
+européenne. Le portail l'a écrit au déploiement de `gpt-6.1-sol`, sur la capture du formulaire: <q>Votre
 déploiement dans francecentral traitera les données dans la zone de données EUR</q>.
 
 Microsoft Learn, le site de documentation de Microsoft, précise cette zone en trois points, dans la page
@@ -93,7 +90,7 @@ Une autre page de Microsoft, « <span lang="en">Data, privacy, and security for 
 Microsoft Foundry</span> », le dit autrement: <q lang="en">prompts and responses may be processed in that or any other
 European Union Member Nation</q>. Les deux pages ne nomment donc pas le même périmètre (« Limites »).
 
-Ce type a été choisi le 2026-10-17 pour `gpt-6-luna`, puis gardé pour `gpt-6.1-sol`. Ce choix suit une règle du
+Ce type a été choisi pour `gpt-6-luna`, puis gardé pour `gpt-6.1-sol`. Ce choix suit une règle du
 projet: le lieu du traitement est choisi et écrit, et c'est la zone de l'Union quand le fournisseur l'offre. Cette
 règle applique le règlement général sur la protection des données (RGPD), pour la sous-traitance et les transferts
 de données. Le type « <span lang="en">Global Standard</span> » a été écarté, parce qu'il peut traiter les données dans toute région Azure.
@@ -101,8 +98,8 @@ de données. Le type « <span lang="en">Global Standard</span> » a été écart
 ### La version figée
 
 Le réglage « Refuser les mises à niveau automatiques des versions de modèle », que `az` nomme `NoAutoUpgrade`, fige
-la version 2026-09-29 de `gpt-6.1-sol`. Le modèle ne change donc pas sans qu'on le décide. Les mesures de l'essai du
-2026-11-17 restent ainsi comparables.
+la version 2026-09-29 de `gpt-6.1-sol`. Le modèle ne change donc pas sans qu'on le décide. Les mesures de l'essai de
+bout en bout restent ainsi comparables.
 
 Une version de modèle finit par être retirée par Microsoft. La page « <span lang="en">Foundry Models lifecycle and
 support policy</span> » dit de deux façons ce qui se passe alors (« Limites »).
@@ -133,7 +130,7 @@ est le jeu de garde-fous par défaut de Foundry, que `az` nomme `Microsoft.Defau
 
 Une demande bloquée reçoit l'erreur 400 `content_filter`. Une réponse filtrée se termine par `finish_reason`
 `content_filter`. Dans les deux cas, le client du modèle, dans l'API IA, classe l'appel en `llm_content_filtered`. Ce
-client ne fait alors pas de nouvelle tentative. Sur les 18 requêtes de l'essai du 2026-11-17, aucun filtre ne s'est
+client ne fait alors pas de nouvelle tentative. Sur les 18 requêtes de l'essai de bout en bout, aucun filtre ne s'est
 déclenché.
 
 ## La gestion des accès
@@ -151,7 +148,7 @@ Deux portes donnent accès au service.
 
 ### Les rôles de l'opératrice
 
-L'opératrice est la personne qui installe et fait tourner K-B. Ses rôles ont été lus le 2026-11-18. Ils portent sur
+L'opératrice est la personne qui installe et fait tourner K-B. Ses rôles, lus par `az`, portent sur
 deux endroits. Le premier est le groupe de ressources du service, et la ressource hérite des rôles de ce groupe. Le
 second est le coffre de secrets de K-B. Ce coffre, un Azure Key Vault, garde les mots de passe et les clés en ligne.
 
@@ -184,7 +181,7 @@ L'API IA appelle le modèle avec la clé de la ressource. Elle envoie cette clé
 est un réglage que le système passe à un programme à son démarrage.
 
 L'authentification par clé est active sur la ressource. Le réglage `disableLocalAuth` vaut en effet `False`, d'après
-la lecture du 2026-11-18. L'essai du 2026-11-17 a d'ailleurs appelé `gpt-6.1-sol` par la clé. La page
+la lecture de la ressource. L'essai de bout en bout a d'ailleurs appelé `gpt-6.1-sol` par la clé. La page
 « <span lang="en">Role-based access control for Microsoft Foundry</span> » de Microsoft Learn le rappelle:
 <q lang="en">If you use key-based authentication instead, the key grants full access without role restrictions</q>.
 Qui a la clé peut donc appeler les deux déploiements, quels que soient ses rôles.
@@ -213,15 +210,15 @@ Changer la clé, par exemple si elle a fuité, se fait en trois étapes.
 La procédure « Pour refaire un seul secret » n'a pas été essayée pour cette clé.
 
 L'accès réseau public de la ressource est activé: le réglage `publicNetworkAccess` vaut `Enabled`, d'après la même
-lecture du 2026-11-18. Les règles réseau de la ressource, `networkAcls`, pourraient restreindre cet accès à
+lecture. Les règles réseau de la ressource, `networkAcls`, pourraient restreindre cet accès à
 certaines adresses. Elles n'ont pas été lues.
 
 ## L'installation
 
 ### Le déploiement, à la main
 
-Le déploiement a été fait le 2026-11-17 dans le portail Foundry, dans le projet Foundry de la ressource (captures
-du 2026-11-17). Pour le refaire, il faut une ressource Foundry dans une région de l'Union. Les étapes sont les
+Le déploiement a été fait dans le portail Foundry, dans le projet Foundry de la ressource (captures
+du portail). Pour le refaire, il faut une ressource Foundry dans une région de l'Union. Les étapes sont les
 suivantes.
 
 1. Ouvrir le projet dans le portail Foundry, puis **Catalogue**, puis **Modèles**. Choisir `gpt-6.1-sol`, puis
@@ -234,7 +231,7 @@ suivantes.
 5. **Limite de débit des jetons par minute**: 250 000.
 6. **Garde-fous**: `DefaultV2`, le jeu par défaut. Puis **Déployer**.
 
-Le 2026-11-17, le catalogue montre `gpt-6.1-sol` en « Disponibilité générale ». Un nouveau déploiement est alors
+Le catalogue montre `gpt-6.1-sol` en « Disponibilité générale ». Un nouveau déploiement est alors
 permis. La version 2026-09-29 passera au stade « <span lang="en">Deprecated</span> » 12 mois après sa sortie. Dès ce stade,
 ce déploiement ne pourra se refaire que sur un abonnement qui a déjà déployé cette version. La page
 « <span lang="en">Foundry Models lifecycle and support policy</span> » le dit ainsi: <q lang="en">"Existing customer"
@@ -267,10 +264,10 @@ Ces réglages appellent quatre remarques.
     demande. Le cache de la consigne est une copie que le fournisseur peut garder du début d'une demande, pour
     traiter plus vite la suivante. `KB_LLM_SEND_PROMPT_CACHE_OPTIONS` n'est pas posée, et vaut donc `true`. Chaque
     requête porte alors le champ `prompt_cache_options`, qui coupe ce cache (« Ce que Microsoft en garde »).
-    L'essai du 2026-11-17 montre que `gpt-6.1-sol` accepte ce champ, car aucune requête n'y a été refusée. Si la
+    L'essai de bout en bout montre que `gpt-6.1-sol` accepte ce champ, car aucune requête n'y a été refusée. Si la
     variable vaut `false`, `kb serve-ai` refuse de démarrer en production.
 - **La passe 2.** Ses paramètres et le secret sont décrits dans le README de l'infrastructure, aux étapes « 4. Poser
-    les secrets » et « 5. Seconde passe ». Le passage de la production à `gpt-6.1-sol`, fait le 2026-11-18, demande
+    les secrets » et « 5. Seconde passe ». Le passage de la production à `gpt-6.1-sol` demande
     l'effort `low` en ligne, déjà fixé dans le fichier Bicep. Il demande aussi l'adresse (`llmBaseUrl`), le nom (`llmModel`) et la
     clé (`kb-llm-api-key`) de ce déploiement, posés à la main à la passe 2.
 - **Le nom du modèle.** Le dépôt de code ne fixe pas la valeur de `KB_LLM_MODEL`. Cette valeur vient du `.env` en local,
@@ -278,7 +275,7 @@ Ces réglages appellent quatre remarques.
 
 ### Relire l'état
 
-Les quatre lectures du 2026-11-18 sont faites en lecture seule, et aucune n'affiche de clé. Dans son format tableau
+Les quatre lectures sont faites en lecture seule, et aucune n'affiche de clé. Dans son format tableau
 (`-o table`), `az` ne montre aucune colonne nommée `type`, ni `id`, ni `etag`. Le type des déploiements n'apparaît
 donc pas dans la sortie de la première lecture. Une portée est l'endroit où un rôle s'applique: un abonnement, un
 groupe ou une ressource. La troisième lecture affiche des portées complètes, avec l'identifiant de l'abonnement et les
@@ -291,13 +288,13 @@ RESOURCE=<ressource Foundry>
 # Les déploiements: nom, type, capacité, version, mise à jour de la version, filtre de contenu.
 az cognitiveservices account deployment list -g "$RG" -n "$RESOURCE" \
   --query "[].{nom:name, type:sku.name, capacite:sku.capacity, version:properties.model.version, maj:properties.versionUpgradeOption, filtre:properties.raiPolicyName}" -o table
-# La ressource: région, accès public, authentification par clé (sortie du 2026-11-18: francecentral, Enabled, False).
+# La ressource: région, accès public, authentification par clé (sortie: francecentral, Enabled, False).
 az cognitiveservices account show -g "$RG" -n "$RESOURCE" \
   --query "{region:location, acces_public:properties.publicNetworkAccess, cle_coupee:properties.disableLocalAuth}" -o table
 # Les rôles du compte connecté, et leur portée.
 az role assignment list --assignee "$(az ad signed-in-user show --query id -o tsv)" --all \
   --query "[].{role:roleDefinitionName, portee:scope}" -o table
-# L'app de l'API IA en ligne: sa révision et les deux variables du modèle (sortie du 2026-11-18 vers 11:28 UTC:
+# L'app de l'API IA en ligne: sa révision et les deux variables du modèle (sortie:
 # ca-kb-ai-api--0000013, KB_LLM_MODEL gpt-6.1-sol, KB_LLM_REASONING_EFFORT low).
 az containerapp show -g "$RG" -n ca-kb-ai-api \
   --query "{revision:properties.latestRevisionName, variables:properties.template.containers[0].env[?name=='KB_LLM_MODEL' || name=='KB_LLM_REASONING_EFFORT'].{nom:name, valeur:value}}" -o json
@@ -318,7 +315,7 @@ dans cette section.
 - Le bac à sable est un environnement d'essai, séparé de la production.
 - Le coffre de notes est le dossier d'Obsidian, une application de notes, où `kb` écrit les fiches de veille.
 
-**Le 2026-11-17, sur `gpt-6.1-sol`**, `kb serve-ai` a tourné en local, avec la version `f1eac19c` du code. L'effort
+**Sur `gpt-6.1-sol`**, `kb serve-ai` a tourné en local, avec la version `f1eac19c` du code. L'effort
 de raisonnement était `low` (`KB_LLM_REASONING_EFFORT=low`). Les mesures partaient vers Grafana Cloud, dans le bac à
 sable (`KB_DEPLOYMENT_ENVIRONMENT=sandbox`). Aucune fiche n'a été écrite dans le coffre de notes pendant l'essai. La
 ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, model gpt-6.1-sol` et
@@ -343,14 +340,14 @@ ligne de démarrage de `kb serve-ai` disait `LLM provider openai_compatible, mod
 
 **Sur `gpt-6-luna`**, le modèle de K-B avant `gpt-6.1-sol`, trois essais ont eu lieu.
 
-- **Le 2026-10-17**, un appel avec la clé a rendu le code 200 et le `model` `gpt-6-luna-2026-09-22`. Sur une veille
+- **Avec la clé**, un appel a rendu le code 200 et le `model` `gpt-6-luna-2026-09-22`. Sur une veille
     réelle, 6 appels de classement, 5 de rédaction et 3 de jugement ont passé, avec le schéma strict de K-B. Un
     jugement est l'appel d'un second modèle, le juge, qui vérifie les affirmations d'une fiche. Le schéma strict est
     le format de réponse que l'API IA impose au modèle. Aucun cache n'a été écrit: `cache_write_tokens` valait 0 sur 20
     réponses.
-- **Le 2026-10-28**, `kb serve-ai` a tourné dans le bac à sable. Une demande de fiches sur 3 jours a fait 10 requêtes
+- **Dans le bac à sable**, `kb serve-ai` a tourné. Une demande de fiches sur 3 jours a fait 10 requêtes
     au modèle. La réponse est arrivée avec le code 200, en 56,8 s.
-- **Le 2026-11-10**, vers 00:03 UTC, les deux commandes de [Refaire le test](#refaire-le-test) ont été lancées.
+- **Les deux commandes de [Refaire le test](#refaire-le-test)** ont été lancées.
     Avec la clé, le déploiement a répondu `gpt-6-luna-2026-09-22 stop`. Sans clé, le déploiement a refusé l'appel:
     `HTTP 401`, avec le code `"401"` et le message <q lang="en">Access denied due to invalid subscription key or wrong
     API endpoint […]</q>.
@@ -407,7 +404,7 @@ texte, élément par élément.
 ```mermaid
 flowchart LR
     accTitle: Qui appelle le service d'IA et ce dont l'appel dépend
-    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, en local, et en ligne depuis le 2026-11-18, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
+    accDescr: kb digest et kb trend-report appellent l'API IA, qui appelle le déploiement gpt-6.1-sol de Foundry par la clé de la ressource, en local, et en ligne, et envoie ses mesures et ses traces à Grafana Cloud. En ligne, la clé vient du coffre de secrets, par l'identité managée.
     digest["kb digest<br>kb trend-report"] -->|"POST /digests<br>POST /trend-reports"| ai["API IA<br>kb serve-ai"]
     ai -->|"chat/completions, clé de la ressource<br>en local et en ligne"| model["Foundry<br>déploiement gpt-6.1-sol"]
     ai -->|"OTLP: mesures, traces"| grafana["Grafana Cloud"]
@@ -420,13 +417,12 @@ flowchart LR
     completions</span>). Les clients de l'API IA sont `kb digest` et `kb trend-report`, décrits dans la fiche de
     l'API IA. Le jeu de référence est un ensemble de sorties du modèle, enregistrées pour être rejouées par les tests.
     Le script qui l'enregistre, lancé à la main, passe lui aussi par l'API IA, dans le même processus.
-- **En ligne, le modèle est appelé depuis le 2026-11-11.** L'app `ca-kb-ai-api` est réglée pour joindre le
-    déploiement que nomment ses paramètres `llmBaseUrl` et `llmModel`. Ce déploiement est `gpt-6.1-sol` depuis le
-    2026-11-18; avant, c'était `gpt-6-luna` (« Le branchement de K-B »). Un job est un programme qu'Azure lance à heure fixe ou à la
+- **En ligne, le modèle est appelé.** L'app `ca-kb-ai-api` est réglée pour joindre le
+    déploiement que nomment ses paramètres `llmBaseUrl` et `llmModel`. Ce déploiement est `gpt-6.1-sol`;
+    avant, c'était `gpt-6-luna` (« Le branchement de K-B »). Un job est un programme qu'Azure lance à heure fixe ou à la
     main, et qui s'arrête une fois son travail fait. Le job `caj-kb-digest-watch` lance `kb digest`, puis
-    `kb trend-report`, par défaut le lundi et le jeudi à 10:00 UTC. Lancé à la main le 2026-11-11, ce job a donné les
-    premiers points de la production dans Grafana Cloud, vers 16:00 UTC. Lancé par son horaire le 2026-11-12, de
-    10:00:00 à 10:02:44 UTC, ce job a appelé le modèle. Les autres jobs n'appellent pas le modèle. Ainsi, le job de
+    `kb trend-report`, par défaut le lundi et le jeudi à 10:00 UTC. Lancé à la main, ce job a donné les
+    premiers points de la production dans Grafana Cloud. Lancé par son horaire, ce job a appelé le modèle. Les autres jobs n'appellent pas le modèle. Ainsi, le job de
     vérification `caj-kb-smoke-test` appelle `GET /health` de l'API IA, et l'API IA y répond sans le modèle. Le
     code de #499 ajoute à ce job des sondes sans clé, des requêtes que l'API doit refuser. L'API IA refuse ainsi
     `POST /digests` en 401, avant tout appel au modèle. En ligne, les sondes partent au premier tag qui porte ce
@@ -489,7 +485,7 @@ Des données personnelles partent pourtant, d'après le registre.
     caching</span> » de Microsoft Learn définit ce terme. Un point d'arrêt marque la fin du début de demande que le
     cache peut réutiliser: <q lang="en">mark the end of a reusable prompt prefix</q>. En mode explicite, seuls les
     points d'arrêt posés dans la demande servent au cache. L'API IA n'en pose aucun, donc ce réglage n'écrit aucun
-    cache. La coupure a été vérifiée une fois, sur `gpt-6-luna`, le 2026-10-17: `cache_write_tokens` valait 0 sur 20 réponses. Sur `gpt-6.1-sol`, elle n'a pas été
+    cache. La coupure a été vérifiée une fois, sur `gpt-6-luna`: `cache_write_tokens` valait 0 sur 20 réponses. Sur `gpt-6.1-sol`, elle n'a pas été
     relevée, parce que le client du modèle ne suit pas ce champ.
 - **La surveillance des abus garde les demandes signalées.** Microsoft surveille les abus, c'est-à-dire les usages
     contraires à ses règles. Une demande et sa réponse peuvent être stockées pour une revue humaine dans deux cas.
@@ -524,11 +520,11 @@ la section « Envoi des mesures à Grafana Cloud ».
 - **Par défaut, rien ne part.** Sans la variable, le réglage vaut `none`.
 - **En production**, le réglage est fixé à `none`, et la valeur `all` y est refusée au démarrage.
 - **Dans le bac à sable**, aucun fichier du dépôt ne pose ce réglage. La commande `make sandbox-alerts` tourne sur le
-    rejeu, sans le modèle et sans traces. L'essai du 2026-11-17 a gardé le réglage à `none`, et sa ligne de
+    rejeu, sans le modèle et sans traces. L'essai de bout en bout a gardé le réglage à `none`, et sa ligne de
     démarrage disait `model content none`.
 - **À la main**, `KB_TRACE_CONTENT=all` peut être posé pour un essai hors production. Le contenu des appels part
-    alors dans Grafana Cloud, qui le garde 14 jours. Un essai l'a posé le 2026-10-28, avec 10 requêtes à
-    `gpt-6-luna`. Grafana Labs a répondu le 2026-10-29. Ce que sa réponse change au contrat de sous-traitance (DPA,
+    alors dans Grafana Cloud, qui le garde 14 jours. Un essai l'a posé, avec 10 requêtes à
+    `gpt-6-luna`. Grafana Labs a répondu ensuite. Ce que sa réponse change au contrat de sous-traitance (DPA,
     <span lang="en">Data Processing Agreement</span>) est encore à décider. Depuis cette réponse, le réglage reste
     donc à `none`.
 
@@ -541,30 +537,29 @@ la section « Envoi des mesures à Grafana Cloud ».
 - **Le déploiement est hors du code.** Aucun test de K-B ne voit une modification faite dans le portail, qu'elle
     porte sur le type, la version ou le filtre. Seule une lecture comme celles de « Relire l'état » la montre.
 - **Des réglages restent sans lecture par `az`.** Le type du déploiement de `gpt-6.1-sol` vient de la capture de son
-    formulaire, du 2026-11-17. Le type de `gpt-6-luna` n'a pas été relu. Le stockage de la surveillance des abus,
+    formulaire. Le type de `gpt-6-luna` n'a pas été relu. Le stockage de la surveillance des abus,
     `ContentLogging`, n'a pas été relu sur la ressource. Qu'il soit actif ou coupé n'est donc pas vérifié. La parade
     tient dans les lectures de « Relire l'état ». Pour le type, il faut la sortie en `-o json`. Pour le stockage, il
     faut ajouter `properties.capabilities[?name=='ContentLogging'].value`.
 - **Les rôles reçus par un groupe ne sont pas lus.** Un groupe Microsoft Entra peut donner des rôles à ses membres.
     `az role assignment list` ne montre ces rôles qu'avec l'option `--include-groups`, d'après la référence de la
-    commande sur Microsoft Learn, lue le 2026-11-18. La lecture du 2026-11-18 n'avait pas cette option.
-- **Les deux commandes de « Refaire le test » n'ont pas été relancées sur `gpt-6.1-sol`.** L'essai du 2026-11-17 a
-    appelé ce modèle par `kb serve-ai`. Sans clé, seul un `GET` de la liste des modèles a été essayé ce jour-là, et
+    commande sur Microsoft Learn. La lecture des rôles n'avait pas cette option.
+- **Les deux commandes de « Refaire le test » n'ont pas été relancées sur `gpt-6.1-sol`.** L'essai de bout en bout a
+    appelé ce modèle par `kb serve-ai`. Sans clé, seul un `GET` de la liste des modèles a été essayé avec lui, et
     `curl` a reçu le `401` attendu.
-- **Un contournement de TLS a été nécessaire pour l'essai du 2026-11-17.** En local, sous macOS, le Python de K-B, avec
+- **Un contournement de TLS a été nécessaire pour l'essai de bout en bout.** En local, sous macOS, le Python de K-B, avec
     OpenSSL 3.5.6, a reçu une `SSLEOFError` sur 8 à 9 appels sur 10 vers la ressource, sans clé. Les mêmes appels ont
     reçu les `401` attendus dans trois cas: avec `curl`, qui utilise LibreSSL, avec ce même Python en TLS 1.2, ou
     avec ce Python sans l'échange de clés ML-KEM. Deux hypothèses restent non tranchées. La première est un
     équipement du réseau local qui coupe un premier message TLS trop gros. La seconde est un changement du côté
     d'Azure. Que le conteneur en ligne soit touché n'a pas été vérifié.
-- **À 300 items, une demande de comptes rendus dépasse son échéance avec `gpt-6.1-sol`.** Le 2026-11-17, elle a
-    donné 4 fiches sur 9 en 200 s, les appels étant faits un par un. L'essai de `gpt-6-luna` du 2026-10-28 portait sur
+- **À 300 items, une demande de comptes rendus dépasse son échéance avec `gpt-6.1-sol`.** À l'essai de bout en bout, elle a
+    donné 4 fiches sur 9 en 200 s, les appels étant faits un par un. L'essai de `gpt-6-luna` dans le bac à sable portait sur
     3 jours. Les deux essais ne se comparent donc pas directement.
 - **Le coût que l'API IA estime est compté aux prix de `gpt-6.1-sol`**, en contexte court. Le contexte est le texte
     que le modèle reçoit en une demande. Un contexte long peut avoir son propre prix. Tout appel est compté aux
     prix de `gpt-6.1-sol`, quel que soit `KB_LLM_MODEL`. Le prix du contexte long n'est pas distingué.
-- **`gpt-6-luna` reste déployé.** La production ne l'appelle plus depuis son passage à `gpt-6.1-sol`, le
-    2026-11-18. La clé de la ressource permet encore de l'appeler, tant qu'il n'est pas retiré.
+- **`gpt-6-luna` reste déployé.** La production ne l'appelle plus depuis son passage à `gpt-6.1-sol`. La clé de la ressource permet encore de l'appeler, tant qu'il n'est pas retiré.
 - **Deux pages de Microsoft ne disent pas le même périmètre** de la zone de données de l'Union. La première dit
     <q lang="en">that or any other European Union Member Nation</q> (« <span lang="en">Data, privacy, and
     security</span> »). La seconde parle de la limite des données de l'Union, qui peut compter des pays de l'AELE
@@ -574,13 +569,11 @@ la section « Envoi des mesures à Grafana Cloud ».
     « <span lang="en">Automatic upgrades</span> », qui ne fait pas d'exception pour `NoAutoUpgrade`.
 - **La durée de conservation de la surveillance des abus** n'est pas publiée par Microsoft.
 - **La date de retrait de `gpt-6.1-sol`** n'a pas été lue.
-- **Les métriques du déploiement dans Azure Monitor**, l'outil de mesure d'Azure, n'ont pas été consultées. Le suivi
-    du modèle passe par les mesures que l'API IA envoie à Grafana Cloud.
 
 ## Vérifier cette fiche
 
 Le tableau suivant donne, pour chaque fait de la fiche tiré du dépôt, le fichier qui le prouve ou la source qui le
-dit. Le code cité est celui de `main` au commit `cc3d8eaf` (2026-11-18). Les chemins du code de K-B (`ai_api/…`,
+dit. Le code cité est celui de `main` au commit `cc3d8eaf`. Les chemins du code de K-B (`ai_api/…`,
 `core/…`, `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt. Le journal ADR est le journal des
 décisions d'architecture (ADR, <span lang="en">Architecture Decision Record</span>),
 `docs/ADR/journal-decisions-projet.md`. Le registre est le registre des traitements, `docs/registre-traitements.md`.
@@ -588,9 +581,9 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 
 | Section | Fait | Où le vérifier |
 |---|---|---|
-| Ce qu'est le service | 140 000 jetons et 140 requêtes par minute pour `gpt-6-luna`, le 2026-10-17 | [note du branchement de gpt-6-luna](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md), « Preuve » |
-| Ce qu'est le service | le choix de `gpt-6.1-sol` à l'effort `low` | journal ADR, 2026-11-17, « Appel du modèle: les réglages des modèles du banc de C7 » |
-| Ce qu'est le service | `DeepSeek-V4-Flash` essayé comme candidat juge le 2026-10-17 | note du branchement de gpt-6-luna, « Choix faits et options écartées » |
+| Ce qu'est le service | 140 000 jetons et 140 requêtes par minute pour `gpt-6-luna` | [note du branchement de gpt-6-luna](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md), « Preuve » |
+| Ce qu'est le service | le choix de `gpt-6.1-sol` à l'effort `low` | journal ADR, « Appel du modèle: les réglages des modèles du banc de C7 », `docs/ADR/journal-decisions-projet.md:7367` |
+| Ce qu'est le service | `DeepSeek-V4-Flash` essayé comme candidat juge | note du branchement de gpt-6-luna, « Choix faits et options écartées » |
 | Le type de déploiement | la règle du lieu du traitement | `.claude/rules/conformite.md`, « RGPD: sous-traitance et transferts » |
 | Le filtre de contenu | `llm_content_filtered`, sans nouvelle tentative | `ai_api/connectors/llm_client.py:487-491`, `:558-559` |
 | La clé de K-B | la clé dans l'en-tête `Authorization: Bearer` | `ai_api/connectors/llm_client.py:214` |
@@ -610,14 +603,14 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Le branchement de K-B | `KB_LLM_REASONING_EFFORT`: `none` dans le fichier d'exemple du `.env`, `low` fixé en ligne | `.env.example:128`; `infra/main.bicep:304` |
 | Le branchement de K-B | `KB_LLM_SEND_PROMPT_CACHE_OPTIONS` vaut `true` par défaut, en commentaire dans le fichier d'exemple du `.env` | `core/config.py:266`; `.env.example:133` |
 | Le branchement de K-B | `reasoning_effort` envoyé au lieu de `temperature: 0` | `ai_api/connectors/llm_client.py:419-422` |
-| Le branchement de K-B | `gpt-6.1-sol` refuse `none` et `minimal`, et demande `low` | journal ADR, 2026-11-17 |
-| Le branchement de K-B | `kb serve-ai` n'accepte que `none`, `minimal` et `low` | `core/config.py:260`; journal ADR, 2026-11-17 |
+| Le branchement de K-B | `gpt-6.1-sol` refuse `none` et `minimal`, et demande `low` | `docs/ADR/journal-decisions-projet.md:7367` |
+| Le branchement de K-B | `kb serve-ai` n'accepte que `none`, `minimal` et `low` | `core/config.py:260`; `docs/ADR/journal-decisions-projet.md:7367` |
 | Le branchement de K-B | `false` refusé au démarrage en production | `ai_api/connectors/llm_settings.py:106-123` |
 | Le branchement de K-B | la passe 2, ses paramètres et le secret | `infra/README.md`, « 4. Poser les secrets » et « 5. Seconde passe » |
-| Le branchement de K-B | l'effort `low` en ligne, demandé par le passage de la production | `infra/main.bicep:301-304`; journal ADR, 2026-11-17 |
-| Ce qui a été essayé | le contournement de TLS de l'essai du 2026-11-17 | #629 |
-| Ce qui a été essayé | l'essai du 2026-10-17 sur `gpt-6-luna` | note du branchement de gpt-6-luna, « Preuve » |
-| Ce qui a été essayé | l'essai du 2026-10-28 dans le bac à sable | [note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel » |
+| Le branchement de K-B | l'effort `low` en ligne, demandé par le passage de la production | `infra/main.bicep:301-304`; `docs/ADR/journal-decisions-projet.md:7367` |
+| Ce qui a été essayé | le contournement de TLS de l'essai de bout en bout | #629 |
+| Ce qui a été essayé | l'essai sur `gpt-6-luna` | note du branchement de gpt-6-luna, « Preuve » |
+| Ce qui a été essayé | l'essai dans le bac à sable | [note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md), « Essai réel » |
 | Refaire le test | le cache coupé dans le corps de la requête | `tests/ai_api/test_llm_client.py:204`, `test_the_request_is_a_chat_completion_with_a_strict_json_schema_written_as_a_dict` |
 | Refaire le test | `reasoning_effort` dans le corps de la requête | `tests/ai_api/test_llm_client.py:236`, `test_a_reasoning_model_gets_its_reasoning_effort_and_no_temperature` |
 | Refaire le test | le refus en production du cache non coupé | `tests/ai_api/test_llm_settings.py:113`, `test_the_prompt_cache_options_left_out_are_refused_in_production` |
@@ -628,7 +621,7 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Les dépendances | le job `caj-kb-digest-watch` | `infra/deployment.json:3` |
 | Les dépendances | `kb digest`, puis `kb trend-report` | `commands/digest_watch_command.py:59-75` |
 | Les dépendances | l'horaire du lundi et du jeudi à 10:00 UTC | `infra/main.bicep:31-32` |
-| Les dépendances | l'appel du modèle par le job, le 2026-11-12 | #522 |
+| Les dépendances | l'appel du modèle par le job, à son horaire | #522 |
 | Les dépendances | `GET /health` répond sans le modèle | `core/api_health.py:12-13` |
 | Les dépendances | les sondes sans clé de `caj-kb-smoke-test`, `POST /digests` refusé en 401 | #499 |
 | Les dépendances | le quota partagé | journal ADR, « Tendances: le choix du modèle et ses contrôles (#368) » |
@@ -646,40 +639,37 @@ Les numéros précédés de `#` sont ceux des tickets du projet sur GitHub.
 | Une copie possible vers Grafana Cloud | aucun fichier ne pose le réglage pour le bac à sable | `.env.example:173-178`, `.env.e2e_test.example` |
 | Une copie possible vers Grafana Cloud | `make sandbox-alerts` sur le rejeu, sans traces | `tests/e2e/test_sandbox_alerts.py` |
 | Une copie possible vers Grafana Cloud | 14 jours de conservation | registre, « Envoi des mesures à Grafana Cloud », « Durée de conservation » |
-| Une copie possible vers Grafana Cloud | l'essai du 2026-10-28 avec `KB_TRACE_CONTENT=all` | note du contenu des appels, « Essai réel » |
+| Une copie possible vers Grafana Cloud | l'essai avec `KB_TRACE_CONTENT=all` | note du contenu des appels, « Essai réel » |
 | Une copie possible vers Grafana Cloud | la décision à prendre sur le contrat | #163; registre, « Envoi des mesures à Grafana Cloud », « Contrat » |
 | Limites | le contournement de TLS | #629 |
-| Limites | le coût compté aux prix de `gpt-6.1-sol` | `core/config.py:293-303`; journal ADR, 2026-11-18 |
+| Limites | le coût compté aux prix de `gpt-6.1-sol` | `core/config.py:293-303`; `docs/ADR/journal-decisions-projet.md:7409` |
 
 ## Sources
 
-Pages de Microsoft Learn, relues le 2026-11-09 (en UTC):
+Pages de Microsoft Learn:
 
-- [<span lang="en">Understanding deployment types in Microsoft Foundry Models</span>](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types),
-    `ms.date` 2026-08-06
-- [<span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy),
-    `ms.date` 2026-05-18
-- [<span lang="en">Foundry Models sold by Azure abuse monitoring</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/abuse-monitoring), `ms.date` 2026-05-13
-- [<span lang="en">Foundry Models lifecycle and support policy</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements), `ms.date` 2026-07-24
-- [<span lang="en">Default safety policies in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/guardrails/default-safety-policies), `ms.date` 2026-10-08
-- [<span lang="en">Role-based access control for Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry), `ms.date` 2026-09-16
-- <span lang="en">Azure built-in roles</span>, `ms.date` 2026-07-01, en trois pages:
+- [<span lang="en">Understanding deployment types in Microsoft Foundry Models</span>](https://learn.microsoft.com/en-us/azure/foundry/foundry-models/concepts/deployment-types)
+- [<span lang="en">Data, privacy, and security for Foundry Models sold by Azure in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/responsible-ai/openai/data-privacy)
+- [<span lang="en">Foundry Models sold by Azure abuse monitoring</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/abuse-monitoring)
+- [<span lang="en">Foundry Models lifecycle and support policy</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/concepts/model-retirements)
+- [<span lang="en">Default safety policies in Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/guardrails/default-safety-policies)
+- [<span lang="en">Role-based access control for Microsoft Foundry</span>](https://learn.microsoft.com/en-us/azure/foundry/concepts/rbac-foundry)
+- <span lang="en">Azure built-in roles</span>, en trois pages:
     [<span lang="en">Privileged</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/privileged) (Owner, Contributor),
     [<span lang="en">AI + Machine Learning</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/ai-machine-learning) (Foundry User) et
     [<span lang="en">Security</span>](https://learn.microsoft.com/en-us/azure/role-based-access-control/built-in-roles/security) (Key Vault Secrets Officer)
 
-Lectures par `az`, en lecture seule, le 2026-11-18: les déploiements, la ressource, les rôles de l'opératrice et
-l'app de l'API IA en ligne, vers 11:28 UTC (« Relire l'état »). Une lecture des déploiements du 2026-11-09, dont la ressource n'est pas établie, pour
-`DeepSeek-V4-Flash` seulement (« Ce qu'est le service »). Appels du 2026-11-10 vers 00:03 UTC, avec la clé et sans
+Lectures par `az`, en lecture seule: les déploiements, la ressource, les rôles de l'opératrice et
+l'app de l'API IA en ligne (« Relire l'état »). Une lecture plus ancienne des déploiements, dont la ressource n'est pas établie, pour
+`DeepSeek-V4-Flash` seulement (« Ce qu'est le service »). Appels avec la clé et sans
 clé, sur `gpt-6-luna` (« Le test »). Microsoft Learn, référence de
 [<span lang="en">az role assignment</span>](https://learn.microsoft.com/en-us/cli/azure/role/assignment?view=azure-cli-latest),
-lue le 2026-11-18, pour l'option `--include-groups`. Microsoft Learn,
+pour l'option `--include-groups`. Microsoft Learn,
 [<span lang="en">Prompt caching</span>](https://learn.microsoft.com/en-us/azure/foundry/openai/how-to/prompt-caching),
-lue le 2026-11-18 par Context7 et par une recherche web, pour la définition du point d'arrêt et du mode explicite;
-sa date `ms.date` n'a pas été relevée.
+lue par Context7 et par une recherche web, pour la définition du point d'arrêt et du mode explicite.
 
-Hors du dépôt: les captures du portail Foundry du 2026-11-17 (le catalogue des modèles, le formulaire de
-déploiement de `gpt-6.1-sol` avec ses réglages), et le relevé de l'essai de bout en bout du 2026-11-17 (« Le test »).
+Hors du dépôt: les captures du portail Foundry (le catalogue des modèles, le formulaire de
+déploiement de `gpt-6.1-sol` avec ses réglages), et le relevé de l'essai de bout en bout (« Le test »).
 
 Dans le dépôt: [la note du branchement de gpt-6-luna](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-17-brancher-gpt-6-luna-sur-foundry.md)
 (2026-10-17), [la note du contenu des appels](https://github.com/SabineLaurent/K-B/blob/main/docs/journaling/2026-10-28-contenu-des-appels-au-modele.md)

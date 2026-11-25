@@ -19,7 +19,7 @@ lui-même. Le déroulé de `kb collect`, pas à pas, avec son logigramme et ses 
 [la fiche de l'import et de la base, « La commande qui précède l'import: `kb collect` »](donnees.md#la-commande-qui-precede-limport-kb-collect);
 le détail de chaque source est dans
 [les spécifications de la collecte](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md). Elle est
-écrite d'après le code de `main` au commit `39cb5eb9` (2026-11-22). Les chemins du code de K-B (`etl/…`, `core/…`,
+écrite d'après le code de `main` au commit `39cb5eb9`. Les chemins du code de K-B (`etl/…`, `core/…`,
 `commands/…`, `post/…`, `purge/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Le périmètre
@@ -320,7 +320,7 @@ fichier, monté dans `/mnt/secrets`, hors du partage où le job garde ses donné
     ([les jetons GitHub de K-B](https://github.com/SabineLaurent/K-B/blob/main/docs/jeton-github.md),
     `docs/jeton-github.md:30-32`). Il part dans la première requête seule, vers `https://api.github.com/`, jamais
     vers une redirection (`etl/sources/github/api.py:48-59`, `etl/http_download.py:118-123`). Les conditions de
-    GitHub, relues le 2026-10-30, valent pour toute sa collecte, GH Archive compris: K-B la lit par l'API, que régit
+    GitHub valent pour toute sa collecte, GH Archive compris: K-B la lit par l'API, que régit
     la section H des conditions d'utilisation de GitHub, et non la règle sur le <span lang="en">scraping</span> de
     ses règles d'usage acceptable (§ 7) (`docs/specs-collecte.md:187-192`).
 - **API arXiv.** Sans authentification. Les conditions d'utilisation de l'API, <span lang="en">« Terms of Use for
@@ -331,7 +331,7 @@ fichier, monté dans `/mnt/secrets`, hors du partage où le job garde ses donné
     s'il a changé, et refusé s'il est servi hors de `https://www.cisa.gov/` (`etl/sources/cisa_kev.py:47`,
     `:63-75`).
 - **tldr.tech.** Sans authentification. Son `robots.txt` autorise tout, sauf les pages d'abonnement et de compte,
-    que K-B ne lit pas; lu le 2026-10-01, relu le 2026-11-01 (`docs/specs-collecte.md:602-604`, `:1104`). K-B ne lit
+    que K-B ne lit pas (`docs/specs-collecte.md:602-604`, `:1104`). K-B ne lit
     que la page d'une édition et d'un jour, et toute redirection est contrôlée (`etl/sources/tldr.py:116-119`).
 - **Zotero.** La base n'est jamais ouverte en place: `zotero.sqlite` est copié avec son journal dans un dossier
     temporaire, la copie est vérifiée par `PRAGMA integrity_check`, ouverte en lecture seule (`mode=ro`), lue, puis

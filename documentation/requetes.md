@@ -16,7 +16,7 @@ d'extraction, sur une copie de la base de Zotero et sur GH Archive dans BigQuery
 leurs filtres, leurs jointures, leur regroupement, puis leurs optimisations et leur mesure. Elle donne ensuite les
 paramètres des requêtes faites aux API. Les scripts des mesures et leurs sorties entières sont dans
 [le document des requêtes d'extraction](https://github.com/SabineLaurent/K-B/blob/main/docs/requetes-extraction.md),
-`docs/requetes-extraction.md`. Elle est écrite d'après le code de `main` au commit `39cb5eb9` (2026-11-22). Les
+`docs/requetes-extraction.md`. Elle est écrite d'après le code de `main` au commit `39cb5eb9`. Les
 chemins du code de K-B (`etl/…`, `core/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Les requêtes et leurs objectifs
@@ -408,8 +408,8 @@ la collecte »). Le tableau suivant donne les deux mesures qui le fixent.
 ## Les paramètres des requêtes aux API
 
 Par défaut, K-B filtre à la lecture du brut, pas à la requête: le brut garde ce que la source a rendu
-(`docs/specs-collecte.md`, « Règles communes »). Deux exceptions décidées posent le filtre dans la requête: arXiv,
-le 2026-10-01, et les alertes GitHub, le 2026-10-02 (`docs/specs-collecte.md`, « API arXiv » et « API GitHub »). Les
+(`docs/specs-collecte.md`, « Règles communes »). Deux exceptions décidées posent le filtre dans la requête: arXiv
+et les alertes GitHub (`docs/specs-collecte.md`, « API arXiv » et « API GitHub »). Les
 réglages de la veille (mots-clés, éditions, dépôts suivis, tailles des tops, délai réseau) sont dans
 `core/config.py`, chacun préfixé par sa source (`core/config.py:8-9`); les faits des API et les plafonds restent dans
 le module de la source.

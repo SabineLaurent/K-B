@@ -135,7 +135,7 @@ gh api 'repos/SabineLaurent/K-B/milestones?state=all' \
 ### Les demandes de fusion
 
 Un changement passe par une branche, puis une demande de fusion (PR, <span lang="en">pull request</span>) vers
-`main`, ce que le ruleset de `main` exige depuis sa création, le 2026-10-16; une PR qui livre une issue la ferme par
+`main`, ce que le ruleset de `main` exige depuis sa création; une PR qui livre une issue la ferme par
 `Closes #n`. Le 2026-11-21, 299 PR sont fusionnées. Le ruleset
 « <span lang="en">Basic-rules-main-protect</span> » de `main` interdit la suppression de la branche et le push forcé,
 exige une PR, et ne fusionne que par commit de fusion.

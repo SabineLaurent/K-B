@@ -1,8 +1,9 @@
 """The settings kb serve-web reads: where it listens, the hosts it answers, whose header it checks,
-and how it reads the data API; the check is off on the machine only, outside Azure Container Apps
-(docs/site-web.md, "Réglages")."""
+how it reads the data API, and the version it shows; the check is off on the machine only, outside
+Azure Container Apps (docs/site-web.md, "Réglages")."""
 
 import ipaddress
+import re
 from collections.abc import Mapping
 from dataclasses import dataclass
 
@@ -38,6 +39,12 @@ CONTAINER_APP_NAME_VARIABLE = "CONTAINER_APP_NAME"
 # closed); kb serve-data reads the same variable for its client WEB.
 DATA_API_URL_VARIABLE = "KB_DATA_API_URL"
 DATA_API_KEY_VARIABLE = f"{API_KEY_VARIABLE_PREFIX}WEB"
+# The version tag the image was built for, set by deploy.yml (Dockerfile), shown in the footer;
+# empty or not set, in an image built elsewhere: no version.
+VERSION_VARIABLE = "KB_VERSION"
+# The rule of the job check of deploy.yml, which refuses any other tag: change both together, or a
+# tag deployed would keep the site from starting. [0-9], not \d, which takes other digits.
+VERSION_TAG = re.compile(r"v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)")
 
 
 @dataclass(frozen=True)
@@ -54,12 +61,16 @@ class WebSettings:
     # In lowercase; None under KB_WEB_AUTH=off: no header checked.
     operator_id: str | None
     data_api: DataApiAccess
+    # None in an image built without the argument of deploy.yml: no line in the footer.
+    version: str | None
 
 
 def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | str:
     """The settings of kb serve-web, or why a variable is refused, its value quoted, but the
     object id, the URL and the key."""
     host = environ.get(WEB_HOST_VARIABLE, WEB_HOST)
+    # Empty is not set: the Dockerfile sets it empty without the argument of deploy.yml.
+    version = environ.get(VERSION_VARIABLE) or None
     port = environ.get(WEB_PORT_VARIABLE, str(WEB_PORT))
     allowed_hosts_value = environ.get(WEB_ALLOWED_HOSTS_VARIABLE)
     # Split once: the list checked is the list served.
@@ -72,6 +83,7 @@ def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | st
         find_host_refusal(WEB_HOST_VARIABLE, host)
         or find_port_refusal(WEB_PORT_VARIABLE, port)
         or find_allowed_hosts_refusal(WEB_ALLOWED_HOSTS_VARIABLE, allowed_hosts)
+        or find_version_refusal(version)
     )
     if refusal is not None:
         return refusal
@@ -87,7 +99,15 @@ def read_web_settings_or_refusal(environ: Mapping[str, str]) -> WebSettings | st
         allowed_hosts=allowed_hosts,
         operator_id=access.operator_id,
         data_api=data_api,
+        version=version,
     )
+
+
+def find_version_refusal(version: str | None) -> str | None:
+    """Why the version is refused: set, but not a tag deploy.yml builds an image for."""
+    if version is None or VERSION_TAG.fullmatch(version):
+        return None
+    return f"{VERSION_VARIABLE}: {quote_value(version)} not a version tag vMAJOR.MINOR.PATCH"
 
 
 @dataclass(frozen=True)
