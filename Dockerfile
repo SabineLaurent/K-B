@@ -52,6 +52,11 @@ ENV PATH="/app/.venv/bin:$PATH" \
 RUN apt-get update \
     && apt-get install --yes --no-install-recommends zlib1g=1:1.3.dfsg+really1.3.1-1+deb13u1 \
     && rm -rf /var/lib/apt/lists/*
+# The version tag the image is built for, given by deploy.yml (--build-arg KB_VERSION=<tag>), which the footer of
+# the site shows (docs/site-web.md, "Réglages"); empty in an image built without it (image.yml, compose.yaml, by
+# hand). After every RUN: its value never rebuilds one.
+ARG KB_VERSION=""
+ENV KB_VERSION=$KB_VERSION
 USER 10001:10001
 # Exec form: kb is PID 1 and receives SIGTERM itself (.claude/rules/poc.md, rule 6). No init
 # process: docker stop of kb serve-data is measured in the pull request of #200. As PID 1, a command

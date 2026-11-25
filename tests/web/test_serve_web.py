@@ -84,6 +84,18 @@ def test_serve_web_listens_on_127_0_0_1_8002_by_default_without_uvicorn_logging_
     }
 
 
+def test_serve_web_gives_the_version_of_its_image_to_the_site(
+    monkeypatch, data_dir, data_api_key, uvicorn_calls
+):
+    monkeypatch.setenv("KB_WEB_OPERATOR_ID", OPERATOR_ID)
+    monkeypatch.setenv("KB_VERSION", "v0.1.9")
+
+    cli.main(["serve-web"])
+
+    [(app, _)] = uvicorn_calls
+    assert app.state.version == "v0.1.9"
+
+
 def test_serve_web_logs_its_access_and_hosts_in_its_own_file_never_the_object_id(
     monkeypatch, data_dir, data_api_key, uvicorn_calls
 ):

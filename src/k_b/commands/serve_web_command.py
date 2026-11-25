@@ -42,6 +42,7 @@ def run_serve_web(environ: Mapping[str, str]) -> int:
             create_app(
                 operator_id=settings.operator_id,
                 data_api_client=data_api_client,
+                version=settings.version,
                 allowed_hosts=settings.allowed_hosts,
             ),
             host=settings.host,

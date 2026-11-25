@@ -25,6 +25,8 @@ PAGE_PATHS = ("/", "/sources", "/accessibilite")
 TEST_API_KEY = secrets.token_urlsafe(32)
 # The moment of the tests: "1 jour" asks since 2026-11-10T00:00:00Z.
 NOW = datetime(2026, 11, 11, 17, 40, tzinfo=UTC)
+# The version tag of an image built by deploy.yml, which the footer of every page gives.
+TEST_VERSION = "v0.1.9"
 
 
 def serve(body, status_code=200):
@@ -36,6 +38,7 @@ def make_app(
     operator_id: str | None = OPERATOR_ID,
     handler=None,
     allowed_hosts=WEB_ALLOWED_HOSTS,
+    version: str | None = TEST_VERSION,
 ) -> FastAPI:
     """The site, its data API answering by handler, the page of the fixture by default."""
     access = DataApiAccess(
@@ -47,6 +50,7 @@ def make_app(
         data_api_client=build_data_api_client(access, transport),
         clock=lambda: NOW,
         allowed_hosts=allowed_hosts,
+        version=version,
     )
 
 

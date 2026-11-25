@@ -29,12 +29,14 @@ def create_app(
     *,
     operator_id: str | None,
     data_api_client: httpx2.Client,
+    version: str | None,
     clock: Callable[[], datetime] = read_utc_now,
     allowed_hosts: Sequence[str] = WEB_ALLOWED_HOSTS,
 ) -> FastAPI:
     """The site, given the object id of its operator in lowercase, or None to check no header
-    (KB_WEB_AUTH=off), the client of the data API it reads, the clock of the period of the feed,
-    and the hosts it answers; it serves no document of an API."""
+    (KB_WEB_AUTH=off), the client of the data API it reads, the version tag of its image, or None,
+    the clock of the period of the feed, and the hosts it answers; it serves no document of an
+    API."""
     app = FastAPI(
         title="K-B",
         docs_url=None,
@@ -49,6 +51,7 @@ def create_app(
     )
     app.state.operator_id = operator_id
     app.state.data_api_client = data_api_client
+    app.state.version = version
     app.state.clock = clock
     # The last added is the outermost: the compression of every answer, the error pages included,
     # then the request id, the headers of every answer, the 500, and the host and the operator

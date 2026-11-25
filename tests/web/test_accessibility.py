@@ -22,7 +22,14 @@ from item_fixture import (
     WITHDRAWN_VULNERABILITY,
     make_detail,
 )
-from site_client import OPERATOR_HEADERS, PAGE_PATHS, make_app, make_client, serve
+from site_client import (
+    OPERATOR_HEADERS,
+    PAGE_PATHS,
+    TEST_VERSION,
+    make_app,
+    make_client,
+    serve,
+)
 from trends_fixture import TRENDS
 
 HEADINGS = ("h1", "h2", "h3", "h4", "h5", "h6")
@@ -294,6 +301,32 @@ def test_the_links_of_the_footer_are_a_list(name):
     assert footer.group(0).count("<a ") == len(
         re.findall(r"<li>\s*<a ", footer.group(0))
     )
+
+
+@pytest.mark.parametrize("name", sorted(PAGES))
+def test_the_footer_of_every_page_gives_the_version_deployed_after_its_links(name):
+    footer = re.search(r"<footer\b.*?</footer>", PAGES[name], flags=re.DOTALL)
+
+    assert footer is not None
+    assert footer.group(0).endswith(
+        "</ul>\n"
+        f'<p class="site-footer-version">Version déployée: {TEST_VERSION}</p>\n'
+        "</footer>"
+    )
+
+
+def test_a_site_without_a_version_has_no_line_of_version_in_its_footer():
+    """An image built outside deploy.yml, or before the first tag built with KB_VERSION, has no
+    version: the site never writes one it does not have."""
+    client = TestClient(
+        make_app(operator_id=None, version=None),
+        base_url="http://localhost",
+    )
+
+    page = client.get("/").text
+
+    assert "site-footer-version" not in page
+    assert "Version déployée" not in page
 
 
 @pytest.mark.parametrize("name", sorted(PAGES))
