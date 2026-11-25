@@ -9,7 +9,7 @@
   `tests/web/test_accessibility.py`
 
 La liste de fichiers fournie à la note compare la branche à une base plus ancienne que `origin/main` (139 fichiers) :
-la branche elle-même porte les deux commits ci-dessus, 18 fichiers (`git diff --stat origin/main...HEAD`), plus le commit de cette note (`776e547e`), soit 19 fichiers.
+la branche elle-même porte les deux commits ci-dessus, 18 fichiers (`git diff --stat origin/main...HEAD`), plus les commits de cette note, soit 19 fichiers.
 Les autres fichiers de cette liste viennent de PR déjà fusionnées, et la note ne les couvre pas.
 
 ## Le pourquoi
