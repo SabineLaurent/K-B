@@ -12,7 +12,7 @@
 - **Commits** : `3bef4b9e` (la ligne, son contrôle, sa couleur), `dd46686b` (intégration de `main`, sans contenu
   propre), `50328124` (la doc et le report des renvois `docs.yml:N`), `df518ead` (le tri de la revue). La liste de
   fichiers que la note a reçue compare à une copie locale de `main` en retard : le diff réel de la branche
-  (`git diff origin/main...HEAD`) ne touche que les six fichiers ci-dessus.
+  (`git diff origin/main...HEAD`) ne touche que les six fichiers ci-dessus, et cette note.
 
 ## Le pourquoi
 

@@ -152,7 +152,7 @@ de focus de la charte, à 6,77:1 sur `#F4F5F2`. En mode sombre, c'est le canard 
 `#1C1E21`. Les deux passent le seuil de 3:1 du RGAA 3.3 pour un composant d'interface. Sur l'en-tête, les onglets, le
 lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode, l'anneau est blanc, `#FFFFFF`: 16,71:1 sur
 `#1C1E21` en mode clair, 18,46:1 sur `#121416` en mode sombre, là où la sarcelle ne donnerait que 2,25:1
-(`:172-186`). Le contour d'un bloc de code, `#DADCD6` sur blanc ou `#4A4F57` sur `#121416`, est un décor: il ne porte
+(`:174-188`). Le contour d'un bloc de code, `#DADCD6` sur blanc ou `#4A4F57` sur `#121416`, est un décor: il ne porte
 aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
