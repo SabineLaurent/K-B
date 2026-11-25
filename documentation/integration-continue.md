@@ -14,8 +14,9 @@ Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comm
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
 `main` au commit `57ff235`, avec le workflow `Docs` et l'audit de tous les groupes de dépendances ajoutés
 par #167, et d'après les réglages du dépôt; la publication du site à chaque fusion et les
-contrôles requis, d'après la demande de fusion de #684 et le ruleset. Les renvois de `docs.yml`, de
-`dependabot.yml` et des étapes de Grype d'`image.yml` visent `main` au commit `a1a01efd`. Les exécutions citées se
+contrôles requis, d'après la demande de fusion de #684 et le ruleset. Les renvois de
+`dependabot.yml` et des étapes de Grype d'`image.yml` visent `main` au commit `a1a01efd`, ceux de `docs.yml` le commit
+`df518ead` (#719). Les exécutions citées se
 relisent par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du
 dépôt (`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en
 ligne d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison-continue.md).

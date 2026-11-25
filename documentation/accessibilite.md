@@ -9,7 +9,8 @@
 
 Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité elle
 suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne` visent
-le commit `38ae9df5`. `mkdocs.yml`,
+le commit `38ae9df5`, sauf ceux de `documentation/stylesheets/extra.css` et de `.github/workflows/docs.yml`, qui
+visent le commit `df518ead` (#719). `mkdocs.yml`,
 `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format

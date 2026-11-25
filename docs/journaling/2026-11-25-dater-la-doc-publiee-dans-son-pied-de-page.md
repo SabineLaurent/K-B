@@ -41,7 +41,7 @@ publie, pas celui d'une PR, et le job échoue avant toute publication si la lign
 Une ligne écrite dans le fichier `$GITHUB_ENV` devient une variable d'environnement des étapes suivantes du même job.
 `git rev-parse HEAD` donne le commit que `actions/checkout` vient de récupérer, donc celui que l'étape suivante
 construit. `date -u +%F` donne le jour en UTC, au format `2026-11-25`. MkDocs lit ces deux variables par la balise
-`!ENV` (`mkdocs.yml:111-112`) :
+`!ENV` (`mkdocs.yml:112-113`) :
 
 ```yaml
   published_commit: !ENV [KB_DOCS_COMMIT, ""]
@@ -137,8 +137,13 @@ du pied, déjà au tableau des contrastes.
 - **Repli de couleur** (constat 1) : `--md-footer-fg-color--light`, 9,26:1. Écarté : `--md-footer-fg-color--lighter`,
   la couleur du texte de pied de Material, 4,52:1, trop près du seuil de 4,5:1.
 - **Les renvois `mkdocs.yml:N` en retard d'une ligne** (constat 3) : défaut antérieur, laissé à #720. La cause vérifiée
-  est `6a71c217` (#510), et non `3e5494b0` (#685) comme le disait la revue. #708, fusionnée le même jour, a recalé ces
-  renvois sur `main` : après l'intégration de `main` dans la branche, chacun tombe sur sa ligne, et #720 n'a plus d'objet.
+  est `6a71c217` (#510), et non `3e5494b0` (#685) comme le disait la revue. Vérifié ensuite, le constat ne tient pas : un
+  renvoi vise le commit que sa fiche nomme dans son introduction. Avant #708, la fiche faisait viser ses renvois
+  `mkdocs.yml` à la demande de fusion de #684 (`2da20b16`, `validation:` à la ligne 98, cité par `97-103`), où ils
+  tombent sur leurs lignes ; #708 les fait viser `38ae9df5`, où ils tombent aussi. #720 n'a donc pas d'objet.
+- **Le commit que visent les renvois de cette branche** : `df518ead`, où `docs.yml` et `extra.css` ont leur forme finale,
+  nommé dans l'introduction des deux fiches pour ces deux fichiers ; les autres renvois gardent le commit qu'elles
+  nommaient.
 - **Les fiches à la règle de #708** (décisions de Sabine du 23/11, appliquées par #708) : ni date de lecture ou de calcul,
   ni nom de personne. Les ajouts de cette branche aux fiches les suivent depuis l'intégration de `main` : la décision
   de #719 y est citée par son issue, et « calculé le » ou « lu le » en sont retirés.
@@ -189,7 +194,6 @@ Le repli mesuré par le navigateur (9,2:1 et 9,39:1) est un peu sous le calcul (
 
 ## Ce qui reste
 
-- #720 : sans objet depuis #708, à fermer.
-- Les renvois `deploy.yml:N` des fiches, en retard sur `main` depuis #717 : relevés dans la PR, à trancher.
+- #720 : sans objet (voir « Choix faits »), à fermer.
 - Après la fusion : lire la ligne sur `https://sabinelaurent.github.io/K-B/`, une fois `deploy` passé.
 - L'anneau qui recouvre la virgule : à trancher (le laisser, ou espacer le lien), hors du tri de cette revue.
