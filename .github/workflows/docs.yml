@@ -24,12 +24,25 @@ jobs:
         with:
           version: "0.13.6" # the uv of the Dockerfile, in the uv_build range of pyproject.toml
           save-cache: false # the jobs share one cache key: only tests saves it
+      # The commit this job checks out and builds, and the day of the build in UTC, which the footer of each page gives
+      # (overrides/partials/copyright.html). Set for a pull request too, so that its build renders the line; only a
+      # build of main is published.
+      - name: Names the commit and the day of the build
+        run: |
+          echo "KB_DOCS_COMMIT=$(git rev-parse HEAD)" >> "$GITHUB_ENV"
+          echo "KB_DOCS_PUBLISHED_ON=$(date -u +%F)" >> "$GITHUB_ENV"
       # The docs group only, pinned by uv.lock: neither K-B nor its dev tools.
       - run: uv run --locked --only-group docs mkdocs build --strict
       # The privacy plugin downloads Mermaid from unpkg, in its moving version 11 (mermaid@11): the build
       # fails unless the file is the one of the npm package of mermaid 11.17.2, checked on 2026-11-14 against
       # the integrity npm publishes for it (documentation/accessibilite.md, "Limites").
       - run: echo "581ed7d74bd9048d0e3a91363927d72ef22942d7722546b27f7cc29e35390eb8  site/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js" | sha256sum --check
+      # The footer says what is online: the day of this build and the commit it built, or the job fails before any
+      # publication.
+      - name: Gives the day and the commit of the build in the footer
+        run: |
+          grep -qF "Documentation publiée le <time datetime=\"$KB_DOCS_PUBLISHED_ON\">" site/index.html
+          grep -qF "href=\"https://github.com/SabineLaurent/K-B/commit/$KB_DOCS_COMMIT\"" site/index.html
       - if: >-
           github.ref == 'refs/heads/main' && (github.event_name == 'workflow_dispatch'
           || (github.event_name == 'push' && vars.PAGES_PUBLISH == 'true'))

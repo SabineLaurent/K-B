@@ -233,3 +233,10 @@
 .md-skip:not(:focus) {
   inset-inline-start: -10000px;
 }
+
+/* The day and the commit of the published site, under the links: the secondary text of the theme, 8.24:1 on the white
+   of the footer, 13.35:1 on its night. */
+.md-typeset .kb-footer-version {
+  margin: 0.4rem 0 0;
+  color: var(--md-default-fg-color--light);
+}

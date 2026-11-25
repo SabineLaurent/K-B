@@ -106,3 +106,7 @@ validation:
 # No "Made with Material for MkDocs" in the footer: an English text, and a link that opens a new window.
 extra:
   generator: false
+  # The commit and the day (UTC) of the build, set by docs.yml, which the footer gives
+  # (overrides/partials/copyright.html); not set, on the machine: no line.
+  published_commit: !ENV [KB_DOCS_COMMIT, ""]
+  published_on: !ENV [KB_DOCS_PUBLISHED_ON, ""]

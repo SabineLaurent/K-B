@@ -8,4 +8,14 @@
       <li><a href="https://creativecommons.org/licenses/by-nc/4.0/deed.fr">Licence CC BY-NC 4.0</a></li>
     </ul>
   </nav>
+  {#- The day and the commit of the build that published the site (docs.yml), in UTC; none on the machine. !ENV gives
+      a date its own type: |string reads it back as 2026-11-25. The day is written as on the site of K-B. #}
+  {%- set published_commit = config.extra.published_commit | string %}
+  {%- set published_on = config.extra.published_on | string %}
+  {%- if published_commit and published_on %}
+  {%- set months = ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre",
+      "novembre", "décembre"] %}
+  {%- set year, month, day = published_on.split("-") %}
+  <p class="kb-footer-version">Documentation publiée le <time datetime="{{ published_on }}">{{ "1er" if day | int == 1 else day | int }} {{ months[month | int - 1] }} {{ year }}</time>, <a href="https://github.com/SabineLaurent/K-B/commit/{{ published_commit }}" hreflang="en">commit {{ published_commit[:8] }}</a></p>
+  {%- endif %}
 </div>
