@@ -9,7 +9,7 @@
   `tests/web/test_accessibility.py`
 
 La liste de fichiers fournie à la note compare la branche à une base plus ancienne que `origin/main` (139 fichiers) :
-la branche elle-même ne porte que les deux commits ci-dessus, 18 fichiers (`git diff --stat origin/main...HEAD`).
+la branche elle-même porte les deux commits ci-dessus, 18 fichiers (`git diff --stat origin/main...HEAD`), plus le commit de cette note (`776e547e`), soit 19 fichiers.
 Les autres fichiers de cette liste viennent de PR déjà fusionnées, et la note ne les couvre pas.
 
 ## Le pourquoi
@@ -92,7 +92,9 @@ rien servir, comme pour un port ou un hôte refusé.
 
 `create_app` range la version dans `app.state.version`. `add_layout_context` est un *context processor* de
 Starlette : une fonction appelée à chaque rendu, qui ajoute ses clés au contexte de la page. Toutes les pages
-héritent de `base.html`, les pages d'erreur comprises, donc toutes ont la ligne. Le `-` de `-%}` retire le retour à
+rendues par un gabarit héritent de `base.html`, les pages d'erreur comprises, donc toutes ont la ligne. Seule
+exception : la page 500 de repli, écrite sans gabarit pour le cas où celui de la page 500 échoue lui-même
+(`FALLBACK_SERVER_ERROR_PAGE`, `src/k_b/web/errors.py:20`), n'a ni pied ni version. Le `-` de `-%}` retire le retour à
 la ligne qui suit la balise, pour que le pied ne porte pas de ligne vide.
 
 La clé s'appelle `deployed_version`, pas `version`. Starlette ajoute les clés du *context processor* après celles
@@ -132,7 +134,7 @@ intégrés), puis validé par Sabine sur la recommandation de time-knight.
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
 | Avant le code : 15 échecs et 4 erreurs dans `tests/web` (`create_app() got an unexpected keyword argument 'version'`) | Les tests ont été écrits d'abord, et échouaient sans le code |
-| `test_the_footer_of_every_page_gives_the_version_deployed_after_its_links` (`test_accessibility.py:307`), sur les 24 pages de `PAGES`, 403, 404, 405 et 500 comprises | Chaque page que le site peut rendre porte la ligne, juste après la liste des liens |
+| `test_the_footer_of_every_page_gives_the_version_deployed_after_its_links` (`test_accessibility.py:307`), sur les 24 pages de `PAGES`, 403, 404, 405 et 500 comprises | Chaque page rendue par un gabarit porte la ligne, juste après la liste des liens (la page 500 de repli, sans gabarit, n'a pas de pied) |
 | `test_a_site_without_a_version_has_no_line_of_version_in_its_footer` (`test_accessibility.py:318`) | Sans version, aucune ligne |
 | `test_an_empty_version_is_no_version`, `test_a_version_tag_of_deploy_yml_is_kept`, `test_a_version_that_is_not_a_tag_of_deploy_yml_is_refused_quoted` (9 valeurs : `0.1.9`, `v0.1`, `v01.1.9`, `v0.01.9`, `v0.1.09`, `v0.1.9-rc.1`, `"v0.1.9\n"`, `" v0.1.9"`, un zéro pleine largeur) | La lecture et le refus, la valeur citée par `quote_value` |
 | `test_serve_web_gives_the_version_of_its_image_to_the_site` (`test_serve_web.py:87`) | `kb serve-web` passe bien la version de l'environnement à l'app |
@@ -156,8 +158,8 @@ intégrés), puis validé par Sabine sur la recommandation de time-knight.
    avant (`test_settings.py:111`).
 4. **Pourquoi aucune ligne en local ?** Une image construite sans l'argument a `KB_VERSION` vide, et `or None` en
    fait une absence (`settings.py:73`). Le site ne montre jamais une version qu'il ne connaît pas.
-5. **Montrer la version, n'est-ce pas une fuite d'information ?** Le dépôt, ses tags et les journaux d'Actions sont
-   publics depuis le 2026-11-25. Le site est privé : Entra ne laisse entrer que l'identifiant de Sabine. C'est la
+5. **Montrer la version, n'est-ce pas une fuite d'information ?** Le dépôt est public (`gh repo view`, lu le
+   2026-11-25), ses tags et les journaux d'Actions avec lui. Le site est privé : Entra ne laisse entrer que l'identifiant de Sabine. C'est la
    version de K-B, pas celle d'un logiciel du serveur, que la règle Opquast 213 vise et que le site tait déjà
    (`server_header=False`).
 
