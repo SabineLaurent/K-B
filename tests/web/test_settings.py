@@ -1,11 +1,25 @@
 """The settings of kb serve-web: where it listens, the hosts it answers, whose header it checks, and
 how it reads the data API; the check is off only on the machine, outside Azure Container Apps."""
 
+import re
+from pathlib import Path
+
 import pytest
 from pydantic import SecretStr
 from site_client import OPERATOR_ID, TEST_API_KEY
 
-from k_b.web.settings import DataApiAccess, WebSettings, read_web_settings_or_refusal
+from k_b.web.settings import (
+    VERSION_TAG,
+    DataApiAccess,
+    WebSettings,
+    read_web_settings_or_refusal,
+)
+
+DEPLOY_WORKFLOW_PATH = (
+    Path(__file__).parents[2] / ".github" / "workflows" / "deploy.yml"
+)
+# The test of the step "Refuses a ref that is not a version tag" of the job check.
+CHECKED_REF = re.compile(r'\[\[ "\$GITHUB_REF" =~ \^refs/tags/(\S+)\$ \]\]')
 
 # The key of the client WEB, which kb serve-web needs whatever its access.
 DATA_API_KEY = {"KB_DATA_API_KEY_WEB": TEST_API_KEY}
@@ -92,6 +106,16 @@ def test_a_version_tag_of_deploy_yml_is_kept(version):
 
     assert isinstance(settings, WebSettings)
     assert settings.version == version
+
+
+def test_the_rule_of_a_version_is_the_one_of_the_job_check_of_deploy_yml():
+    """A tag deploy.yml accepts and the site refuses would keep the site from starting, after the
+    migration of the base."""
+    [checked_tag] = CHECKED_REF.findall(
+        DEPLOY_WORKFLOW_PATH.read_text(encoding="utf-8")
+    )
+
+    assert checked_tag == VERSION_TAG.pattern
 
 
 # A digit of full width: \d would take it, [0-9] does not.

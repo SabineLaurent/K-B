@@ -306,7 +306,7 @@ du réseau pourrait poser l'en-tête.
 `--build-arg KB_VERSION=<tag>`, et le `Dockerfile` garde cette valeur dans l'environnement de l'image : la version
 suit l'empreinte de l'image, en retour arrière comme en passe 2 de Bicep. Le pied de chaque page la donne après ses
 liens, « Version déployée: v0.1.9 ». Vide ou absente, pas de ligne : l'image a été construite hors de `deploy.yml`
-(`image.yml`, `compose.yaml`, à la main) ou avant la v0.1.9. Posée, elle doit être `vMAJEUR.MINEUR.CORRECTIF`,
+(`image.yml`, `compose.yaml`, à la main) ou avant le premier tag construit avec `KB_VERSION`. Posée, elle doit être `vMAJEUR.MINEUR.CORRECTIF`,
 sans zéro en tête (`VERSION_TAG`, `web/settings.py`), sinon `kb serve-web` refuse de démarrer. C'est la règle du job
 `check` de `deploy.yml`, qui refuse tout autre tag : les deux changent ensemble, sinon un tag livré empêcherait le
 site de démarrer.

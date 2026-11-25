@@ -31,8 +31,8 @@
 <li>{{ nav_link("/sources", "Sources et conditions d’utilisation") }}</li>
 <li>{{ nav_link("/accessibilite", "Accessibilité") }}</li>
 </ul>
-{% if version -%}
-<p class="site-footer-version">Version déployée: {{ version }}</p>
+{% if deployed_version -%}
+<p class="site-footer-version">Version déployée: {{ deployed_version }}</p>
 {% endif -%}
 </footer>
 </body>

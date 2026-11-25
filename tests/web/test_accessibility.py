@@ -316,8 +316,8 @@ def test_the_footer_of_every_page_gives_the_version_deployed_after_its_links(nam
 
 
 def test_a_site_without_a_version_has_no_line_of_version_in_its_footer():
-    """An image built outside deploy.yml, or before v0.1.9, has no version: the site never writes
-    one it does not have."""
+    """An image built outside deploy.yml, or before the first tag built with KB_VERSION, has no
+    version: the site never writes one it does not have."""
     client = TestClient(
         make_app(operator_id=None, version=None),
         base_url="http://localhost",
