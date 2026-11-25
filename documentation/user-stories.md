@@ -43,7 +43,8 @@ Chaque story suit la forme <q>en tant que…, je veux…, afin de…</q>, puis d
 - **le contexte**: ce que fait K-B pour cette fonction, et les commandes ou les routes en jeu;
 - **les scénarios d'utilisation**: les cas que la fonction traite, y compris les cas d'erreur;
 - **les critères de validation**: ce qui doit être vrai pour que la story soit tenue, chacun avec le test automatisé
-    qui le vérifie. Les critères d'accessibilité en font partie: chacun nomme le critère des WCAG qu'il applique.
+    ou le relevé qui le vérifie. Les critères d'accessibilité en font partie: chacun nomme le critère des WCAG
+    qu'il applique.
 
 Une story qui n'a pas d'interface le dit dans ses critères.
 
