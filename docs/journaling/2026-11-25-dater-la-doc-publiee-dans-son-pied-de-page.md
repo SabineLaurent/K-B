@@ -10,7 +10,9 @@
   [la publication des fiches en site accessible](2026-11-18-publier-les-fiches-en-site-accessible.md), qui a écrit
   `docs.yml`.
 - **Commits** : `3bef4b9e` (la ligne, son contrôle, sa couleur), `dd46686b` (intégration de `main`, sans contenu
-  propre), `50328124` (la doc et le report des renvois `docs.yml:N`), `df518ead` (le tri de la revue). La liste de
+  propre), `50328124` (la doc et le report des renvois `docs.yml:N`), `df518ead` (le tri de la revue), `87c4f2e9` (cette note), `bc55ca2f` (un renvoi oublié), `83836c1e`
+  (intégration de `main` et de #708, conflits résolus), `7de73160` (le commit que visent les renvois), `94c794c1` (la CI
+  dans la note), et le commit qui corrige cette liste. La liste de
   fichiers que la note a reçue compare à une copie locale de `main` en retard : le diff réel de la branche
   (`git diff origin/main...HEAD`) ne touche que les six fichiers ci-dessus, et cette note.
 
@@ -156,7 +158,7 @@ du pied, déjà au tableau des contrastes.
 | Après le tri : l'étape `docs.yml:46-56`, lancée sur le Mac (`bash -eo pipefail`, `RUNNER_TEMP` dans le scratchpad), sort en 0 ; l'étape `docs.yml:42-45` aussi | Une valeur vide ou absente ne donne pas de ligne ; la ligne attendue est là avec les deux valeurs |
 | Session précédente : l'étape `docs.yml:42-45` sort en 1 sur une construction sans la ligne, puis en 0 | Le contrôle de la ligne échoue quand elle manque |
 | `KB_DOCS_PUBLISHED_ON=2026-12-01` donne `<time datetime="2026-12-01">1er décembre 2026</time>` | La règle du « 1er » |
-| `mkdocs build --strict` vert avec et sans variables ; empreinte de Mermaid `OK` ; `uv run pytest` : 5 799 passés | Rien d'autre ne casse (aucun fichier Python touché) |
+| `mkdocs build --strict` vert avec et sans variables ; empreinte de Mermaid `OK` ; `uv run pytest` : 5 799 passés, puis 5 838 après l'intégration de `main` ; `ruff check --no-cache` vert | Rien d'autre ne casse (aucun fichier Python touché) |
 | Chrome 158 sans interface, axe-core 4.14.1 : 3 pages, modes clair et sombre, 100 % et 200 %, sites avec la ligne, sans elle, et avec la ligne sans le bloc `@supports` (36 cas) | Ligne à 8,24:1 et 13,35:1 ; lien du commit à 7,41:1 et 13,88:1 ; repli à 9,2:1 et 9,39:1 ; 4 arrêts de Tab dans le pied avec la ligne, 3 sans, anneau visible ; mêmes violations axe avec et sans la ligne, aucune dans le pied |
 
 Le repli mesuré par le navigateur (9,2:1 et 9,39:1) est un peu sous le calcul (9,26:1 et 9,44:1) :
@@ -188,11 +190,11 @@ Le repli mesuré par le navigateur (9,2:1 et 9,39:1) est un peu sous le calcul (
 - **Les types implicites de `!ENV`** : un commit fait de chiffres seuls serait lu comme un entier, que `| string`
   réécrit. Le cas n'a pas été essayé (environ une chance sur 150 millions pour 40 caractères hexadécimaux).
 - **Le rendu au lecteur d'écran** n'est pas vérifié, comme pour le reste du site.
-- **Relevé au navigateur, non corrigé** : au focus, l'anneau du lien du commit recouvre la virgule qui le précède
-  (« 2026, »), à 100 % comme à 200 %.
+- **Relevé au navigateur, laissé tel quel** : au focus, l'anneau du lien du commit recouvre la virgule qui le précède
+  (« 2026, »), à 100 % comme à 200 %. Tranché par time-knight (délégation de Sabine du 15/10) : la virgule n'est
+  cachée que pendant le focus, et aucun critère WCAG n'est touché.
 
 ## Ce qui reste
 
-- #720 : sans objet (voir « Choix faits »), à fermer.
+- #720 : sans objet (voir « Choix faits ») ; sa fermeture est décidée par time-knight (délégation de Sabine du 15/10).
 - Après la fusion : lire la ligne sur `https://sabinelaurent.github.io/K-B/`, une fois `deploy` passé.
-- L'anneau qui recouvre la virgule : à trancher (le laisser, ou espacer le lien), hors du tri de cette revue.
