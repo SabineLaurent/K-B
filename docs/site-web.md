@@ -300,6 +300,16 @@ du réseau pourrait poser l'en-tête.
 | `KB_DATA_API_KEY_WEB` | obligatoire : la clé que lit aussi `kb serve-data` pour son client `WEB` | un secret posé aux deux apps |
 | `KB_DATA_API_URL` | `http://127.0.0.1:8000` par défaut | l'URL interne de l'API de données, en `https` |
 | `KB_LOG_TO_FILE` | `true` par défaut : `logs/kb-serve-web.log` | `false` (image) : la sortie d'erreur |
+| `KB_VERSION` | non posée : pas de ligne de version | posée par l'image : le tag de sa construction |
+
+`KB_VERSION` ne se pose jamais à la main. `deploy.yml` construit l'image d'un tag avec
+`--build-arg KB_VERSION=<tag>`, et le `Dockerfile` garde cette valeur dans l'environnement de l'image : la version
+suit l'empreinte de l'image, en retour arrière comme en passe 2 de Bicep. Le pied de chaque page la donne après ses
+liens, « Version déployée: v0.1.9 ». Vide ou absente, pas de ligne : l'image a été construite hors de `deploy.yml`
+(`image.yml`, `compose.yaml`, à la main) ou avant la v0.1.9. Posée, elle doit être `vMAJEUR.MINEUR.CORRECTIF`,
+sans zéro en tête (`VERSION_TAG`, `web/settings.py`), sinon `kb serve-web` refuse de démarrer. C'est la règle du job
+`check` de `deploy.yml`, qui refuse tout autre tag : les deux changent ensemble, sinon un tag livré empêcherait le
+site de démarrer.
 
 En ligne, l'app sert `serve-web` par une entrée externe en HTTPS seulement, avec l'authentification Entra
 en « Require authentication » : sans session, un navigateur reçoit un 302 vers la connexion de Microsoft Entra
@@ -396,6 +406,7 @@ qu'un test peut vérifier. La charte vient des maquettes du 2026-11-09.
 - un seul `h1`, et des titres sans niveau sauté ;
 - les zones et le lien d'évitement ;
 - le lien courant, et les liens du pied de page en liste ;
+- la version déployée, au bas du pied de page, après ses liens ;
 - les SVG décoratifs ;
 - l'absence de script ;
 - un lien vers un autre site dit « site externe » et « nouvel onglet », s'ouvre dans un nouvel onglet

@@ -11,8 +11,11 @@ from jinja2 import Environment, PackageLoader, StrictUndefined
 
 def add_layout_context(request: Request) -> dict[str, Any]:
     """What the layout of every page reads: whether the operator is checked, which shows the link to
-    sign out of Microsoft Entra."""
-    return {"is_operator_checked": request.app.state.operator_id is not None}
+    sign out of Microsoft Entra, and the version deployed, which its footer gives."""
+    return {
+        "is_operator_checked": request.app.state.operator_id is not None,
+        "version": request.app.state.version,
+    }
 
 
 # autoescape=True rather than the select_autoescape() of Starlette, which escapes .html, .htm and

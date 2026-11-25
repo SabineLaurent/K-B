@@ -31,6 +31,8 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
+      # The rule of VERSION_TAG of src/k_b/web/settings.py, which refuses any other KB_VERSION: change both together,
+      # or a tag deployed would keep the site from starting.
       - name: Refuses a ref that is not a version tag
         run: |
           if ! [[ "$GITHUB_REF" =~ ^refs/tags/v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
@@ -99,6 +101,7 @@ jobs:
       # An image is never overwritten: there with the commit of the tag, it is deployed again (a rollback);
       # there with another commit (a tag deleted and created again elsewhere), the deployment stops. The apps
       # and the jobs then get the image by its digest, which no push can change, checked again for its commit.
+      # The image carries its tag in KB_VERSION, which the footer of the site shows (Dockerfile).
       - name: Builds and pushes the image of the tag, unless it is there
         run: |
           label='{{ index .Image.Config.Labels "org.opencontainers.image.revision" }}'
@@ -111,7 +114,8 @@ jobs:
             echo "the image of $GITHUB_REF_NAME is there, built from $SHA"
           elif grep -q "not found" "$inspect_error"; then
             docker buildx build --platform linux/amd64 --provenance=false --sbom=false \
-              --label "org.opencontainers.image.revision=$SHA" --tag "$IMAGE" --push .
+              --label "org.opencontainers.image.revision=$SHA" --build-arg "KB_VERSION=$GITHUB_REF_NAME" \
+              --tag "$IMAGE" --push .
           else
             cat "$inspect_error"
             exit 1

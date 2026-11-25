@@ -7,7 +7,7 @@ import re
 
 import pytest
 from fastapi.testclient import TestClient
-from site_client import NOW, OPERATOR_HEADERS, OPERATOR_ID
+from site_client import NOW, OPERATOR_HEADERS, OPERATOR_ID, TEST_VERSION
 
 from k_b.web.app import create_app
 
@@ -21,7 +21,10 @@ def site(data_api):
     """The site, its client of the data API the data API of the test base."""
     return TestClient(
         create_app(
-            operator_id=OPERATOR_ID, data_api_client=data_api, clock=lambda: NOW
+            operator_id=OPERATOR_ID,
+            data_api_client=data_api,
+            clock=lambda: NOW,
+            version=TEST_VERSION,
         ),
         base_url="http://localhost",
         headers=OPERATOR_HEADERS,

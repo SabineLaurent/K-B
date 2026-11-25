@@ -26,6 +26,7 @@ def test_the_defaults_listen_on_the_machine_and_check_the_operator():
         allowed_hosts=("127.0.0.1", "localhost"),
         operator_id=OPERATOR_ID,
         data_api=DEFAULT_DATA_API,
+        version=None,
     )
 
 
@@ -54,6 +55,7 @@ def test_the_check_on_every_address_in_azure_container_apps():
             "KB_WEB_ALLOWED_HOSTS": "ca-kb-web.example.azurecontainerapps.io,10.0.0.4",
             "CONTAINER_APP_NAME": "ca-kb-web",
             "KB_DATA_API_URL": "https://ca-kb-data-api.internal.example.azurecontainerapps.io",
+            "KB_VERSION": "v0.1.9",
             **DATA_API_KEY,
         }
     )
@@ -67,7 +69,53 @@ def test_the_check_on_every_address_in_azure_container_apps():
             base_url="https://ca-kb-data-api.internal.example.azurecontainerapps.io",
             api_key=SecretStr(TEST_API_KEY),
         ),
+        version="v0.1.9",
     )
+
+
+def test_an_empty_version_is_no_version():
+    """The image built without the argument of deploy.yml (image.yml, compose.yaml, by hand) has
+    KB_VERSION set, empty."""
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": "", **DATA_API_KEY}
+    )
+
+    assert isinstance(settings, WebSettings)
+    assert settings.version is None
+
+
+@pytest.mark.parametrize("version", ["v0.0.0", "v10.20.30"])
+def test_a_version_tag_of_deploy_yml_is_kept(version):
+    settings = read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": version, **DATA_API_KEY}
+    )
+
+    assert isinstance(settings, WebSettings)
+    assert settings.version == version
+
+
+# A digit of full width: \d would take it, [0-9] does not.
+FULL_WIDTH_ZERO = chr(0xFF10)
+
+
+@pytest.mark.parametrize(
+    "version",
+    [
+        "0.1.9",
+        "v0.1",
+        "v01.1.9",
+        "v0.01.9",
+        "v0.1.09",
+        "v0.1.9-rc.1",
+        "v0.1.9\n",
+        " v0.1.9",
+        f"v{FULL_WIDTH_ZERO}.1.9",
+    ],
+)
+def test_a_version_that_is_not_a_tag_of_deploy_yml_is_refused_quoted(version):
+    assert read_web_settings_or_refusal(
+        {"KB_WEB_AUTH": "off", "KB_VERSION": version, **DATA_API_KEY}
+    ) == (f"KB_VERSION: {version!r} not a version tag vMAJOR.MINOR.PATCH")
 
 
 @pytest.mark.parametrize(
