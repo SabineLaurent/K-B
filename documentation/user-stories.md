@@ -42,9 +42,9 @@ Chaque story suit la forme <q>en tant que…, je veux…, afin de…</q>, puis d
 
 - **le contexte**: ce que fait K-B pour cette fonction, et les commandes ou les routes en jeu;
 - **les scénarios d'utilisation**: les cas que la fonction traite, y compris les cas d'erreur;
-- **les critères de validation**: ce qui doit être vrai pour que la story soit tenue, chacun avec le test automatisé
-    ou le relevé qui le vérifie. Les critères d'accessibilité en font partie: chacun nomme le critère des WCAG
-    qu'il applique.
+- **les critères de validation**: ce qui doit être vrai pour que la story soit tenue, chacun avec le test automatisé,
+    le relevé ou la recherche dans le code qui le vérifie. Les critères d'accessibilité en font partie: chacun nomme le
+    critère des WCAG qu'il applique.
 
 Une story qui n'a pas d'interface le dit dans ses critères.
 
@@ -98,9 +98,11 @@ dans le dossier de données.
     (`tests/commands/test_collect_command.py:374`).
 - Accessibilité, WCAG 1.4.1 (utilisation de la couleur): aucune information n'est portée par la couleur seule. `kb`
     n'écrit aucun code de couleur: le code de `src/k_b/` ne contient ni séquence d'échappement de couleur ni bibliothèque
-    de mise en couleur.
+    de mise en couleur. Recherche dans le code: `grep -rnE '\\x1b|\\033|\\u001b|colorama|termcolor|rich|click' src/k_b`
+    ne rend rien.
 - Accessibilité, WCAG 4.1.3 (messages d'état): la fin de la commande est annoncée par une ligne de texte, le résumé,
-    qu'un lecteur d'écran lit sans déplacer le focus.
+    qu'un lecteur d'écran lit sans déplacer le focus. Test:
+    `test_collect_says_how_many_raw_files_each_source_collected_wrote` (`tests/commands/test_collect_command.py:348`).
 
 ## F2. Ranger la veille en base, sans doublon
 

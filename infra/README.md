@@ -117,7 +117,7 @@ elle n'a pas été posée.
 
 Chaque `az deployment` qui suit commence par `kb_check … &&`. Dans un shell interactif, un contrôle qui échoue
 n'arrête pas les lignes collées après lui : seul le `&&` empêche l'envoi. Dans un nouveau terminal, `kb_check`
-n'existe pas encore : la commande échoue (`command not found`), et le `&&` bloque aussi.
+n'existe pas encore : la commande échoue (<q lang="en">command not found</q>), et le `&&` bloque aussi.
 
 L'adresse des alertes du budget se passe au déploiement : elle n'est jamais écrite dans le dépôt, mais elle reste
 dans l'historique des déploiements du groupe, côté Azure, et dans la sortie du `what-if`.
@@ -193,7 +193,7 @@ az acr repository show-tags -n "$REGISTRY" --repository k-b -o tsv    # l'étiqu
 ```
 
 Le point final de `docker buildx build` est le contexte de construction, c'est-à-dire le dossier courant. S'il
-manque, la commande s'arrête sur `'docker buildx build' requires 1 argument`.
+manque, la commande s'arrête sur <q lang="en">'docker buildx build' requires 1 argument</q>.
 
 L'image ne se construit pas par `az acr build` : les tâches ACR sont suspendues sur les crédits gratuits d'Azure.
 
@@ -233,7 +233,7 @@ Le tableau suivant donne chaque secret, son contenu et ce qui le lit.
 
 Ce que dit chaque cas :
 - **Rien ne s'affiche** : le secret est posé.
-- **`ERROR: … Forbidden`** : le rôle <span lang="en">Key Vault Secrets Officer</span> de la passe 1 n'est pas encore actif. Il lui faut
+- **<q lang="en">ERROR: … Forbidden</q>** : le rôle <span lang="en">Key Vault Secrets Officer</span> de la passe 1 n'est pas encore actif. Il lui faut
   jusqu'à 10 minutes : relancer la commande.
 - **Jamais Entrée sur une invite vide.** Elle poserait une version vide par-dessus la bonne, et l'API IA refuserait
   de démarrer. Pour sortir sans rien poser : Ctrl-C.
@@ -295,7 +295,7 @@ site privé »). `exposeWeb` oublié ferme le site au lieu de l'ouvrir.
 
 Le Bicep ne refuse pas ces valeurs vides : la passe 1 les laisse vides. Le contrôle vient donc de `kb_check`. Sans
 lui, un `TAG` vide referait la passe 1 sans erreur, une adresse vide déploierait une API IA qui refuse de démarrer
-(`KB_OTLP_ENDPOINT: not set, while KB_OTLP_HEADERS is`). Un `WEB_APP_ID` vide, s'il passait, ôterait la connexion du
+(<q lang="en">KB_OTLP_ENDPOINT: not set, while KB_OTLP_HEADERS is</q>). Un `WEB_APP_ID` vide, s'il passait, ôterait la connexion du
 gabarit et laisserait le site en ingress interne (`api-container-app.bicep`, `hasSignIn`).
 
 L'aperçu attendu à la première passe 2, le 2026-11-06 (#414) :
@@ -405,7 +405,7 @@ az containerapp job execution list -n caj-kb-smoke-test -g "$RG" --query "[].{na
 Attendu : `Running`, puis `Succeeded`.
 
 Ce qu'a écrit le job se lit dans `log-kb`, quelques minutes après sa fin. `az containerapp job logs show` ne lit
-qu'une exécution en cours : après, il répond `No replicas found`.
+qu'une exécution en cours : après, il répond <q lang="en">No replicas found</q>.
 
 ```sh
 WS=$(az monitor log-analytics workspace show -n log-kb -g "$RG" --query customerId -o tsv)
