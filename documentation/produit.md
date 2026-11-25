@@ -1,7 +1,7 @@
 # Le produit K-B
 
 Cette page dit ce que fait K-B, ce qu'il ne fait pas, ses contraintes techniques et ses moyens. Elle est écrite
-d'après `main` au commit `39cb5eb9` (2026-11-22). Le détail de chaque partie est dans les fiches du menu.
+d'après `main` au commit `39cb5eb9`. Le détail de chaque partie est dans les fiches du menu.
 
 ## L'objectif
 
@@ -105,18 +105,18 @@ Un modèle lit la veille, à travers l'API de données, et ce qui en sort est ra
 
 ## Les moyens et leurs coûts
 
-Les coûts du tableau suivant, sauf la ligne du modèle, ont été relevés le 2026-10-25, avant le choix de PostgreSQL pour la base en ligne, le
-2026-11-06 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-« Base: PostgreSQL en ligne, par un adaptateur maison (#417) »). Il donne chaque poste et son coût.
+Les coûts du tableau suivant, sauf la ligne du modèle, ont été relevés le 2026-10-25, avant le choix de PostgreSQL pour la base en ligne
+([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
+« Base: PostgreSQL en ligne, par un adaptateur maison (#417) », `docs/ADR/journal-decisions-projet.md:5252`). Il donne chaque poste et son coût.
 
 | Poste | Coût |
 |---|---|
 | API GitHub | un jeton en lecture seule, sans frais ([le jeton GitHub](https://github.com/SabineLaurent/K-B/blob/main/docs/jeton-github.md)) |
 | BigQuery (GH Archive) | un bac à sable sans compte de facturation: au-delà du quota gratuit (1 Tio lu par mois), une requête est refusée, jamais facturée ([BigQuery](https://github.com/SabineLaurent/K-B/blob/main/docs/bigquery.md)) |
-| Modèle des fiches | gpt-6.1-sol depuis le 2026-11-18, 250 000 jetons par minute ([la fiche du service d'IA](service-ia.md)); avant, gpt-6-luna sur Azure AI Foundry, région France Central, zone de données UE, 140 000 jetons par minute (journal des décisions, 2026-10-17). Pour gpt-6-luna, l'ordre de grandeur relevé le 2026-10-16: au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal des décisions, 2026-10-16) |
-| Mise en ligne: coûts communs aux deux options (France Central, prix publics en dollars, mois de 730 h) | **8,96 $ par mois** sans l'offre gratuite d'Azure Container Apps, **5,26 $** avec elle: l'offre ne couvre que Container Apps, le job (0,41 $) et les deux API à zéro réplique (3,29 $), soit 3,70 $; restent le registre d'images (5,07 $) et le brut dans Blob Storage (0,19 $). **29,32 $**, ou environ **27,70 $**, si les deux API gardent une réplique: l'offre en retire alors environ 1,62 $, ses vCPU-secondes et Gio-secondes gratuites comptées au tarif de repos. Le détail: le job de collecte et d'import, une exécution par jour de 15 min à 0,5 vCPU (<span lang="en">virtual CPU</span>) et 1 Gio (hypothèse, non mesurée), 0,41 $ au tarif actif (0,000024 $ par vCPU-seconde, 0,000003 $ par Gio-seconde); `kb serve-data` et `kb serve-ai`, 0,5 vCPU et 1 Gio chacune, à zéro réplique au repos (décidé le 2026-11-06, #414) et actives 1 h par jour (hypothèse), 3,29 $, ou 23,65 $ avec une réplique gardée, au tarif de repos (0,000003 $ par vCPU-seconde et par Gio-seconde); le brut dans Blob Storage (Hot LRS, <span lang="en">locally redundant storage</span>, 0,0192 $ par Go et par mois), 10 Go supposés, non mesurés, 0,19 $; le registre d'images Azure Container Registry Basic (0,1666 $ par jour, 10 Go compris), 5,07 $, ou 0 $ avec le registre de GitHub (GHCR), gratuit pour un paquet public; ACR Basic choisi le 2026-11-06 (#414), tiré par identité managée, sans secret; les journaux dans Log Analytics, 0 $ sous 5 Go par mois, puis 2,76 $ par Go. L'offre gratuite (180 000 vCPU-secondes, 360 000 Gio-secondes et 2 millions de requêtes par abonnement et par mois) couvre le job et les deux API à zéro réplique (123 188 vCPU-secondes, 246 375 Gio-secondes) |
+| Modèle des fiches | gpt-6.1-sol, 250 000 jetons par minute ([la fiche du service d'IA](service-ia.md)); avant, gpt-6-luna sur Azure AI Foundry, région France Central, zone de données UE, 140 000 jetons par minute (journal des décisions, `docs/ADR/journal-decisions-projet.md:2461`). Pour gpt-6-luna, l'ordre de grandeur relevé le 2026-10-16: au pire environ 420 000 jetons par demande de fiches, à 0,12 $ en entrée et 0,60 $ en sortie par million de jetons, prix UE, soit quelques centimes (journal des décisions, `docs/ADR/journal-decisions-projet.md:2138`) |
+| Mise en ligne: coûts communs aux deux options (France Central, prix publics en dollars, mois de 730 h) | **8,96 $ par mois** sans l'offre gratuite d'Azure Container Apps, **5,26 $** avec elle: l'offre ne couvre que Container Apps, le job (0,41 $) et les deux API à zéro réplique (3,29 $), soit 3,70 $; restent le registre d'images (5,07 $) et le brut dans Blob Storage (0,19 $). **29,32 $**, ou environ **27,70 $**, si les deux API gardent une réplique: l'offre en retire alors environ 1,62 $, ses vCPU-secondes et Gio-secondes gratuites comptées au tarif de repos. Le détail: le job de collecte et d'import, une exécution par jour de 15 min à 0,5 vCPU (<span lang="en">virtual CPU</span>) et 1 Gio (hypothèse, non mesurée), 0,41 $ au tarif actif (0,000024 $ par vCPU-seconde, 0,000003 $ par Gio-seconde); `kb serve-data` et `kb serve-ai`, 0,5 vCPU et 1 Gio chacune, à zéro réplique au repos (#414, `docs/ADR/journal-decisions-projet.md:5623`) et actives 1 h par jour (hypothèse), 3,29 $, ou 23,65 $ avec une réplique gardée, au tarif de repos (0,000003 $ par vCPU-seconde et par Gio-seconde); le brut dans Blob Storage (Hot LRS, <span lang="en">locally redundant storage</span>, 0,0192 $ par Go et par mois), 10 Go supposés, non mesurés, 0,19 $; le registre d'images Azure Container Registry Basic (0,1666 $ par jour, 10 Go compris), 5,07 $, ou 0 $ avec le registre de GitHub (GHCR), gratuit pour un paquet public; ACR Basic choisi (#414, `docs/ADR/journal-decisions-projet.md:5642`), tiré par identité managée, sans secret; les journaux dans Log Analytics, 0 $ sous 5 Go par mois, puis 2,76 $ par Go. L'offre gratuite (180 000 vCPU-secondes, 360 000 Gio-secondes et 2 millions de requêtes par abonnement et par mois) couvre le job et les deux API à zéro réplique (123 188 vCPU-secondes, 246 375 Gio-secondes) |
 | Mise en ligne, option SQLite et Blob | **0,02 $ par mois** de plus: la base, un fichier produit par le job puis rangé dans Blob Storage, et lu par `kb serve-data` au démarrage (hypothèse: la façon de la lire n'était pas décidée), 1 Go supposé, au prix du brut |
-| Mise en ligne, option PostgreSQL, retenue le 2026-11-06 | **18,13 $ par mois** de plus: Azure Database for PostgreSQL, serveur flexible Burstable B1ms (1 vCore, 2 Gio), 0,019 $ de l'heure, 13,87 $, et 32 Gio de stockage, le minimum, à 0,133 $ par Go et par mois, 4,26 $; une sauvegarde au-delà du stockage compris est comptée 0,10 $ par Go et par mois, non chiffrée |
+| Mise en ligne, option PostgreSQL, retenue | **18,13 $ par mois** de plus: Azure Database for PostgreSQL, serveur flexible Burstable B1ms (1 vCore, 2 Gio), 0,019 $ de l'heure, 13,87 $, et 32 Gio de stockage, le minimum, à 0,133 $ par Go et par mois, 4,26 $; une sauvegarde au-delà du stockage compris est comptée 0,10 $ par Go et par mois, non chiffrée |
 
 Les sources de ces coûts, consultées le 2026-10-25:
 
@@ -130,7 +130,7 @@ Les sources de ces coûts, consultées le 2026-10-25:
     seulement): [<span lang="en">Azure Container Apps pricing</span>](https://azure.microsoft.com/en-us/pricing/details/container-apps/).
 - Le stockage minimal de 32 Gio:
     [<span lang="en">Compute options in Azure Database for PostgreSQL</span>](https://learn.microsoft.com/azure/postgresql/compute-storage/concepts-compute)
-    (Microsoft Learn, mis à jour le 2026-07-08).
+    (Microsoft Learn).
 - Le stockage compris dans Container Registry Basic:
     [<span lang="en">Azure Container Registry service tiers</span>](https://learn.microsoft.com/azure/container-registry/container-registry-skus)
     (Microsoft Learn).

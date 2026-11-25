@@ -15,7 +15,7 @@ Cette fiche dit ce qu'est l'API IA, comment elle est construite, ce que fait cha
 qui peut l'appeler, et comment une clé se change. Le contrat de ses deux routes est
 [l'OpenAPI versionnée de l'API IA](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-ia.json),
 `docs/api/openapi-ia.json`: la fiche y renvoie et ne la remplace pas. Elle est écrite d'après le code de `main` au
-commit `fd956430` (2026-11-18). Les chemins du code de K-B (`ai_api/…`, `core/…`, `database/…`, `post/…`,
+commit `fd956430`. Les chemins du code de K-B (`ai_api/…`, `core/…`, `database/…`, `post/…`,
 `commands/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API IA
@@ -258,8 +258,8 @@ résout les dépendances à `dependencies/utils.py:619` avant le corps à `:698-
 **Une clé de l'API IA n'expire pas.** Elle n'a ni durée de vie ni date de fin; il n'y a pas de jeton à
 renouveler, donc pas d'étape de renouvellement chez le client. La clé reste valide jusqu'à ce qu'on la change ou
 la retire (`core/api_access.py:17-21`, repris dans l'OpenAPI). C'est une décision écrite: la clé reste fixe, sa
-rotation est documentée (journal des décisions d'architecture, ou ADR, « POC du 25/10 », décision 7, précisée le
-2026-10-20).
+rotation est documentée (journal des décisions d'architecture, ou ADR, « POC du 25/10 », décision 7,
+`docs/ADR/journal-decisions-projet.md:1807`, précisée à `:3320-3323`).
 
 ### Faire une clé
 
@@ -375,7 +375,7 @@ leurs corps, leurs réponses, chaque état d'erreur, et le schéma de sécurité
     zéro réplique, le remet à zéro, et deux répliques tournent pendant un déploiement
     (`infra/modules/api-container-app.bicep:184-185`).
 - **Les essais de clé ne sont pas limités.** Le débit ne compte que les clients à clé valide; un 401 ne compte
-    pas. Écart voulu, décidé par Sabine le 2026-11-05: une clé de 32 caractères au moins ne se trouve pas par essais
+    pas. Écart voulu: une clé de 32 caractères au moins ne se trouve pas par essais
     ([la spécification des comptes rendus de veille](https://github.com/SabineLaurent/K-B/blob/main/docs/fiches-veille.md),
     « <span lang="en">API2:2023 Broken Authentication</span> »).
 - **Un retrait ne prend effet qu'au redémarrage** de `kb serve-ai`. Une variable `KB_AI_API_KEY_*` exportée dans le

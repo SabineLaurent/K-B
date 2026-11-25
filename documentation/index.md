@@ -15,6 +15,7 @@ titre.
 - [Utiliser K-B](utilisation.md): les commandes, leurs réglages, leur sortie et leurs codes.
 - [L'architecture de l'application](architecture.md)
 - [Les maquettes du site et le parcours de l'opératrice](maquettes-et-parcours.md)
+- [Les user stories de K-B](user-stories.md)
 - [La collecte des données](collecte.md)
 - [Les requêtes d'extraction](requetes.md)
 - [L'agrégation, l'import et la base](donnees.md)

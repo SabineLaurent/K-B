@@ -7,42 +7,41 @@
 
     — C8.5, C9.11, C11.9, C12.7, C13.8, C17.12, C18.7, C19.7, C20.7
 
-Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité
-elle suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne`
-visent le dépôt au 2026-11-19, et les fichiers qu'ils citent n'ont pas changé depuis (relu le 2026-11-21), sauf
-`.github/workflows/docs.yml` et `mkdocs.yml`, dont les renvois visent la demande de fusion de #684 (2026-11-22).
-`mkdocs.yml`, `documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
+Cette fiche dit sous quel format la documentation de K-B est communiquée, quelles recommandations d'accessibilité elle
+suit, comment chaque règle est tenue dans les fiches, et ce qui n'est pas vérifié. Les renvois `fichier:ligne` visent
+le commit `38ae9df5`. `mkdocs.yml`,
+`documentation/stylesheets/extra.css` et `.github/workflows/docs.yml` arrivent avec cette fiche.
 
 ## Le format
 
 Les fiches sont écrites en Markdown dans `documentation/`. MkDocs 1.6.1, avec le thème Material for MkDocs 9.8.1, en
 fait un site HTML statique: une page par fiche, une page d'accueil ([La documentation de K-B](index.md)) et un
-champ de recherche (`mkdocs.yml:4-41`, `:83-84`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
+champ de recherche (`mkdocs.yml:4-43`, `:85-86`). Sur un écran large, de 76,25em (1 220 pixels par défaut) ou plus,
 une barre d'onglets en haut de chaque page mène à la documentation, au dépôt GitHub et au journal des décisions. Un
 seul menu, à gauche, donne la page d'accueil et la page du produit, puis les cinq parties numérotées de la
 documentation et leurs fiches.
-La table des matières de la page ouverte est sous son lien (`mkdocs.yml:50-56`). Sur un écran plus étroit, le bouton
+La table des matières de la page ouverte est sous son lien (`mkdocs.yml:52-58`). Sur un écran plus étroit, le bouton
 de menu de l'en-tête ouvre ce menu sur la partie de la fiche ouverte, ou sur la liste des parties depuis l'accueil ou cette fiche.
 Sa flèche de retour mène aux parties, puis au premier niveau, qui porte aussi les deux liens de la barre. Ce bouton
-n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:38-39`). Le
-pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes du 2026-11-09
+n'est pas atteint au clavier (« Limites »). Cette fiche est en fin de menu, sans numéro (`mkdocs.yml:40-41`). Le
+pied de page y mène aussi, comme au dépôt et à la licence (`overrides/partials/copyright.html`). Les couleurs sont celles du back office du site de K-B, tirées de ses maquettes
 (`documentation/stylesheets/extra.css:1-62`). Le texte du menu et des tableaux est à la taille du texte courant
 (`:211-220`). Le menu est élargi pour que ses titres longs passent sur moins de lignes (`:64-78`). Un script garde sur
 une ligne « K-B », résultats de la recherche compris, et dans un tableau une date et chaque mot du code
 (`documentation/javascripts/nowrap.js`, `extra.css:222-225`). Le site a un mode clair et un mode sombre. À la première
 visite, il
 prend le réglage du système; ensuite, il garde le mode affiché, que la lectrice change par un bouton de l'en-tête
-(`mkdocs.yml:57-73`). Le site se publie sur
+(`mkdocs.yml:59-75`). Le site se publie sur
 GitHub Pages à chaque fusion, une fois la variable `PAGES_PUBLISH` posée à `true`, ou à la main (section [Publier](#publier)).
 
-Le format de remise, un site publié par MkDocs ou un outil équivalent, est une décision de Sabine du 2026-11-11, et
-l'outil, MkDocs avec Material, la sienne du 2026-11-12 ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
-2026-11-14, « Documentation publiée par un site MkDocs sur GitHub Pages »). Les deux outils sont dans un groupe de
+Le format de remise est un site publié par MkDocs ou un outil équivalent, et l'outil retenu est MkDocs avec
+Material ([journal des décisions](https://github.com/SabineLaurent/K-B/blob/main/docs/ADR/journal-decisions-projet.md),
+« Documentation publiée par un site MkDocs sur GitHub Pages », `docs/ADR/journal-decisions-projet.md:7335`). Les deux outils sont dans un groupe de
 dépendances à part, `docs` (`pyproject.toml`), que ni les tests ni l'image de K-B n'installent.
 
 ## Les recommandations suivies
 
-Quatre sources: les trois premières lues le 2026-11-14, la quatrième le 2026-11-18.
+Quatre sources:
 
 - **L'association Valentin Haüy** (AVH), la page « L'essentiel à savoir » sur l'accessibilité des documents. Elle
     vise les documents de bureautique. Ses règles de structure valent pour une page HTML, et ce sont elles que la
@@ -73,20 +72,20 @@ vérifie.
 |---|---|---|---|
 | Des titres hiérarchisés | AVH; Microsoft; RGAA 9.1 | Un seul titre de niveau 1 par fiche, puis `##` à `####` sans saut de niveau. Un paragraphe en gras n'est pas un titre. | Le contrôle du HTML construit |
 | De vraies listes | AVH; RGAA 9.3 | Les listes Markdown, rendues en `ul` et `ol`. Chaque niveau est en retrait de quatre espaces: Python-Markdown, qui construit les pages, ne rattache à un point de liste que ce qui est en retrait de quatre espaces. | Le HTML construit |
-| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:56`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
+| Un sommaire | AVH | La « Table des matières » de chaque page, tirée de ses titres par le thème, dans le menu de gauche, sous le titre de la page (`mkdocs.yml:58`); le menu donne la page d'accueil et la page du produit, puis les cinq parties numérotées et leurs fiches, puis cette fiche, sans numéro. | Le contrôle du HTML construit |
 | Une alternative à chaque élément non textuel | AVH; Microsoft | Les huit images, les deux planches de la fiche des maquettes, les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de données, ont chacune un texte de remplacement court qui nomme la section de leur description, et chaque logigramme et chaque schéma Merise un lien vers son fichier en taille réelle; cette description en texte en donne tout le contenu. Chaque schéma Mermaid est annoncé par une phrase qui nomme le texte qui le décrit. | La relecture de chaque fiche; chaque description de planche comparée au fichier source de la planche; chaque logigramme comparé au code; chaque schéma Merise comparé aux deux scripts de la base |
-| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:48-49`). | La configuration |
+| Des polices lisibles | AVH | Les polices du système de la lectrice, sans Google Fonts (`mkdocs.yml:50-51`). | La configuration |
 | Un contraste suffisant | AVH; RGAA 3.2 | Les couleurs du back office de K-B, en mode clair et en mode sombre, mesurées ([Les contrastes du thème](#les-contrastes-du-theme)) (`documentation/stylesheets/extra.css:8-62`); l'anneau de focus de la couleur de l'accent (`:42-43`, `:194-197`), et blanc sur l'en-tête, les onglets, le lien d'évitement, le logo du menu d'un écran étroit et le bouton du mode (`:172-186`). | Le calcul des rapports de contraste |
 | Pas la couleur seule | AVH; Microsoft; RGAA 3.1; RGAA 10.6 | Aucune fiche ne porte une information par la couleur. Un lien est souligné (`documentation/stylesheets/extra.css:80-89`): sa couleur seule, contre le texte, ne donne que 2,25:1 en mode clair (`#0F5E6B` contre `#1C1E21`) et 1,22:1 en mode sombre (`#CFE3E6` contre `#F4F5F2`), sous le seuil de 3:1. L'onglet ouvert est en demi-gras et souligné (`:157-170`), de la même couleur que les autres onglets. Dans le menu, la page ouverte se distingue des autres liens par sa couleur, à 2,25:1 ou 1,22:1 seulement, et par un second signe. Sur un écran large, sa table des matières est dépliée sous son lien, bordée d'un filet à gauche, de la couleur du texte secondaire: 7,53:1 en mode clair, 12,08:1 en mode sombre (`:188-192`). Sur un écran plus étroit, une icône de table des matières suit son nom. Aucun schéma Mermaid n'a de style de couleur. | La relecture de chaque fiche; la feuille de style |
 | Des liens explicites | Microsoft; RGAA 6.1 | Le texte d'un lien nomme sa cible: ni adresse brute, ni « ici », ni « plus haut ». Un lien vers un fichier du dépôt hors des fiches mène à sa page sur GitHub. | Le contrôle du HTML construit |
 | Des tableaux simples à en-têtes | Microsoft; RGAA 5.6 | Des tableaux Markdown, rendus avec leurs en-têtes de colonne (`th`), annoncés par une phrase ou un titre. | Le contrôle du HTML construit |
-| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:88-90`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
-| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:45`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:105-107`). | Le contrôle du HTML construit |
-| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:85-86`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
+| Des citations déclarées | AcceDe Web; RGAA 9.4 | Les mots d'une source, recopiés, forment une citation. En ligne, c'est un `q`, sans guillemets tapés: la feuille de style dessine les guillemets français, avec l'espace intérieure des guillemets tapés (`documentation/stylesheets/extra.css:205-209`). En bloc, comme l'intitulé du référentiel en tête de chaque fiche, c'est un `blockquote`, suivi de sa source. En tête de fiche, ces citations sont réunies dans un encadré titré « Compétences de la certification » (`mkdocs.yml:90-92`, `documentation/stylesheets/extra.css:120-146`). Le titre cité d'une section, d'une page ou d'un document, un mot dont on parle et un libellé d'interface gardent leurs guillemets tapés: ce ne sont pas des citations. | Le HTML construit; la relecture de chaque fiche |
+| La langue de la page et ses changements | RGAA 8.3; RGAA 8.7 | `lang="fr"` sur chaque page (`mkdocs.yml:47`); un passage en anglais balisé `<span lang="en">`. Le pied de page du thème, en anglais, est retiré (`mkdocs.yml:107-109`). | Le contrôle du HTML construit |
+| Aucune requête hors du site | (règle de K-B) | Le plugin `privacy` télécharge à la construction ce que le thème irait chercher ailleurs, Mermaid compris, et le sert avec le site (`mkdocs.yml:87-88`), sauf dans deux cas (« Limites »). | Le contrôle du HTML construit |
 
 ### Les contrastes du thème
 
-Les rapports de contraste suivants sont calculés selon la formule des WCAG 2.1, le 2026-11-18, pour le mode clair et
+Les rapports de contraste suivants sont calculés selon la formule des WCAG 2.1, pour le mode clair et
 pour le mode sombre. Ils portent sur les couleurs de `documentation/stylesheets/extra.css:8-62` et, pour les blocs de
 code et les schémas, sur celles de la feuille de style construite de Material 9.8.1. Une couleur transparente du
 thème est d'abord posée sur son fond, et c'est la couleur obtenue qui est mesurée. Ces couleurs composées sont
@@ -156,14 +155,14 @@ aucune information.
 
 ## La vérification selon la notice d'AcceDe Web
 
-Les vingt et une pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
+Les vingt-deux pages du site ont été vérifiées selon chaque règle de la notice d'accessibilité éditoriale d'AcceDe
 Web, sur le HTML construit par `mkdocs build --strict` et à la relecture: dix le 2026-11-18, la fiche des maquettes le
 2026-11-19, la fiche du monitorage le 2026-11-21, après sa mise en forme (#669), la fiche de l'import et de la base de
 nouveau le 2026-11-21, avec ses trois logigrammes (#675), celle de la conduite du projet le 2026-11-21, à son écriture
 (#512), les cinq fiches de la collecte, des requêtes, du modèle de données, des données personnelles et de l'API de
-données le 2026-11-22 (#685), les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684), et la
-fiche de l'incident le 2026-11-22, à son écriture (#510). Le tableau suivant donne chaque règle de la notice, son
-résultat sur les vingt et une pages, et comment il a été vérifié.
+données le 2026-11-22 (#685), les pages du produit et de l'utilisation le 2026-11-22, à leur création (#684), la fiche
+de l'incident le 2026-11-22, à son écriture (#510), et celle des user stories le 2026-11-22, à sa création (#705). Le
+tableau suivant donne chaque règle de la notice, son résultat sur les vingt-deux pages, et comment il a été vérifié.
 
 | Règle de la notice | Résultat | Vérifiée par |
 |---|---|---|
@@ -189,6 +188,23 @@ AELE, RGPD, PR, ADR, CVE, DINUM, OSV, MCD, MLD, MPD, SGBD, CNIL) sont développ�
 courants (API, HTML, URL, UTC, SHA) ne le sont pas. Le libellé d'un schéma ne compte pas comme premier emploi: un sigle
 peut y paraître avant le texte qui le développe.
 
+Deux sections du guide d'infrastructure, `infra/README.md`, que GitHub affiche, sont vérifiées à part selon la même
+notice, le 2026-11-23: « Appliquer » et « Déployer une version », qui portent les commandes d'installation et de
+livraison auxquelles renvoie [la livraison continue](livraison-continue.md). Le tableau suivant donne le résultat de
+chaque règle sur ces deux sections.
+
+| Règle de la notice | Résultat sur les deux sections du guide |
+|---|---|
+| 1, 2, 3.2, 5, 6.3, 7.2, 9 | Tenues: aucun saut de ligne multiple, des titres sans niveau sauté, aucun attribut `title`, des listes Markdown, aucun renvoi par la seule position, aucune information par la couleur seule, aucun émoji. |
+| 3.1, 4, 8 | Sans objet: aucun lien, aucune image, aucun contenu riche ni en mouvement. |
+| 6.1. Citations déclarées | Tenue: chaque message d'erreur cité est un `q`. |
+| 6.2. Changements de langue | Tenue dans le fichier: chaque passage en anglais porte `lang="en"`, sur un `span` ou sur le `q` d'une citation. Limite: GitHub déclare sa page en anglais, et le fichier ne peut pas changer cette langue: le texte français y est annoncé comme de l'anglais. |
+| 7.1. Contrastes | Sans objet pour le fichier: les couleurs sont celles de GitHub. |
+
+Le tableau des secrets y est annoncé par une phrase et a sa ligne d'en-tête. Les sigles employés pour la première fois
+dans ces deux sections y sont développés (SMB, MI, OTLP, ADR), sauf les sigles techniques courants (TLS, REST, PUT,
+SHA, URL, ID).
+
 ## Vérifier
 
 1. Construire le site en mode strict:
@@ -198,7 +214,7 @@ peut y paraître avant le texte qui le développe.
     ```
 
     Un lien vers un fichier absent, une ancre absente ou une fiche oubliée dans la navigation arrête la construction
-    (`mkdocs.yml:97-103`). Le workflow `docs.yml` la lance sur chaque demande de fusion
+    (`mkdocs.yml:99-105`). Le workflow `docs.yml` la lance sur chaque demande de fusion
     (PR, <span lang="en">pull request</span>) et sur chaque push sur `main`
     (`.github/workflows/docs.yml:7-12`, `:28`).
 
@@ -211,7 +227,7 @@ peut y paraître avant le texte qui le développe.
     et chaque paire de guillemets tapés, qui n'entoure pas une citation.
 
 4. Passer WAVE, l'outil de contrôle de WebAIM, sur trois pages du site servi en local, et les parcourir à la touche Tab,
-    sur un écran large et sur un écran étroit. Le 2026-11-18, sur le thème de #652, WAVE relevait 15 erreurs de
+    sur un écran large et sur un écran étroit. Sur le thème de #652, WAVE relevait 15 erreurs de
     libellé, sur les cases cachées du thème et sur les `label` des deux radios du mode (« Limites »), et un contraste
     très faible, sur l'en-tête caché des résultats de recherche: un fond transparent, que WAVE ne compose pas avec la
     page. Cet en-tête a depuis un fond opaque, le même à l'œil (`documentation/stylesheets/extra.css:199-203`). La
@@ -219,7 +235,7 @@ peut y paraître avant le texte qui le développe.
     touche Tab avant que le focus ne bouge, et la liste repliée n'a plus de hauteur. Elle n'est plus un arrêt de la
     touche Tab (`documentation/javascripts/search-list.js`); les résultats s'atteignent par les flèches, depuis le
     champ de recherche. Sur un écran large, le parcours à la touche Tab suit l'ordre de la page, le bouton du mode
-    compris. Le 2026-11-19, Sabine a passé WAVE sur la fiche du monitorage en mode sombre, et l'a parcourue à la
+    compris. La fiche du monitorage a été passée à WAVE en mode sombre, et parcourue à la
     touche Tab. WAVE relevait les mêmes 15 erreurs de libellé, 7 libellés vides et 8 multiples, et un seul contraste
     très faible, sur le lien d'évitement du thème, « Aller au contenu ». Ce lien reste transparent tant qu'il n'a pas
     le focus (`opacity: 0`), et WAVE mesure son texte transparent sur la page. Il paraît au premier appui sur la
@@ -230,7 +246,7 @@ peut y paraître avant le texte qui le développe.
     défiler au clavier (WCAG 2.1, critère 2.1.1). Depuis, le lien d'évitement est placé hors de l'écran tant qu'il n'a
     pas le focus, comme le recommande WebAIM, et non plus transparent: son texte garde ses couleurs
     (`documentation/stylesheets/extra.css:227-235`). Au premier appui sur la touche Tab, il paraît en haut à gauche de
-    la page, avec son anneau blanc, en mode clair comme en mode sombre (relevé le 2026-11-19 dans Chrome sans interface,
+    la page, avec son anneau blanc, en mode clair comme en mode sombre (relevé dans Chrome sans interface,
     à 1 512 et à 390 pixels).
 
 ## Publier
@@ -241,12 +257,12 @@ la variable de dépôt `PAGES_PUBLISH` vaut `true`, et quand on le lance à la m
 quand Pages n'était pas encore activé, et `deploy` aurait échoué à chaque fusion. Un seul déploiement tourne à la
 fois, jamais interrompu, et un seul attend: quand une fusion arrive
 pendant qu'un déploiement tourne et qu'un autre attend, celui qui attend est annulé et le sien prend sa place
-([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency), lu le 2026-11-22; `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
+([<span lang="en">Control the concurrency of workflows and jobs</span>](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency); `:48-50`). Le site publié est alors celui de la dernière fusion, et l'exécution `Docs`
 annulée fait refuser un tag posé sur son commit, jusqu'à sa relance (`deploy.yml:59-67`). Seul le job `deploy` a le droit d'écrire sur Pages (`:53-55`).
 
-Pages est activé depuis le 2026-11-22, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
-`"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). La première publication a été lancée à
-la main le même jour: l'exécution de `Docs` sur `main`, à 02:54 UTC, a réussi. La publication à chaque fusion demande
+Pages est activé, avec pour source GitHub Actions (`gh api repos/SabineLaurent/K-B/pages` rend
+`"build_type":"workflow"` et l'adresse `https://sabinelaurent.github.io/K-B/`). Le site est publié à
+la main, par une exécution de `Docs` lancée sur `main`. La publication à chaque fusion demande
 un geste de l'administratrice du dépôt: créer la variable de dépôt `PAGES_PUBLISH`, de valeur `true`, dans les
 réglages (<span lang="en">Settings > Secrets and variables > Actions > Variables</span>) ou par
 `gh variable set PAGES_PUBLISH --body true --repo SabineLaurent/K-B`. Elle se vérifie à la fusion suivante: le job
@@ -257,28 +273,28 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
 - **Le rendu au lecteur d'écran n'est pas vérifié.** Le contrôle porte sur le HTML, pas sur ce qu'un lecteur d'écran
     en dit. Le vérifier demande un essai avec un lecteur d'écran, VoiceOver par exemple, sur le site construit.
 - **Lue sur GitHub, une citation en ligne ne reçoit pas la feuille de style du site.** Le rendu de GitHub garde le
-    `q` (vérifié le 2026-11-18 par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
+    `q` (vérifié par son rendu Markdown, `gh api markdown`), mais pas la feuille de style du site: le
     navigateur devrait y dessiner les guillemets de la langue de la page de GitHub, l'anglais (propriété CSS
     `quotes`, valeur `auto`). Ce rendu n'a pas été vu. Le format de remise est le site.
 - **Les schémas larges sont réduits à la largeur du texte.** Dans l'architecture, le flux en bref et le déploiement
     sur Azure sont dessinés sur 688 pixels de large, et leurs libellés ne se lisent qu'avec le zoom du navigateur
-    (relevé le 2026-11-18 dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.
+    (relevé dans Chrome sans interface). Le texte qui suit chaque schéma le décrit flèche par flèche.
     Les trois logigrammes de la fiche de l'import et de la base et les trois schémas Merise de la fiche du modèle de
     données sont réduits de même: chacun donne la vue d'ensemble, et le lien vers son fichier en taille réelle et sa description en texte en donnent le détail.
 - **La partie et la page ouvertes ne sont signalées qu'à la vue.** Le thème marque l'onglet de la partie ouverte et
-    le lien de la page ouverte par une classe CSS, sans attribut `aria-current` (relevé le 2026-11-18 dans le HTML
+    le lien de la page ouverte par une classe CSS, sans attribut `aria-current` (relevé dans le HTML
     construit). Sans cet attribut, rien dans le HTML ne les désigne comme courants pour un lecteur d'écran.
 - **Le bouton du menu d'un écran étroit n'est pas atteint au clavier.** Sous 76,25em, ce bouton est un `label` du
-    thème, sans `tabindex`: la touche Tab ne s'y arrête pas (relevé le 2026-11-18 dans Chrome sans interface, à
+    thème, sans `tabindex`: la touche Tab ne s'y arrête pas (relevé dans Chrome sans interface, à
     390 pixels; #651). Le champ de recherche, atteint au clavier, mène à chaque fiche. Une fenêtre élargie, ou
     un zoom réduit, jusqu'à 76,25em ou plus fait paraître la barre d'onglets.
 - **WAVE relève des libellés vides ou multiples sur les cases cachées du thème et sur les radios du mode.** Material ouvre son menu, sa
     recherche et la table des matières d'une page par des cases à cocher cachées, liées à des `label` sans texte ou à
     plusieurs `label`. Sur la fiche des tests, il y en avait 5 vides et 3 multiples avant le thème de #652, 7 et 8
-    après lui, et 7 et 9 depuis la rubrique « 5. Conduite du projet » (#512; relevé du 2026-11-22): le menu numéroté
+    après lui, et 7 et 9 depuis la rubrique « 5. Conduite du projet » (#512): le menu numéroté
     ajoute une case par rubrique, et le bouton du mode deux radios, qui ont un nom. Les
     cases sont en `display: none`: elles ne sont ni dans
-    l'ordre de la touche Tab ni dans l'arbre d'accessibilité de Chrome (relevé le 2026-11-18). Seuls y sont le
+    l'ordre de la touche Tab ni dans l'arbre d'accessibilité de Chrome. Seuls y sont le
     champ de recherche et les deux radios du mode, chacun avec son nom (« Rechercher », « Passer au mode sombre »,
     « Passer au mode clair »).
 - **Un navigateur sans `light-dark()` garde les couleurs de Material.** Avant Chrome 123, Firefox 120 et Safari 17.5
@@ -289,7 +305,7 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
     la touche Tab atteint le radio nommé « Passer au mode sombre », sur une page déjà sombre: un lecteur d'écran
     annonce l'inverse de ce qui se passe. Entrée change toujours le mode. Espace et les flèches cochent un radio, dont
     le nom dit l'inverse du mode qu'il pose. À la première touche sur une page sombre, Espace la passe en clair et les
-    flèches la laissent sombre; ensuite, Espace ne change rien et les flèches changent le mode (relevé le 2026-11-18
+    flèches la laissent sombre; ensuite, Espace ne change rien et les flèches changent le mode (relevé
     dans Chrome sans interface). Un vrai bouton est porté par #653.
 - **Les deux liens du logo du thème portent un attribut `title`**, le nom du site, sur chaque page, dans l'en-tête et
     dans le menu (règle 3.2 d'AcceDe Web).
@@ -297,22 +313,21 @@ réglages (<span lang="en">Settings > Secrets and variables > Actions > Variable
 - **Deux chargements hors du site restent possibles.** Le script du thème demande
     `resize-observer-polyfill` à unpkg sur un navigateur qui n'a pas `ResizeObserver`, ce que le plugin `privacy` ne
     rapatrie pas. Mermaid est appelé par l'adresse du site publié, `site_url` (`mkdocs.yml:6`): un aperçu local de
-    `site/` le charge depuis le site en ligne, qui le sert (relevé le 2026-11-22: réponse 200 à
+    `site/` le charge depuis le site en ligne, qui le sert (réponse 200 à
     `https://sabinelaurent.github.io/K-B/assets/external/unpkg.com/mermaid@11/dist/mermaid.min.js`).
 - **Un schéma Mermaid est dessiné par un script.** Sans JavaScript, la page montre son code source; le texte qui le
     décrit reste lisible dans les deux cas.
 - **Mermaid est téléchargé depuis unpkg à la construction**, dans sa dernière version 11 (`mermaid@11`), une version
     qui bouge. Le workflow `docs.yml` vérifie l'empreinte du fichier téléchargé, celle de Mermaid 11.17.2,
-    vérifiée le 2026-11-14 contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
+    vérifiée contre l'empreinte que npm publie pour son paquet; un autre fichier arrête la construction
     (`.github/workflows/docs.yml:29-32`). Une nouvelle version 11 de Mermaid demande de refaire cette vérification et
     de changer l'empreinte.
 - **Material for MkDocs est en fin de vie le 2027-05-05**: ses corrections de sécurité s'arrêtent à cette date. Son
     successeur, Zensical, lit `mkdocs.yml`; la migration n'est pas faite.
-- **Le site n'est pas en ligne** le 2026-11-14 (section [Publier](#publier)).
+- **Le site ne se publie pas à chaque fusion**: il est publié à la main, par le workflow `Docs`, et la variable de
+    dépôt `PAGES_PUBLISH` n'est pas posée (section [Publier](#publier)).
 
 ## Sources
-
-Lues le 2026-11-14:
 
 - Association Valentin Haüy, « L'essentiel à savoir »,
     [page de l'accessibilité des documents](https://www.avh.asso.fr/nos-solutions/accessibilite/accessibilite-numerique/documents-courriels/essentiel-savoir).
@@ -329,21 +344,17 @@ Lues le 2026-11-14:
     pour sa fin de vie; versions de MkDocs et de Material lues sur PyPI, sans faille connue dans la base OSV
     (<span lang="en">Open Source Vulnerabilities</span>).
 
-Lues le 2026-11-18:
-
 - MDN, la propriété CSS `quotes`,
     [page de MDN](https://developer.mozilla.org/docs/Web/CSS/quotes), par Context7 et une recherche web: les
     guillemets d'un `q` se fixent par des paires de chaînes; la valeur `auto`, par défaut, suit la langue héritée.
 - Atalan, AcceDe Web, « Notice d'accessibilité éditoriale »,
     [version en ligne](https://www.accede-web.com/notices/editoriale/), ses neuf sections et ses bonnes pratiques
     (pages de la section `notices/editoriale-modele/`). Context7 ne la couvre pas: elle a été lue à la source, après
-    une recherche web du même jour.
-
-Lues le 2026-11-19:
+    une recherche web.
 
 - W3C, <span lang="en">« Understanding SC 1.4.3: Contrast (Minimum) »</span>,
-    [page du W3C](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum), après une recherche web du même jour:
+    [page du W3C](https://www.w3.org/WAI/WCAG21/Understanding/contrast-minimum), après une recherche web:
     un texte que personne ne voit n'a pas d'exigence de contraste; le texte qui paraît au focus en a une.
 - WebAIM, <span lang="en">« Skip Navigation Links »</span>,
-    [page de WebAIM](https://webaim.org/techniques/skipnav/), après une recherche web du même jour: un lien
+    [page de WebAIM](https://webaim.org/techniques/skipnav/), après une recherche web: un lien
     d'évitement caché hors de l'écran, qui y revient au focus, plutôt que transparent ou de la couleur du fond.

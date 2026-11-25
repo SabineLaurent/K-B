@@ -12,9 +12,8 @@
 
 Cette fiche dit comment installer l'environnement de test, quelles dépendances il installe, comment lancer les
 tests et calculer leur couverture, puis donne le plan de tests de `POST /digests`. Elle est écrite d'après le code de
-`main` au commit `852dad4` (2026-11-08), et le test de l'export des mesures d'après `main` au commit `fd956430`
-(2026-11-18). Les comptes de tests, la couverture et ce que lance l'intégration continue (CI) sont ceux du commit
-`cf7b8983` (tag `v0.1.8`, 2026-11-20): les comptes de la suite et de `tests-postgresql` et la couverture lus dans le
+`main` au commit `852dad4`, et le test de l'export des mesures d'après `main` au commit `fd956430`. Les comptes de tests, la couverture et ce que lance l'intégration continue (CI) sont ceux du commit
+`cf7b8983` (tag `v0.1.8`): les comptes de la suite et de `tests-postgresql` et la couverture lus dans le
 journal de [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), les
 tests de bout en bout comptés par `uv run pytest -m e2e --collect-only -q`, et ce que lance la CI lu dans
 `.github/workflows/ci.yml`. Les chemins du code de K-B (`ai_api/…`, `core/…`) partent de `src/k_b/`, les autres de
@@ -36,7 +35,7 @@ uv sync
 ```
 
 `uv sync` installe K-B, ses dépendances et le groupe `dev` du `pyproject.toml`, que uv installe par défaut
-(documentation de uv, « <span lang="en">Default groups</span> », lue par Context7 le 2026-11-08). La CI lance
+(documentation de uv, « <span lang="en">Default groups</span> », lue par Context7). La CI lance
 `uv sync --locked`: les versions de `uv.lock`, sans le mettre à jour.
 
 ### Sans `.env`
@@ -151,8 +150,8 @@ arrête le test avant toute demande (`tests/e2e/test_real_export.py:66`). Sinon,
 (`tests/e2e/test_real_export.py:108-112`), et échoue si la réponse n'est pas 200, si aucun envoi de mesures n'a eu
 lieu, ou si l'un d'eux n'a pas réussi (`:117-119`).
 
-Il échouait avant la demande de fusion (PR, <span lang="en">pull request</span>) #527, fusionnée le 2026-11-09, qui
-a fermé #495: la fixture lui retirait `KB_DEPLOYMENT_ENVIRONMENT` (constaté le 2026-11-08 au commit `852dad4`:
+Il échouait avant la demande de fusion (PR, <span lang="en">pull request</span>) #527, qui
+a fermé #495: la fixture lui retirait `KB_DEPLOYMENT_ENVIRONMENT` (constaté au commit `852dad4`:
 `KB_DEPLOYMENT_ENVIRONMENT: not set, sandbox or production`), et il ouvrait l'API IA au client `TERMINAL`, que
 `POST /digests` refuse. Depuis, un test de la suite par défaut, donc de la CI, le lance dans un sous-processus avec
 `KB_DEPLOYMENT_ENVIRONMENT=staging` et une adresse factice, et attend son refus nommé,
@@ -160,7 +159,7 @@ a fermé #495: la fixture lui retirait `KB_DEPLOYMENT_ENVIRONMENT` (constaté le
 toute demande (`test_the_end_to_end_test_of_the_export_gets_the_environment_of_the_terminal`,
 `tests/test_e2e_selection.py:175-193`).
 
-Lancé par Sabine le 2026-11-09 sur `9534048`, avec les vraies valeurs de `.env.e2e_test`
+Lancé sur `9534048`, avec les vraies valeurs de `.env.e2e_test`
 (`uv run --env-file .env.e2e_test pytest -m e2e -k real_export -rs`), il a passé: `1 passed, 4422 deselected`
 (commentaire de la PR #527). Ce qu'il ne prouve pas: le SDK d'OpenTelemetry compte une réponse 3xx comme un succès,
 et les séries de cette exécution n'ont pas été lues dans Grafana Explore (`tests/e2e/test_real_export.py:7-8`;
@@ -170,7 +169,7 @@ commentaire de la PR #527). Il n'a pas été relancé sur `fd956430`: son fichie
 
 ### Le bac à sable des alertes
 
-Fusionné au commit `1d2f554` (PR #517, 2026-11-08). Il se lance à la main, hors de la CI, depuis un terminal où
+Fusionné au commit `1d2f554` (PR #517). Il se lance à la main, hors de la CI, depuis un terminal où
 le `.env` n'est pas chargé:
 
 ```sh
@@ -178,7 +177,7 @@ make sandbox-alerts
 ```
 
 La cible lance les seuls tests de `tests/e2e/test_sandbox_alerts.py`, avec le `.env.e2e_test` de la copie de
-travail principale du dépôt, et écrit le rapport `reports/sandbox-alerts.html` (`Makefile:3`, `:64-66`). Les deux
+travail principale du dépôt, et écrit le rapport `reports/sandbox-alerts.html` (`Makefile:3`, `:73-75`). Les deux
 variables à y mettre sont `KB_OTLP_ENDPOINT` et `KB_OTLP_HEADERS`; sans elles, chaque test est sauté
 (`read_sandbox_export_settings`). Chaque test pose lui-même `KB_DEPLOYMENT_ENVIRONMENT=sandbox` avant de lire ces
 réglages, à la place de toute valeur du terminal (`tests/e2e/test_sandbox_alerts.py:96-98`).
@@ -200,8 +199,8 @@ Les tests prouvent que chaque envoi est accepté et que les valeurs calculées s
 scénario, sous ou au-dessus du seuil pour la fidélité et le coût; le déclenchement d'une alerte se lit dans
 Grafana, pas dans le test.
 `uv run --env-file .env.e2e_test pytest -m e2e` lance aussi ces quatre tests: 15 tests de bout en bout au commit
-`cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable lancé par
-Sabine: [la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
+`cf7b8983`, dont les quatre du bac à sable. Ce que montrent les alertes, et le relevé du bac à sable:
+[la fiche du monitorage](monitorage.md), sections « Le bac à sable » et « Relevé des alertes du
 bac à sable ».
 
 ### Ce que lance la CI
@@ -217,7 +216,7 @@ Chaque job installe l'environnement par `uv sync --locked`, puis lance la comman
 | `lint` | `uv run ruff check`, puis `uv run ruff format --check` |
 | `types` | `uv run mypy --strict` |
 | `audit` | `uvx pip-audit@2.10.1` sur les versions de `uv.lock`, avec leurs empreintes |
-| `digests-reference` | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests`, sans appel au modèle, et échoue sous un seuil du 2026-10-15 (100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), si le rejeu n'envoie pas tous les appels enregistrés dans leur ordre, ou si la route ne répond pas 200; le rapport est un artefact de l'exécution (`.github/workflows/ci.yml:111-131`, `tests/ai_api/digests_evaluation.py:28-34`, `:80-90`, `:189-190`) |
+| `digests-reference` | `uv run python tests/ai_api/digests_evaluation.py reports/digests-reference-report.md`: rejoue le jeu de référence de `POST /digests`, sans appel au modèle, et échoue sous un seuil du journal des décisions (`docs/ADR/journal-decisions-projet.md:3389`: 100 % de schémas valides après une nouvelle tentative, au moins 95 % de fidélité, aucun item oublié), si le rejeu n'envoie pas tous les appels enregistrés dans leur ordre, ou si la route ne répond pas 200; le rapport est un artefact de l'exécution (`.github/workflows/ci.yml:111-131`, `tests/ai_api/digests_evaluation.py:28-34`, `:80-90`, `:189-190`) |
 
 Dans [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956), au commit
 `cf7b8983`, les sept jobs ont réussi, `digests-reference` compris. Les tests `e2e` ne tournent jamais dans la CI: ils
@@ -239,12 +238,12 @@ Les réglages sont dans `pyproject.toml`:
 | `[tool.coverage.run] source` | `["k_b"]` | mesure le code de `src/k_b/` |
 | `branch` | `true` | compte aussi les branches jamais prises d'un `if` |
 | `patch` | `["subprocess"]` | mesure aussi les sous-processus que lancent des tests (pytest-cov 7 ne le fait plus) |
-| `[tool.coverage.report] fail_under` | `96` | sous 96 %, lignes et branches, la commande échoue: un plancher contre la régression, pas une cible (journal des décisions d'architecture, ou ADR, 2026-11-08) |
+| `[tool.coverage.report] fail_under` | `96` | sous 96 %, lignes et branches, la commande échoue: un plancher contre la régression, pas une cible (journal des décisions d'architecture, ou ADR, `docs/ADR/journal-decisions-projet.md:6101`) |
 | `precision` | `2` | le total est arrondi à deux décimales avant d'être comparé au seuil |
 
 Seules les commandes avec `--cov` vérifient le seuil (`make test` et `uv run pytest`, non). Sur une partie de la
 suite, ajouter `--cov-fail-under=0`. La CI vérifie le seuil dans le job `tests`; `tests-postgresql` ne mesure pas
-la couverture. Mesure du 2026-11-20 (16:10 UTC) au commit `cf7b8983`, par le job `tests` de
+la couverture. Mesure au commit `cf7b8983`, par le job `tests` de
 [l'exécution 44770275956 de la CI](https://github.com/SabineLaurent/K-B/actions/runs/44770275956): 5664 réussis,
 365 écartés, couverture totale 98,54 %. Le job `tests-postgresql` de la même exécution: 350 réussis.
 
@@ -257,7 +256,7 @@ Les sections suivantes du plan disent, composante par composante, les cas testé
 fichier. Les tests de `POST /trend-reports` sont listés dans
 [la section « Ce qui le prouve » de la spécification du compte rendu des tendances](https://github.com/SabineLaurent/K-B/blob/main/docs/tendances.md#ce-qui-le-prouve).
 Le compte rendu de leur exécution et ce qu'ils ne prouvent pas sont dans
-[le compte rendu des tests de l'API IA du 2026-11-08, relancé le 2026-11-18](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
 
 ### Types de test
 
@@ -440,9 +439,9 @@ Le tableau suivant donne chaque cas, ses tests et leur fichier.
 |---|---|
 | le vrai modèle: aucun test de la CI ne l'appelle, toutes les sorties sont rejouées | #210 (essai des fiches sur la veille réelle avec gpt-6-luna), ouverte |
 | le juge de chaque affirmation, et son étalonnage | #223 et #224, ouvertes |
-| les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main ([Les tests de bout en bout](#les-tests-de-bout-en-bout)); celui de l'export a passé le 2026-11-09, et n'a pas été relancé sur `fd956430` ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)) |
+| les vraies sources et l'envoi réel des mesures | les tests `e2e`, lancés à la main ([Les tests de bout en bout](#les-tests-de-bout-en-bout)); celui de l'export a passé sur `9534048`, et n'a pas été relancé sur `fd956430` ([Le test de l'export des mesures](#le-test-de-lexport-des-mesures)) |
 | le déclenchement des alertes du monitorage du modèle | le bac à sable, `make sandbox-alerts`, lancé à la main ([Le bac à sable des alertes](#le-bac-a-sable-des-alertes)) |
 
 Ce que les tests de l'API IA ne prouvent pas d'autre (le transport réseau hors des API servies et des tests de bout
 en bout, les dépendances de production qu'ils remplacent, la limite de débit sous une vraie charge) est dans
-[le compte rendu des tests de l'API IA du 2026-11-08, relancé le 2026-11-18](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).
+[le compte rendu des tests de l'API IA du 2026-11-08](https://github.com/SabineLaurent/K-B/blob/main/docs/2026-11-08-tests-api-ia.md).

@@ -8,8 +8,8 @@
 
 Cette fiche décrit l'architecture applicative de K-B: le flux des données de bout en bout, en bref puis en détail, les
 couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après `main` au commit
-`fd956430` (2026-11-18). Ce qu'elle dit du passage de la production à `gpt-6.1-sol` suit la fiche du service d'IA,
-mise à jour le 2026-11-18 (#623). « Déployé » y veut dire déclaré en ligne par le Bicep d'`infra/` et par
+`fd956430`. Ce qu'elle dit du passage de la production à `gpt-6.1-sol` suit la fiche du service d'IA
+(#623). « Déployé » y veut dire déclaré en ligne par le Bicep d'`infra/` et par
 `infra/deployment.json` à ce commit; la version qui tourne en ligne n'a pas été relue (section
 [Limites](#limites)). Les chemins du code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les
 autres de la racine du dépôt.
@@ -366,11 +366,15 @@ K-B est écrit en Python, version 3.13 au moins (`pyproject.toml:9`). Les deux A
 FastAPI (`data_api/app.py:49`, `ai_api/app.py:55`, `web/app.py:38`), servies par uvicorn
 (`commands/serve_data_command.py:67`, `commands/serve_ai_command.py:98`, `commands/serve_web_command.py:41`).
 
-Le code est rangé en trois couches (`.claude/rules/conventions.md`, règle 5): la présentation (`cli.py`,
-`commands/`, les routes des deux API et les pages du site), le métier et l'ETL, l'extraction, la transformation et le
-chargement des données (`etl/`), puis l'accès aux données (`database/`). Une couche n'appelle que celle du dessous.
-`items.py` et `core/` sont le vocabulaire commun: chaque couche peut les importer. Les tests de `tests/architecture/`
-lisent les imports de chaque module et tiennent ces règles.
+Le code est rangé en trois couches (`.claude/rules/conventions.md`, règle 5): la présentation (`cli.py`, `commands/`,
+les routes des deux API et les pages du site), le métier et l'ETL, l'extraction, la transformation et le chargement
+des données (`etl/`), puis l'accès aux données (`database/`). Une couche n'appelle jamais celle du dessus: `database/`
+n'importe que `items` et `core` (`tests/architecture/test_layers.py:28`), et `etl/` n'importe aucune des deux API
+(`:200`). Une couche peut en sauter une: les routes de l'API de données lisent la base par `database/`, sans passer
+par `etl/` (`data_api/routers/item_router.py:18`, `tests/architecture/test_apis.py:22`). L'API IA et le site
+n'importent pas `database/` (`test_apis.py:107`, `test_layers.py:471`): ils lisent la base par l'API de données, en
+HTTP. `items.py` et `core/` sont le vocabulaire commun: chaque couche peut les importer. Les tests de
+`tests/architecture/` lisent les imports de chaque module et tiennent ces règles.
 
 La liste suivante donne chaque paquet de `src/k_b/`, son rôle, puis ce que les tests lui interdisent.
 
@@ -434,7 +438,7 @@ Deux tests tiennent la liste elle-même: les modules de premier niveau de K-B
     (`etl/extract.py:53-100`, `etl/raw_store.py:22`). À la collecte suivante, chaque source reçoit sa date
     (`etl/extract.py:68-70`); une source en échec garde la sienne.
 - **Le brut est gardé tel que la source l'a rendu**, dans deux dossiers de `raw/`: `automated_watch/` pour ce que
-    la veille collecte, `selected_library/` pour ce que Sabine a choisi, Zotero et les clips
+    la veille collecte, `selected_library/` pour ce que l'opératrice a choisi, Zotero et les clips
     (`etl/raw_store.py:14-20`). Chaque fichier est écrit par un temporaire caché, renommé sur la cible
     (`.claude/rules/conventions.md`, règle 2).
 - **Zotero n'est jamais ouvert en place**: `zotero.sqlite` est copié, avec son journal d'écriture, dans un dossier
@@ -598,7 +602,7 @@ flowchart TB
     end
     grafana("Grafana Cloud, Allemagne")
     githubApi("API GitHub")
-    model("Modèle de langage, Microsoft Foundry<br>gpt-6.1-sol, depuis le 2026-11-18<br>France Central, zone de données<br>de l'Union européenne")
+    model("Modèle de langage, Microsoft Foundry<br>gpt-6.1-sol<br>France Central, zone de données<br>de l'Union européenne")
     actions -->|"pousse l'image, AcrPush"| registry
     actions -->|"met à jour, lance les jobs"| cae
     registry -->|"image, AcrPull"| cae
@@ -646,7 +650,7 @@ Les flèches du schéma, une à une:
     `main` règle l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:301-304`); l'adresse et le nom du
     déploiement viennent de la seconde passe. L'état en ligne n'est pas relu ici: selon
     [la fiche du service d'IA](service-ia.md), l'API IA en ligne appelle `gpt-6.1-sol` depuis le passage
-    de la production, le 2026-11-18, et appelait `gpt-6-luna` avant.
+    de la production, et appelait `gpt-6-luna` avant.
 - Du conteneur `smoke-test` à `caj-kb-smoke-test` (« liste, Blob Data Reader »), puis de `caj-kb-smoke-test` aux deux
     API (« GET /health, sondes sans clé »): déployé pour `GET /health`; les sondes partent au premier tag qui
     porte #499.
@@ -705,7 +709,7 @@ Le détail de chaque partie:
     (`infra/modules/budget.bicep:1`, `:27-58`).
 - **Hors du Bicep**: le modèle `gpt-6.1-sol` est déployé à la main dans Microsoft Foundry (anciennement Azure AI
     Foundry), en France Central, en zone de données de l'Union européenne; `gpt-6-luna`, le modèle d'avant, y reste
-    déployé, et l'API IA en ligne l'a appelé jusqu'au passage de la production à `gpt-6.1-sol`, le 2026-11-18, selon
+    déployé, et l'API IA en ligne l'a appelé jusqu'au passage de la production à `gpt-6.1-sol`, selon
     [la fiche du service d'IA](service-ia.md); ce que l'app en ligne appelle n'est pas relu ici. Les mesures et les traces vont à Grafana Cloud, pile
     `prod-eu-west-2`, en Allemagne (`docs/registre-traitements.md:123`, `:128`). Le Bicep n'en porte que les
     paramètres, les secrets et l'effort de raisonnement de `gpt-6.1-sol` (`infra/main.bicep:22-29`, `:301-304`).
@@ -721,7 +725,7 @@ Le détail de chaque partie:
     avant le `until` d'un compte rendu mais collecté après lui n'entre dans aucun, comme les éditions de tldr.tech et
     les entrées du catalogue KEV de la CISA (<span lang="en">Known Exploited Vulnerabilities</span>) du lundi et du
     jeudi, datées de minuit et collectées le lendemain. Il attend la lecture par date d'arrivée dans K-B, prévue pour
-    plus tard par décision de Sabine du 2026-11-11
+    plus tard
     ([le README de l'infrastructure](https://github.com/SabineLaurent/K-B/blob/main/infra/README.md), « Les comptes
     rendus en ligne (#423) »).
 - **Rien ne tient deux exécutions à l'écart**, sauf une consigne: les heures de départ à la main du
@@ -741,7 +745,7 @@ Le détail de chaque partie:
 Depuis la racine du dépôt, au commit `fd956430` (`git switch --detach fd956430`):
 
 ```sh
-# Les couches et les imports de chaque paquet: 279 tests le 2026-11-18.
+# Les couches et les imports de chaque paquet: 279 tests au commit fd956430.
 uv run pytest tests/architecture/
 # Les commandes de kb.
 uv run kb --help
