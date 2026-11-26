@@ -150,6 +150,16 @@ def test_a_failure_of_watch_is_the_data_api_unavailable():
         ),
         # A model out of the form kb writes: shown as code on the page.
         ({"model": "gpt 6 <b>"}, None),
+        # Two sources under one id: the link would name one, the page of the source check the other.
+        (
+            {
+                "sources": [
+                    *DIGEST["sources"],
+                    {"item_id": 9, "title": "Another title", "url": None},
+                ]
+            },
+            None,
+        ),
     ],
 )
 def test_an_answer_out_of_the_contract_is_refused(changes, day):
@@ -189,6 +199,8 @@ def test_the_days_of_a_subject_are_asked_thirty_at_most():
         {"days": [DAY] * 31, "total": 31},
         {"days": [DAY, "2026-11-19"], "total": 1},
         {"days": ["23/11/2026"], "total": 1},
+        # A day twice: two days would be marked as the one shown.
+        {"days": [DAY, DAY], "total": 2},
     ],
 )
 def test_days_out_of_the_contract_are_refused(body):

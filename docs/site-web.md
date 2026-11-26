@@ -194,8 +194,8 @@ bandeau « Compte rendu partiel » quand la lecture est coupée ; « Rédigé pa
 partir des items du fil. Chaque affirmation cite ses sources. », le modèle lu dans la réponse (`model`), jamais
 écrit dans le site ; sous le `h2` « Affirmations », une liste numérotée dans l'ordre de la fiche, chaque
 affirmation suivie de « Source: » ou « Sources: » et de la liste de ses sources dans l'ordre où elle les cite,
-chacune un lien qui porte son titre, en `lang="en"` (hypothèse, comme au fil) ; sous le `h2` « Tous les jours du
-sujet », les 30 jours les plus récents, chacun un lien vers son compte rendu, le jour affiché marqué
+chacune un lien qui porte son titre, en `lang="en"` (hypothèse, comme au fil), la liste nommée par son « Sources: »
+(`aria-labelledby`) ; sous le `h2` « Les jours du sujet », les 30 jours les plus récents, chacun un lien vers son compte rendu, le jour affiché marqué
 `aria-current="page"`, sans lien. Au-delà de 30 jours, la liste le dit (« Les 30 jours les plus récents sur 45. »),
 sans pagination : à deux comptes rendus par semaine, 30 jours en couvrent quinze. Aucun lien de la navigation n'est marqué courant, comme sur le détail d'un item ; l'index marque « Comptes rendus ».
 
@@ -203,7 +203,19 @@ Les sources sont sous leur affirmation : on lit l'affirmation et ce qui l'appuie
 lecteur d'écran, sans aller-retour (écarté : les renvois numérotés de la fiche vers une liste en bas). Un seul lien
 par source, vers son item ; le lien vers la page d'origine reste sur la page de l'item (écarté : deux liens par
 source, jusqu'à 120 arrêts de Tab). Chaque lien d'une source ou d'un jour est une cible de 44 px par son
-`padding` (Opquast 186), et un titre sans espace se coupe partout (320 px).
+`padding` (Opquast 186), et un titre sans espace se coupe partout (320 px). Un lien de source ou de jour visité
+prend l'ardoise de la charte (Opquast 141). Les titres des sources sont à 14 px, comme le lien d'une carte : ils
+appuient l'affirmation, qui reste à la taille du texte.
+
+**Le bandeau « Compte rendu partiel »** : l'API IA lit les sortes dans l'ordre de `WATCH_KINDS` (failles, alertes,
+papiers, *releases*, articles de newsletters) et s'arrête à la coupe (`list_items`,
+`ai_api/connectors/data_api_client.py`) ; `covered_after` est la date du premier item laissé de côté, borne exclue.
+Le bandeau dit, chaque phrase seulement si elle nomme une sorte : la sorte coupée et le moment, à la seconde, après
+lequel ses items sont lus ; les sortes qui la suivent, « n’ont pas été lus » ; celles qui la précèdent, « ont été
+lus en entier » (« lues » si elles sont toutes au féminin). `since` est propre au sujet, `covered_after` est celle de
+la lecture de tous les sujets : quand `covered_after` précède `since`, la sorte coupée est lue en entier dans la
+fenêtre du sujet, et s'il ne manque rien au sujet (coupe sur la dernière sorte), aucun bandeau. `WatchKind` et
+`WATCH_KINDS` sont passés d'`ai_api/watch_items.py` à `items.py` : le site n'importe que `core` et `items`.
 
 **Les textes reçus** : une affirmation et un titre passent par `clean_received_text`, puis sont échappés ; une
 balise ou une adresse dans un texte reste du texte, jamais un lien (OWASP LLM10). Une affirmation que le nettoyage
@@ -213,12 +225,14 @@ laisse vide se lit « Sans texte. », un titre « Sans titre » (sans `lang`).
 est une clé de substitution, et une base refaite renumérote ses items. Le lien vise donc
 `/comptes-rendus/<sujet>/<jour>/sources/<id>`, jamais `/items/<id>` : au clic, le site relit le compte rendu, puis
 l'item, et compare le titre de l'item, mis sur une ligne comme l'écrit le jumeau (`make_visible`, passée de
-`post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la source.
+`post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la source,
+puis son URL à celle de la source, quand la source en a une (le jumeau l'écrit telle quelle, `find_writable_url`) :
+les failles du catalogue KEV partagent leur titre (`vulnerabilityName`), jamais leur URL (NVD et le n° CVE).
 
 | Item | Page |
 |---|---|
-| son titre est celui de la source | la page de l'item (`item.html`), « ← Retour au compte rendu », son titre suivi de « , source du compte rendu … du … » (RGAA 8.6) |
-| un autre titre, `item_not_found`, une entrée Zotero ou un clip | « Source introuvable » : « Aucun item de ce titre ne porte le n° … dans la base de K-B. », le titre de la source, et son lien d'origine s'il est en `https`, par `external_link` |
+| son titre et son URL sont ceux de la source | la page de l'item (`item.html`), « ← Retour au compte rendu », son titre suivi de « , source du compte rendu … du … » (RGAA 8.6) |
+| un autre titre ou une autre URL, `item_not_found`, une entrée Zotero ou un clip | « Source introuvable » : « Le n° … de la base de K-B ne mène pas à cette source. », le titre de la source, et son lien d'origine s'il est en `https`, par `external_link`, en anglais (`hreflang="en"`, comme les liens d'origine des cinq sortes) |
 | la source n'est pas dans le compte rendu | la page 404, sans lecture d'item |
 
 Écartés : un lien direct vers `/items/<id>`, qu'une base refaite mènerait sans erreur à un autre item ; contrôler
@@ -235,16 +249,16 @@ de la source vient du compte rendu relu.
 | un 404 `digest_not_found` avec un jour | 404 | la page 404 (l'adresse vient d'un lien ou d'une saisie) |
 | `outcome` `no_claim` | 200 | « Aucune affirmation retenue. », les mots de la fiche (`post/digest_sheets.py`), et les jours |
 | `outcome` `no_item` | 200 | « Aucun item classé dans ce sujet. », de même |
-| la lecture coupée (`items_capped`) | 200 | le bandeau « Compte rendu partiel » : la sorte coupée, et le moment après lequel ses items sont lus, en UTC |
+| la lecture coupée (`items_capped`) | 200 | le bandeau « Compte rendu partiel » (ci-dessus), s'il manque au sujet une sorte ou une part d'une sorte |
 | tout autre échec, une réponse hors contrat | 500 | journalisée comme au fil (`data_api_failed: …`), sans le sujet ni le jour |
 
 Sans affirmation, la ligne « Rédigé par … » n'est pas écrite : `no_item` dit qu'aucun item n'est allé au modèle.
 Une réponse est hors contrat pour un autre sujet ou un autre jour que ceux demandés, une affirmation qui cite une
-source absente du compte rendu (OWASP LLM07), un `outcome` qui contredit les affirmations, une lecture coupée sans
+source absente du compte rendu (OWASP LLM07), une source listée deux fois, un `outcome` qui contredit les affirmations, une lecture coupée sans
 sa sorte ou sans sa date, une sorte coupée hors des cinq du fil, un modèle hors de la forme que `kb` écrit
 (`MODEL_NAME`), et au-delà des bornes de `items.py` et de `core/config.py` (12 affirmations, 400 caractères, 1 à 5
 sources par affirmation, 60 sources, un titre de 1 024 caractères, une URL de 2 000) ; pour les jours, au-delà de
-30 ou un total plus petit que les jours servis. Le 503 `watch_unconfigured` (le Mac sans `AZURE_CLIENT_ID`) est la
+30, un jour listé deux fois ou un total plus petit que les jours servis. Le 503 `watch_unconfigured` (le Mac sans `AZURE_CLIENT_ID`) est la
 page 500.
 
 **Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés, cache vide, gzip compris, sur un compte

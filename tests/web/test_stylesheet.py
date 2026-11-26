@@ -236,7 +236,15 @@ def test_nothing_is_fetched_from_elsewhere():
 
 
 @pytest.mark.parametrize(
-    "links", [r"\.prose a", r"\.card-link", r"\.card-title a", r"\.trends-table a"]
+    "links",
+    [
+        r"\.prose a",
+        r"\.card-link",
+        r"\.card-title a",
+        r"\.trends-table a",
+        r"\.claim-sources a",
+        r"\.days a",
+    ],
 )
 def test_a_link_visited_in_a_text_has_a_colour_of_its_own_of_the_chart(links):
     """Opquast 2025, rule 141: a link in a text, and the link of a card to its source; a menu is out

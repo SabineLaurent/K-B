@@ -17,7 +17,7 @@ from digest_fixture import (
     make_digest,
     serve_digests,
 )
-from item_fixture import ITEM_DETAILS, make_detail
+from item_fixture import ITEM_DETAILS, VULNERABILITY, make_detail
 from screen_weight import SCREEN_BUDGET_BYTES, SCREEN_RESOURCES, weigh_screen
 from site_client import OPERATOR_HEADERS, make_client
 
@@ -28,7 +28,8 @@ from k_b.core.config import (
     MAX_ITEMS_PER_DIGEST,
     TEXT_CHARS,
 )
-from k_b.web.digests import SUBJECTS
+from k_b.post.digest_sheets import NO_CLAIM, NO_ITEM
+from k_b.web.digests import EMPTY_TEXT_BY_OUTCOME, SUBJECTS
 
 INDEX_PATH = "/comptes-rendus"
 SOURCE_PATH = f"{DAY_PATH}/sources"
@@ -206,6 +207,11 @@ def test_thirty_days_or_fewer_are_all_shown_without_a_note():
 # --- The states of a digest.
 
 
+def test_the_words_of_a_digest_without_claim_are_those_of_its_sheet():
+    """The site cannot import post: the words of post/digest_sheets.py are held equal here."""
+    assert EMPTY_TEXT_BY_OUTCOME == {"no_claim": NO_CLAIM, "no_item": NO_ITEM}
+
+
 @pytest.mark.parametrize(
     ("outcome", "text"),
     [
@@ -225,23 +231,115 @@ def test_a_digest_without_claim_says_why_in_the_words_of_its_sheet(outcome, text
     assert '<ul class="days" role="list">' in response.text
 
 
-def test_a_digest_cut_says_so_in_words_with_the_kind_and_the_moment():
-    """OWASP LLM07: a digest cut must not look whole; RGAA 3.1: said in words."""
+CUT_RELEASES = (
+    'Parmi les <span lang="en">releases</span>, K-B n’a lu que les items publiés après le'
+    ' <time datetime="2026-11-21T09:05:40Z">21 novembre 2026 à 09:05:40 UTC</time> (temps'
+    " universel coordonné): les plus anciens de la fenêtre n’y sont pas."
+)
+
+
+@pytest.mark.parametrize(
+    ("capped_kind", "covered_after", "text"),
+    [
+        # The reading goes through the kinds in the order of WATCH_KINDS and stops at the cut: the
+        # kinds after it are not read at all (ai_api/connectors/data_api_client.py, list_items).
+        (
+            "release",
+            "2026-11-21T09:05:40Z",
+            (
+                f"{CUT_RELEASES} Les articles de newsletters n’ont pas été lus. Les failles, les"
+                " alertes et les papiers ont été lus en entier."
+            ),
+        ),
+        # The first item left out is older than the window of the subject (its since): every
+        # paper of the window is read, the kinds after are not.
+        (
+            "paper",
+            "2026-11-18T00:00:00Z",
+            (
+                'Les <span lang="en">releases</span> et les articles de newsletters n’ont pas été'
+                " lus. Les failles, les alertes et les papiers ont été lus en entier."
+            ),
+        ),
+        # Feminine kinds only: the participle agrees.
+        (
+            "advisory",
+            "2026-11-21T09:05:40Z",
+            (
+                "Parmi les alertes, K-B n’a lu que les items publiés après le <time"
+                ' datetime="2026-11-21T09:05:40Z">21 novembre 2026 à 09:05:40 UTC</time> (temps'
+                " universel coordonné): les plus anciens de la fenêtre n’y sont pas. Les papiers,"
+                ' les <span lang="en">releases</span> et les articles de newsletters n’ont pas été'
+                " lus. Les failles ont été lues en entier."
+            ),
+        ),
+        # Cut on the first kind: none is read whole.
+        (
+            "vulnerability",
+            "2026-11-21T09:05:40Z",
+            (
+                "Parmi les failles, K-B n’a lu que les items publiés après le <time"
+                ' datetime="2026-11-21T09:05:40Z">21 novembre 2026 à 09:05:40 UTC</time> (temps'
+                " universel coordonné): les plus anciens de la fenêtre n’y sont pas. Les alertes,"
+                ' les papiers, les <span lang="en">releases</span> et les articles de newsletters'
+                " n’ont pas été lus."
+            ),
+        ),
+        # Cut on the last kind: every other is read whole.
+        (
+            "newsletter_article",
+            "2026-11-21T00:00:00Z",
+            (
+                "Parmi les articles de newsletters, K-B n’a lu que les items publiés après le <time"
+                ' datetime="2026-11-21T00:00:00Z">21 novembre 2026 à 00:00:00 UTC</time> (temps'
+                " universel coordonné): les plus anciens de la fenêtre n’y sont pas. Les failles,"
+                ' les alertes, les papiers et les <span lang="en">releases</span> ont été lus en'
+                " entier."
+            ),
+        ),
+    ],
+    ids=["release", "paper-before-since", "advisory", "vulnerability", "newsletter"],
+)
+def test_a_digest_cut_says_in_words_what_was_read_and_what_was_not(
+    capped_kind, covered_after, text
+):
+    """OWASP LLM07: a digest cut must not look whole; RGAA 3.1: said in words. The moment is given
+    to the second: its bound is exclusive."""
     digest = make_digest(
-        items_capped=True,
-        capped_kind="release",
-        covered_after="2026-11-21T09:05:00Z",
+        items_capped=True, capped_kind=capped_kind, covered_after=covered_after
     )
 
     response = get(DIGEST_PATH, serve_digests(digest)[0])
 
     assert '<p class="banner-title">Compte rendu partiel</p>' in response.text
-    assert (
-        'Parmi les <span lang="en">releases</span>, K-B n’a lu que les items publiés après'
-        ' le <time datetime="2026-11-21T09:05:00Z">21 novembre 2026 à 09:05 UTC</time>'
-        " (temps universel coordonné): les plus anciens de la fenêtre n’y sont pas. Les"
-        " autres sortes sont lues en entier." in response.text
+    assert f'<p class="banner-text">{text}</p>' in response.text
+
+
+def test_a_cut_that_leaves_nothing_out_of_the_subject_has_no_banner():
+    """Cut on the last kind, its first item left out older than the window of the subject."""
+    digest = make_digest(
+        items_capped=True,
+        capped_kind="newsletter_article",
+        covered_after="2026-11-18T00:00:00Z",
     )
+
+    response = get(DIGEST_PATH, serve_digests(digest)[0])
+
+    assert response.status_code == 200
+    assert "banner" not in response.text
+
+
+def test_the_moment_of_a_cut_is_written_to_the_second_in_its_time_element():
+    """HTML allows 1 to 3 digits of fraction only."""
+    digest = make_digest(
+        items_capped=True,
+        capped_kind="release",
+        covered_after="2026-11-21T09:05:40.123456Z",
+    )
+
+    response = get(DIGEST_PATH, serve_digests(digest)[0])
+
+    assert CUT_RELEASES in response.text
 
 
 def test_a_digest_whole_has_no_banner():
@@ -437,11 +535,10 @@ def test_a_source_without_its_item_is_said_with_its_title_and_its_link(items):
 
     assert response.status_code == 200
     assert "<h1>Source introuvable</h1>" in response.text
-    assert (
-        "Aucun item de ce titre ne porte le n° 9 dans la base de K-B." in response.text
-    )
+    assert "Le n° 9 de la base de K-B ne mène pas à cette source." in response.text
     assert f'<dd lang="en">{ITEM_DETAILS[9]["title"]}</dd>' in response.text
-    assert f'href="{ITEM_DETAILS[9]["url"]}"' in response.text
+    assert f'href="{ITEM_DETAILS[9]["url"]}" hreflang="en"' in response.text
+    assert "(en anglais, site externe, nouvel onglet)" in response.text
     assert "Another title" not in response.text
     assert "A private page kept" not in response.text
     assert "secret-clip-text" not in response.text
@@ -449,6 +546,34 @@ def test_a_source_without_its_item_is_said_with_its_title_and_its_link(items):
         f'<a class="back-link" href="{DAY_PATH}"><span aria-hidden="true">←</span>'
         " Retour au compte rendu</a>" in response.text
     )
+
+
+def test_a_source_whose_item_has_its_title_under_another_url_is_not_found():
+    """Vulnerabilities of the CISA KEV catalog share their vulnerabilityName: a base made again can
+    give the id of a source to another CVE of the same title, never of the same URL."""
+    vulnerability = ITEM_DETAILS[VULNERABILITY]
+    digest = make_digest(
+        claims=[{"text": "Une affirmation.", "item_ids": [VULNERABILITY]}],
+        sources=[
+            {
+                "item_id": VULNERABILITY,
+                "title": vulnerability["title"],
+                "url": vulnerability["url"],
+            }
+        ],
+    )
+    other_cve = make_detail(
+        VULNERABILITY, url="https://nvd.nist.gov/vuln/detail/CVE-2026-86951"
+    )
+
+    response = get(
+        f"{SOURCE_PATH}/{VULNERABILITY}",
+        serve_digests(digest, items={VULNERABILITY: other_cve})[0],
+    )
+
+    assert response.status_code == 200
+    assert "<h1>Source introuvable</h1>" in response.text
+    assert "CVE-2026-86951" not in response.text
 
 
 def test_a_source_without_an_https_url_has_no_link_to_its_page():

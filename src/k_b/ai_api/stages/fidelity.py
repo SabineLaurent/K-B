@@ -9,7 +9,7 @@ from typing import Literal
 
 from k_b.ai_api.repository_texts import MASKED_EMAIL
 from k_b.ai_api.stages.writing import Claim, Fact
-from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem, WatchKind
+from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
 
 # Dashes U+2010 to U+2015 and the minus sign U+2212 become "-", the typographic quotes "'" and '"'.
@@ -45,6 +45,8 @@ GHSA = re.compile(
     rf"g{SEPARATOR}h{SEPARATOR}s{SEPARATOR}a(?:s(?![^\W\d_]))?{SEPARATOR}{NUMBER_WORD}"
     rf"([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){SEPARATOR}([0-9a-z]{{4}}){END_LIMIT}"
 )
+from k_b.items import WatchKind
+
 # The emphasis of Markdown (**, ==), removed for the detection only: CVE-2026-00**01** displays as
 # an identifier.
 EMPHASIS = str.maketrans("", "", "*=")

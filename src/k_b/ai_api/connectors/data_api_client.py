@@ -15,9 +15,7 @@ from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.tracing import build_traceparent
 from k_b.ai_api.trajectories import RepositoryStars, StarWindow
 from k_b.ai_api.watch_items import (
-    WATCH_KINDS,
     WatchItem,
-    WatchKind,
     WatchReading,
     build_fields,
 )
@@ -38,10 +36,12 @@ from k_b.core.outbound import (
 from k_b.core.trace_context import TRACEPARENT_HEADER
 from k_b.items import (
     TREND_REPOSITORY_NAME_MAX_LENGTH,
+    WATCH_KINDS,
     Int64,
     RansomwareUse,
     RepositoryName,
     UtcDatetime,
+    WatchKind,
 )
 
 ITEMS_PATH = "items"

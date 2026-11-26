@@ -58,6 +58,7 @@ from k_b.items import (
     RansomwareUse,
     RepositoryName,
     UtcDatetime,
+    WatchKind,
 )
 from k_b.web.settings import DataApiAccess
 
@@ -261,8 +262,8 @@ class WatchDigest(DataApiModel):
     # Of the form kb writes (core/config.py): shown as code, never a text of the model.
     model: Annotated[str, StringConstraints(pattern=f"^{MODEL_NAME.pattern}$")]
     items_capped: bool
-    # The watch reads the five kinds of the feed only (ai_api/watch_items.py).
-    capped_kind: FeedKind | None
+    # The kinds of the watch, in the order of its reading (items.py).
+    capped_kind: WatchKind | None
     covered_after: UtcDatetime | None
     outcome: DigestOutcome
     claims: Annotated[list[DigestClaim], Field(max_length=MAX_CLAIMS)]
@@ -285,6 +286,13 @@ class WatchDigest(DataApiModel):
         return self
 
     @model_validator(mode="after")
+    def check_each_source_is_listed_once(self) -> Self:
+        """A link names a source and the page of the source checks it: both the same one."""
+        if len({source.item_id for source in self.sources}) != len(self.sources):
+            raise ValueError("a source listed twice")
+        return self
+
+    @model_validator(mode="after")
     def check_each_claim_cites_a_source_listed(self) -> Self:
         """Each claim leads to its sources (OWASP LLM07)."""
         listed = {source.item_id for source in self.sources}
@@ -303,6 +311,13 @@ class DigestDays(DataApiModel):
     def check_the_total_counts_the_days(self) -> Self:
         if self.total < len(self.days):
             raise ValueError("total under the days served")
+        return self
+
+    @model_validator(mode="after")
+    def check_each_day_is_listed_once(self) -> Self:
+        """The day shown is marked once."""
+        if len(set(self.days)) != len(self.days):
+            raise ValueError("a day listed twice")
         return self
 
 
@@ -381,7 +396,7 @@ def read_item(
     the feed. Only the 404 item_not_found names an item missing: any other 404 is an answer out
     of the contract of the route."""
     status, body = send(http_client, f"{ITEMS_PATH}/{item_id}", {}, clock)
-    if status == httpx2.codes.NOT_FOUND and names_error(body, "item_not_found"):
+    if status == httpx2.codes.NOT_FOUND and is_error_named(body, "item_not_found"):
         raise DataApiError("data_api_item_not_found", status)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -403,7 +418,9 @@ def read_trends(
         {} if window_end is None else {"window_end": window_end.isoformat()}
     )
     status, body = send(http_client, TREND_WINDOW_PATH, params, clock)
-    if status == httpx2.codes.NOT_FOUND and names_error(body, "trend_window_not_found"):
+    if status == httpx2.codes.NOT_FOUND and is_error_named(
+        body, "trend_window_not_found"
+    ):
         raise DataApiError("data_api_trend_window_not_found", status)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -429,7 +446,7 @@ def read_digest(
         {} if day is None else {"day": day.isoformat()}
     )
     status, body = send(http_client, f"{DIGESTS_PATH}/{subject}", params, clock)
-    if status == httpx2.codes.NOT_FOUND and names_error(body, "digest_not_found"):
+    if status == httpx2.codes.NOT_FOUND and is_error_named(body, "digest_not_found"):
         raise DataApiError("data_api_digest_not_found", status)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -461,7 +478,7 @@ def list_digest_days(
         raise DataApiError("data_api_invalid_response", status) from None
 
 
-def names_error(body: bytes, error: str) -> bool:
+def is_error_named(body: bytes, error: str) -> bool:
     """Whether the body is the JSON of the error named."""
     try:
         return ERROR_BODY.validate_json(body).error == error

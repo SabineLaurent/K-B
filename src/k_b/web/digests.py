@@ -1,11 +1,11 @@
 """The pages of the digests of the watch, without input nor output: the subject and the day read from
 the address, the page of a digest, of a subject without digest, and of a source the base no longer
-holds under its title (docs/site-web.md, "Comptes rendus")."""
+holds under its title and its URL (docs/site-web.md, "Comptes rendus")."""
 
 from dataclasses import dataclass
 from datetime import datetime
 
-from k_b.items import make_visible
+from k_b.items import WATCH_KINDS, WatchKind, make_visible
 from k_b.web.data_api_client import (
     DigestDays,
     DigestSource,
@@ -18,7 +18,7 @@ from k_b.web.feed import (
     NO_TITLE,
     keep_https_link,
 )
-from k_b.web.french_dates import write_count, write_day, write_moment
+from k_b.web.french_dates import write_count, write_day
 from k_b.web.item_detail import BackLink, Day, to_day
 from k_b.web.received_text import clean_received_value
 
@@ -26,7 +26,8 @@ DIGESTS_PATH = "/comptes-rendus"
 SUBJECT_PATH = "/comptes-rendus/{subject}"
 DAY_PATH = "/comptes-rendus/{subject}/{day}"
 SOURCE_PATH = "/comptes-rendus/{subject}/{day}/sources/{item_id}"
-# The words of the sheet of a digest without claim (post/digest_sheets.py, NO_CLAIM and NO_ITEM).
+# The words of the sheet of a digest without claim (post/digest_sheets.py, NO_CLAIM and NO_ITEM),
+# held equal by a test: the site does not import post.
 EMPTY_TEXT_BY_OUTCOME = {
     "no_claim": "Aucune affirmation retenue.",
     "no_item": "Aucun item classé dans ce sujet.",
@@ -35,6 +36,13 @@ EMPTY_TEXT_BY_OUTCOME = {
 NO_TEXT = "Sans texte."
 NO_DIGEST_TEXT = "Aucun compte rendu pour ce sujet."
 SOURCE_LINK_LABEL = "Lire la source"
+# The five kinds of the watch link to pages in English (LABELS_BY_KIND, link_lang).
+SOURCE_LINK_LANG = "en"
+SOURCE_LINK_NOTE = f"en anglais, {NEW_TAB_NOTE}"
+# The kinds whose plural is feminine: the kinds read in full, all of them feminine, take "lues".
+FEMININE_KINDS: frozenset[WatchKind] = frozenset(
+    {"vulnerability", "advisory", "release"}
+)
 
 
 @dataclass(frozen=True)
@@ -115,13 +123,32 @@ class ClaimView:
 
 
 @dataclass(frozen=True)
-class CapNotice:
-    """The kind cut by the reading, in the words of the form of the feed, and the moment after which
-    its items are read."""
+class KindName:
+    """A kind in the words of the form of the feed, in lower case."""
 
-    kind_label: str
-    kind_lang: str | None
+    label: str
+    lang: str | None
+
+
+@dataclass(frozen=True)
+class CutKind:
+    """The kind cut by the reading, and the moment after which its items are read."""
+
+    name: KindName
     after: Day
+
+
+@dataclass(frozen=True)
+class CapNotice:
+    """What the cut of the reading left out of the window of the subject: the reading goes through
+    WATCH_KINDS in order and stops at the cut (ai_api/connectors/data_api_client.py, list_items)."""
+
+    # None: the first item left out is older than the window, whose items of the kind are all read.
+    cut: CutKind | None
+    unread: tuple[KindName, ...]
+    whole: tuple[KindName, ...]
+    # The participle of "ont été ... en entier", agreed with the kinds read in full.
+    whole_participle: str
 
 
 @dataclass(frozen=True)
@@ -170,6 +197,7 @@ class MissingSourcePage:
     # None: a URL out of https, never made a link.
     link: str | None
     link_label: str
+    link_lang: str
     link_note: str
 
 
@@ -219,17 +247,38 @@ def build_digest_page(digest: WatchDigest, days: DigestDays) -> DigestPage:
 
 
 def build_cap_notice(digest: WatchDigest) -> CapNotice | None:
+    """The kinds read in full, cut and not read; None when the window of the subject misses none.
+    since is the subject's own, covered_after the one of the reading of every subject."""
     if digest.capped_kind is None or digest.covered_after is None:
         return None
-    labels = LABELS_BY_KIND[digest.capped_kind]
+    position = WATCH_KINDS.index(digest.capped_kind)
+    # covered_after is the first item left out, bound excluded: in the window, items are missing.
+    is_cut_in_window = digest.covered_after >= digest.since
+    whole = WATCH_KINDS[: position if is_cut_in_window else position + 1]
+    unread = WATCH_KINDS[position + 1 :]
+    if not is_cut_in_window and not unread:
+        return None
+    cut = CutKind(name_kind(digest.capped_kind), to_moment(digest.covered_after))
     return CapNotice(
-        labels.form_label.lower(), labels.label_lang, to_moment(digest.covered_after)
+        cut=cut if is_cut_in_window else None,
+        unread=tuple(map(name_kind, unread)),
+        whole=tuple(map(name_kind, whole)),
+        whole_participle="lues" if FEMININE_KINDS.issuperset(whole) else "lus",
     )
 
 
+def name_kind(kind: WatchKind) -> KindName:
+    labels = LABELS_BY_KIND[kind]
+    return KindName(labels.form_label.lower(), labels.label_lang)
+
+
 def to_moment(moment: datetime) -> Day:
-    """A moment as its time element gives it: ISO in UTC for the machine, its minute for people."""
-    return Day(moment.isoformat().replace("+00:00", "Z"), write_moment(moment))
+    """A moment as its time element gives it, to the second, the bound of a cut being exclusive: ISO
+    in UTC for the machine, the month in letters for people."""
+    return Day(
+        moment.isoformat(timespec="seconds").replace("+00:00", "Z"),
+        f"{write_day(moment)} à {moment:%H:%M:%S} UTC",
+    )
 
 
 def build_source_link(digest: WatchDigest, source: DigestSource) -> SourceLink:
@@ -283,9 +332,12 @@ def find_source(digest: WatchDigest, item_id: int) -> DigestSource | None:
 
 def is_item_of_source(detail: ItemDetail, source: DigestSource) -> bool:
     """Whether the item is the source: its title on one line, as the twin of the sheet writes it
-    (make_visible), is the title of the source. A base made again numbers its items anew
-    (docs/specs-api.md, GET /digests/{subject}, limit (d))."""
-    return make_visible(detail.title) == source.title
+    (make_visible), and its URL when the source has one. A base made again numbers its items anew
+    (docs/specs-api.md, GET /digests/{subject}, limit (d)); vulnerabilities of the CISA KEV share
+    their title, never their URL."""
+    return make_visible(detail.title) == source.title and (
+        source.url is None or source.url == detail.url
+    )
 
 
 def build_missing_source_page(
@@ -297,10 +349,11 @@ def build_missing_source_page(
         page_title=f"Source introuvable, n° {source.item_id} du compte rendu"
         f" {SUBJECTS[digest.subject].label} du {write_day(digest.day)}",
         back_link=build_digest_back_link(digest),
-        text=f"Aucun item de ce titre ne porte le n° {source.item_id} dans la base de K-B.",
+        text=f"Le n° {source.item_id} de la base de K-B ne mène pas à cette source.",
         title=title or NO_TITLE,
         title_lang="en" if title else None,
         link=keep_https_link(source.url),
         link_label=SOURCE_LINK_LABEL,
-        link_note=NEW_TAB_NOTE,
+        link_lang=SOURCE_LINK_LANG,
+        link_note=SOURCE_LINK_NOTE,
     )

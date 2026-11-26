@@ -95,6 +95,8 @@ DIGEST_PAGES = {
         serve_digests(
             make_digest(
                 day="2026-11-16",
+                since="2026-11-12T10:00:00Z",
+                until="2026-11-16T10:00:00Z",
                 items_capped=True,
                 capped_kind="release",
                 covered_after="2026-11-15T09:05:00Z",
@@ -981,11 +983,25 @@ def test_the_claims_are_an_ordered_list_under_their_heading_each_source_a_list(n
     assert re.search(
         r'<h2 id="affirmations">Affirmations</h2>\s*<ol class="claims">', page
     )
-    assert page.count('<ul class="claim-sources" role="list">') == 2
+    assert page.count('<ul class="claim-sources" role="list"') == 2
+
+
+@pytest.mark.parametrize("name", ["digest", "digest-cut"])
+def test_each_list_of_sources_is_named_by_the_label_above_it(name):
+    """WCAG 1.3.1: a list of sources reached alone, from list to list, still says what it is."""
+    labels = re.findall(
+        r'<p class="claim-sources-label" id="([a-z0-9-]+)">Sources?:</p>\s*'
+        r'<ul class="claim-sources" role="list" aria-labelledby="([a-z0-9-]+)">',
+        PAGES[name],
+    )
+
+    assert len(labels) == 2
+    assert all(label == named for label, named in labels)
+    assert len({label for label, _ in labels}) == 2
 
 
 def test_the_days_of_a_digest_are_a_list_under_their_heading():
     assert re.search(
-        r'<h2 id="jours">Tous les jours du sujet</h2>\s*<ul class="days" role="list">',
+        r'<h2 id="jours">Les jours du sujet</h2>\s*<ul class="days" role="list">',
         PAGES["digest"],
     )

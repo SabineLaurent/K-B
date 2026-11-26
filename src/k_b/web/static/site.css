@@ -971,6 +971,11 @@
   .days a {
     display: inline-block;
     padding-block: 0.75rem;
+
+    /* Visited in another colour of the chart (Opquast 2025, rule 141): which days are read. */
+    &:visited {
+      color: var(--color-slate);
+    }
   }
 
   .days [aria-current="page"] {

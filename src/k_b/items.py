@@ -46,6 +46,14 @@ ItemKind = Literal[
     "clip",
 ]
 
+# The kinds of the watch, in the order of the reading: the rare ones first, so that a cap cuts
+# the newsletter articles before a vulnerability. Neither zotero_entry nor clip: no library in
+# the digests on 25/10 (Sabine, 2026-10-15). Here, as the site says what a cut left unread.
+type WatchKind = Literal[
+    "vulnerability", "advisory", "paper", "release", "newsletter_article"
+]
+WATCH_KINDS: tuple[WatchKind, ...] = get_args(WatchKind.__value__)
+
 # The acquisition modes a reader filters on (database/reading.py, kb search --in): those of
 # schema.sql but wiki, which no source has yet (decision of 2026-10-14).
 SearchableMode = Literal["watch", "library"]

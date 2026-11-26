@@ -7,9 +7,8 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field
 
 from k_b.ai_api.connectors.llm_client import LlmFailure
 from k_b.ai_api.stage_calls import DigestStage
-from k_b.ai_api.watch_items import WatchKind
 from k_b.core.config import MAX_DIGEST_WINDOW_DAYS, MIN_DIGEST_WINDOW_DAYS
-from k_b.items import UtcDatetime, parse_aware_datetime
+from k_b.items import UtcDatetime, WatchKind, parse_aware_datetime
 
 WindowDays = Annotated[int, Field(ge=MIN_DIGEST_WINDOW_DAYS, le=MAX_DIGEST_WINDOW_DAYS)]
 

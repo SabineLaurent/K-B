@@ -6,7 +6,8 @@ from dataclasses import dataclass
 
 from k_b.ai_api.stages.fidelity import ClaimFidelity, check_claim
 from k_b.ai_api.stages.writing import Claim, WritingOutput, is_within_claim_bounds
-from k_b.ai_api.watch_items import WatchItem, WatchKind, to_item_ref
+from k_b.ai_api.watch_items import WatchItem, to_item_ref
+from k_b.items import WatchKind
 
 # A source URL is returned only with one of these schemes (docs/fiches-veille.md, "Réponse").
 SOURCE_URL_SCHEMES = ("http://", "https://")

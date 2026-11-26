@@ -20,7 +20,7 @@ from k_b.ai_api.connectors.llm_settings import LlmSettings
 from k_b.ai_api.deadline import Deadline
 from k_b.ai_api.stage_calls import StageCall
 from k_b.ai_api.tracing import TRACING_OFF, Step, Tracing
-from k_b.ai_api.watch_items import WatchItem, WatchKind, cut_value, to_item_ref
+from k_b.ai_api.watch_items import WatchItem, cut_value, to_item_ref
 from k_b.core.config import (
     MAX_CLASSIFICATION_INPUT_CHARS,
     MAX_FIELD_CHARS_FOR_CLASSIFICATION,
@@ -28,6 +28,7 @@ from k_b.core.config import (
     NO_SUITABLE_SUBJECT_ANSWER,
     DigestSubject,
 )
+from k_b.items import WatchKind
 
 CLASSIFICATION_PROMPT_NAME = "classify"
 CLASSIFICATION_PROMPT_VERSION = "classify-2"

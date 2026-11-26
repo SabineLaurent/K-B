@@ -10,7 +10,8 @@ from data_api.test_watch_digest_router import make_twin, put_twin
 from fastapi.testclient import TestClient
 from site_client import NOW, OPERATOR_HEADERS, OPERATOR_ID, TEST_VERSION
 
-from k_b.items import make_visible
+from k_b.post.ai_api_client import Source
+from k_b.post.digest_sheets import build_twin_source
 from k_b.web.app import create_app
 
 CARD_TITLE = re.compile(
@@ -99,7 +100,9 @@ def test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_i
     """The twin holds the title of its source as kb digest writes it, from the detail the AI API
     reads (post/digest_sheets.py, build_twin_source): the site finds it again on the item."""
     paper = data_api.get("/items/1").json()
-    source = {"item_id": 1, "title": make_visible(paper["title"]), "url": paper["url"]}
+    source = build_twin_source(
+        Source(item_id=1, title=paper["title"], url=paper["url"])
+    )
     claim = {
         "text": "Un cadre d’agents ancré sur une chaîne de blocs.",
         "item_ids": [1],
