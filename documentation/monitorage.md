@@ -531,8 +531,8 @@ ligne écrite par une bibliothèque, uvicorn compris, est cité par `quote_value
 retours à la ligne et ses caractères de contrôle échappés, coupé à 300 caractères
 (`src/k_b/commands/run_log.py:63-68`, `:122-151`). Son message tient donc sur sa seule ligne
 (`tests/commands/test_run_log.py:233`). Une ligne de `kb` garde son message tel quel
-(`tests/commands/test_run_log.py:283`): `kb` cite lui-même chaque valeur qu'il journalise
-(`.claude/rules/conventions.md`, règle 3).
+(`tests/commands/test_run_log.py:283`): la règle 3 veut que `kb` cite lui-même chaque valeur qu'il journalise
+(`.claude/rules/conventions.md`).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
 statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête `X-Request-ID`

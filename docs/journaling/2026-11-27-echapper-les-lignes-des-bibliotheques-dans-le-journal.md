@@ -16,11 +16,12 @@ ci-dessus sont les seuls de la branche (`git log origin/main..HEAD`), et la note
 
 ## Le pourquoi
 
-Le journal de `kb` est la trace de chaque commande, de `kb collect` aux API et au site : une ligne datée par
+Le journal de `kb` est la trace des commandes, de `kb collect` aux API et au site, hors `kb openapi` et le `--dry-run`
+d'une routine (`src/k_b/cli.py:110-123`) : une ligne datée par
 événement, sur la sortie d'erreur et dans un fichier de `<KB_DATA_DIR>/logs/` (`src/k_b/commands/run_log.py:24-34`). En
 ligne, la sortie d'erreur part dans Log Analytics, et c'est là qu'on lit l'échec d'un job (`documentation/monitorage.md`,
-« Ce que l'application écrit »). Chaque ligne a la forme `<date> <niveau> <module>: <message>`
-(`src/k_b/commands/run_log.py:37`).
+« Ce que l'application écrit »). Une ligne a la forme `<date> <niveau> <module>: <message>`, avec l'identifiant de trace
+pendant une requête (`src/k_b/commands/run_log.py:35-37`).
 
 La règle 3 de `.claude/rules/conventions.md` veut que `kb` cite chaque valeur observée par `quote_value` : tronquée,
 retours à la ligne et caractères de contrôle échappés. Les bibliothèques qui tournent dans le même processus (uvicorn,
@@ -33,7 +34,8 @@ sanitization on all event data to prevent log injection attacks », citée par `
 
 #412 avait déjà tenu `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`, `src/k_b/commands/run_log.py:56-62`) : à WARNING, `azure` cite le texte d'une
 réponse, et `urllib3` peut citer une URL entière, celle d'un blob (`src/k_b/commands/run_log.py:41-48`).
-Une liste ne couvre que les bibliothèques qu'on a pensé à y mettre : #441 demande une seule règle, pour toutes.
+Une liste ne couvre que les bibliothèques qu'on a pensé à y mettre : la piste de la revue que porte #441, retenue par
+le plan, est une seule règle, pour toutes.
 
 ## Le comment
 
@@ -151,9 +153,9 @@ le fichier. L'autre texte d'une bibliothèque que cite une fiche, `address alrea
 |---|---|---|
 | Un `Formatter` | les deux sorties le partagent déjà, et il décore déjà l'enregistrement (`trace_field`) : une seule place | un `logging.Filter` par gestionnaire : depuis Python 3.12, il peut rendre une copie au lieu de modifier en place, mais c'est un second objet à poser sur chaque gestionnaire |
 | Une copie de l'enregistrement | les autres gestionnaires (pytest, et tout gestionnaire posé plus tard) reçoivent l'enregistrement tel que la bibliothèque l'a écrit | un filtre ou un formateur qui réécrit `msg` en place : effet de bord sur tous les gestionnaires servis après lui |
-| Citer les seuls loggers hors de `k_b` | `kb` cite déjà ses valeurs : citer ses lignes les citerait deux fois et changerait chaque ligne de `kb` | tout citer, `k_b.*` compris |
-| Une règle pour toutes les bibliothèques | aucune liste à tenir : une bibliothèque ajoutée est couverte d'office (le texte de #441) | étendre `LIBRARY_LOG_LEVELS` : une liste à tenir, bibliothèque par bibliothèque, et le niveau de chacune à vérifier à l'essai, comme pour `azure.identity` (#412, rappelé par le constat de #441) |
-| 300 caractères | la ligne est la seule copie du message, comme l'échec d'une source | 100, le défaut de `quote_value`, fait pour une seule valeur, quand une ligne de bibliothèque porte un message entier, qui cite lui-même ses valeurs ; aucune coupe : contraire à la règle 3 |
+| Citer les seuls loggers hors de `k_b` | la règle 3 fait citer à `kb` ses valeurs : citer ses lignes citerait deux fois ces valeurs, et changerait chaque ligne de `kb` | tout citer, `k_b.*` compris |
+| Une règle pour toutes les bibliothèques | aucune liste à tenir : une bibliothèque ajoutée est couverte d'office (la piste de #441, retenue par le plan) | étendre `LIBRARY_LOG_LEVELS` : une liste à tenir, bibliothèque par bibliothèque, et le niveau de chacune à vérifier à l'essai, comme pour `azure.identity` (#412, rappelé par le constat de #441) |
+| 300 caractères | la ligne est la seule copie du message, comme l'échec d'une source | 100, le défaut de `quote_value` (`src/k_b/core/quoting.py:9-10`), fait pour une seule valeur, quand une ligne de bibliothèque porte un message entier, ses valeurs comprises ; aucune coupe : contraire à la règle 3 |
 | Garder `QuotingFilter` | il fait ce que le formateur ne fait pas : il cite chaque argument texte à 100, réduit une exception à son type et retire la trace de l'exporteur | le retirer : la trace de l'exporteur reviendrait dans le journal |
 | Le message seul, pas la trace d'une exception | la règle 3 veut que la trace suive sa ligne datée, sur ses lignes : la changer touche aussi les traces de `kb` ; c'est l'objet de #725 | échapper toute la sortie d'un enregistrement de bibliothèque, trace comprise : une trace d'uvicorn (« Exception in ASGI application », `uvicorn/protocols/websockets/websockets_impl.py:262`) deviendrait une seule ligne de 300 caractères, illisible pour qui cherche la cause |
 
@@ -166,7 +168,7 @@ le fichier. L'autre texte d'une bibliothèque que cite une fiche, `address alrea
 | `test_the_record_of_a_library_is_left_as_it_is_for_the_other_handlers` (`:261`) ; avec une réécriture en place simulée dans le processus : `1 failed` | la copie : `caplog` relit le message d'origine |
 | `test_only_a_line_of_kb_keeps_its_message_as_kb_wrote_it` (`:283`), trois cas ; avant le code, le cas `k_b_library` échouait | `k_b` et `k_b.test` gardent leur message, `k_b_library` est cité |
 | `uv run pytest` : 5866 passed, 365 deselected ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` : verts | rien d'autre ne casse : les tests qui lisent une ligne de bibliothèque la cherchent par une partie de son texte (`tests/ai_api/test_serve_ai.py:520`, `:552`) ou par `record.getMessage()`, que le formateur ne change pas (`tests/ai_api/test_metrics_export.py:468`, `tests/ai_api/test_trace_export.py:253`) |
-| `grep` d'`infra/` et d'`observability/` | aucune requête de Log Analytics ni alerte ne lit le texte d'une ligne de bibliothèque ; les requêtes d'`infra/README.md` filtrent par `JobName` (`infra/README.md:413`, `:827`, `:1250`, `:1430`) |
+| `grep` d'`infra/` et d'`observability/` | aucune requête de Log Analytics ni alerte ne lit le texte d'une ligne de bibliothèque ; les requêtes d'`infra/README.md` filtrent par date et par `JobName`, aucune par le texte d'une ligne (`infra/README.md:413`, `:827`, `:1250`, `:1430`) |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -180,7 +182,7 @@ le fichier. L'autre texte d'une bibliothèque que cite une fiche, `address alrea
    le texte d'un message, pas le nom du logger, que fixe le code de la bibliothèque. Seul du code déjà chargé dans le
    processus pourrait choisir `k_b.x`, et il pourrait alors écrire dans le fichier directement
    (`run_log.py:137-139`).
-4. **Pourquoi 300 et pas 100 ?** 100 est la longueur d'une valeur seule. Une ligne de bibliothèque porte un message
+4. **Pourquoi 300 et pas 100 ?** 100 est la longueur par défaut d'une valeur seule (`core/quoting.py:9-10`). Une ligne de bibliothèque porte un message
    entier, et c'est sa seule copie, comme le message d'échec d'une source, que K-B coupe déjà à 300
    (`run_log.py:66-68`, `etl/extract.py:38`).
 5. **Et la trace d'une exception ?** Elle suit sa ligne datée, sur ses propres lignes (règle 3) : seul le message de
@@ -193,7 +195,8 @@ le fichier. L'autre texte d'une bibliothèque que cite une fiche, `address alrea
   par un logger nommé `a.library`. Le mécanisme ne dépend que du nom du logger et du message, pas de la bibliothèque.
 - Les suites `postgresql` et `e2e`, écartées par `uv run pytest`, n'ont pas été lancées sur le Mac. Deux tests
   `postgresql` lisent `kb.log` pour y vérifier l'absence d'une valeur que PostgreSQL cite
-  (`tests/commands/test_postgresql_errors_in_logs.py:54-55`, `:74`) : citer un message n'ajoute aucun texte. Le job
+  (`tests/commands/test_postgresql_errors_in_logs.py:54-55`, `:74`) : citer un message n'y ajoute que des guillemets et
+  des échappements. Le job
   `tests-postgresql` de la CI les lance.
 - L'effet sur un gestionnaire OpenTelemetry posé sur le logger racine : K-B n'en pose aucun (`grep -rn addHandler
   src/k_b` ne trouve que `src/k_b/commands/run_log.py:107`), et ses enregistrements partent par un `Logger`
