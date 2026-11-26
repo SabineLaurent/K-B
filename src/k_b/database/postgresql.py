@@ -12,7 +12,7 @@ from typing import Any
 import psycopg
 from psycopg import IsolationLevel, pq
 from psycopg.conninfo import conninfo_to_dict
-from psycopg_pool import ConnectionPool
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from k_b.core.config import (
     DATABASE_CONNECT_TIMEOUT_SECONDS,
@@ -281,6 +281,12 @@ def configure_reader(
     reader.execute(SET_STATEMENT_TIMEOUT, (statement_timeout,))
     # A rollback would undo the setting.
     reader.commit()
+
+
+def is_pool_timeout(error: BaseException) -> bool:
+    """Whether the pool lent no connection within its wait: every one lent, or none that could
+    connect to the base."""
+    return isinstance(error, PoolTimeout)
 
 
 @contextmanager

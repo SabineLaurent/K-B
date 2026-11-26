@@ -8,6 +8,8 @@ import subprocess
 import sys
 from datetime import UTC, datetime, time, timedelta
 
+import psycopg_pool.pool
+import psycopg_pool.sched
 import pytest
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError
@@ -224,6 +226,21 @@ def test_a_library_that_logs_what_an_answer_says_is_held_and_set_back(
         assert library_logger.level == level
 
     assert library_logger.level == level_before
+
+
+@pytest.mark.parametrize(
+    ("module", "logger_name"),
+    [(psycopg_pool.pool, "psycopg.pool"), (psycopg_pool.sched, "psycopg_pool.sched")],
+)
+def test_the_pool_and_its_scheduler_write_nothing_below_error(
+    tmp_path, module, logger_name
+):
+    """The pool logs under psycopg.pool, its scheduler under psycopg_pool.sched: at WARNING, both
+    quote the error of a connection, the text of libpq."""
+    assert module.logger.name == logger_name
+
+    with cli.logging_to(tmp_path, None):
+        assert module.logger.getEffectiveLevel() == logging.ERROR
 
 
 def test_a_line_out_of_a_request_has_no_trace_id(tmp_path, capsys):

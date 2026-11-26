@@ -3,7 +3,7 @@
   "info": {
     "title": "K-B data API",
     "description": "Thank you to arXiv for use of its open access interoperability.",
-    "version": "0.14.0"
+    "version": "0.15.0"
   },
   "paths": {
     "/items": {
@@ -161,7 +161,7 @@
             }
           },
           "503": {
-            "description": "database_missing, query_timeout",
+            "description": "database_missing, database_unavailable, query_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -286,7 +286,7 @@
             }
           },
           "503": {
-            "description": "database_missing, query_timeout",
+            "description": "database_missing, database_unavailable, query_timeout",
             "content": {
               "application/json": {
                 "schema": {
@@ -392,7 +392,7 @@
             }
           },
           "503": {
-            "description": "database_missing, query_timeout",
+            "description": "database_missing, database_unavailable, query_timeout",
             "content": {
               "application/json": {
                 "schema": {

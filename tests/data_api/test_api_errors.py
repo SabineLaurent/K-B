@@ -13,8 +13,9 @@ from k_b.core.config import (
     READING_POOL_WAIT_SECONDS,
 )
 from k_b.data_api.routers import item_router
-from k_b.database import engine
-from k_b.database.engine import make_deadline_check
+from k_b.database import engine, postgresql
+from k_b.database.engine import make_deadline_check, open_readers
+from k_b.database.location import PostgresUrl
 
 # The methods of RFC 9110 (section 9) and PATCH (RFC 5789), all sent by the test client.
 HTTP_METHODS = (
@@ -152,10 +153,11 @@ def test_on_postgresql_a_request_beyond_its_deadline_gives_503_query_timeout_wit
 
 
 @pytest.mark.postgresql
-def test_on_postgresql_a_database_error_gives_500_without_detail_and_logs_its_type(
+def test_on_postgresql_a_base_without_its_tables_gives_503_database_missing_and_logs_its_state(
     make_client, postgresql_base, api_keys, authorization, caplog
 ):
-    """A base without the tables of K-B: the type of the error only, never its message."""
+    """A base not yet migrated (42P01): the state and the class of the error, never its message,
+    which names the table."""
     with open_connected_readers(
         postgresql_base, DATA_API_QUERY_TIMEOUT_SECONDS
     ) as readers:
@@ -163,11 +165,67 @@ def test_on_postgresql_a_database_error_gives_500_without_detail_and_logs_its_ty
         with caplog.at_level(logging.ERROR, logger="k_b.data_api"):
             response = client.get("/items", headers=authorization)
 
-    assert response.status_code == 500
-    assert response.json() == {"error": "database_error"}
+    assert response.status_code == 503
+    assert response.json() == {"error": "database_missing"}
     request_id = response.headers["X-Request-ID"]
-    assert f"database_error: UndefinedTable request_id={request_id}" in caplog.text
+    assert (
+        f"database_missing: UndefinedTable 42P01 request_id={request_id}" in caplog.text
+    )
     assert "does not exist" not in caplog.text
+
+
+@pytest.mark.parametrize(
+    ("error", "status", "line"),
+    [
+        (
+            psycopg.errors.UndefinedTable(),
+            503,
+            "database_missing: UndefinedTable 42P01",
+        ),
+        (
+            psycopg.errors.UndefinedColumn(),
+            500,
+            "database_error: UndefinedColumn",
+        ),
+    ],
+)
+def test_on_postgresql_a_missing_table_gives_503_and_another_error_500(
+    client, authorization, monkeypatch, caplog, error, status, line
+):
+    """The classes of psycopg carry their SQLSTATE: no server is needed to raise them."""
+
+    def fail(*_, **__):
+        raise error
+
+    monkeypatch.setattr(item_router, "read_items", fail)
+
+    with caplog.at_level(logging.ERROR, logger="k_b.data_api"):
+        response = client.get("/items", headers=authorization)
+
+    assert response.status_code == status
+    request_id = response.headers["X-Request-ID"]
+    assert f"{line} request_id={request_id}" in caplog.text
+
+
+# No server listens on port 1: each connection of the pool is refused at once.
+UNREACHABLE_BASE = PostgresUrl("postgresql://kb@127.0.0.1:1/kb")
+
+
+def test_a_pool_that_lends_no_connection_within_its_wait_gives_503_database_unavailable(
+    make_client, api_keys, authorization, monkeypatch, caplog
+):
+    """A base that does not answer: the request waits for the pool, then PoolTimeout, a 503 and
+    not a 500."""
+    monkeypatch.setattr(postgresql, "READING_POOL_WAIT_SECONDS", 0.1)
+    with open_readers(UNREACHABLE_BASE, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        client = make_client(readers, api_keys)
+        with caplog.at_level(logging.WARNING, logger="k_b.data_api"):
+            response = client.get("/items", headers=authorization)
+
+    assert response.status_code == 503
+    assert response.json() == {"error": "database_unavailable"}
+    request_id = response.headers["X-Request-ID"]
+    assert f"database_unavailable: PoolTimeout request_id={request_id}" in caplog.text
 
 
 def test_the_deadline_starts_at_the_first_check_of_sqlite_not_at_the_opening():

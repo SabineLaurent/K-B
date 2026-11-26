@@ -526,7 +526,7 @@ def test_serve_without_base_answers_health_and_503_database_missing_without_pool
     assert not (data_dir / "k-b.sqlite").exists()
 
 
-def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
+def test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq(
     monkeypatch, capfd, data_dir, requests_while_serving
 ):
     """The pool fails to connect in the background: its lines, and those of psycopg, would quote
@@ -540,12 +540,12 @@ def test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq(
     assert cli.main(["serve-data"]) == 0
 
     [(_, status, body, _, health_status)] = requests_while_serving
-    assert (status, body) == (500, {"error": "database_error"})
+    assert (status, body) == (503, {"error": "database_unavailable"})
     assert health_status == 200
     written = (
         capfd.readouterr().err + (data_dir / "logs" / "kb-serve-data.log").read_text()
     )
-    assert "database_error: PoolTimeout" in written
+    assert "database_unavailable: PoolTimeout" in written
     # The names of the URL and the words of libpq ("connection to server at … failed").
     for observed in ("kb_user", "kb_base", PASSWORD, "connection to server", "failed"):
         assert observed not in written

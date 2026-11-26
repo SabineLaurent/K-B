@@ -224,7 +224,7 @@ requête dans `<KB_DATA_DIR>/logs/kb-serve-data.log`, avec le nom du client, jam
     autres commandes. Pendant le démarrage, le code dépend du moment: 130 avec cette ligne, 3 ou 0.
 
 Avec une base PostgreSQL, `kb serve-data` démarre sans attendre la base: une base injoignable se voit à la requête,
-qui répond 500 `database_error`.
+qui répond 503 `database_unavailable`.
 
 ### Ce que l'opératrice tient
 

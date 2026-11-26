@@ -346,12 +346,13 @@ quand il vient et sur quelles routes (`core/api_errors.py:58-63`, `data_api/erro
 | 404 | `digest_not_found` | aucun jumeau du jour demandé, ou aucun jumeau | `GET /digests/{subject}` |
 | 422 | `invalid_parameter` | paramètre hors de ses bornes ou mal formé | toutes les routes de données |
 | 429 | `rate_limit_exceeded` | client au-delà du débit de la route, avec `Retry-After` | toutes les routes de données |
-| 500 | `database_error` | toute autre erreur de la base, sans détail; sur PostgreSQL, une base injoignable ou sans tables, ou aucune connexion libre en 2 s | items et tendances |
+| 500 | `database_error` | toute autre erreur de la base, sans détail | items et tendances |
 | 500 | `internal_error` | erreur imprévue, journalisée par son type seul | toutes les routes de données |
 | 502 | `watch_listing_too_long` | plus de 5 000 noms, ou plus de deux pages, dans le dossier | tops et comptes rendus |
 | 502 | `watch_production_refused` | jumeau refusé (section [La lecture de `watch`](#la-lecture-de-watch)) | tops et comptes rendus |
 | 502 | `exchange_storage_unavailable`, `exchange_storage_no_token`, `exchange_storage_unauthorized`, `exchange_storage_forbidden`, `exchange_storage_failed` | le stockage d'échange, ou l'identité, a échoué ou refusé | tops et comptes rendus |
-| 503 | `database_missing` | le fichier SQLite de la base n'existe pas | items et tendances |
+| 503 | `database_missing` | le fichier SQLite de la base n'existe pas; sur PostgreSQL, la base n'a pas les tables de K-B | items et tendances |
+| 503 | `database_unavailable` | sur PostgreSQL, aucune connexion du <span lang="en">pool</span> en 2 s: toutes prêtées, ou aucune qui joigne la base | items et tendances |
 | 503 | `query_timeout` | la requête a passé sa borne de temps dans la base | items et tendances |
 | 503 | `watch_unconfigured` | `kb serve-data` n'a pas `KB_EXCHANGE_BLOB_URL` ou `AZURE_CLIENT_ID` | tops et comptes rendus |
 | 503 | `watch_production_changed` | le jumeau a changé depuis la liste gardée | tops et comptes rendus |
@@ -484,7 +485,7 @@ ce secret ([le README de l'infrastructure](https://github.com/SabineLaurent/K-B/
 ## Le contrat OpenAPI
 
 [L'OpenAPI versionnée de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json),
-`docs/api/openapi-donnees.json`, est la référence de l'API au standard OpenAPI 3.1.0. Sa version, `0.14.0`, est celle
+`docs/api/openapi-donnees.json`, est la référence de l'API au standard OpenAPI 3.1.0. Sa version, `0.15.0`, est celle
 de l'app (`data_api/app.py:28-29`) et de
 [la spécification de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-api.md)
 (`docs/specs-api.md:11`); un changement visible par un client change les trois. Il décrit les sept routes, leurs
@@ -559,15 +560,16 @@ KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:543
 - **Le <span lang="en">pool</span>.** `kb serve-data` ouvre au démarrage un <span lang="en">pool</span> de 1 à 4 connexions, par `psycopg-pool`, qui se connecte
     en arrière-plan: l'API démarre sans attendre la base (`database/postgresql.py:236-268`,
     `core/config.py:207-208`). Une requête attend une connexion 2 s au plus (`core/config.py:209`,
-    `database/postgresql.py:286-290`), puis reçoit 500 `database_error`.
+    `database/postgresql.py:286-290`), puis reçoit 503 `database_unavailable`.
 - **La lecture seule et la borne de temps.** `configure_reader` fait de chaque connexion neuve une lectrice: chaque
     transaction en `REPEATABLE READ READ ONLY`, si bien que le serveur refuse toute écriture et que les lectures d'une
     requête voient un seul état de la base, et un `statement_timeout` de 5 s par instruction, posé par K-B et non par
     le serveur (`database/postgresql.py:51`, `:271-284`). Au-delà, le serveur arrête l'instruction, et l'API répond
     le même 503 `query_timeout` (`database/errors.py:97-103`, `data_api/errors.py:77-79`). Un délai de moins d'1 ms
     est refusé au démarrage: à 0, `statement_timeout` n'arrêterait rien (`database/postgresql.py:246-250`).
-- **Une base absente.** Une base injoignable, ou sans tables, reçoit 500 `database_error`, sans détail (test
-    `test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq`).
+- **Une base absente.** Une base injoignable reçoit 503 `database_unavailable`, une base sans les tables de K-B 503
+    `database_missing`, sans détail (tests `test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq`,
+    `test_on_postgresql_a_base_without_its_tables_gives_503_database_missing_and_logs_its_state`).
 - **Plusieurs lectures, un seul état.** `begin_reading` ne fait rien sur PostgreSQL: psycopg ouvre la transaction à
     la première instruction, en `REPEATABLE READ READ ONLY` (`database/engine.py:90-95`).
 
@@ -619,7 +621,7 @@ Pour lire la base sans passer par l'API, en local ou en ligne, la fiche de l'imp
 Depuis la racine du dépôt, au commit `39cb5eb9`:
 
 ```bash
-# Le contrat: OpenAPI 3.1.0, version 0.14.0, les sept routes, le schéma HTTPBearer.
+# Le contrat: OpenAPI 3.1.0, version 0.15.0, les sept routes, le schéma HTTPBearer.
 python3 -c "import json; d=json.load(open('docs/api/openapi-donnees.json')); print(d['openapi'], d['info']['version'], list(d['paths']), list(d['components']['securitySchemes']))"
 # Le contrat égal au code, valide, chaque route avec ses erreurs: 22 tests passent.
 uv run pytest tests/data_api/test_openapi.py
