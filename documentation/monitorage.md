@@ -350,7 +350,7 @@ Les chemins sont ceux de l'interface de Grafana 13.
     `ModelMetrics` crée, convertis comme Grafana Cloud le fait; il échoue sur un nom qui n'existe plus.
 - **Le jeton d'envoi**: un par environnement (`.env.e2e_test` pour le bac à sable; le secret `kb-otlp-headers` du
     coffre pour la production, refait par la procédure « Pour refaire un seul secret » d'`infra/README.md`). Un refus
-    de Grafana se lit dans le journal de l'API IA: `Failed to export 'metrics' batch code: 401`. La date
+    de Grafana se lit dans le journal de l'API IA, au message `Failed to export … batch code: 401` de l'exporteur. La date
     d'expiration d'un jeton est celle choisie à sa création, dans le champ
     <span lang="en">**Expiration date**</span> de la boîte <span lang="en">**Create new token**</span> (étape 3 de
     [Brancher l'export](#brancher-lexport)); un jeton expiré est marqué <span lang="en">Expired</span> sur la page

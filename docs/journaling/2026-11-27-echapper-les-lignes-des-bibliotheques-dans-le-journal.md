@@ -2,7 +2,8 @@
 
 - **Date** : 2026-11-27
 - **Branche** : `fix/escape-library-log-lines`, sur `4d593c83` : `e063e047` (le code, ses tests et la doc), `e1e60641`
-  (deux phrases de la fiche rendues exactes après la revue), puis cette note et l'entrée du journal ADR
+  (deux phrases de la fiche rendues exactes après la revue), `912a96f5` (cette note et l'entrée du journal ADR), puis
+  la phrase de la fiche sur l'échec d'un envoi à Grafana et la relecture de cette note
 - **Issue** : #441
 - **Fichiers principaux** : `src/k_b/commands/run_log.py`, `tests/commands/test_run_log.py`,
   `documentation/monitorage.md` (section « Lire une ligne ») ; renvois `run_log.py:` remis à jour dans
@@ -10,7 +11,7 @@
 - **Série** : suite de [Journaux horodatés et fichier de journal](2026-10-14-journaux-horodates-et-fichier-de-journal.md)
   et de [Documenter les journaux de l'application](2026-11-11-documenter-les-journaux-de-l-application.md)
 
-La liste des commits fournie à l'écriture de cette note remontait dans l'historique de `main`. Les deux commits
+La liste des commits fournie à l'écriture de cette note remontait dans l'historique de `main`. Les commits
 ci-dessus sont les seuls de la branche (`git log origin/main..HEAD`), et la note ne traite que d'eux.
 
 ## Le pourquoi
@@ -113,11 +114,23 @@ démarrage (`uvicorn/lifespan/on.py:62`), la seconde par le message du test du c
 ```
 
 La fausse ligne est devenue une partie du message, `\n` compris. Les lignes de l'exporteur OpenTelemetry, dont `QuotingFilter`
-(`src/k_b/ai_api/connectors/metrics_export.py:251-269`) cite déjà chaque argument, sont citées une seconde fois.
+(`src/k_b/ai_api/connectors/metrics_export.py:251-269`) cite déjà chaque argument, sont citées une seconde fois. Le
+message d'un échec d'envoi, sorti de même de `logging_to` avec `QuotingFilter` posé, une fois avec une raison sans `"`,
+une fois avec une raison qui en porte :
+
+```text
+2026-11-26T23:08:37Z ERROR opentelemetry.exporter.otlp.common.http: "Failed to export 'metrics' batch code: 401, reason: 'Unauthorized'"
+2026-11-26T23:08:37Z ERROR opentelemetry.exporter.otlp.common.http: 'Failed to export \'metrics\' batch code: 401, reason: \'{"status":"error"}\''
+```
+
+`repr` choisit ses guillemets selon le message : quand celui-ci porte à la fois `'` et `"`, il échappe les `'`. La fiche
+du monitorage citait `Failed to export 'metrics' batch code: 401`, qui ne se lit plus tel quel dans le second cas : elle
+cite désormais `Failed to export … batch code: 401`, qui se lit dans les deux.
 
 La fiche du monitorage le dit, section « Lire une ligne ». Comme le changement décale les lignes de `run_log.py`, ses
 renvois `run_log.py:` sont remis à jour dans cinq fiches, dont plusieurs pointaient déjà une ligne trop haut ou trop
-bas.
+bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in use` d'uvicorn
+(`documentation/utilisation.md:221`), se lit tel quel dans le message cité.
 
 ## Choix faits et options écartées
 
@@ -139,8 +152,8 @@ bas.
 | `test_what_a_library_logs_is_cut_to_300_characters` (`:253`) ; avant le code, la ligne gardait ses 1 000 `x` | la coupe à 300, guillemet d'ouverture compris |
 | `test_the_record_of_a_library_is_left_as_it_is_for_the_other_handlers` (`:261`) ; avec une réécriture en place simulée dans le processus : `1 failed` | la copie : `caplog` relit le message d'origine |
 | `test_only_a_line_of_kb_keeps_its_message_as_kb_wrote_it` (`:283`), trois cas ; avant le code, le cas `k_b_library` échouait | `k_b` et `k_b.test` gardent leur message, `k_b_library` est cité |
-| `uv run pytest` : 5866 passed, 365 deselected ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` : verts | rien d'autre ne casse, aucun test ne lisait une ligne de bibliothèque à la lettre |
-| `grep` des tests, de `docs/`, de `documentation/`, d'`infra/` et d'`observability/` sur les textes d'uvicorn | aucune requête de Log Analytics ni alerte ne lit ces lignes ; les requêtes d'`infra/README.md` filtrent par job ou par application |
+| `uv run pytest` : 5866 passed, 365 deselected ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` : verts | rien d'autre ne casse : les tests qui lisent une ligne de bibliothèque la cherchent par une partie de son texte (`tests/ai_api/test_serve_ai.py:520`, `:552`) ou par `record.getMessage()`, que le formateur ne change pas (`tests/ai_api/test_metrics_export.py:468`, `tests/ai_api/test_trace_export.py:253`) |
+| `grep` d'`infra/` et d'`observability/` | aucune requête de Log Analytics ni alerte ne lit le texte d'une ligne de bibliothèque ; les requêtes d'`infra/README.md` filtrent par `JobName` |
 
 ## Ce que tu dois pouvoir défendre
 
