@@ -5,13 +5,14 @@ A text of a source goes only in the user message, encoded in JSON, never in the 
 (.claude/rules/poc.md, rule 8); at most one retry per call."""
 
 import json
+import re
 import time
 from collections.abc import Callable, Mapping
 from dataclasses import dataclass, field, replace
 from typing import Annotated, Literal, get_args
 
 import httpx2
-from pydantic import BaseModel, ConfigDict, Field, ValidationError
+from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationError
 
 from k_b.ai_api.connectors.llm_replay import ReplayTransport
 from k_b.ai_api.connectors.llm_settings import LlmSettings
@@ -85,6 +86,13 @@ JSON_OUTPUT = "json"
 # is sent as OTHER_FINISH_REASON (the register allows closed values only).
 TRACED_FINISH_REASONS = frozenset({"stop", "length", "content_filter"})
 OTHER_FINISH_REASON = "other"
+# The code and the param of an error of the provider go to a metric line in the shape of an
+# identifier, cut to this length; any other value as OTHER_PROVIDER_ERROR_FIELD, as it may hold a
+# character that json.dumps with ensure_ascii=False writes as it is: U+2028, U+2029, a C1 or a
+# bidirectional control.
+MAX_PROVIDER_ERROR_FIELD_LENGTH = 64
+PROVIDER_ERROR_FIELD = re.compile(r"[A-Za-z0-9_.\[\]-]+")
+OTHER_PROVIDER_ERROR_FIELD = "other"
 
 
 class EnvelopeModel(BaseModel):
@@ -124,12 +132,29 @@ class ChatCompletion(EnvelopeModel):
     usage: Usage | None = None
 
 
+def keep_provider_error_field(value: object) -> str | None:
+    """A code or a param of the provider in the shape of an identifier, cut; other for any other
+    value; None when the provider gave none."""
+    if value is None:
+        return None
+    if not isinstance(value, str) or PROVIDER_ERROR_FIELD.fullmatch(value) is None:
+        return OTHER_PROVIDER_ERROR_FIELD
+    return value[:MAX_PROVIDER_ERROR_FIELD_LENGTH]
+
+
+type ProviderErrorField = Annotated[
+    str | None, BeforeValidator(keep_provider_error_field)
+]
+
+
 class ErrorDetail(EnvelopeModel):
-    code: str | None = None
+    code: ProviderErrorField = None
+    param: ProviderErrorField = None
 
 
 class ErrorBody(EnvelopeModel):
-    """The error of a 4xx: its code only, as its message may quote the input."""
+    """The error of an answer other than 200: its code and its param, never its message, which may
+    quote the input."""
 
     error: ErrorDetail
 
@@ -163,6 +188,10 @@ class LlmCall[OutputT: BaseModel]:
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
+    # The code and the param of the error of the last attempt, as http_status
+    # (keep_provider_error_field); None when its answer gave none, was a 200, or did not come.
+    provider_error_code: str | None
+    provider_error_param: str | None
     # Whether an attempt got a 429: a retry that times out, gets a 5xx or is cut by the deadline
     # does not erase it. After a call that failed with one, the request sends nothing more; a
     # retry answered after its Retry-After got past it, and the next calls go.
@@ -186,6 +215,8 @@ class Attempt[OutputT: BaseModel]:
     is_checked: bool = False
     retry_after_seconds: int | None = None
     http_status: int | None = None
+    provider_error_code: str | None = None
+    provider_error_param: str | None = None
     # None: no retry. 0: a retry at once, after an output refused; else the wait before it.
     retry_wait_seconds: float | None = None
     # The output of a 200, refused or not; it never leaves call_model but in an AttemptContent.
@@ -477,6 +508,17 @@ def read_answer[OutputT: BaseModel](
 def read_failure[OutputT: BaseModel](
     response: httpx2.Response, content: bytes
 ) -> Attempt[OutputT]:
+    """An answer other than 200: its state, and the code and the param of its error."""
+    error = read_error(content)
+    attempt: Attempt[OutputT] = name_failure(response, error.code)
+    return replace(
+        attempt, provider_error_code=error.code, provider_error_param=error.param
+    )
+
+
+def name_failure[OutputT: BaseModel](
+    response: httpx2.Response, error_code: str | None
+) -> Attempt[OutputT]:
     """The state of an answer other than 200: a 429 or a 5xx gets a retry unless wait_or_end
     refuses it, a 400 of a prompt filtered none."""
     status = response.status_code
@@ -484,10 +526,7 @@ def read_failure[OutputT: BaseModel](
         return wait_or_end(response, "llm_rate_limited")
     if status >= httpx2.codes.INTERNAL_SERVER_ERROR:
         return wait_or_end(response, "llm_unavailable")
-    if (
-        status == httpx2.codes.BAD_REQUEST
-        and read_error_code(content) == "content_filter"
-    ):
+    if status == httpx2.codes.BAD_REQUEST and error_code == "content_filter":
         return Attempt(outcome="llm_content_filtered", failed_check="content_filter")
     return Attempt(outcome="llm_unavailable")
 
@@ -510,11 +549,12 @@ def wait_or_end[OutputT: BaseModel](
     )
 
 
-def read_error_code(content: bytes) -> str | None:
+def read_error(content: bytes) -> ErrorDetail:
+    """The error of the answer; an empty one when its body is not an error of the envelope."""
     try:
-        return ErrorBody.model_validate_json(content).error.code
+        return ErrorBody.model_validate_json(content).error
     except ValidationError:
-        return None
+        return ErrorDetail()
 
 
 def check_completion[OutputT: BaseModel](
@@ -647,6 +687,8 @@ def summarize[OutputT: BaseModel](
         is_checked=any(attempt.is_checked for attempt in attempts),
         retry_after_seconds=last.retry_after_seconds,
         http_status=last.http_status,
+        provider_error_code=last.provider_error_code,
+        provider_error_param=last.provider_error_param,
         saw_rate_limit=any(
             attempt.outcome == "llm_rate_limited" for attempt in attempts
         ),

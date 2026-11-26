@@ -6,6 +6,7 @@ from typing import get_args
 
 import httpx2
 import pytest
+from ai_api.provider_errors import MESSAGE_MARK, UNSUPPORTED_EFFORT
 from opentelemetry.trace import INVALID_SPAN_CONTEXT, SpanKind, StatusCode
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -841,6 +842,121 @@ def test_the_status_of_the_last_answer_is_kept(steps, http_status):
     assert llm_call.http_status == http_status
 
 
+def test_the_code_and_the_param_of_a_refused_request_are_kept_never_its_message():
+    llm_call, transport, _ = call([response(400, UNSUPPORTED_EFFORT), completion()])
+
+    assert llm_call.outcome == "llm_unavailable"
+    assert llm_call.attempts == 1
+    assert len(transport.requests) == 1
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "unsupported_value",
+        "reasoning_effort",
+    )
+    assert MESSAGE_MARK not in repr(llm_call)
+    assert "invalid_request_error" not in repr(llm_call)
+
+
+ERROR_OF_THE_TEST = json.dumps({"error": {"code": "a_code", "param": "a_param"}})
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [response(401, ERROR_OF_THE_TEST)],
+        [
+            response(
+                429,
+                ERROR_OF_THE_TEST,
+                retry_after=str(LLM_RETRY_AFTER_MAX_SECONDS + 1),
+            )
+        ],
+        [response(503, ERROR_OF_THE_TEST), response(503, ERROR_OF_THE_TEST)],
+    ],
+    ids=["401", "429", "503"],
+)
+def test_the_code_and_the_param_of_any_answer_but_a_200_are_kept(steps):
+    llm_call, _, _ = call(steps)
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "a_code",
+        "a_param",
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "kept"),
+    [
+        ("messages[0].content-1", "messages[0].content-1"),
+        ("x" * 65, "x" * 64),
+        ("x" * 64 + " input of the request", "other"),
+        ("", "other"),
+        (
+            "reasoning_effort\n2026-11-26T17:00:00Z ERROR k_b.cli: a forged line",
+            "other",
+        ),
+        (f"reasoning{chr(0x202E)}effort", "other"),
+        (f"reasoning{chr(0x9B)}effort", "other"),
+        ("reasoning effort", "other"),
+        (400, "other"),
+        (["reasoning_effort"], "other"),
+        (None, None),
+    ],
+    ids=[
+        "identifier",
+        "too-long",
+        "too-long-then-text",
+        "empty",
+        "line-break",
+        "bidirectional-control",
+        "c1-control",
+        "space",
+        "number",
+        "list",
+        "null",
+    ],
+)
+def test_a_code_or_a_param_out_of_the_shape_of_an_identifier_is_kept_as_other(
+    value, kept
+):
+    body = json.dumps({"error": {"code": value, "param": value}})
+
+    llm_call, _, _ = call([response(400, body)])
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (kept, kept)
+
+
+def test_a_filtered_prompt_whose_param_is_not_a_string_is_still_filtered():
+    body = json.dumps({"error": {"code": "content_filter", "param": {"prompt": 0}}})
+
+    llm_call, _, _ = call([response(400, body)])
+
+    assert llm_call.outcome == "llm_content_filtered"
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "content_filter",
+        "other",
+    )
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [completion()],
+        [response(503, ERROR_OF_THE_TEST), completion()],
+        [{"kind": "timeout"}],
+        [response(400, json.dumps({"error": {"message": MESSAGE_MARK}}))],
+        [response(400, "not json")],
+    ],
+    ids=["ok", "503-then-ok", "timeout", "400-without-code", "400-not-json"],
+)
+def test_a_last_answer_without_code_nor_param_keeps_none(steps):
+    llm_call, _, _ = call(steps)
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        None,
+        None,
+    )
+
+
 def test_the_check_that_refused_the_first_attempt_is_kept_after_a_retry():
     llm_call, _, _ = call([completion("not json"), completion()])
 
@@ -881,14 +997,19 @@ def test_a_retry_after_a_rate_limit_past_the_deadline_is_not_made():
     deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 1, Clock())
 
     llm_call, transport, sleeps = call(
-        [response(429, retry_after="2"), completion()], deadline=deadline
+        [response(429, ERROR_OF_THE_TEST, retry_after="2"), completion()],
+        deadline=deadline,
     )
 
     assert llm_call.outcome == "llm_timeout"
     assert llm_call.attempts == 1
-    # What was observed stays: the 429 and its Retry-After.
+    # What was observed stays: the 429, its Retry-After and its error.
     assert llm_call.http_status == 429
     assert llm_call.retry_after_seconds == 2
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "a_code",
+        "a_param",
+    )
     assert sleeps == []
     assert len(transport.requests) == 1
 
