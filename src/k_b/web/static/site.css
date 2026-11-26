@@ -1156,6 +1156,16 @@
       padding-inline: 0.5rem;
     }
 
+    /* The frame of the texts of a detail and of the claims of a digest, and the room of the numbers
+       of the claims: at 200 % text from 320 px, they left the claims less than ten letters a line. */
+    .item-text {
+      padding-inline: 0.5rem;
+    }
+
+    .claims {
+      padding-inline-start: 1.25rem;
+    }
+
     .button,
     .button-secondary {
       padding-inline: 0.75rem;
