@@ -74,7 +74,8 @@ par l'API de données, `GET /items`, `GET /items/{item_id}` et `GET /trends`
 local, le terminal ou un script appelle avec sa propre clé, par exemple celle du client `TERMINAL`
 ([Utiliser K-B](utilisation.md), « La lancer et l'appeler »). Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
 (`commands/smoke_test_command.py:94-101`, `commands/digest_watch_command.py:43-48`); `kb smoke-test` y ajoute des
-sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`). L'API de données lit la base, SQLite
+sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`), et
+`GET /health/database`, sans clé, qui dit si l'API lit sa base (`commands/smoke_test_command.py:105`, `:161-172`). L'API de données lit la base, SQLite
 ou PostgreSQL, en lecture seule, et le conteneur `watch` du stockage d'échange pour les tops et les comptes rendus
 (`data_api/watch_reading.py:1-4`).
 
@@ -102,10 +103,10 @@ préfixe et ses étiquettes (`tags`): `items`, `trends`, `tops` et `digests`, qu
 
 ## Les points de terminaison
 
-L'API de données a dix chemins. Les sept routes de données sont dans le contrat, `docs/api/openapi-donnees.json`.
-`GET /health`, `/docs` et `/openapi.json` sont **hors du contrat**: ils sont décrits ici d'après le code (section
+L'API de données a onze chemins. Les sept routes de données sont dans le contrat, `docs/api/openapi-donnees.json`.
+`GET /health`, `GET /health/database`, `/docs` et `/openapi.json` sont **hors du contrat**: ils sont décrits ici d'après le code (section
 [Hors du contrat, d'après le code](#hors-du-contrat-dapres-le-code)). Le test `test_the_routes_are_listed` tient la
-liste des dix (`tests/data_api/test_api_keys.py:37-49`). Le tableau suivant donne, pour chaque chemin, s'il est dans
+liste des onze (`tests/data_api/test_api_keys.py:37-50`). Le tableau suivant donne, pour chaque chemin, s'il est dans
 le contrat, ce qu'il rend, ce qu'il lit et les clients permis.
 
 | Chemin | Dans le contrat | Ce qu'il rend | Lit | Clients permis |
@@ -118,6 +119,7 @@ le contrat, ce qu'il rend, ce qu'il lit et les clients permis.
 | `GET /digests/{subject}` | oui | le compte rendu de veille d'un sujet d'un jour | `watch` | le client `WEB` seul |
 | `GET /digests/{subject}/days` | oui | les jours qui ont un compte rendu du sujet | `watch` | le client `WEB` seul |
 | `GET /health` | non | `{"status": "ok"}` | rien | sans clé |
+| `GET /health/database` | non | `{"status": "ok"}`, ou l'erreur d'une route de données | la base, une ligne au plus | sans clé, un appel à la fois |
 | `GET /openapi.json` | non | l'OpenAPI de l'app | rien | sans clé, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` seulement; 404 sinon |
 | `GET /docs` | non | Swagger UI, qui lit `/openapi.json` | rien | comme `/openapi.json` |
 
@@ -316,6 +318,18 @@ Les quatre routes de `watch` lisent par le même lecteur, `WatchReader` (`data_a
     la base ni `watch` (`core/api_health.py:1-13`). C'est une route de Starlette, ajoutée hors du schéma, que la clé
     de l'app n'atteint pas (`data_api/app.py:80-82`). Une réponse 200 de `/health` n'est pas journalisée
     (`core/api_request_log.py:36-38`). En ligne, c'est la sonde du conteneur.
+- `GET /health/database` dit si l'API lit sa base, sans clé, pour l'opératrice, `kb smoke-test` et la surveillance,
+    jamais pour les sondes du conteneur, qui feraient redémarrer l'API à chaque panne de la base (test
+    `test_no_probe_of_azure_container_apps_asks_the_database_health`). Elle lit une ligne au plus de la première table
+    du schéma, `SELECT 1 FROM source LIMIT 1`, par la connexion d'une route de données, sous ses délais
+    (`database/reading.py:24-27`, `:328-330`, `data_api/database_health.py:17-37`). Elle répond 200
+    `{"status": "ok"}`, sans aucune valeur de la base, ou l'erreur d'une route de données pour la même cause: 503
+    `database_missing`, même pour une base PostgreSQL sans les tables de K-B, où `SELECT 1` passerait, 503
+    `database_unavailable`, 503 `query_timeout` ou 500 `database_error` (`tests/data_api/test_database_health.py`).
+    Un second appel pendant qu'un premier tourne reçoit 429 `request_already_running`, avec `Retry-After: 7`, les 2 s
+    d'attente d'une connexion et les 5 s de l'instruction (`core/config.py:427-429`): sans clé, elle ne prend qu'une
+    des 4 connexions du <span lang="en">pool</span> à la fois. Chaque appel est journalisé, 200 compris: seul `/health` à 200 ne l'est pas
+    (`core/api_request_log.py:38`). C'est une route de Starlette, ajoutée hors du schéma (`data_api/app.py:89-94`).
 - `/openapi.json` et `/docs` ne sont servis que si `KB_DEPLOYMENT_ENVIRONMENT` vaut exactement `sandbox`; toute
     autre valeur, ou aucune, ne sert ni l'un ni l'autre (`core/api_settings.py:69-79`). ReDoc n'est pas servi
     (`data_api/app.py:58-59`, test `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`).
@@ -436,8 +450,9 @@ celle de `GET /trends` un compte rendu des tendances (test
 pas: un 401 ne compte pas
 (`test_a_request_without_a_valid_key_counts_for_nothing`). Une requête admise par le débit compte, même refusée
 ensuite: un 422 compte (`test_a_parameter_refused_counts`, `tests/data_api/test_rate_limit.py:58-72`), et un 403
-aussi, le débit passant avant le client de la route. `/health`, `/docs` et `/openapi.json` n'ont pas de limite (test
-`test_the_public_routes_have_no_limit`).
+aussi, le débit passant avant le client de la route. `/health`, `/health/database`, `/docs` et `/openapi.json` n'ont
+pas de limite par client (test `test_the_public_routes_have_no_limit`); `/health/database` en a une d'un appel à la
+fois.
 
 ## Expiration et changement d'une clé
 

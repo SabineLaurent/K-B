@@ -354,18 +354,21 @@ Le démarrage d'une app, le tirage de l'image et le réveil d'une app à 0 répl
 
 ### Le test de fumée
 
-Le test de fumée réussi écrit `smoke test finished in … s: 9 of 9 checks passed`. Ses neuf contrôles tournent
+Le test de fumée réussi écrit `smoke test finished in … s: 10 of 10 checks passed`. Ses dix contrôles tournent
 toujours, et chaque échec a sa ligne, avec son état:
 
 - pour le `/health` d'une API: `health_failed`, `health_timeout`, `health_unavailable` ou `health_invalid_response`;
 - pour une sonde sans clé (#499), trois par API: une route à clé (`GET /items`,
     `POST /digests`) qui doit rendre 401, `GET /docs` qui doit rendre 404, et `HEAD /health` qui doit rendre 405:
     `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`;
+- pour `GET /health/database` de l'API de données, qui lit une ligne de sa base: les états du `/health`, dont
+    `health_failed` avec le statut reçu (503 `database_missing`, `database_unavailable` ou `query_timeout`, que la
+    ligne de l'API de données nomme);
 - pour le stockage d'échange: `exchange_storage_no_token` (l'identité du job sans jeton, refusée ou injoignable),
     `exchange_storage_forbidden`, `exchange_storage_unauthorized`, `exchange_storage_not_found`,
     `exchange_storage_unavailable` ou `exchange_storage_failed`.
 
-Son code de sortie: 0 si les neuf contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
+Son code de sortie: 0 si les dix contrôles passent, 1 si l'un échoue, 2 si rien n'est contrôlé (une variable
 manque ou est refusée), rendus par `src/k_b/commands/smoke_test_command.py`; 143 sur SIGTERM et 130 sur SIGINT,
 rendus par `src/k_b/cli.py`, `kb smoke-test` étant dans `COMMANDS_STOPPED_BY_SIGTERM` (`src/k_b/commands/sigterm.py`).
 Leurs valeurs sont dans `src/k_b/commands/exit_codes.py`.

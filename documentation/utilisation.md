@@ -524,10 +524,12 @@ KB_DATA_DIR=<dossier> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.ne
 et à l'API IA (`KB_AI_API_URL`), sans clé. Après le `/health` de chaque API, qui la réveille, trois sondes sans clé
 vérifient qu'elle refuse ce qu'elle doit refuser (`jobs/api_probes.py`): une route à clé rend 401 (`GET /items`,
 `POST /digests`), `GET /docs` rend 404 (200 avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, où les API le servent) et
-`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Puis il demande le jeton de l'identité managée
+`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Il demande ensuite `GET /health/database` à l'API
+de données, qui répond 200 quand elle lit sa base, sinon l'erreur d'une route de données (503 `database_missing`,
+`database_unavailable` ou `query_timeout`, 500 `database_error`). Puis il demande le jeton de l'identité managée
 attribuée au job (`AZURE_CLIENT_ID`, un GUID; sans lui, le SDK (<span lang="en">software development kit</span>) d'Azure chercherait l'identité système, que les jobs de K-B
 n'ont pas), et liste une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange
-(`KB_EXCHANGE_BLOB_URL`, en `https`, sans défaut). Les neuf contrôles tournent toujours. Il n'écrit que des comptes:
+(`KB_EXCHANGE_BLOB_URL`, en `https`, sans défaut). Les dix contrôles tournent toujours. Il n'écrit que des comptes:
 jamais le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
 (`exchange_storage_forbidden`…), son statut HTTP et son code; l'identité sans jeton, refusée ou injoignable, est
 `exchange_storage_no_token`.

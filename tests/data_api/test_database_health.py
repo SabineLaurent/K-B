@@ -11,11 +11,14 @@ from database.connected_readers import open_connected_readers
 
 from k_b.core.config import DATA_API_QUERY_TIMEOUT_SECONDS, READING_POOL_WAIT_SECONDS
 from k_b.database import engine, postgresql
-from k_b.database.engine import open_readers
+from k_b.database.engine import connect_database, open_readers
 from k_b.database.location import PostgresUrl
 
 DATABASE_HEALTH_PATH = "/health/database"
 INFRA_DIR = Path(__file__).parents[2] / "infra"
+# Statements of the test only, on the bases it creates.
+SELECT_SOURCE_CODES = "SELECT source_code FROM source"
+DELETE_SOURCES = "DELETE FROM source"
 # No server listens on port 1: each connection of the pool is refused at once.
 UNREACHABLE_BASE = PostgresUrl("postgresql://kb@127.0.0.1:1/kb")
 
@@ -28,6 +31,36 @@ def ask_database_health(client, caplog):
 
 def test_the_database_health_answers_ok_without_key_on_each_engine(reading_client):
     response = reading_client.get(DATABASE_HEALTH_PATH)
+
+    assert response.status_code == 200
+    assert response.json() == {"status": "ok"}
+
+
+def test_the_answer_holds_no_value_of_the_row_read(client, items_database):
+    """The body is the one of /health, byte for byte: no source of the base is in it."""
+    connection = connect_database(items_database)
+    try:
+        source_codes = [code for (code,) in connection.execute(SELECT_SOURCE_CODES)]
+    finally:
+        connection.close()
+
+    response = client.get(DATABASE_HEALTH_PATH)
+
+    assert source_codes
+    assert response.content == b'{"status":"ok"}'
+
+
+def test_a_base_without_any_source_answers_ok(make_client, new_base, api_keys):
+    """The statement reads one row at most: an empty table is a base the API reads."""
+    connection = connect_database(new_base)
+    try:
+        connection.execute(DELETE_SOURCES)
+        connection.commit()
+    finally:
+        connection.close()
+
+    with open_connected_readers(new_base, DATA_API_QUERY_TIMEOUT_SECONDS) as readers:
+        response = make_client(readers, api_keys).get(DATABASE_HEALTH_PATH)
 
     assert response.status_code == 200
     assert response.json() == {"status": "ok"}
@@ -164,14 +197,15 @@ def test_a_host_other_than_the_allowed_ones_gives_400(client):
 
 
 def test_no_probe_of_azure_container_apps_asks_the_database_health():
-    """A probe that opened the base would restart the API at each failure of the base."""
-    bicep_texts = {path: path.read_text("utf-8") for path in INFRA_DIR.rglob("*.bicep")}
-    probe_module = (INFRA_DIR / "modules" / "api-container-app.bicep").read_text(
-        "utf-8"
-    )
+    """A probe that opened the base would restart the API at each failure of the base: the only
+    probes are those of the module of the apps, each the request whose path is /health."""
+    bicep_texts = {
+        path.name: path.read_text("utf-8") for path in INFRA_DIR.rglob("*.bicep")
+    }
+    probe_module = bicep_texts["api-container-app.bicep"]
 
-    assert bicep_texts
-    assert [
-        path for path, text in bicep_texts.items() if "/health/database" in text
-    ] == []
+    assert [name for name, text in bicep_texts.items() if "probes:" in text] == [
+        "api-container-app.bicep"
+    ]
+    assert re.findall(r"httpGet: (\w+)", probe_module) == ["probeRequest"] * 3
     assert re.findall(r"path: '([^']*)'", probe_module) == ["/health"]

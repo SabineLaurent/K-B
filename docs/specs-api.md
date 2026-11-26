@@ -148,8 +148,8 @@ l'ordre des résultats, change la version.
   clients) ; tout autre statut l'est, si bien qu'une sonde mal réglée se voit.
 - **Santé de la base** : `GET /health/database` dit si l'API lit sa base, sans clé, hors de
   l'OpenAPI, pour Sabine, `kb smoke-test` et la surveillance ; **jamais pour les sondes d'ACA**,
-  qui feraient redémarrer l'API à chaque panne de la base (aucun fichier de `infra/` ne la nomme,
-  `test_no_probe_of_azure_container_apps_asks_the_database_health`). Elle lit une ligne au plus de
+  qui feraient redémarrer l'API à chaque panne de la base (les seules sondes, celles du module des
+  apps, appellent `/health`, `test_no_probe_of_azure_container_apps_asks_the_database_health`). Elle lit une ligne au plus de
   la première table du schéma (`SELECT 1 FROM source LIMIT 1`, `check_reading`,
   `database/reading.py`) par la connexion d'une route (`connect_reader`), sous les mêmes délais :
   2 s pour une connexion du pool, 5 s pour l'instruction. Elle répond 200 `{"status": "ok"}`, ou
