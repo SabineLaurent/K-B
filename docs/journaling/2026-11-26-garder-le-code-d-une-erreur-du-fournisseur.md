@@ -12,11 +12,11 @@
 
 ## Le pourquoi
 
-Quand le modèle de production est passé de gpt-6-luna à gpt-6.1-sol, l'effort de raisonnement est resté à `none`.
-Azure a refusé chaque appel par un 400 dont le corps dit la cause : `code` `unsupported_value`, `param`
-`reasoning_effort` (#710, étape 5). La ligne `llm_call` de l'API IA ne disait que `outcome: llm_unavailable` et
-`http_status: 400`. Elle désignait le fournisseur, pas la cause, et il a fallu rejouer la demande à la main pour lire
-le paramètre refusé.
+Au banc de comparaison des modèles, puis dans sa reproduction en développement (#710), gpt-6.1-sol a reçu l'effort
+de raisonnement `none`, celui de gpt-6-luna, le modèle d'avant. Azure a refusé chaque appel par un 400 dont le corps
+dit la cause : `code` `unsupported_value`, `param` `reasoning_effort` (#710, étape 5). La ligne `llm_call` de l'API
+IA ne disait que `outcome: llm_unavailable` et `http_status: 400`. Elle désignait le fournisseur, pas la cause, et il
+a fallu rejouer la demande à la main pour lire le paramètre refusé.
 
 La ligne `llm_call` est la mesure de chaque appel au modèle : une ligne JSON sur la sortie standard, que Log Analytics
 recueille en ligne, et que l'on retrouve par le `request_id` d'une demande (`documentation/monitorage.md`). Elle porte
@@ -84,10 +84,12 @@ type ProviderErrorField = Annotated[
 (`llm_client.py:145-147`.) L'enveloppe est en mode strict (`strict=True`). Un `BeforeValidator` reçoit la valeur
 brute avant la validation du type, et Pydantic valide ensuite ce qu'il rend contre `str | None` (documentation
 Pydantic, « Before validators », lue par Context7 le 2026-11-26). `keep_provider_error_field` rend toujours une chaîne
-ou `None`, et ne lève jamais d'erreur. Un `param` qui n'est pas une chaîne n'empêche donc plus de lire le corps
-entier. Le code qui reconnaît `content_filter` ne dépend pas de la forme du `param`.
+ou `None`, et ne lève jamais d'erreur. Avant cette PR, `param` n'était pas déclaré, et l'enveloppe l'ignorait. Le
+déclarer en `str | None` strict aurait fait échouer la lecture du corps entier sur un `param` objet, et avec elle la
+reconnaissance de `content_filter`. Le validateur l'évite : un `param` qui n'est pas une chaîne devient `other`, et le
+code reste lu.
 
-### Toute réponse autre que 200, une seule lecture
+### Toute réponse autre que 200 lue dans ses bornes, une seule lecture
 
 ```python
     error = read_error(content)
@@ -97,8 +99,10 @@ entier. Le code qui reconnaît `content_filter` ne dépend pas de la forme du `p
     )
 ```
 
-(`llm_client.py:512-516`.) `read_failure` lit l'erreur une fois, pour un 400, un 401, un 429 ou un 5xx. Elle laisse
-`name_failure` nommer l'état, avec la même logique qu'avant, puis pose les deux champs sur la tentative.
+(`llm_client.py:512-516`.) `read_failure` lit l'erreur une fois, pour un 400, un 401, un 429 ou un 5xx dont le corps
+a été lu dans ses bornes. Elle laisse `name_failure` nommer l'état, avec la même logique qu'avant, puis pose les deux
+champs sur la tentative. Un corps trop gros, ou encore en lecture à l'échéance, sort avant elle
+(`llm_client.py:474-479`) : la tentative garde son statut, et les deux champs restent nuls.
 `name_failure` compare le code déjà mis en forme à `content_filter` (`llm_client.py:529`) : `content_filter` a la
 forme d'un identifiant, il passe tel quel. `read_error` rend une erreur vide quand le corps n'est pas une erreur de
 l'enveloppe (HTML d'une passerelle, JSON d'une autre forme, `llm_client.py:552-557`) : les deux champs restent nuls.
@@ -108,7 +112,8 @@ l'enveloppe (HTML d'une passerelle, JSON d'une autre forme, `llm_client.py:552-5
 `summarize` garde les champs de la dernière tentative, comme `http_status` (`llm_client.py:690-691`), et
 `build_llm_call_line` les écrit juste après lui (`metrics.py:92-93`). Le code et le statut se lisent ainsi sur la même
 tentative. Après un 503 suivi d'une réponse 200, les deux champs sont nuls. Après un 503 dont la nouvelle tentative
-finit en délai, ils sont nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de réponse. Quand
+finit en délai avant toute réponse, ils sont nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu
+de réponse. Quand
 l'échéance de la demande ne laisse pas le temps d'une nouvelle tentative, après un 429 ou un 5xx, l'appel finit en
 `llm_timeout` sur sa seule tentative : la ligne porte le statut de cette réponse et son code, comme `http_status`.
 
@@ -122,7 +127,7 @@ l'échéance de la demande ne laisse pas le temps d'une nouvelle tentative, apr�
 | Un caractère au moins (`+`) | Une chaîne vide n'est pas un identifiant : `other` (constat de la revue) | `*` : la chaîne vide était gardée telle quelle, ni nulle ni `other` |
 | `provider_error_code`, `provider_error_param` | La ligne porte déjà `outcome` et `failed_check`, des états de K-B ; le préfixe dit d'où vient la valeur | `error_code` : il se confondrait avec un état de K-B |
 | `code` et `param` seulement | Ce que propose #710 ; le `param` nomme le champ refusé | `type`, qui redit le statut ; `message`, qui peut citer l'entrée |
-| Toute réponse autre que 200 | Une seule lecture sert à tous les statuts : un corps dans l'enveloppe d'erreur donne son code et son paramètre, un corps d'une autre forme laisse les deux champs nuls | Les seuls 4xx : deux chemins de lecture selon le statut |
+| Toute réponse autre que 200 dont le corps est lu dans ses bornes | Une seule lecture sert à tous les statuts : un corps dans l'enveloppe d'erreur donne son code et son paramètre, un corps d'une autre forme laisse les deux champs nuls | Les seuls 4xx : deux chemins de lecture selon le statut |
 | La dernière tentative, comme `http_status` | Le code et le statut d'une ligne décrivent la même réponse | Porter le dernier code non nul d'une tentative à l'autre : il décrirait une autre réponse que `http_status` |
 | Un code numérique s'écrit `other` | Le 400 relevé dans #710 porte des chaînes ; en Python, un `bool` est aussi un `int` | Le garder en décimal : une branche de plus, pour un corps que K-B n'a pas observé |
 | Aucun attribut OpenTelemetry | Une valeur ouverte en attribut de métrique multiplie les séries ; les spans ne portent que des valeurs fermées (`TRACED_FINISH_REASONS`) | Un attribut `k_b.provider_error_code` |
@@ -132,11 +137,11 @@ l'échéance de la demande ne laisse pas le temps d'une nouvelle tentative, apr�
 
 | Test ou sortie observée | Ce que ça démontre |
 |---|---|
-| Avant le code : 21 tests nouveaux en échec (19 `AttributeError` sur `provider_error_code`, 1 `KeyError`, la liste des champs de la ligne) | Les tests échouaient sans le changement, pour la raison attendue |
+| Avant le code : 21 tests en échec, les 20 cas nouveaux (19 `AttributeError` sur `provider_error_code`, 1 `KeyError`) et le test existant de la liste des champs de la ligne, que cette PR allonge | Les tests échouaient sans le changement, pour la raison attendue |
 | `test_the_code_and_the_param_of_a_refused_request_are_kept_never_its_message` (`tests/ai_api/test_llm_client.py:845`) | Le 400 de #710 garde `unsupported_value` et `reasoning_effort`, reste `llm_unavailable` en une tentative, et ni le repère du message ni le `type` ne sont dans l'appel |
 | `test_the_code_and_the_param_of_any_answer_but_a_200_are_kept` (`:877`, cas 401, 429, 503) | La lecture vaut pour toute réponse autre que 200 |
 | `test_a_code_or_a_param_out_of_the_shape_of_an_identifier_is_kept_as_other` (`:918`, 11 cas) | Un identifiant est gardé, coupé à 64 ; une valeur plus longue suivie d'un texte, une chaîne vide, un retour à la ligne suivi d'une fausse ligne, U+202E, un C1, une espace, un nombre et une liste donnent `other` ; `null` donne nul |
-| `test_a_filtered_prompt_whose_param_is_not_a_string_is_still_filtered` (`:928`) | Un `param` objet ne casse plus la lecture : le 400 reste `llm_content_filtered` |
+| `test_a_filtered_prompt_whose_param_is_not_a_string_is_still_filtered` (`:928`) | Un `param` objet, désormais lu, ne casse pas la lecture : le 400 reste `llm_content_filtered` |
 | `test_a_last_answer_without_code_nor_param_keeps_none` (`:951`, 5 cas) | Un 200, un 503 suivi d'un 200, un délai, un 400 sans code et un 400 qui n'est pas du JSON laissent les deux champs nuls |
 | `test_a_retry_after_a_rate_limit_past_the_deadline_is_not_made` (`:996`) | Quand l'échéance coupe la nouvelle tentative d'un 429, l'appel finit en `llm_timeout` et garde le statut, le `Retry-After` et le code de ce 429 |
 | `test_a_request_refused_by_the_provider_writes_its_code_and_param_never_its_message` (`tests/ai_api/test_digest_router.py:681`) | De bout en bout : la demande répond 502 `llm_unavailable`, sa ligne porte les deux champs, et le repère du message n'est ni sur la sortie standard, ni sur la sortie d'erreur, ni dans le journal |
