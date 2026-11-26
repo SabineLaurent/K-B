@@ -58,7 +58,8 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
     [Journaux de l'application](#journaux-de-lapplication).
 - Le format accessible: [L'accessibilité de la documentation](accessibilite.md).
 
-Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`. Le monitorage du modèle tient dans deux
+Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`, et ceux qui portent « #458 » le
+code de la demande de fusion de #458. Le monitorage du modèle tient dans deux
 fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`,
 et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie
 en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »).
@@ -600,9 +601,9 @@ grep "trace_id=<id>" "$KB_DATA_DIR"/logs/kb-serve-*.log      # les lignes d'une 
 Un avertissement nomme un état, un délai de la base dépassé par exemple (`query_timeout`,
 `src/k_b/data_api/errors.py:55`). La trace d'une erreur imprévue suit sa ligne datée, sur des lignes sans date
 (`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` trouve la ligne
-de la requête et les autres lignes de la même requête (`database_error`, `database_missing`, `database_unavailable`,
-`query_timeout`, `internal_error`:
-`docs/specs-api.md:140-142`; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
+de la requête et les autres lignes de la même requête (`database_error`, `query_timeout`, `internal_error`:
+`docs/specs-api.md:140-142`; depuis #458, aussi `database_missing` et `database_unavailable`: `docs/specs-api.md:175-177`,
+#458; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
 une ligne de mesure porte `"request_id"`, sur la sortie standard.
 
 Les lignes de mesure ne vont que sur la sortie standard de `kb serve-ai`: aucun fichier ne les garde

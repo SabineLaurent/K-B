@@ -20,7 +20,7 @@ s'installe, se configure et se teste, et que faire quand une livraison échoue. 
 (PR, <span lang="en">pull request</span>) de #423, et les apps que la livraison met à jour, les exécutions attendues
 sur un commit de `main` et la place de `Docs` dans le contrôle de l'intégration continue (CI) d'après `main` au
 commit `fd956430`, puis d'après la demande de fusion de #684, qui fait tourner `Docs` sur
-chaque fusion. Les exécutions citées se relisent par `gh run view <id> --repo SabineLaurent/K-B`, et
+chaque fusion; ce qui porte « #458 », d'après le code de la demande de fusion de #458. Les exécutions citées se relisent par `gh run view <id> --repo SabineLaurent/K-B`, et
 leur journal par `--log`.
 
 ## La chaîne en bref
@@ -354,14 +354,14 @@ Le démarrage d'une app, le tirage de l'image et le réveil d'une app à 0 répl
 
 ### Le test de fumée
 
-Le test de fumée réussi écrit `smoke test finished in … s: 10 of 10 checks passed`. Ses dix contrôles tournent
+Depuis #458, le test de fumée réussi écrit `smoke test finished in … s: 10 of 10 checks passed`. Ses dix contrôles tournent
 toujours, et chaque échec a sa ligne, avec son état:
 
 - pour le `/health` d'une API: `health_failed`, `health_timeout`, `health_unavailable` ou `health_invalid_response`;
 - pour une sonde sans clé (#499), trois par API: une route à clé (`GET /items`,
     `POST /digests`) qui doit rendre 401, `GET /docs` qui doit rendre 404, et `HEAD /health` qui doit rendre 405:
     `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`;
-- pour `GET /health/database` de l'API de données, qui lit une ligne de sa base: les états du `/health`, dont
+- pour `GET /health/database` de l'API de données (#458), qui lit une ligne de sa base: les états du `/health`, dont
     `health_failed` avec le statut reçu (503 `database_missing`, `database_unavailable` ou `query_timeout`, que la
     ligne de l'API de données nomme);
 - pour le stockage d'échange: `exchange_storage_no_token` (l'identité du job sans jeton, refusée ou injoignable),
