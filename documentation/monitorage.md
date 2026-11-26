@@ -527,11 +527,12 @@ WARNING (l'URL du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'UR
 clip); `psycopg` et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:38-62`, `:109-110`). uvicorn écrit
 par les mêmes sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
 `src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:113-114`). Le message d'une
-ligne écrite par une bibliothèque, uvicorn compris, est cité comme une valeur observée: entre guillemets, ses retours
-à la ligne et ses caractères de contrôle échappés, coupé à 300 caractères (`src/k_b/commands/run_log.py:63-68`,
-`:122-151`). Il ne peut donc pas écrire une seconde ligne datée (`tests/commands/test_run_log.py:233`). Une ligne de
-`kb` garde son message tel quel (`tests/commands/test_run_log.py:283`): `kb` cite lui-même chaque valeur qu'il
-journalise (`.claude/rules/conventions.md`, règle 3).
+ligne écrite par une bibliothèque, uvicorn compris, est cité par `quote_value`, comme une valeur observée: ses
+retours à la ligne et ses caractères de contrôle échappés, coupé à 300 caractères
+(`src/k_b/commands/run_log.py:63-68`, `:122-151`). Son message tient donc sur sa seule ligne
+(`tests/commands/test_run_log.py:233`). Une ligne de `kb` garde son message tel quel
+(`tests/commands/test_run_log.py:283`): `kb` cite lui-même chaque valeur qu'il journalise
+(`.claude/rules/conventions.md`, règle 3).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
 statut, la durée en ms, le nom du client et l'identifiant de la requête, rendu aussi dans l'en-tête `X-Request-ID`
