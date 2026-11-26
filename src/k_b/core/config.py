@@ -196,9 +196,13 @@ DATABASE_LOCK_TIMEOUT_SECONDS = 5
 # the local default; entra asks the managed identity for a token (database/location.py).
 DEFAULT_DATABASE_AUTH = "libpq"
 # The waits of a request for that token, to the identity endpoint of the container
-# (database/entra.py): azure-core would otherwise wait 300 s for it.
-DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 5
-DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 10
+# (database/entra.py), and its retries: none. azure-core would otherwise wait 300 s for an answer,
+# and ask three times more: on a local endpoint, a failure took 45 s when it did not answer, and
+# 4.8 s when it refused the connection or answered 500. A token that does not come fails below the
+# DATA_API_READ_TIMEOUT_SECONDS of the client of the AI API.
+DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 2
+DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 5
+DATABASE_TOKEN_RETRIES = 0
 # The pool of connections the data API reads a PostgreSQL base with (database/postgresql.py): one
 # replica, a few clients. A request waits for a connection at most READING_POOL_WAIT_SECONDS, then
 # fails: that wait and one statement (DATA_API_QUERY_TIMEOUT_SECONDS) stay below the

@@ -222,7 +222,8 @@ L'installation se fait en quatre temps, par la propriétaire du groupe de ressou
 4. **La connexion**: avec `KB_DATABASE_AUTH=entra`, un jeton de l'identité managée d'`AZURE_CLIENT_ID` sert de mot
     de passe (`database/location.py:13-14`, `database/entra.py:1-2`). Une connexion directe, celle de `kb import`,
     demande le sien; un pool, celui de l'API de données, garde le sien et en demande un nouveau avant qu'il expire
-    (`database/postgresql.py:198-200`, `database/entra.py:42-43`).
+    (`database/postgresql.py:198-200`, `database/entra.py:43-44`). La demande d'un jeton attend 2 s la connexion et
+    5 s la réponse, sans nouvelle tentative (`core/config.py:198-205`, `database/entra.py:45-49`).
     K-B refuse alors une URL qui porte un mot de passe, ou qui ne pose pas `sslmode=verify-full`
     (`database/postgresql.py:178-192`).
 

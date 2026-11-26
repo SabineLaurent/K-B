@@ -72,7 +72,12 @@ l'ordre des résultats, change la version.
     `database_unreachable`, `database_tls_refused` et `database_authentication_refused`, lue dans
     la classe de l'erreur ou dans une table fixe de fragments de son texte, sinon
     `database_connection_failed` (`ReaderConnection` et `name_connection_failure`,
-    `database/postgresql.py`).
+    `database/postgresql.py`). Sous Entra, la demande d'un jeton attend 2 s la connexion au point
+    d'identité et 5 s sa réponse, sans nouvelle tentative (`DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS`,
+    `DATABASE_TOKEN_READ_TIMEOUT_SECONDS`, `DATABASE_TOKEN_RETRIES`, `core/config.py`) : un jeton
+    qui ne vient pas échoue sous les 10 s du client de l'API IA
+    (`test_a_failed_request_for_the_token_is_not_asked_again`,
+    `test_a_token_that_does_not_come_fails_before_the_client_of_the_ai_api_stops_waiting`).
 - **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`).
   En SQLite, elles sont comptées depuis le premier contrôle de sa première lecture, le temps de
   Python entre deux lectures compris ; l'attente d'un fil (le pool de fils de Starlette), avant la

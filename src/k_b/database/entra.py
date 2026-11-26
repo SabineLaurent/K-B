@@ -12,6 +12,7 @@ from azure.identity import ManagedIdentityCredential
 from k_b.core.config import (
     DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS,
     DATABASE_TOKEN_READ_TIMEOUT_SECONDS,
+    DATABASE_TOKEN_RETRIES,
 )
 
 # The scope of a token for Azure Database for PostgreSQL (Microsoft Learn, "Connect with managed
@@ -40,9 +41,11 @@ def build_database_credential(
     client_id: str, transport: RequestsTransport | None = None
 ) -> ManagedIdentityCredential:
     """The credential of the user-assigned identity of client_id; it keeps its token and asks for a
-    new one before it expires."""
+    new one before it expires, and asks once only for each."""
     return ManagedIdentityCredential(
-        client_id=client_id, transport=transport or build_identity_transport()
+        client_id=client_id,
+        transport=transport or build_identity_transport(),
+        retry_total=DATABASE_TOKEN_RETRIES,
     )
 
 
