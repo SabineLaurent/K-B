@@ -74,7 +74,7 @@ Le schéma se lit ainsi:
     (règle 7 de `.claude/rules/poc.md`): ses imports sont tenus par `tests/architecture/test_apis.py:120` et `:144`;
     son écriture se vérifie à la main par la commande `grep` de la règle 7 (section
     [Vérifier cette fiche](#verifier-cette-fiche)). Le processus `kb serve-ai` tient son journal,
-    `logs/kb-serve-ai.log` dans `KB_DATA_DIR` (`commands/run_log.py:30`, `cli.py:74`), sauf avec
+    `logs/kb-serve-ai.log` dans `KB_DATA_DIR` (`commands/run_log.py:32`, `cli.py:74`), sauf avec
     `KB_LOG_TO_FILE=false` (`commands/environment.py:16`).
 
 ### Le parcours de `POST /digests`

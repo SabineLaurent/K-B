@@ -326,7 +326,7 @@ Les quatre routes de `watch` lisent par le même lecteur, `WatchReader` (`data_a
 - Un `Host` hors des hôtes permis reçoit le 400 de `TrustedHostMiddleware`, en texte, avant l'app
     (`data_api/app.py:73-74`).
 - Chaque réponse porte l'en-tête `X-Request-ID`, l'identifiant que reprend la ligne de journal de la requête, dans
-    `logs/kb-serve-data.log` sous `KB_DATA_DIR` (`core/api_request_log.py:17-49`, `commands/run_log.py:28`). Cette
+    `logs/kb-serve-data.log` sous `KB_DATA_DIR` (`core/api_request_log.py:17-49`, `commands/run_log.py:30`). Cette
     ligne nomme le client, jamais sa clé ni une valeur de paramètre (`core/api_request_log.py:1-2`).
 
 ### Les erreurs

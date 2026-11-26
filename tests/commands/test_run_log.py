@@ -226,6 +226,70 @@ def test_a_library_that_logs_what_an_answer_says_is_held_and_set_back(
     assert library_logger.level == level_before
 
 
+# A line kb writes, which a library must not write in the log of kb.
+FORGED_LINE = "2026-11-26T20:00:00Z ERROR k_b.cli: kb stopped by SIGTERM"
+
+
+def test_a_line_break_in_what_a_library_logs_writes_no_line_of_its_own(
+    tmp_path, capsys
+):
+    """A library may log the text of an answer: its message is escaped as kb quotes a value
+    (conventions.md, rule 3)."""
+    with cli.logging_to(tmp_path):
+        logging.getLogger("a.library").warning(
+            "the server says: %s", f"refused\n{FORGED_LINE}"
+        )
+
+    [file_line] = (tmp_path / "logs" / "kb.log").read_text("utf-8").splitlines()
+    [error_line] = capsys.readouterr().err.splitlines()
+    assert file_line == error_line
+    assert re.fullmatch(
+        rf"{LOG_LINE_DATE} WARNING a\.library: 'the server says: refused\\n"
+        rf"{re.escape(FORGED_LINE)}'",
+        file_line,
+    )
+
+
+def test_what_a_library_logs_is_cut_to_300_characters(tmp_path, capsys):
+    with cli.logging_to(tmp_path, None):
+        logging.getLogger("a.library").warning("x" * 1000)
+
+    [line] = capsys.readouterr().err.splitlines()
+    assert line.endswith(" WARNING a.library: '" + "x" * 299)
+
+
+def test_the_record_of_a_library_is_left_as_it_is_for_the_other_handlers(
+    tmp_path, caplog
+):
+    with (
+        cli.logging_to(tmp_path, None),
+        caplog.at_level(logging.WARNING, logger="a.library"),
+    ):
+        logging.getLogger("a.library").warning("refused\n%s", FORGED_LINE)
+
+    [record] = caplog.records
+    assert record.getMessage() == f"refused\n{FORGED_LINE}"
+
+
+@pytest.mark.parametrize(
+    ("logger_name", "message"),
+    [
+        ("k_b", "a line of the test"),
+        ("k_b.test", "a line of the test"),
+        # Its name starts as K-B's, without the dot of a module of K-B.
+        ("k_b_library", "'a line of the test'"),
+    ],
+)
+def test_only_a_line_of_kb_keeps_its_message_as_kb_wrote_it(
+    tmp_path, capsys, logger_name, message
+):
+    with cli.logging_to(tmp_path, None):
+        logging.getLogger(logger_name).warning("a line of the test")
+
+    [line] = capsys.readouterr().err.splitlines()
+    assert line.endswith(f" WARNING {logger_name}: {message}")
+
+
 def test_a_line_out_of_a_request_has_no_trace_id(tmp_path, capsys):
     """Only a line written during a request of an API carries its trace id."""
     with cli.logging_to(tmp_path, None):

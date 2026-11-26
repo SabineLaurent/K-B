@@ -7753,6 +7753,29 @@ personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-ess
   fusion ; Pages est activé depuis le 2026-11-22 et la première publication faite à la main, et la publication à
   chaque fusion attend que la variable soit posée (`documentation/accessibilite.md`, « Publier »). — PR de #684
 
+## 2026-11-27
+
+### Journal de `kb` : le message d'une bibliothèque cité par le formateur (#441)
+
+- **Le formateur du journal de `kb` (`TracedFormatter`, `commands/run_log.py`) cite par `quote_value` le message de
+  tout enregistrement dont le logger n'est ni `k_b` ni `k_b.*`, coupé à 300 caractères, sur une copie de
+  l'enregistrement.** Complète l'entrée du 2026-11-06 (#412), qui tient `azure` et `urllib3` à ERROR : une liste ne
+  couvre que les bibliothèques qu'on y met. Pourquoi : une bibliothèque qui recopie à WARNING le texte d'une réponse
+  pouvait y laisser un retour à la ligne suivi d'une fausse ligne datée de `kb`, dans `kb.log` comme sur la sortie
+  d'erreur, donc dans `log-kb` (règle 3 de `conventions.md`). Le formateur, que partagent les deux sorties, porte la
+  règle une fois ; la copie laisse l'enregistrement d'origine aux autres gestionnaires (pytest le relit après coup).
+  300 : la ligne est la seule copie du message, comme le message d'échec d'une source (`MAX_QUOTED_FAILURE_LENGTH`,
+  `etl/extract.py`). Options écartées : un `logging.Filter` par gestionnaire (depuis Python 3.12, il peut rendre une
+  copie, mais c'est un second objet à poser sur chaque gestionnaire) ; un filtre ou un formateur qui réécrit le
+  message en place (effet de bord sur les autres gestionnaires) ; citer aussi les lignes de `k_b.*` (leurs valeurs,
+  déjà citées par `kb`, le seraient deux fois) ; étendre `LIBRARY_LOG_LEVELS` (une liste à tenir, bibliothèque par
+  bibliothèque) ; 100, le défaut de `quote_value`, fait pour une valeur seule. Limites assumées : les lignes des
+  exporteurs OpenTelemetry, dont `QuotingFilter` (`ai_api/connectors/metrics_export.py`) cite déjà les arguments texte,
+  sont citées deux fois, et `QuotingFilter` reste, car il retire aussi la trace de l'exporteur ; la décision porte
+  sur le message, et la trace d'une exception (`exc_info`) garde ses lignes après sa ligne datée (règle 3) :
+  échapper le texte d'une exception dans sa trace vaut pour `kb` comme pour une bibliothèque, et se fait par #725.
+  Plan validé par Sabine le 2026-11-26. — PR de #441
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office
