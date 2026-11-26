@@ -89,6 +89,8 @@ def build_llm_call_line(
         "outcome": call.outcome,
         "finish_reason": call.finish_reason,
         "http_status": call.http_status,
+        "provider_error_code": call.provider_error_code,
+        "provider_error_param": call.provider_error_param,
         "schema_valid": call.schema_valid,
         "failed_check": call.failed_check,
         "first_failed_check": call.first_failed_check,

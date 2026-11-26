@@ -841,6 +841,133 @@ def test_the_status_of_the_last_answer_is_kept(steps, http_status):
     assert llm_call.http_status == http_status
 
 
+# The answer of Azure to gpt-6.1-sol asked with the effort none (#710), its message given a mark:
+# a message may quote the input, so it is never kept.
+MESSAGE_MARK = "message-mark-of-the-test"
+UNSUPPORTED_EFFORT = json.dumps(
+    {
+        "error": {
+            "message": "Unsupported value: 'reasoning_effort' does not support 'none'"
+            f" with this model. {MESSAGE_MARK}",
+            "type": "invalid_request_error",
+            "param": "reasoning_effort",
+            "code": "unsupported_value",
+        }
+    }
+)
+
+
+def test_the_code_and_the_param_of_a_refused_request_are_kept_never_its_message():
+    llm_call, transport, _ = call([response(400, UNSUPPORTED_EFFORT), completion()])
+
+    assert llm_call.outcome == "llm_unavailable"
+    assert llm_call.attempts == 1
+    assert len(transport.requests) == 1
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "unsupported_value",
+        "reasoning_effort",
+    )
+    assert MESSAGE_MARK not in repr(llm_call)
+    assert "invalid_request_error" not in repr(llm_call)
+
+
+ERROR_OF_THE_TEST = json.dumps({"error": {"code": "a_code", "param": "a_param"}})
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [response(401, ERROR_OF_THE_TEST)],
+        [
+            response(
+                429,
+                ERROR_OF_THE_TEST,
+                retry_after=str(LLM_RETRY_AFTER_MAX_SECONDS + 1),
+            )
+        ],
+        [response(503, ERROR_OF_THE_TEST), response(503, ERROR_OF_THE_TEST)],
+    ],
+    ids=["401", "429", "503"],
+)
+def test_the_code_and_the_param_of_any_answer_but_a_200_are_kept(steps):
+    llm_call, _, _ = call(steps)
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "a_code",
+        "a_param",
+    )
+
+
+@pytest.mark.parametrize(
+    ("value", "kept"),
+    [
+        ("messages[0].content-1", "messages[0].content-1"),
+        ("x" * 65, "x" * 64),
+        (
+            "reasoning_effort\n2026-11-26T17:00:00Z ERROR k_b.cli: a forged line",
+            "other",
+        ),
+        (f"reasoning{chr(0x202E)}effort", "other"),
+        (f"reasoning{chr(0x9B)}effort", "other"),
+        ("reasoning effort", "other"),
+        (400, "other"),
+        (["reasoning_effort"], "other"),
+        (None, None),
+    ],
+    ids=[
+        "identifier",
+        "too-long",
+        "line-break",
+        "bidirectional-control",
+        "c1-control",
+        "space",
+        "number",
+        "list",
+        "null",
+    ],
+)
+def test_a_code_or_a_param_out_of_the_shape_of_an_identifier_is_kept_as_other(
+    value, kept
+):
+    body = json.dumps({"error": {"code": value, "param": value}})
+
+    llm_call, _, _ = call([response(400, body)])
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (kept, kept)
+
+
+def test_a_filtered_prompt_whose_param_is_not_a_string_is_still_filtered():
+    body = json.dumps({"error": {"code": "content_filter", "param": {"prompt": 0}}})
+
+    llm_call, _, _ = call([response(400, body)])
+
+    assert llm_call.outcome == "llm_content_filtered"
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "content_filter",
+        "other",
+    )
+
+
+@pytest.mark.parametrize(
+    "steps",
+    [
+        [completion()],
+        [response(503, ERROR_OF_THE_TEST), completion()],
+        [{"kind": "timeout"}],
+        [response(400, json.dumps({"error": {"message": MESSAGE_MARK}}))],
+        [response(400, "not json")],
+    ],
+    ids=["ok", "503-then-ok", "timeout", "400-without-code", "400-not-json"],
+)
+def test_a_last_answer_without_code_nor_param_keeps_none(steps):
+    llm_call, _, _ = call(steps)
+
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        None,
+        None,
+    )
+
+
 def test_the_check_that_refused_the_first_attempt_is_kept_after_a_retry():
     llm_call, _, _ = call([completion("not json"), completion()])
 
