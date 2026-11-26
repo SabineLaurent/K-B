@@ -643,10 +643,9 @@ Les paramètres et la réponse de `GET /tops/{top}/days` : `limit` de 1 à 100 (
   (`sheet_exists`). Sauf l'arrêt, le sujet est compté en échec et `kb digest` sort en erreur (`twin not written`,
   `commands/digest_command.py`), vu au journal du job. Pour réduire le risque : réécrire ce jumeau depuis la fiche,
   par l'outil de (a), sans `item_id` ; faisable en code, non planifié.
-- (d) `item_id` est une clé de substitution : une base refaite renumérote ses items, et le lien du site mène sans
-  erreur à un autre item ; un item purgé répond 404 `item_not_found`. Pour réduire le risque : le site ne mène à
-  l'item que si son titre est celui de la source, sinon à l'URL de la source ; faisable, geste de la session du site.
-  Les UUID de #403 n'y suffiraient pas : une base refaite en tire de nouveaux (« Ce qui manque, et comment le tenir »,
+- (d) `item_id` est une clé de substitution : une base refaite renumérote ses items ; un item purgé répond 404
+  `item_not_found`. Le site ne mène à l'item que si son titre est celui de la source ; sinon, il le dit et donne
+  l'URL de la source (#724, `docs/site-web.md`, « Comptes rendus »). Les UUID de #403 n'y suffiraient pas : une base refaite en tire de nouveaux (« Ce qui manque, et comment le tenir »,
   API1).
 - (e) Un sujet retiré de `DIGEST_SUBJECTS` rend ses anciens comptes rendus inaccessibles (422). Pour réduire le
   risque : garder, à part, la liste des sujets retirés que la route lit encore ; faisable en code, non planifié.

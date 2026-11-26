@@ -11,6 +11,8 @@ comme son client `WEB` (`KB_DATA_API_KEY_WEB`). Le paquet `src/k_b/web/` n'impor
 |---|---|
 | `/` | « Quoi de neuf », le fil de veille (« Fil », ci-dessous) |
 | `/items/<id>` | le détail d'un item du fil (« Détail », ci-dessous) |
+| `/comptes-rendus`, `/comptes-rendus/<sujet>`, `/comptes-rendus/<sujet>/<jour>` | « Comptes rendus de veille », les sujets, puis le compte rendu d'un sujet (« Comptes rendus », ci-dessous) |
+| `/comptes-rendus/<sujet>/<jour>/sources/<id>` | une source d'un compte rendu : la page de son item, ou « Source introuvable » |
 | `/tendances` | « Dépôts qui ont le vent en poupe », les tendances d'une fenêtre (« Tendances », ci-dessous) |
 | `/sources` | « Sources et conditions d'utilisation » |
 | `/accessibilite` | « Accessibilité » |
@@ -115,7 +117,7 @@ chiffres ASCII, puis au plus 2⁶³ − 1, par `read_item_id` (`web/item_detail.
 route sur le chemin décodé (spécification ASGI, `path`), si bien que `/items/%39` sert aussi l'item 9.
 
 **La page**, un seul gabarit (`item.html`) dans l'ordre des maquettes : « ← Retour au fil » (vers `/`, sans les
-filtres) ; la sorte encadrée, les identifiants et les dates en `<time>` ; le titre en `h1` ; le bandeau ; les
+filtres ; « ← Retour au compte rendu » pour un item atteint par une source, « Comptes rendus », ci-dessous) ; la sorte encadrée, les identifiants et les dates en `<time>` ; le titre en `h1` ; le bandeau ; les
 faits en `<dl>` ; les textes sous des `h2` ; le lien vers la source, en bouton, par la macro `external_link`
 (nouvel onglet annoncé, même texte que sur la carte). Aucun lien de la navigation n'est marqué courant.
 
@@ -157,6 +159,103 @@ d'une *release* (125 000 caractères au plus) et les auteurs d'un papier (1 000 
 **La preuve de bout en bout** (C17.3) : `tests/web/test_site_on_the_data_api.py` sert le site sur la vraie API
 de données de la base de test, en mémoire : une date du fil refusée sous son champ, un filtre gardé, puis le
 détail par le lien du titre d'une carte. Il tourne dans `uv run pytest`, donc en CI.
+
+## Comptes rendus
+
+`/comptes-rendus` (#724) montre les comptes rendus de veille que `kb digest` écrit le lundi et le jeudi (job
+`caj-kb-digest-watch`, #423), par `GET /digests/{subject}` et `GET /digests/{subject}/days` de l'API de données,
+avec la clé du client `WEB` (#560). Aucun écran n'est maquetté : la page suit la mise en page du détail et la
+charte, sans couleur nouvelle. `web/digests.py` lit l'adresse et bâtit les pages, sans entrée ni sortie.
+
+| Chemin | Page | Appels à l'API |
+|---|---|---|
+| `/comptes-rendus` | les 9 sujets, chacun une carte : son libellé en lien (`h2`), une ligne qui le décrit | 0 |
+| `/comptes-rendus/<sujet>` | le compte rendu le plus récent du sujet | 2 |
+| `/comptes-rendus/<sujet>/<AAAA-MM-JJ>` | le compte rendu de ce jour | 2 |
+| `/comptes-rendus/<sujet>/<AAAA-MM-JJ>/sources/<id>` | la page de l'item de la source, ou « Source introuvable » | 2 |
+
+**Les sujets** gardent leur code d'API dans l'adresse (`agent_frameworks`). Leur libellé et leur ligne, en
+français, sont dans `SUBJECTS` (`web/digests.py`), dans l'ordre de `DIGEST_SUBJECTS`, tenus égaux par un test : un
+sujet ajouté à `DIGEST_SUBJECTS` le fait échouer tant que le site ne le nomme pas. Les libellés sont ceux de Sabine
+(2026-11-26 : « Vulnérabilités », « Frameworks agentiques », LLM gardé tel quel). La ligne est écrite pour le
+site : les définitions de `DIGEST_SUBJECTS` sont celles que lit le modèle. Écartés : un code français par sujet
+dans l'adresse (une seconde table à tenir) ; le dernier jour de chaque sujet sur l'index (9 appels par affichage,
+RGESN) ; un formulaire de date, comme les tendances (le site ne sait pas quels jours existent : la liste des jours
+le dit).
+
+**L'adresse** est lue en chaînes, jamais typée par FastAPI (sinon un 422 en JSON) : le sujet parmi `SUBJECTS`, le
+jour par `read_written_day` (`AAAA-MM-JJ`, un jour qui existe), le numéro de la source par `read_item_id`. Hors de
+sa forme, la page 404, sans appel à l'API. Le journal des requêtes écrit le gabarit de la route
+(`route=/comptes-rendus/{subject}/{day}`), jamais le sujet ni le jour.
+
+**La page d'un compte rendu** (`digest.html`), dans l'ordre : « ← Tous les comptes rendus » ; « Compte rendu »
+encadré et la fenêtre, du jour de `since` au jour de `until`, en `<time>` ; le libellé et le jour en `h1` ; le
+bandeau « Compte rendu partiel » quand la lecture est coupée ; « Rédigé par le LLM (grand modèle de langage) … à
+partir des items du fil. Chaque affirmation cite ses sources. », le modèle lu dans la réponse (`model`), jamais
+écrit dans le site ; sous le `h2` « Affirmations », une liste numérotée dans l'ordre de la fiche, chaque
+affirmation suivie de « Source: » ou « Sources: » et de la liste de ses sources dans l'ordre où elle les cite,
+chacune un lien qui porte son titre, en `lang="en"` (hypothèse, comme au fil) ; sous le `h2` « Tous les jours du
+sujet », les 30 jours les plus récents, chacun un lien vers son compte rendu, le jour affiché marqué
+`aria-current="page"`, sans lien. Au-delà de 30 jours, la liste le dit (« Les 30 jours les plus récents sur 45. »),
+sans pagination : à deux comptes rendus par semaine, 30 jours en couvrent quinze. Aucun lien de la navigation n'est marqué courant, comme sur le détail d'un item ; l'index marque « Comptes rendus ».
+
+Les sources sont sous leur affirmation : on lit l'affirmation et ce qui l'appuie au même endroit, au clavier et au
+lecteur d'écran, sans aller-retour (écarté : les renvois numérotés de la fiche vers une liste en bas). Un seul lien
+par source, vers son item ; le lien vers la page d'origine reste sur la page de l'item (écarté : deux liens par
+source, jusqu'à 120 arrêts de Tab). Chaque lien d'une source ou d'un jour est une cible de 44 px par son
+`padding` (Opquast 186), et un titre sans espace se coupe partout (320 px).
+
+**Les textes reçus** : une affirmation et un titre passent par `clean_received_text`, puis sont échappés ; une
+balise ou une adresse dans un texte reste du texte, jamais un lien (OWASP LLM10). Une affirmation que le nettoyage
+laisse vide se lit « Sans texte. », un titre « Sans titre » (sans `lang`).
+
+**Le lien d'une source vers son item** (limite (d) de `GET /digests/{subject}`, `docs/specs-api.md`) : `item_id`
+est une clé de substitution, et une base refaite renumérote ses items. Le lien vise donc
+`/comptes-rendus/<sujet>/<jour>/sources/<id>`, jamais `/items/<id>` : au clic, le site relit le compte rendu, puis
+l'item, et compare le titre de l'item, mis sur une ligne comme l'écrit le jumeau (`make_visible`, passée de
+`post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la source.
+
+| Item | Page |
+|---|---|
+| son titre est celui de la source | la page de l'item (`item.html`), « ← Retour au compte rendu », son titre suivi de « , source du compte rendu … du … » (RGAA 8.6) |
+| un autre titre, `item_not_found`, une entrée Zotero ou un clip | « Source introuvable » : « Aucun item de ce titre ne porte le n° … dans la base de K-B. », le titre de la source, et son lien d'origine s'il est en `https`, par `external_link` |
+| la source n'est pas dans le compte rendu | la page 404, sans lecture d'item |
+
+Écartés : un lien direct vers `/items/<id>`, qu'une base refaite mènerait sans erreur à un autre item ; contrôler
+chaque source à l'affichage, jusqu'à 60 `GET /items/{id}` par page. Le titre de l'adresse n'est jamais lu : celui
+de la source vient du compte rendu relu.
+
+**Les états** :
+
+| État | Statut | Page |
+|---|---|---|
+| l'index | 200 | les 9 sujets, sans appel |
+| un sujet hors de `SUBJECTS`, un jour ou un numéro hors de sa forme, un jour qui n'existe pas (`2026-02-30`) | 404 | sans appel à l'API |
+| un 404 `digest_not_found` sans jour | 200 | « Aucun compte rendu pour ce sujet. », sans appel de ses jours |
+| un 404 `digest_not_found` avec un jour | 404 | la page 404 (l'adresse vient d'un lien ou d'une saisie) |
+| `outcome` `no_claim` | 200 | « Aucune affirmation retenue. », les mots de la fiche (`post/digest_sheets.py`), et les jours |
+| `outcome` `no_item` | 200 | « Aucun item classé dans ce sujet. », de même |
+| la lecture coupée (`items_capped`) | 200 | le bandeau « Compte rendu partiel » : la sorte coupée, et le moment après lequel ses items sont lus, en UTC |
+| tout autre échec, une réponse hors contrat | 500 | journalisée comme au fil (`data_api_failed: …`), sans le sujet ni le jour |
+
+Sans affirmation, la ligne « Rédigé par … » n'est pas écrite : `no_item` dit qu'aucun item n'est allé au modèle.
+Une réponse est hors contrat pour un autre sujet ou un autre jour que ceux demandés, une affirmation qui cite une
+source absente du compte rendu (OWASP LLM07), un `outcome` qui contredit les affirmations, une lecture coupée sans
+sa sorte ou sans sa date, une sorte coupée hors des cinq du fil, un modèle hors de la forme que `kb` écrit
+(`MODEL_NAME`), et au-delà des bornes de `items.py` et de `core/config.py` (12 affirmations, 400 caractères, 1 à 5
+sources par affirmation, 60 sources, un titre de 1 024 caractères, une URL de 2 000) ; pour les jours, au-delà de
+30 ou un total plus petit que les jours servis. Le 503 `watch_unconfigured` (le Mac sans `AZURE_CLIENT_ID`) est la
+page 500.
+
+**Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés, cache vide, gzip compris, sur un compte
+rendu à ses bornes (12 affirmations de 400 caractères, 60 sources aux titres de 140 caractères) et 30 jours
+(`tests/web/test_digest_pages.py`). Hors budget : des titres à leur borne de 1 024 caractères, comme les notes
+d'une *release* au détail. Appels à l'API : 0 pour l'index, 2 par compte rendu, 2 par clic sur une source. RGESN
+7.1 n'est pas tenu, par décision (D1, le site ne garde aucune réponse de l'API).
+
+**La preuve de bout en bout** : `tests/web/test_site_on_the_data_api.py` dépose un jumeau dans un `watch`
+simulé, sert le site sur la vraie API de données de la base de test, puis suit le lien d'une source jusqu'à son
+item : le titre de la source, écrit comme `kb digest` l'écrit depuis le détail que lit l'API IA, retrouve l'item.
 
 ## Tendances
 
@@ -249,8 +348,8 @@ segment `.` ou `..`, ou `..` en son sein) garde sa ligne et son rang, écrit san
 `https://github.com/owner/..` vers une autre page de GitHub, et un seul nom ne cache pas les autres lignes. Le
 journal des requêtes écrit `route=/tendances`, jamais le jour.
 
-**La navigation** mène au fil (« Veille ») et aux tendances, visibles à toutes les largeurs, sans menu replié
-(D2 de #564, décision de Sabine du 2026-11-11) ; la page 404 propose aussi « Voir les tendances ».
+**La navigation** mène au fil (« Veille »), aux comptes rendus (#724) et aux tendances, visibles à toutes les
+largeurs, sans menu replié (D2 de #564, décision de Sabine du 2026-11-11) ; la page 404 propose aussi « Voir les tendances ».
 
 **Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés, 60 lignes aux noms de 140 caractères
 (`tests/web/test_trends_page.py`), pesé par la même aide que le fil et le détail (`tests/web/screen_weight.py`).
@@ -446,7 +545,12 @@ Sur les tendances (une fenêtre, un jour refusé, une fenêtre absente, la base 
 l'aide du champ, le message d'un jour refusé, ouvert par « Erreur. », et son `aria-invalid`, la légende du tableau, un `th scope="col"`
 par colonne et un `th scope="row"` par ligne (RGAA 5.4, 5.6 et 5.7), les deux jours de la fenêtre en `<time>`, *forks* en `lang="en"`,
 l'échantillon et l'ordre dits, et le cadre du tableau atteint au clavier, une région nommée par sa légende. Sur
-chaque page, la navigation mène au fil et aux tendances ; la 404 propose les deux.
+chaque page, la navigation mène au fil, aux comptes rendus et aux tendances ; la 404 propose le fil et les
+tendances.
+
+Sur les comptes rendus (l'index, un compte rendu, sans affirmation, partiel, un sujet sans compte rendu, une source
+et une source introuvable), il vérifie : LLM et UTC expliqués à leur première occurrence, les affirmations en
+liste numérotée sous leur `h2`, la liste des sources sous chaque affirmation, et la liste des jours sous son `h2`.
 
 `tests/web/test_stylesheet.py` calcule les contrastes de la charte, celui des liens visités compris, et
 vérifie l'anneau de focus et sa marge de défilement, la taille du lien d'évitement, les règles du fort zoom et la

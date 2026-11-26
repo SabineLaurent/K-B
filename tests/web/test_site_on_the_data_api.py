@@ -1,14 +1,16 @@
 """The site on the real data API of its test base, in memory, without network: a filter of the feed
 refused, a filter kept, then the detail of an item by the title of its card (C17.3 of the
-certification: an input validated and a second screen); the trends of the base, by their window.
-Not marked e2e: it runs in the CI."""
+certification: an input validated and a second screen); the trends of the base, by their window;
+a digest of watch, then the item of one of its sources. Not marked e2e: it runs in the CI."""
 
 import re
 
 import pytest
+from data_api.test_watch_digest_router import make_twin, put_twin
 from fastapi.testclient import TestClient
 from site_client import NOW, OPERATOR_HEADERS, OPERATOR_ID, TEST_VERSION
 
+from k_b.items import make_visible
 from k_b.web.app import create_app
 
 CARD_TITLE = re.compile(
@@ -89,3 +91,40 @@ def test_the_trends_show_the_latest_window_then_the_window_asked_then_one_absent
         (request.url.path, request.url.params.get("window_end"))
         for request in data_api.requests
     ] == [("/trends", None), ("/trends", "2026-10-09"), ("/trends", "2026-10-11")]
+
+
+def test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_title(
+    site, data_api
+):
+    """The twin holds the title of its source as kb digest writes it, from the detail the AI API
+    reads (post/digest_sheets.py, build_twin_source): the site finds it again on the item."""
+    paper = data_api.get("/items/1").json()
+    source = {"item_id": 1, "title": make_visible(paper["title"]), "url": paper["url"]}
+    claim = {
+        "text": "Un cadre d’agents ancré sur une chaîne de blocs.",
+        "item_ids": [1],
+    }
+    put_twin(
+        data_api.watch,
+        "2026-11-10",
+        "agent_frameworks",
+        make_twin("2026-11-10", "agent_frameworks", claims=[claim], sources=[source]),
+    )
+    data_api.requests.clear()
+
+    digest = site.get("/comptes-rendus/agent_frameworks")
+    [link] = re.findall(r'<a href="(/comptes-rendus/[^"]+/sources/1)"', digest.text)
+    item = site.get(link)
+
+    assert digest.status_code == 200
+    assert claim["text"] in digest.text
+    assert link == "/comptes-rendus/agent_frameworks/2026-11-10/sources/1"
+    assert item.status_code == 200
+    assert "Retour au compte rendu" in item.text
+    assert "Source introuvable" not in item.text
+    assert [request.url.path for request in data_api.requests] == [
+        "/digests/agent_frameworks",
+        "/digests/agent_frameworks/days",
+        "/digests/agent_frameworks",
+        "/items/1",
+    ]

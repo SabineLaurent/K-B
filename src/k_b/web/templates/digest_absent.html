@@ -1,0 +1,8 @@
+{% extends "base.html" %}
+{% block title %}{{ page.page_title }}{% endblock %}
+{% block main_class %}page item-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/comptes-rendus"><span aria-hidden="true">←</span> Tous les comptes rendus</a>
+<h1>{{ page.heading }}</h1>
+<p class="results-line">{{ page.text }}</p>
+{% endblock %}

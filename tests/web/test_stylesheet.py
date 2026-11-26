@@ -294,7 +294,14 @@ def test_a_button_keeps_a_border_in_the_forced_colours_of_windows():
 
 @pytest.mark.parametrize(
     "selector",
-    [".item h1", ".item-authors", ".item-text", ".item-facts dd", ".package"],
+    [
+        ".item h1",
+        ".item-authors",
+        ".item-text",
+        ".item-facts dd",
+        ".package",
+        ".claim-sources a",
+    ],
 )
 def test_a_long_text_of_a_detail_wraps_anywhere(selector):
     """100 packages of 255 characters, or a word of a source without space, hold at 320 px
@@ -344,7 +351,10 @@ def test_the_summary_of_the_errors_is_framed_as_the_box_of_the_chart():
     assert "text-decoration" not in link
 
 
-@pytest.mark.parametrize("selector", [".card-title a", ".back-link", ".trends-table a"])
+@pytest.mark.parametrize(
+    "selector",
+    [".card-title a", ".back-link", ".trends-table a", ".claim-sources a", ".days a"],
+)
 def test_a_link_of_a_detail_or_of_a_title_is_a_target_of_44_pixels(selector):
     """Opquast 2025, rule 186: by its padding, or its minimum height."""
     rule = strip_nested_rules(read_rule(selector))

@@ -189,6 +189,17 @@ def is_hidden_character(character: str) -> bool:
     )
 
 
+def make_visible(text: str) -> str:
+    """The text on one line, each character a reader would not see a space
+    (is_hidden_character): the title of a source as the twin of a digest holds it, and as the site
+    finds it again on its item."""
+    return " ".join(
+        "".join(
+            " " if is_hidden_character(character) else character for character in text
+        ).split()
+    )
+
+
 def check_text_is_visible(text: str) -> str:
     """Refuse a text that holds a hidden character, saying its length only."""
     if any(map(is_hidden_character, text)):

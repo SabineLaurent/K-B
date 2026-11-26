@@ -918,6 +918,66 @@
     white-space: pre-wrap;
   }
 
+  /* The claims of a digest, in the order of its sheet, each followed by its sources: what supports
+     a claim is read where the claim is. */
+  .claims {
+    margin: 0;
+    padding-inline-start: 1.5rem;
+    display: grid;
+    gap: 1.25rem;
+  }
+
+  .claim-sources-label {
+    color: var(--color-slate);
+    font-size: 0.875rem;
+  }
+
+  .claim-sources {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+  }
+
+  /* Small as the link of a card, a target of 44 px in height by its padding (Opquast 2025, rule
+     186); a title of 1,024 characters without space holds at 320 px. */
+  .claim-sources a {
+    display: inline-block;
+    padding-block: 0.75rem;
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+
+    /* Visited in another colour of the chart (Opquast 2025, rule 141): which sources are read. */
+    &:visited {
+      color: var(--color-slate);
+    }
+
+    &:hover {
+      color: var(--color-teal-deep);
+    }
+  }
+
+  /* The days of a subject side by side, wrapping as the page narrows. */
+  .days {
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 1.25rem;
+    list-style: none;
+  }
+
+  /* A target of 44 px in height by its padding (Opquast 2025, rule 186), and the day shown at the
+     height of the others. */
+  .days a {
+    display: inline-block;
+    padding-block: 0.75rem;
+  }
+
+  .days [aria-current="page"] {
+    display: inline-block;
+    padding-block: 0.75rem;
+  }
+
   .pagination {
     display: flex;
     flex-wrap: wrap;

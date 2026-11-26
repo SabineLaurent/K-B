@@ -9,6 +9,13 @@ from html.parser import HTMLParser
 from itertools import pairwise
 
 import pytest
+from digest_fixture import (
+    DAY_PATH,
+    DIGEST_PATH,
+    NOT_FOUND,
+    make_digest,
+    serve_digests,
+)
 from fastapi.testclient import TestClient
 from feed_fixture import make_page
 from item_fixture import (
@@ -71,6 +78,32 @@ TREND_PAGES = {
         serve(TRENDS_NOT_FOUND, status_code=404),
     ),
     "trends-empty": ("/tendances", serve(TRENDS_NOT_FOUND, status_code=404)),
+}
+# The digests in each state, by name: their address, and the data API that answers them.
+DIGEST_PAGES = {
+    "/comptes-rendus": ("/comptes-rendus", serve_digests()[0]),
+    "digest": (DIGEST_PATH, serve_digests()[0]),
+    # Each of another day, as each page has a title of its own.
+    "digest-no-claim": (
+        f"{DIGEST_PATH}/2026-11-19",
+        serve_digests(
+            make_digest(day="2026-11-19", outcome="no_claim", claims=[], sources=[])
+        )[0],
+    ),
+    "digest-cut": (
+        DIGEST_PATH,
+        serve_digests(
+            make_digest(
+                day="2026-11-16",
+                items_capped=True,
+                capped_kind="release",
+                covered_after="2026-11-15T09:05:00Z",
+            )
+        )[0],
+    ),
+    "digest-absent": (DIGEST_PATH, serve_digests(NOT_FOUND, digest_status=404)[0]),
+    "digest-source": (f"{DAY_PATH}/sources/9", serve_digests()[0]),
+    "digest-source-not-found": (f"{DAY_PATH}/sources/9", serve_digests(items={})[0]),
 }
 
 
@@ -184,7 +217,7 @@ def fetch_every_page():
         pages[name] = make_client(handler=serve(detail)).get(
             f"/items/{detail['id']}", headers=OPERATOR_HEADERS
         )
-    for name, (path, handler) in TREND_PAGES.items():
+    for name, (path, handler) in {**TREND_PAGES, **DIGEST_PAGES}.items():
         pages[name] = make_client(handler=handler).get(path, headers=OPERATOR_HEADERS)
     return {name: response.text for name, response in pages.items()}
 
@@ -246,6 +279,10 @@ def test_the_first_link_skips_to_the_content(name):
         ("item-paper", []),
         ("/tendances", ["/tendances"]),
         ("trends-refused", ["/tendances"]),
+        ("/comptes-rendus", ["/comptes-rendus"]),
+        # A digest is not the list of the subjects, as the detail of an item is not the feed.
+        ("digest", []),
+        ("digest-source", []),
     ],
 )
 def test_only_the_link_of_the_current_page_is_marked(name, current):
@@ -415,6 +452,9 @@ def test_the_link_to_a_page_in_english_gives_its_language():
         ("500", "UTC", "temps universel coordonné"),
         ("/", "KEV", "Known Exploited Vulnerabilities"),
         ("/", "CISA", "Cybersecurity and Infrastructure Security Agency"),
+        ("/comptes-rendus", "LLM", "grand modèle de langage"),
+        ("digest", "LLM", "grand modèle de langage"),
+        ("digest-cut", "UTC", "temps universel coordonné"),
         *(
             (name, abbreviation, meaning)
             for name in (*VULNERABILITY_PAGES, *ADVISORY_PAGES)
@@ -462,7 +502,7 @@ def test_the_accessibility_statement_gives_its_date():
     """Opquast 2025, rule 6: established, then updated."""
     assert outline(PAGES["/accessibilite"]).find_all("time") == [
         {"datetime": "2026-11-11"},
-        {"datetime": "2026-11-22"},
+        {"datetime": "2026-11-27"},
     ]
 
 
@@ -727,8 +767,8 @@ def test_the_statement_says_a_link_partly_out_of_the_trends_frame_stays_partly_h
 
 
 @pytest.mark.parametrize("name", sorted(PAGES))
-def test_the_navigation_leads_to_the_feed_and_to_the_trends(name):
-    """Sabine, 2026-11-11: both links in sight at every width, no menu folded."""
+def test_the_navigation_leads_to_the_feed_the_digests_and_the_trends(name):
+    """Sabine, 2026-11-11: its links in sight at every width, no menu folded."""
     navigation = re.search(
         r'<div class="site-nav-links">(.*?)</div>', PAGES[name], flags=re.DOTALL
     )
@@ -737,7 +777,11 @@ def test_the_navigation_leads_to_the_feed_and_to_the_trends(name):
     assert [
         (link.attributes["href"], link.text)
         for link in outline(navigation.group(1)).links
-    ] == [("/", "Veille"), ("/tendances", "Tendances")]
+    ] == [
+        ("/", "Veille"),
+        ("/comptes-rendus", "Comptes rendus"),
+        ("/tendances", "Tendances"),
+    ]
 
 
 def test_the_page_not_found_leads_to_the_feed_and_to_the_trends():
@@ -919,3 +963,29 @@ def test_the_frame_of_the_table_scrolls_by_the_keyboard_named_by_its_caption():
     assert (frame.get("role"), frame.get("tabindex")) == ("region", "0")
     assert frame.get("aria-labelledby") == caption.get("id")
     assert caption.get("id")
+
+
+def test_the_statement_says_what_the_tests_check_of_the_digests():
+    assert (
+        "sur un compte rendu, ses affirmations en liste numérotée, chacune suivie de la liste de"
+        " ses sources" in outline(PAGES["/accessibilite"]).text
+    )
+
+
+@pytest.mark.parametrize("name", ["digest", "digest-cut"])
+def test_the_claims_are_an_ordered_list_under_their_heading_each_source_a_list(name):
+    """RGAA 9.3: the order of the claims is the one of the sheet; each source under its claim, a list
+    whose links say the title of their source (RGAA 6.1)."""
+    page = PAGES[name]
+
+    assert re.search(
+        r'<h2 id="affirmations">Affirmations</h2>\s*<ol class="claims">', page
+    )
+    assert page.count('<ul class="claim-sources" role="list">') == 2
+
+
+def test_the_days_of_a_digest_are_a_list_under_their_heading():
+    assert re.search(
+        r'<h2 id="jours">Tous les jours du sujet</h2>\s*<ul class="days" role="list">',
+        PAGES["digest"],
+    )

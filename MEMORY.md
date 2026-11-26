@@ -107,7 +107,8 @@ décisions sont dans `docs/ADR/journal-decisions-projet.md`. Chargé à chaque s
   (`test_no_route_documents_a_raw_file_path_or_a_collection_date`). Depuis #560, de même `GET /digests/{subject}` et
   `GET /digests/{subject}/days`, du jumeau que `kb digest` écrit après chaque fiche, `DigestProduction` : un seul
   lecteur, une `TwinKind` par sorte (`TOP_TWINS`, `DIGEST_TWINS`, chacune son cache). Un sujet nouveau de
-  `DIGEST_SUBJECTS` s'écrit aussi dans `DigestSubjectName` (`data_api/schemas/watch_digest_schema.py`, tenu par un test).
+  `DIGEST_SUBJECTS` s'écrit aussi dans `DigestSubjectName` (`data_api/schemas/watch_digest_schema.py`), et le site
+  le nomme dans `SUBJECTS` (`web/digests.py`, #724), chacun tenu par un test.
 - `kb digest` (#209) demande les fiches à l'API IA, puis les écrit dans le coffre,
   `veille/<sujet>/AAAA-MM-JJ.md` ; `kb serve-data` et `kb serve-ai` doivent tourner (journal ADR,
   2026-10-21, « Fiches de veille : `kb digest` les écrit dans le coffre »).

@@ -1,25 +1,40 @@
-"""The reading of the feed, of the detail of an item and of the trends by the data API, with the key
-of the client WEB (docs/site-web.md, "Fil", "Détail" and "Tendances"): one GET /items by page, one
-GET /items/{item_id} by detail, one GET /trends by window, a failure a named state raised as a
-DataApiError, without retry."""
+"""The reading of the feed, of the detail of an item, of the trends and of the digests by the data
+API, with the key of the client WEB (docs/site-web.md, "Fil", "Détail", "Tendances" and "Comptes
+rendus"): one GET /items by page, one GET /items/{item_id} by detail, one GET /trends by window, one
+GET /digests/{subject} by digest and one GET /digests/{subject}/days by list of its days, a failure a
+named state raised as a DataApiError, without retry."""
 
 import time
 from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import date, timedelta
-from typing import Annotated, Literal, get_args
+from typing import Annotated, Literal, Self, get_args
 
 import httpx2
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, ValidationError
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    StringConstraints,
+    TypeAdapter,
+    ValidationError,
+    model_validator,
+)
 
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
     DATA_API_POOL_TIMEOUT_SECONDS,
     DATA_API_WRITE_TIMEOUT_SECONDS,
+    DAYS_LIMIT,
     FEED_PAGE_SIZE,
     GH_ARCHIVE_TOP_SIZE,
     GH_ARCHIVE_WINDOW_DAYS,
+    ITEMS_PER_CLAIM,
+    MAX_CLAIMS,
+    MAX_ITEMS_PER_DIGEST,
     MAX_WEB_DATA_API_BODY_BYTES,
+    MODEL_NAME,
+    TEXT_CHARS,
     WEB_DATA_API_READ_TIMEOUT_SECONDS,
     WEB_DATA_API_REQUEST_DEADLINE_SECONDS,
 )
@@ -31,9 +46,12 @@ from k_b.core.outbound import (
     read_bounded_body,
 )
 from k_b.items import (
+    MAX_DIGEST_SOURCE_TITLE_CHARS,
+    MAX_DIGEST_SOURCE_URL_CHARS,
     MAX_INT64,
     ArxivId,
     CveId,
+    DigestOutcome,
     GhsaId,
     NewsletterEdition,
     NonEmptyText,
@@ -45,6 +63,7 @@ from k_b.web.settings import DataApiAccess
 
 ITEMS_PATH = "items"
 TREND_WINDOW_PATH = "trends"
+DIGESTS_PATH = "digests"
 # The 30 first repositories by stars and the 30 first by forks, together (docs/specs-api.md).
 MAX_TRENDS = 2 * GH_ARCHIVE_TOP_SIZE
 # The first day a window can end on: the site writes its start, GH_ARCHIVE_WINDOW_DAYS - 1 days
@@ -65,6 +84,7 @@ type DataApiState = Literal[
     "data_api_invalid_response",
     "data_api_item_not_found",
     "data_api_trend_window_not_found",
+    "data_api_digest_not_found",
 ]
 
 
@@ -207,17 +227,94 @@ class TrendWindow(DataApiModel):
     trends: Annotated[list[Trend], Field(min_length=1, max_length=MAX_TRENDS)]
 
 
+# The id of an item, as a digest cites it.
+type DigestItemId = Annotated[int, Field(ge=1, le=MAX_INT64)]
+
+
+class DigestClaim(DataApiModel):
+    """A claim of a digest, written by the model: a text the site cleans before it shows it."""
+
+    text: Annotated[str, Field(min_length=TEXT_CHARS[0], max_length=TEXT_CHARS[1])]
+    item_ids: Annotated[
+        list[DigestItemId],
+        Field(min_length=ITEMS_PER_CLAIM[0], max_length=ITEMS_PER_CLAIM[1]),
+    ]
+
+
+class DigestSource(DataApiModel):
+    """A source of a digest: its item_id leads to an item only if the title of the item is its
+    title (docs/specs-api.md, GET /digests/{subject}, limit (d))."""
+
+    item_id: DigestItemId
+    title: Annotated[str, Field(max_length=MAX_DIGEST_SOURCE_TITLE_CHARS)]
+    url: Annotated[str, Field(max_length=MAX_DIGEST_SOURCE_URL_CHARS)] | None
+
+
+class WatchDigest(DataApiModel):
+    """The digest of a subject of a day, as the twin of its sheet holds it (items.py,
+    DigestProduction), within the bounds kb writes."""
+
+    subject: str
+    day: date
+    since: UtcDatetime
+    until: UtcDatetime
+    # Of the form kb writes (core/config.py): shown as code, never a text of the model.
+    model: Annotated[str, StringConstraints(pattern=f"^{MODEL_NAME.pattern}$")]
+    items_capped: bool
+    # The watch reads the five kinds of the feed only (ai_api/watch_items.py).
+    capped_kind: FeedKind | None
+    covered_after: UtcDatetime | None
+    outcome: DigestOutcome
+    claims: Annotated[list[DigestClaim], Field(max_length=MAX_CLAIMS)]
+    sources: Annotated[list[DigestSource], Field(max_length=MAX_ITEMS_PER_DIGEST)]
+
+    @model_validator(mode="after")
+    def check_the_cap_is_named_whole(self) -> Self:
+        """A reading cut names the kind cut and the date after which it is read: the page says
+        both, as a digest cut must not look whole (OWASP LLM07)."""
+        named = {self.capped_kind is not None, self.covered_after is not None}
+        if named != {self.items_capped}:
+            raise ValueError("items_capped, capped_kind and covered_after disagree")
+        return self
+
+    @model_validator(mode="after")
+    def check_the_outcome_is_the_claims(self) -> Self:
+        """written exactly when a claim is there: the page shows the claims or says why none."""
+        if (self.outcome == "written") != bool(self.claims):
+            raise ValueError("outcome not the claims")
+        return self
+
+    @model_validator(mode="after")
+    def check_each_claim_cites_a_source_listed(self) -> Self:
+        """Each claim leads to its sources (OWASP LLM07)."""
+        listed = {source.item_id for source in self.sources}
+        if any(not listed.issuperset(claim.item_ids) for claim in self.claims):
+            raise ValueError("a claim cites a source not listed")
+        return self
+
+
+class DigestDays(DataApiModel):
+    """The most recent days of a subject, as many as the site asks, and their total."""
+
+    days: Annotated[list[date], Field(max_length=DAYS_LIMIT)]
+    total: Annotated[int, Field(ge=0)]
+
+    @model_validator(mode="after")
+    def check_the_total_counts_the_days(self) -> Self:
+        if self.total < len(self.days):
+            raise ValueError("total under the days served")
+        return self
+
+
 class InvalidParameterBody(DataApiModel):
     error: Literal["invalid_parameter"]
     parameters: list[str]
 
 
-class ItemNotFoundBody(DataApiModel):
-    error: Literal["item_not_found"]
+class ErrorBody(DataApiModel):
+    """The error an answer names, read to tell a 404 of the contract from another."""
 
-
-class TrendWindowNotFoundBody(DataApiModel):
-    error: Literal["trend_window_not_found"]
+    error: str
 
 
 PAGE = TypeAdapter(FeedItemPage)
@@ -225,9 +322,10 @@ DETAIL: TypeAdapter[ItemDetail | ExcludedItem] = TypeAdapter(
     Annotated[ItemDetail | ExcludedItem, Field(discriminator="kind")]
 )
 INVALID_PARAMETER = TypeAdapter(InvalidParameterBody)
-ITEM_NOT_FOUND = TypeAdapter(ItemNotFoundBody)
+ERROR_BODY = TypeAdapter(ErrorBody)
 TREND_WINDOW = TypeAdapter(TrendWindow)
-TREND_WINDOW_NOT_FOUND = TypeAdapter(TrendWindowNotFoundBody)
+DIGEST = TypeAdapter(WatchDigest)
+DIGEST_DAYS = TypeAdapter(DigestDays)
 
 
 @dataclass(frozen=True)
@@ -283,7 +381,7 @@ def read_item(
     the feed. Only the 404 item_not_found names an item missing: any other 404 is an answer out
     of the contract of the route."""
     status, body = send(http_client, f"{ITEMS_PATH}/{item_id}", {}, clock)
-    if status == httpx2.codes.NOT_FOUND and is_item_not_found(body):
+    if status == httpx2.codes.NOT_FOUND and names_error(body, "item_not_found"):
         raise DataApiError("data_api_item_not_found", status)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -291,14 +389,6 @@ def read_item(
         return DETAIL.validate_json(body)
     except ValidationError:
         raise DataApiError("data_api_invalid_response", status) from None
-
-
-def is_item_not_found(body: bytes) -> bool:
-    try:
-        ITEM_NOT_FOUND.validate_json(body)
-    except ValidationError:
-        return False
-    return True
 
 
 def read_trends(
@@ -313,7 +403,7 @@ def read_trends(
         {} if window_end is None else {"window_end": window_end.isoformat()}
     )
     status, body = send(http_client, TREND_WINDOW_PATH, params, clock)
-    if status == httpx2.codes.NOT_FOUND and is_trend_window_not_found(body):
+    if status == httpx2.codes.NOT_FOUND and names_error(body, "trend_window_not_found"):
         raise DataApiError("data_api_trend_window_not_found", status)
     if status != httpx2.codes.OK:
         raise name_failure(status, body)
@@ -327,12 +417,56 @@ def read_trends(
     return window
 
 
-def is_trend_window_not_found(body: bytes) -> bool:
+def read_digest(
+    http_client: httpx2.Client,
+    subject: str,
+    day: date | None,
+    clock: Callable[[], float] = time.monotonic,
+) -> WatchDigest:
+    """The digest of the subject of a day, or its most recent without it; bounded as a page of the
+    feed. Only the 404 digest_not_found names a digest missing, of the subject or of this day."""
+    params: dict[str, str | int | list[str]] = (
+        {} if day is None else {"day": day.isoformat()}
+    )
+    status, body = send(http_client, f"{DIGESTS_PATH}/{subject}", params, clock)
+    if status == httpx2.codes.NOT_FOUND and names_error(body, "digest_not_found"):
+        raise DataApiError("data_api_digest_not_found", status)
+    if status != httpx2.codes.OK:
+        raise name_failure(status, body)
     try:
-        TREND_WINDOW_NOT_FOUND.validate_json(body)
+        digest = DIGEST.validate_json(body)
+    except ValidationError:
+        raise DataApiError("data_api_invalid_response", status) from None
+    # The digest of the subject and of the day asked, or 404: never another shown as its answer.
+    if digest.subject != subject or (day is not None and digest.day != day):
+        raise DataApiError("data_api_invalid_response", status)
+    return digest
+
+
+def list_digest_days(
+    http_client: httpx2.Client,
+    subject: str,
+    clock: Callable[[], float] = time.monotonic,
+) -> DigestDays:
+    """The DAYS_LIMIT most recent days of the subject, and their total; bounded as a page of the
+    feed."""
+    status, body = send(
+        http_client, f"{DIGESTS_PATH}/{subject}/days", {"limit": DAYS_LIMIT}, clock
+    )
+    if status != httpx2.codes.OK:
+        raise name_failure(status, body)
+    try:
+        return DIGEST_DAYS.validate_json(body)
+    except ValidationError:
+        raise DataApiError("data_api_invalid_response", status) from None
+
+
+def names_error(body: bytes, error: str) -> bool:
+    """Whether the body is the JSON of the error named."""
+    try:
+        return ERROR_BODY.validate_json(body).error == error
     except ValidationError:
         return False
-    return True
 
 
 def build_params(query: FeedQuery) -> dict[str, str | int | list[str]]:

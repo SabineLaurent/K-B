@@ -19,12 +19,11 @@ from k_b.core.quoting import locate_first_error, quote_value
 from k_b.etl.raw_files import read_collection_time
 from k_b.etl.raw_store import RawStore
 from k_b.etl.tops import Top, TopEntry
-from k_b.items import MAX_TOP_DESCRIPTION_CHARS, TopProduction
+from k_b.items import MAX_TOP_DESCRIPTION_CHARS, TopProduction, make_visible
 from k_b.post.vault_files import (
     MARKDOWN_SYNTAX_CHARACTERS,
     VaultEntryRefusedError,
     has_sheet,
-    make_visible,
     neutralize_text,
     refuse_linked_folders,
     write_new_sheet,

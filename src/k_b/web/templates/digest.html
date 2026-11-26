@@ -1,0 +1,54 @@
+{% extends "base.html" %}
+{% block title %}{{ digest.page_title }}{% endblock %}
+{% block main_class %}page item-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/comptes-rendus"><span aria-hidden="true">←</span> Tous les comptes rendus</a>
+<article class="item">
+<p class="item-meta"><span class="card-kind">Compte rendu</span> <span class="item-line">Fenêtre du <time datetime="{{ digest.window_start.iso }}">{{ digest.window_start.text }}</time> au <time datetime="{{ digest.window_end.iso }}">{{ digest.window_end.text }}</time></span></p>
+<h1>{{ digest.heading }}</h1>
+{#- A digest cut must not look whole (OWASP LLM07): said in words, the colour following (RGAA 3.1). -#}
+{% if digest.cap %}
+<div class="banner banner-neutral">
+<p class="banner-title">Compte rendu partiel</p>
+<p class="banner-text">Parmi les {% if digest.cap.kind_lang %}<span lang="{{ digest.cap.kind_lang }}">{{ digest.cap.kind_label }}</span>{% else %}{{ digest.cap.kind_label }}{% endif %}, K-B n’a lu que les items publiés après le <time datetime="{{ digest.cap.after.iso }}">{{ digest.cap.after.text }}</time> (temps universel coordonné): les plus anciens de la fenêtre n’y sont pas. Les autres sortes sont lues en entier.</p>
+</div>
+{% endif %}
+{% if digest.claims %}
+<p>Rédigé par le LLM (grand modèle de langage) <span class="item-code">{{ digest.model }}</span> à partir des items du fil. Chaque affirmation cite ses sources.</p>
+<section class="item-text" aria-labelledby="affirmations">
+<h2 id="affirmations">Affirmations</h2>
+{#- Each claim and its sources in one place, in the order of the sheet (RGAA 9.3): the keyboard and a
+screen reader read what supports a claim without going back and forth. -#}
+<ol class="claims">
+{% for claim in digest.claims %}
+<li class="claim">
+<p class="claim-text">{{ claim.text }}</p>
+<p class="claim-sources-label">{{ "Source" if claim.sources|length == 1 else "Sources" }}:</p>
+{#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
+<ul class="claim-sources" role="list">
+{% for source in claim.sources %}
+<li><a href="{{ source.href }}"{% if source.title_lang %} lang="{{ source.title_lang }}"{% endif %}>{{ source.title }}</a></li>
+{% endfor %}
+</ul>
+</li>
+{% endfor %}
+</ol>
+</section>
+{% else %}
+<p class="results-line">{{ digest.empty_text }}</p>
+{% endif %}
+{% if digest.days %}
+<section aria-labelledby="jours">
+<h2 id="jours">Tous les jours du sujet</h2>
+{% if digest.days_note %}
+<p class="table-note">{{ digest.days_note }}</p>
+{% endif %}
+<ul class="days" role="list">
+{% for listed in digest.days %}
+<li>{% if listed.is_current %}<span aria-current="page"><time datetime="{{ listed.day.iso }}">{{ listed.day.text }}</time></span>{% else %}<a href="{{ listed.href }}"><time datetime="{{ listed.day.iso }}">{{ listed.day.text }}</time></a>{% endif %}</li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
+</article>
+{% endblock %}
