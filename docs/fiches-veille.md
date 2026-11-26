@@ -1817,6 +1817,7 @@ ne sont écrites qu'au retour du parcours.
 | `outcome` | `ok`, ou l'état `llm_*` de l'appel |
 | `finish_reason` | celui de la dernière tentative, coupé à 64 caractères ; nul s'il manque |
 | `http_status` | le statut HTTP de la dernière réponse du fournisseur (un 401 de clé refusée se distingue ainsi d'un 503) ; nul sans réponse (délai, connexion refusée) |
+| `provider_error_code`, `provider_error_param` | le `code` et le `param` de l'erreur que rend le fournisseur à la dernière tentative, comme `http_status`, quand sa réponse n'est pas un 200 (`unsupported_value` et `reasoning_effort` pour un effort que le modèle refuse), jamais son `message`, qui peut citer l'entrée ; gardés si la valeur entière a la forme d'un identifiant (un caractère au moins, lettres et chiffres ASCII, `_`, `.`, `-`, `[`, `]`), puis coupés à 64 caractères, `other` sinon ; nuls quand le fournisseur n'en donne pas, pour un 200, sans réponse, et quand le corps de la réponse dépasse ses bornes (trop gros, ou encore en lecture à l'échéance) |
 | `schema_valid` | la dernière tentative a passé le contrôle 2 |
 | `failed_check` | le contrôle qui a refusé la dernière tentative (`content_filter`, `finish_reason`, `schema`, `subject`, `item_id`, `completeness`, `markup`, et `criterion` pour le choix des tendances) ; nul si `ok` |
 | `first_failed_check` | le contrôle qui a refusé la première tentative, quand une seconde a suivi ; nul sinon (#205, `LlmCall`, constat de #158 : le motif de la première tentative était perdu) |
@@ -1830,9 +1831,9 @@ ne sont écrites qu'au retour du parcours.
 `ts`, `stage`, `failed_check`, `items_dropped`, `items_capped`, `reasoning_tokens` et `http_status`
 s'ajoutent à la liste de #156, puis `first_failed_check` (#205), puis `fidelity_rate` (#207), puis
 `items_with_subject`, `items_no_suitable_subject` et `items_unanswered` (`classify-2`, #210), puis
-`facts_found_in_item` et `facts_found_in_text` (#518). En
-0.4.0, `items_dropped` devient `items_dropped_before_writing_stage` et `items_uncited`,
-`items_removed_by_checks`.
+`facts_found_in_item` et `facts_found_in_text` (#518), puis `provider_error_code` et
+`provider_error_param` (#710). En 0.4.0, `items_dropped` devient
+`items_dropped_before_writing_stage` et `items_uncited`, `items_removed_by_checks`.
 
 **Jamais** dans une ligne : le texte d'un item ou d'une affirmation, la consigne, la sortie du
 modèle, un titre, un auteur, une clé (règle 5 de `poc.md`). Un échec `data_api_*` ne fait aucun appel au modèle, donc

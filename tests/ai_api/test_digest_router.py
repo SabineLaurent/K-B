@@ -17,6 +17,7 @@ from typing import get_args
 
 import httpx2
 import pytest
+from ai_api.provider_errors import MESSAGE_MARK, UNSUPPORTED_EFFORT
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics import MeterProvider
@@ -677,6 +678,29 @@ def test_a_classification_that_fails_fails_the_request_with_its_lines(
     )
 
 
+def test_a_request_refused_by_the_provider_writes_its_code_and_param_never_its_message(
+    make_ai_api, capsys, caplog
+):
+    client, _ = make_ai_api(
+        [{"kind": "response", "status": 400, "body": UNSUPPORTED_EFFORT}]
+    )
+
+    with caplog.at_level(logging.DEBUG, logger="k_b"):
+        response = post_digests(client)
+
+    assert response.status_code == 502
+    assert response.json() == {"error": "llm_unavailable"}
+    captured = capsys.readouterr()
+    [line] = [json.loads(text) for text in captured.out.splitlines()]
+    assert (
+        line["outcome"],
+        line["http_status"],
+        line["provider_error_code"],
+        line["provider_error_param"],
+    ) == ("llm_unavailable", 400, "unsupported_value", "reasoning_effort")
+    assert MESSAGE_MARK not in captured.out + captured.err + caplog.text
+
+
 def test_a_writing_that_fails_names_its_subject_and_the_others_are_returned(
     make_ai_api,
 ):
@@ -775,6 +799,8 @@ METRIC_FIELDS = [
     "outcome",
     "finish_reason",
     "http_status",
+    "provider_error_code",
+    "provider_error_param",
     "schema_valid",
     "failed_check",
     "first_failed_check",
