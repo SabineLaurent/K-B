@@ -1,8 +1,8 @@
 # Garder le code et le paramètre d'une erreur du fournisseur dans la ligne `llm_call`
 
 - **Date** : 2026-11-26
-- **Branche** : `feat/provider-error-fields-in-llm-call`, commits `769ba0af` (le code et ses tests) et
-  `25098ba3` (les constats des revues), sur `2b8aaed0`
+- **Branche** : `feat/provider-error-fields-in-llm-call`, sur `2b8aaed0` : `769ba0af` (le code et ses tests),
+  `25098ba3` (les constats de la première revue), puis la note et les constats de la seconde revue
 - **Issue** : #710
 - **Fichiers principaux** : `src/k_b/ai_api/connectors/llm_client.py`, `src/k_b/ai_api/observability/metrics.py`,
   `tests/ai_api/test_llm_client.py`, `tests/ai_api/test_digest_router.py`, `tests/ai_api/provider_errors.py`,
@@ -107,8 +107,10 @@ l'enveloppe (HTML d'une passerelle, JSON d'une autre forme, `llm_client.py:552-5
 
 `summarize` garde les champs de la dernière tentative, comme `http_status` (`llm_client.py:690-691`), et
 `build_llm_call_line` les écrit juste après lui (`metrics.py:92-93`). Le code et le statut se lisent ainsi sur la même
-tentative. Après un 503 suivi d'une réponse 200, les deux champs sont nuls. Après un 503 suivi d'un délai, ils sont
-nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de réponse.
+tentative. Après un 503 suivi d'une réponse 200, les deux champs sont nuls. Après un 503 dont la nouvelle tentative
+finit en délai, ils sont nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de réponse. Quand
+l'échéance de la demande ne laisse pas le temps d'une nouvelle tentative, après un 429 ou un 5xx, l'appel finit en
+`llm_timeout` sur sa seule tentative : la ligne porte le statut de cette réponse et son code, comme `http_status`.
 
 ## Choix faits et options écartées
 
@@ -120,9 +122,9 @@ nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de r�
 | Un caractère au moins (`+`) | Une chaîne vide n'est pas un identifiant : `other` (constat de la revue) | `*` : la chaîne vide était gardée telle quelle, ni nulle ni `other` |
 | `provider_error_code`, `provider_error_param` | La ligne porte déjà `outcome` et `failed_check`, des états de K-B ; le préfixe dit d'où vient la valeur | `error_code` : il se confondrait avec un état de K-B |
 | `code` et `param` seulement | Ce que propose #710 ; le `param` nomme le champ refusé | `type`, qui redit le statut ; `message`, qui peut citer l'entrée |
-| Toute réponse autre que 200 | Un 429 ou un 5xx d'Azure porte aussi un code, et une seule lecture sert à tous | Les seuls 4xx : deux lectures pour un même corps |
+| Toute réponse autre que 200 | Une seule lecture sert à tous les statuts : un corps dans l'enveloppe d'erreur donne son code et son paramètre, un corps d'une autre forme laisse les deux champs nuls | Les seuls 4xx : deux chemins de lecture selon le statut |
 | La dernière tentative, comme `http_status` | Le code et le statut d'une ligne décrivent la même réponse | Porter le dernier code non nul d'une tentative à l'autre : il décrirait une autre réponse que `http_status` |
-| Un code numérique s'écrit `other` | Azure rend des chaînes (corps cités dans #710) ; en Python, un `bool` est aussi un `int` | Le garder en décimal : une branche de plus pour un fournisseur que K-B n'appelle pas |
+| Un code numérique s'écrit `other` | Le 400 relevé dans #710 porte des chaînes ; en Python, un `bool` est aussi un `int` | Le garder en décimal : une branche de plus, pour un corps que K-B n'a pas observé |
 | Aucun attribut OpenTelemetry | Une valeur ouverte en attribut de métrique multiplie les séries ; les spans ne portent que des valeurs fermées (`TRACED_FINISH_REASONS`) | Un attribut `k_b.provider_error_code` |
 | La réponse Azure des tests dans `tests/ai_api/provider_errors.py` | Une connaissance à un seul endroit (code.md), importée par les deux modules de tests, comme `tests/exchange/storage_fakes.py` | Deux copies, dont les messages divergeaient déjà (constat de la revue) |
 
@@ -136,6 +138,7 @@ nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de r�
 | `test_a_code_or_a_param_out_of_the_shape_of_an_identifier_is_kept_as_other` (`:918`, 11 cas) | Un identifiant est gardé, coupé à 64 ; une valeur plus longue suivie d'un texte, une chaîne vide, un retour à la ligne suivi d'une fausse ligne, U+202E, un C1, une espace, un nombre et une liste donnent `other` ; `null` donne nul |
 | `test_a_filtered_prompt_whose_param_is_not_a_string_is_still_filtered` (`:928`) | Un `param` objet ne casse plus la lecture : le 400 reste `llm_content_filtered` |
 | `test_a_last_answer_without_code_nor_param_keeps_none` (`:951`, 5 cas) | Un 200, un 503 suivi d'un 200, un délai, un 400 sans code et un 400 qui n'est pas du JSON laissent les deux champs nuls |
+| `test_a_retry_after_a_rate_limit_past_the_deadline_is_not_made` (`:996`) | Quand l'échéance coupe la nouvelle tentative d'un 429, l'appel finit en `llm_timeout` et garde le statut, le `Retry-After` et le code de ce 429 |
 | `test_a_request_refused_by_the_provider_writes_its_code_and_param_never_its_message` (`tests/ai_api/test_digest_router.py:681`) | De bout en bout : la demande répond 502 `llm_unavailable`, sa ligne porte les deux champs, et le repère du message n'est ni sur la sortie standard, ni sur la sortie d'erreur, ni dans le journal |
 | `METRIC_FIELDS` dans `test_each_call_writes_one_json_line_on_stdout_without_a_text` | Les deux champs suivent `http_status`, dans l'ordre de la table de `docs/fiches-veille.md` |
 | Après les revues : les 2 cas nouveaux (`too-long-then-text`, `empty`) en échec, puis `uv run pytest` 5 860 passés ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les constats corrigés sont tenus par un test |
@@ -161,11 +164,10 @@ nuls aussi, comme `http_status`, puisque la dernière tentative n'a pas eu de r�
 
 ## Zones non vérifiées
 
-- Les corps d'erreur d'un 429 et d'un 5xx d'Azure ne sont pas rejoués : les tests leur donnent un corps écrit pour
-  eux, de la même enveloppe que le 400 observé dans #710. Un corps d'une autre forme laisse les deux champs nuls, ce
-  que vérifie le cas `400-not-json`.
-- La preuve de bout en bout rejoue le corps du 400 relevé dans #710 (étape 5), par le fournisseur `replay`. Aucun
-  appel au fournisseur réel n'a été fait : un appel est payant, et la sortie d'Azure est déjà citée dans l'issue.
+- Les tests du 429 et du 5xx donnent à la réponse un corps dans l'enveloppe d'erreur du 400 relevé dans #710. Un
+  corps d'une autre forme laisse les deux champs nuls : le cas `400-not-json` le vérifie.
+- La preuve de bout en bout rejoue, par le fournisseur `replay`, le corps du 400 relevé dans #710, sans appel payant
+  au modèle.
 
 ## Ce qui reste
 

@@ -997,14 +997,19 @@ def test_a_retry_after_a_rate_limit_past_the_deadline_is_not_made():
     deadline = Deadline.after(MIN_SECONDS_FOR_LLM_REQUEST + 1, Clock())
 
     llm_call, transport, sleeps = call(
-        [response(429, retry_after="2"), completion()], deadline=deadline
+        [response(429, ERROR_OF_THE_TEST, retry_after="2"), completion()],
+        deadline=deadline,
     )
 
     assert llm_call.outcome == "llm_timeout"
     assert llm_call.attempts == 1
-    # What was observed stays: the 429 and its Retry-After.
+    # What was observed stays: the 429, its Retry-After and its error.
     assert llm_call.http_status == 429
     assert llm_call.retry_after_seconds == 2
+    assert (llm_call.provider_error_code, llm_call.provider_error_param) == (
+        "a_code",
+        "a_param",
+    )
     assert sleeps == []
     assert len(transport.requests) == 1
 
