@@ -14,8 +14,9 @@ Cette fiche dit ce que fait la chaîne d'intégration continue (CI) de K-B, comm
 comment elle s'installe, se configure et se teste, et que faire quand elle échoue. Elle est écrite d'après le code de
 `main` au commit `57ff235`, avec le workflow `Docs` et l'audit de tous les groupes de dépendances ajoutés
 par #167, et d'après les réglages du dépôt; la publication du site à chaque fusion et les
-contrôles requis, d'après la demande de fusion de #684 et le ruleset. Les renvois de `docs.yml`, de
-`dependabot.yml` et des étapes de Grype d'`image.yml` visent `main` au commit `a1a01efd`. Les exécutions citées se
+contrôles requis, d'après la demande de fusion de #684 et le ruleset. Les renvois de
+`dependabot.yml` et des étapes de Grype d'`image.yml` visent `main` au commit `a1a01efd`, ceux de `docs.yml` le commit
+`df518ead` (#719). Les exécutions citées se
 relisent par `gh run view <id> --repo SabineLaurent/K-B`, 90 jours au plus: c'est la durée de garde des journaux du
 dépôt (`gh api repos/SabineLaurent/K-B/actions/permissions/artifact-and-log-retention` → `"days":90`). La mise en
 ligne d'une version, qui suit la CI, est dans [la fiche de la livraison continue](livraison-continue.md).
@@ -49,7 +50,7 @@ de dépôt `PAGES_PUBLISH` posée à `true`, ou lancé à la main depuis `main`.
 | Ruleset « Basic-rules-main-protect » | dit quels contrôles une PR doit passer pour fusionner | réglages du dépôt ([Le ruleset de `main`](#le-ruleset-de-main)) |
 
 Les actions épinglées sont `actions/checkout` v7.0.1 et `astral-sh/setup-uv` v10.3.3 dans les workflows, et en plus,
-dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:36`, `:61`).
+dans `docs.yml`, `actions/upload-pages-artifact` v5.0.0 et `actions/deploy-pages` v5.0.1 (`docs.yml:60`, `:85`).
 
 La chaîne tourne sur GitHub Actions, et ces faits l'y attachent: le dépôt est sur GitHub (`git remote get-url origin`
 → `git@github.com:SabineLaurent/K-B.git`); son ruleset exige des contrôles rendus par GitHub Actions (`integration_id`
@@ -62,8 +63,8 @@ chaque action (`sha_pinning_required`, `gh api repos/SabineLaurent/K-B/actions/p
 | Déclencheur | Ce qui tourne |
 |---|---|
 | une PR vers `main`: ouverte, rouverte, ou un commit poussé sur sa branche | `CI`, `Image`, `Infra` et `Docs` (`ci.yml:3-7`, `image.yml:3-7`, `infra.yml:3-7`, `docs.yml:7-9`); `Infra` sans filtre de chemin depuis #496 |
-| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image`, `Infra` et `Docs`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`, `docs.yml:10-11`); `Docs` n'y publie le site que si la variable de dépôt `PAGES_PUBLISH` vaut `true` (`docs.yml:33-35`, `:42-44`) |
-| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:12`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:33-35`, `:42-44`) |
+| un push sur `main`, c'est-à-dire une fusion | `CI`, `Image`, `Infra` et `Docs`, sur le commit de fusion (`ci.yml:4-5`, `image.yml:4-5`, `infra.yml:4-5`, `docs.yml:10-11`); `Docs` n'y publie le site que si la variable de dépôt `PAGES_PUBLISH` vaut `true` (`docs.yml:57-59`, `:66-68`) |
+| un lancement de `Docs` à la main (`workflow_dispatch`, `docs.yml:12`), sur une branche choisie | `Docs` seul; il ne publie le site que lancé depuis `main` (`docs.yml:57-59`, `:66-68`) |
 | « <span lang="en">Re-run all jobs</span> » ou « <span lang="en">Re-run failed jobs</span> » sur une exécution, ou `gh run rerun <id>` | la même exécution, sur le même commit |
 | le planning de Dependabot, chaque semaine (`dependabot.yml:6-7`, `:13-14`) | une PR de mise à jour, qui lance la CI comme toute PR |
 | une alerte de Dependabot, à tout moment (mises à jour de sécurité, activées dans [Les réglages de Dependabot](#les-reglages-de-dependabot)) | une PR de sécurité, sans attente, qui lance la CI comme toute PR |
@@ -79,10 +80,10 @@ première n'est pas annulée.
 ### Les jobs et leurs tâches
 
 Les jobs d'un même workflow tournent en parallèle, chacun sur un runner neuf, sauf un job qui en attend un autre: le
-`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:45`). Dans un job, les étapes s'enchaînent, et la première
+`deploy` de `Docs` attend son `build` (`needs`, `docs.yml:69`). Dans un job, les étapes s'enchaînent, et la première
 qui échoue arrête le job. Chaque workflow n'a qu'un jeton qui lit le dépôt (`permissions: contents: read`,
 `ci.yml:9-10`, `image.yml:9-10`, `infra.yml:9-10`, `docs.yml:14-15`), et aucun ne lit de secret. Seul le job `deploy`
-de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:53-55`), pour publier sur GitHub Pages.
+de `Docs` a ses propres droits, `pages: write` et `id-token: write` (`docs.yml:77-79`), pour publier sur GitHub Pages.
 
 #### Le workflow `CI`
 
@@ -146,18 +147,24 @@ du groupe de ressources applique le Bicep à la main (`infra/README.md`).
 tourne sur chaque PR vers `main`, sur chaque push sur `main` et quand on le lance à la main (`workflow_dispatch`)
 (`docs.yml:7-12`).
 
-- `build` (l. 19-38) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
-    construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 27-28): le groupe `docs` seul, aux
+- `build` (l. 19-62) récupère le dépôt (l. 22) et installe uv 0.13.6, sans enregistrer le cache (l. 23-26). Il
+    nomme le commit qu'il a récupéré (`git rev-parse HEAD`) et le jour de la construction, en UTC (`date -u +%F`), dans
+    `KB_DOCS_COMMIT` et `KB_DOCS_PUBLISHED_ON` (l. 27-33), que le pied de chaque page donne
+    (`overrides/partials/copyright.html`); une PR les nomme aussi, pour que sa construction rende la ligne. Il
+    construit le site par `uv run --locked --only-group docs mkdocs build --strict` (l. 34-35): le groupe `docs` seul, aux
     versions de `uv.lock`, sans K-B ni ses outils de développement. En mode strict, un lien vers un fichier absent, une
     ancre absente ou une fiche oubliée dans la navigation fait échouer la construction (`mkdocs.yml:99-105`). Puis
     `sha256sum --check` compare le fichier de Mermaid que le plugin `privacy` a téléchargé depuis unpkg, dans sa version
-    11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 29-32). Depuis `main`, sur un push
-    quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin `site/` en artefact de
-    Pages (l. 33-38), que `deploy` publie.
-- `deploy` (l. 40-61) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
-    (l. 42-44), après `build` (l. 45); un seul déploiement tourne à la fois (l. 48-50). Il a les droits
-    `pages: write` et `id-token: write` (l. 53-55), dans l'environnement `github-pages` (l. 56-58), et publie le site
-    par `actions/deploy-pages` (l. 60-61).
+    11 qui bouge (`mermaid@11`), à l'empreinte du fichier de Mermaid 11.17.2 (l. 36-39). Il cherche ensuite, dans
+    `site/index.html`, la date de la construction et le lien vers son commit, et échoue sans eux (l. 40-45). Il
+    construit encore le site trois fois, hors de `site/`: le commit vide, le jour vide, puis sans ces deux variables, et
+    échoue si l'une de ces pages d'accueil porte la ligne ou n'a pas son pied de page (l. 46-56). Depuis
+    `main`, sur un push quand la variable de dépôt `PAGES_PUBLISH` vaut `true`, ou lancé à la main, il dépose enfin
+    `site/` en artefact de Pages (l. 57-62), que `deploy` publie.
+- `deploy` (l. 64-85) ne tourne que depuis `main`, sur un push quand `PAGES_PUBLISH` vaut `true`, ou lancé à la main
+    (l. 66-68), après `build` (l. 69); un seul déploiement tourne à la fois (l. 72-74). Il a les droits
+    `pages: write` et `id-token: write` (l. 77-79), dans l'environnement `github-pages` (l. 80-82), et publie le site
+    par `actions/deploy-pages` (l. 84-85).
 
 Sur une PR, `deploy` est donc sauté. GitHub Pages est activé sur le dépôt:
 voir [GitHub Pages](#github-pages).
@@ -189,7 +196,7 @@ gh pr checks <n° de la PR> --repo SabineLaurent/K-B --watch    # attend la fin,
 
 Une PR reçoit onze contrôles: les sept jobs de `CI`, `image-build`, `bicep-build`, que `infra.yml` lance sur toute PR
 depuis #496, qu'elle touche `infra/` ou non, et les deux jobs de `Docs`, `build` et `deploy`. Dix tournent; `deploy`
-est sauté sur une PR (`docs.yml:42-44`), et GitHub le liste comme tel: `gh pr checks 637` donne `deploy`
+est sauté sur une PR (`docs.yml:66-68`), et GitHub le liste comme tel: `gh pr checks 637` donne `deploy`
 à `skipping`.
 
 ### Fusionner
@@ -300,7 +307,7 @@ uv 0.13.6 compris (`uv self update 0.13.6`), et, pour `tests-postgresql`, un ser
 
 Rien ne se règle hors du dépôt, en dehors des réglages d'[Installer la chaîne](#installer-la-chaine): aucun workflow de
 la CI ne lit de secret, et seul `docs.yml` lit une variable du dépôt, `PAGES_PUBLISH`, qui ouvre la publication du
-site à chaque push sur `main` (`.github/workflows/docs.yml:35`, `:44`).
+site à chaque push sur `main` (`.github/workflows/docs.yml:59`, `:68`).
 
 ### Ce qui se change, et où
 
@@ -316,7 +323,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
 | version de Grype | `image.yml:67` et `:70` (deux fois), et son SHA256 à `image.yml:71` | à la main, ensemble ([Le détail des réglages](#le-detail-des-reglages)) |
 | version épinglée d'un paquet Debian | `Dockerfile:48-54` (zlib1g) | retirée par son issue, #647, quand l'image de base porte le correctif ([Une vulnérabilité dans l'image](#une-vulnerabilite-dans-limage), étape 3) |
 | versions de MkDocs et de Material | `uv.lock`, groupe `docs` (`pyproject.toml:45-47`) | `uv lock --upgrade-package <paquet>`, puis la construction du site sur le poste |
-| fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:32` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
+| fichier de Mermaid attendu par `Docs` | son empreinte, `docs.yml:39` | à la main, après vérification ([Le détail des réglages](#le-detail-des-reglages)) |
 | seuil de couverture | `fail_under`, `pyproject.toml:87` | une décision consignée au journal ADR |
 | règles de lint | `[tool.ruff.lint]`, `pyproject.toml:52-71` | `uv run ruff check --no-cache` avant de pousser |
 | tests écartés par défaut | marqueurs `e2e` et `postgresql`, écartés sauf s'ils sont nommés par `-m` (`tests/conftest.py:125-137`) | un test marqué `postgresql` ne tourne que dans `tests-postgresql` |
@@ -334,7 +341,7 @@ Le tableau suivant donne chaque réglage de la chaîne, où il se trouve, et com
     recoupée avec `grype_<version>_checksums.txt`. La version est aussi écrite dans les pages qui la citent
     (`grep -rn "Grype v0" docs/fiches-veille.md documentation/`).
 - **Le fichier de Mermaid**: le plugin `privacy` télécharge Mermaid depuis unpkg dans sa dernière version 11
-    (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:29-32`). Avant de
+    (`mermaid@11`), et un autre fichier que celui de Mermaid 11.17.2 arrête `build` (`docs.yml:36-39`). Avant de
     changer l'empreinte, vérifier le nouveau fichier contre l'intégrité que npm publie pour son paquet, comme le dit
     [la section Limites de la fiche de l'accessibilité](accessibilite.md#limites).
 - **Dependabot**: chaque semaine, 7 jours d'attente pour une version nouvelle (`cooldown`, `dependabot.yml:8-9` et
