@@ -570,6 +570,13 @@ KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:543
 - **Une base absente.** Une base injoignable reçoit 503 `database_unavailable`, une base sans les tables de K-B 503
     `database_missing`, sans détail (tests `test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq`,
     `test_on_postgresql_a_base_without_its_tables_gives_503_database_missing_and_logs_its_state`).
+- **Un échec de connexion.** Chaque échec du <span lang="en">pool</span> à ouvrir une connexion s'écrit au journal par sa
+    cause, jamais par le texte de libpq, qui cite l'hôte, le port et l'utilisateur: `database_connection_failed: <cause>`,
+    la cause parmi `database_no_token`, `database_connect_timeout`, `database_unreachable`, `database_tls_refused` et
+    `database_authentication_refused`, lue dans la classe de l'erreur ou dans une table fixe de fragments de son texte,
+    sinon `database_connection_failed` (`database/postgresql.py:66-87`, `:320-367`; tests
+    `test_the_cause_of_a_failed_connection_is_named_by_its_class_or_a_fragment_of_libpq`,
+    `test_the_pool_names_the_cause_of_a_failed_connection_without_the_text_of_libpq`).
 - **Plusieurs lectures, un seul état.** `begin_reading` ne fait rien sur PostgreSQL: psycopg ouvre la transaction à
     la première instruction, en `REPEATABLE READ READ ONLY` (`database/engine.py:90-95`).
 

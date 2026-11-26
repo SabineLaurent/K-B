@@ -66,7 +66,13 @@ l'ordre des résultats, change la version.
     Les lignes de `psycopg` et `psycopg_pool` sous ERROR ne sont pas journalisées
     (`LIBRARY_LOG_LEVELS`, `commands/run_log.py`) : elles citent le texte de libpq et la connexion
     (hôte, utilisateur, base). Une base injoignable se voit à la requête, par
-    `database_unavailable: PoolTimeout`.
+    `database_unavailable: PoolTimeout`, et à chaque échec du pool à ouvrir une connexion, par une
+    ligne qui nomme sa cause sans citer libpq : `database_connection_failed: <cause>`, la cause
+    parmi `database_no_token` (l'identité n'a pas donné de jeton), `database_connect_timeout`,
+    `database_unreachable`, `database_tls_refused` et `database_authentication_refused`, lue dans
+    la classe de l'erreur ou dans une table fixe de fragments de son texte, sinon
+    `database_connection_failed` (`ReaderConnection` et `name_connection_failure`,
+    `database/postgresql.py`).
 - **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`).
   En SQLite, elles sont comptées depuis le premier contrôle de sa première lecture, le temps de
   Python entre deux lectures compris ; l'attente d'un fil (le pool de fils de Starlette), avant la

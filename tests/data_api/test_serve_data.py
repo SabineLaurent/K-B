@@ -530,7 +530,8 @@ def test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq(
     monkeypatch, capfd, data_dir, requests_while_serving
 ):
     """The pool fails to connect in the background: its lines, and those of psycopg, would quote
-    the text of libpq (host, port, user); the request says only the type of the error."""
+    the text of libpq (host, port, user); K-B names the cause, and the request the type of its
+    error."""
     monkeypatch.setattr(postgresql, "READING_POOL_WAIT_SECONDS", 0.3)
     monkeypatch.setenv("KB_DATA_API_KEY_TERMINAL", make_key())
     monkeypatch.setenv(
@@ -546,8 +547,16 @@ def test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq(
         capfd.readouterr().err + (data_dir / "logs" / "kb-serve-data.log").read_text()
     )
     assert "database_unavailable: PoolTimeout" in written
-    # The names of the URL and the words of libpq ("connection to server at … failed").
-    for observed in ("kb_user", "kb_base", PASSWORD, "connection to server", "failed"):
+    assert "database_connection_failed: database_unreachable" in written
+    # The names of the URL and the words of libpq ("connection to server at … failed:
+    # Connection refused").
+    for observed in (
+        "kb_user",
+        "kb_base",
+        PASSWORD,
+        "connection to server",
+        "Connection refused",
+    ):
         assert observed not in written
 
 
