@@ -1,6 +1,6 @@
 """The pages of the digests of the watch, without input nor output: the subject and the day read from
 the address, the page of a digest, of a subject without digest, and of a source the base no longer
-holds under its title and its URL (docs/site-web.md, "Comptes rendus")."""
+holds under its number (docs/site-web.md, "Comptes rendus")."""
 
 from dataclasses import dataclass
 from datetime import datetime
@@ -36,9 +36,6 @@ EMPTY_TEXT_BY_OUTCOME = {
 NO_TEXT = "Sans texte."
 NO_DIGEST_TEXT = "Aucun compte rendu pour ce sujet."
 SOURCE_LINK_LABEL = "Lire la source"
-# The five kinds of the watch link to pages in English (LABELS_BY_KIND, link_lang).
-SOURCE_LINK_LANG = "en"
-SOURCE_LINK_NOTE = f"en anglais, {NEW_TAB_NOTE}"
 # The kinds whose plural is feminine: the kinds read in full, all of them feminine, take "lues".
 FEMININE_KINDS: frozenset[WatchKind] = frozenset(
     {"vulnerability", "advisory", "release"}
@@ -187,7 +184,7 @@ class AbsentDigestPage:
 
 @dataclass(frozen=True)
 class MissingSourcePage:
-    """A source of a digest whose item the base does not hold under its title."""
+    """A source of a digest that its number no longer leads to (is_item_of_source)."""
 
     page_title: str
     back_link: BackLink
@@ -197,7 +194,6 @@ class MissingSourcePage:
     # None: a URL out of https, never made a link.
     link: str | None
     link_label: str
-    link_lang: str
     link_note: str
 
 
@@ -331,13 +327,13 @@ def find_source(digest: WatchDigest, item_id: int) -> DigestSource | None:
 
 
 def is_item_of_source(detail: ItemDetail, source: DigestSource) -> bool:
-    """Whether the item is the source: its title on one line, as the twin of the sheet writes it
-    (make_visible), and its URL when the source has one. A base made again numbers its items anew
-    (docs/specs-api.md, GET /digests/{subject}, limit (d)); vulnerabilities of the CISA KEV share
-    their title, never their URL."""
-    return make_visible(detail.title) == source.title and (
-        source.url is None or source.url == detail.url
-    )
+    """Whether the item is the source: its URL when the source has one, which a paper retitled in
+    place keeps (database/writers/paper_writer.py) and vulnerabilities of the CISA KEV, sharing
+    their title, never share; else its title on one line, as the twin writes it (make_visible). A
+    base made again numbers its items anew (docs/specs-api.md, GET /digests/{subject}, limit (d))."""
+    if source.url is not None:
+        return source.url == detail.url
+    return make_visible(detail.title) == source.title
 
 
 def build_missing_source_page(
@@ -354,6 +350,7 @@ def build_missing_source_page(
         title_lang="en" if title else None,
         link=keep_https_link(source.url),
         link_label=SOURCE_LINK_LABEL,
-        link_lang=SOURCE_LINK_LANG,
-        link_note=SOURCE_LINK_NOTE,
+        # The site knows neither the kind of a source nor the language of its page: the note alone,
+        # as on the card of a newsletter article.
+        link_note=NEW_TAB_NOTE,
     )

@@ -17,7 +17,7 @@ from digest_fixture import (
     make_digest,
     serve_digests,
 )
-from item_fixture import ITEM_DETAILS, VULNERABILITY, make_detail
+from item_fixture import ITEM_DETAILS, PAPER, VULNERABILITY, make_detail
 from screen_weight import SCREEN_BUDGET_BYTES, SCREEN_RESOURCES, weigh_screen
 from site_client import OPERATOR_HEADERS, make_client
 
@@ -521,7 +521,13 @@ def test_the_detail_of_the_feed_keeps_its_way_back_to_the_feed():
     "items",
     [
         # Another item under the same id: a base made again numbers its items anew.
-        {9: make_detail(9, title="Another title")},
+        {
+            9: make_detail(
+                9,
+                title="Another title",
+                url="https://github.com/advisories/GHSA-aaaa-bbbb-cccc",
+            )
+        },
         # No item of this id in the base.
         {},
         # A Zotero entry or a clip, never shown.
@@ -537,8 +543,11 @@ def test_a_source_without_its_item_is_said_with_its_title_and_its_link(items):
     assert "<h1>Source introuvable</h1>" in response.text
     assert "Le n° 9 de la base de K-B ne mène pas à cette source." in response.text
     assert f'<dd lang="en">{ITEM_DETAILS[9]["title"]}</dd>' in response.text
-    assert f'href="{ITEM_DETAILS[9]["url"]}" hreflang="en"' in response.text
-    assert "(en anglais, site externe, nouvel onglet)" in response.text
+    # The site does not know the kind of a source, nor the language of its page: the note alone,
+    # as on the card of a newsletter article.
+    assert f'href="{ITEM_DETAILS[9]["url"]}" target="_blank"' in response.text
+    assert "(site externe, nouvel onglet)" in response.text
+    assert "en anglais" not in response.text
     assert "Another title" not in response.text
     assert "A private page kept" not in response.text
     assert "secret-clip-text" not in response.text
@@ -546,6 +555,30 @@ def test_a_source_without_its_item_is_said_with_its_title_and_its_link(items):
         f'<a class="back-link" href="{DAY_PATH}"><span aria-hidden="true">←</span>'
         " Retour au compte rendu</a>" in response.text
     )
+
+
+def test_a_source_whose_paper_was_retitled_leads_to_the_page_of_its_item():
+    """arXiv retitles a paper in place (database/writers/paper_writer.py): its URL, without its
+    version, stays. A source with a URL is checked by its URL alone."""
+    paper = ITEM_DETAILS[PAPER]
+    digest = make_digest(
+        claims=[{"text": "Une affirmation.", "item_ids": [PAPER]}],
+        sources=[
+            {
+                "item_id": PAPER,
+                "title": "An earlier title of the paper",
+                "url": paper["url"],
+            }
+        ],
+    )
+
+    response = get(
+        f"{SOURCE_PATH}/{PAPER}", serve_digests(digest, items={PAPER: paper})[0]
+    )
+
+    assert response.status_code == 200
+    assert "Retour au compte rendu" in response.text
+    assert "Source introuvable" not in response.text
 
 
 def test_a_source_whose_item_has_its_title_under_another_url_is_not_found():

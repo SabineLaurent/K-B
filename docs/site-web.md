@@ -224,15 +224,18 @@ laisse vide se lit « Sans texte. », un titre « Sans titre » (sans `lang`).
 **Le lien d'une source vers son item** (limite (d) de `GET /digests/{subject}`, `docs/specs-api.md`) : `item_id`
 est une clé de substitution, et une base refaite renumérote ses items. Le lien vise donc
 `/comptes-rendus/<sujet>/<jour>/sources/<id>`, jamais `/items/<id>` : au clic, le site relit le compte rendu, puis
-l'item, et compare le titre de l'item, mis sur une ligne comme l'écrit le jumeau (`make_visible`, passée de
-`post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la source,
-puis son URL à celle de la source, quand la source en a une (le jumeau l'écrit telle quelle, `find_writable_url`) :
-les failles du catalogue KEV partagent leur titre (`vulnerabilityName`), jamais leur URL (NVD et le n° CVE).
+l'item, et compare l'URL de l'item à celle de la source, quand la source en a une (le jumeau l'écrit telle quelle,
+`find_writable_url`) ; sinon, le titre de l'item, mis sur une ligne comme l'écrit le jumeau (`make_visible`, passée
+de `post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la
+source. L'URL d'abord : les failles du catalogue KEV partagent leur titre (`vulnerabilityName`), jamais leur URL
+(NVD et le n° CVE), et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
+(`database/writers/paper_writer.py`), jamais son URL (`abs/<id>`, sans version). Un même article TLDR, repris par
+deux éditions, est deux items d'une même URL : sa source mène alors à l'un ou à l'autre, le même article.
 
 | Item | Page |
 |---|---|
-| son titre et son URL sont ceux de la source | la page de l'item (`item.html`), « ← Retour au compte rendu », son titre suivi de « , source du compte rendu … du … » (RGAA 8.6) |
-| un autre titre ou une autre URL, `item_not_found`, une entrée Zotero ou un clip | « Source introuvable » : « Le n° … de la base de K-B ne mène pas à cette source. », le titre de la source, et son lien d'origine s'il est en `https`, par `external_link`, en anglais (`hreflang="en"`, comme les liens d'origine des cinq sortes) |
+| son URL est celle de la source, ou son titre si la source n'a pas d'URL | la page de l'item (`item.html`), « ← Retour au compte rendu », son titre suivi de « , source du compte rendu … du … » (RGAA 8.6) |
+| une autre URL (ou un autre titre), `item_not_found`, une entrée Zotero ou un clip | « Source introuvable » : « Le n° … de la base de K-B ne mène pas à cette source. », le titre de la source, et son lien d'origine s'il est en `https`, par `external_link`, sans langue : le site ne connaît ni la sorte de la source ni la langue de sa page, comme pour l'article d'une newsletter |
 | la source n'est pas dans le compte rendu | la page 404, sans lecture d'item |
 
 Écartés : un lien direct vers `/items/<id>`, qu'une base refaite mènerait sans erreur à un autre item ; contrôler

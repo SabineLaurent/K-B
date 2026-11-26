@@ -64,7 +64,7 @@ from k_b.web.settings import DataApiAccess
 
 ITEMS_PATH = "items"
 TREND_WINDOW_PATH = "trends"
-DIGESTS_PATH = "digests"
+DIGESTS_API_PATH = "digests"
 # The 30 first repositories by stars and the 30 first by forks, together (docs/specs-api.md).
 MAX_TRENDS = 2 * GH_ARCHIVE_TOP_SIZE
 # The first day a window can end on: the site writes its start, GH_ARCHIVE_WINDOW_DAYS - 1 days
@@ -243,8 +243,8 @@ class DigestClaim(DataApiModel):
 
 
 class DigestSource(DataApiModel):
-    """A source of a digest: its item_id leads to an item only if the title of the item is its
-    title (docs/specs-api.md, GET /digests/{subject}, limit (d))."""
+    """A source of a digest: its item_id leads to an item only if the item has its URL, or its
+    title when it has none (docs/specs-api.md, GET /digests/{subject}, limit (d))."""
 
     item_id: DigestItemId
     title: Annotated[str, Field(max_length=MAX_DIGEST_SOURCE_TITLE_CHARS)]
@@ -445,7 +445,7 @@ def read_digest(
     params: dict[str, str | int | list[str]] = (
         {} if day is None else {"day": day.isoformat()}
     )
-    status, body = send(http_client, f"{DIGESTS_PATH}/{subject}", params, clock)
+    status, body = send(http_client, f"{DIGESTS_API_PATH}/{subject}", params, clock)
     if status == httpx2.codes.NOT_FOUND and is_error_named(body, "digest_not_found"):
         raise DataApiError("data_api_digest_not_found", status)
     if status != httpx2.codes.OK:
@@ -468,7 +468,7 @@ def list_digest_days(
     """The DAYS_LIMIT most recent days of the subject, and their total; bounded as a page of the
     feed."""
     status, body = send(
-        http_client, f"{DIGESTS_PATH}/{subject}/days", {"limit": DAYS_LIMIT}, clock
+        http_client, f"{DIGESTS_API_PATH}/{subject}/days", {"limit": DAYS_LIMIT}, clock
     )
     if status != httpx2.codes.OK:
         raise name_failure(status, body)

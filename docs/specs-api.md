@@ -644,7 +644,7 @@ Les paramètres et la réponse de `GET /tops/{top}/days` : `limit` de 1 à 100 (
   `commands/digest_command.py`), vu au journal du job. Pour réduire le risque : réécrire ce jumeau depuis la fiche,
   par l'outil de (a), sans `item_id` ; faisable en code, non planifié.
 - (d) `item_id` est une clé de substitution : une base refaite renumérote ses items ; un item purgé répond 404
-  `item_not_found`. Le site ne mène à l'item que si son titre et son URL sont ceux de la source ; sinon, il le dit et donne
+  `item_not_found`. Le site ne mène à l'item que si son URL est celle de la source, ou son titre quand la source n'a pas d'URL ; sinon, il le dit et donne
   l'URL de la source (#724, `docs/site-web.md`, « Comptes rendus »). Les UUID de #403 n'y suffiraient pas : une base refaite en tire de nouveaux (« Ce qui manque, et comment le tenir »,
   API1).
 - (e) Un sujet retiré de `DIGEST_SUBJECTS` rend ses anciens comptes rendus inaccessibles (422). Pour réduire le
