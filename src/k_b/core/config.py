@@ -422,6 +422,11 @@ DATA_API_STORAGE_READ_TIMEOUT_SECONDS = 10
 # an ordinary one 0.03 s. Below DATA_API_READ_TIMEOUT_SECONDS, the wait of the AI API for each
 # piece of an answer.
 DATA_API_QUERY_TIMEOUT_SECONDS = 5
+# What a GET /health/database refused while another runs is told to wait: the longest the one under
+# way takes, the wait for a connection of the pool, then its statement (data_api/database_health.py).
+DATABASE_HEALTH_RETRY_AFTER_SECONDS = (
+    READING_POOL_WAIT_SECONDS + DATA_API_QUERY_TIMEOUT_SECONDS
+)
 
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
 # by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.

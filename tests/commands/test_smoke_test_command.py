@@ -1,5 +1,6 @@
-"""kb smoke-test: the health and the probes without key of both APIs, then the listing of the
-container of the test by the identity of the job; only counts are written."""
+"""kb smoke-test: the health and the probes without key of both APIs, the health of the base of the
+data API, then the listing of the container of the test by the identity of the job; only counts are
+written."""
 
 import re
 import signal
@@ -40,6 +41,7 @@ HEALTH_BODY = b'{"status":"ok"}'
 # each probe to the apps themselves.
 STATUS_WITHOUT_KEY = {
     ("GET", "/health"): 200,
+    ("GET", "/health/database"): 200,
     ("GET", "/items"): 401,
     ("POST", "/digests"): 401,
     ("GET", "/docs"): 404,
@@ -155,6 +157,7 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
         ("GET", f"{TEST_DATA_API_URL}/items"),
         ("GET", f"{TEST_DATA_API_URL}/docs"),
         ("HEAD", f"{TEST_DATA_API_URL}/health"),
+        ("GET", f"{TEST_DATA_API_URL}/health/database"),
         ("GET", f"{TEST_AI_API_URL}/health"),
         ("POST", f"{TEST_AI_API_URL}/digests"),
         ("GET", f"{TEST_AI_API_URL}/docs"),
@@ -168,6 +171,7 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
         "data API GET /items": "401 as expected",
         "data API GET /docs": "404 as expected",
         "data API HEAD /health": "405 as expected",
+        "data API GET /health/database": "ok",
         "AI API": "ok",
         "AI API POST /digests": "401 as expected",
         "AI API GET /docs": "404 as expected",
@@ -175,10 +179,11 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
         "exchange storage": "1 blob listed in smoke-test",
     }
     log = read_kb_log(smoke_test_environment)
+    assert "data API: /health/database answered" in log
     assert "AI API: POST /digests without key answered 401" in log
     assert "exchange storage: 1 blob listed in smoke-test" in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 9 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 10 of 10 checks passed\n", log
     )
 
 
@@ -193,7 +198,7 @@ def test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run(
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.FAILED
-    assert len(api_requests) == 8
+    assert len(api_requests) == 9
     assert len(storage_requests) == 1
     summary = read_summary(capsys.readouterr().out)
     assert summary[f"{name} {method} {path}"] == "failed"
@@ -204,7 +209,7 @@ def test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run(
         "probe_unexpected_status, HTTP 200\n"
     ) in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 10 checks passed\n", log
     )
 
 
@@ -230,7 +235,7 @@ def test_a_probe_without_answer_fails_by_its_state_without_the_url(
     assert TEST_AI_API_HOST not in log
     assert "refused by the test" not in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 10 checks passed\n", log
     )
 
 
@@ -246,7 +251,7 @@ def test_the_body_of_an_answer_to_a_probe_is_never_read(
 ):
     def answer_probes_with_an_unread_body(request):
         answer = answer_as_the_apis()(request)
-        if (request.method, request.url.path) == ("GET", "/health"):
+        if request.method == "GET" and request.url.path.startswith("/health"):
             return answer
         return httpx2.Response(answer.status_code, stream=UnreadStream())
 
@@ -320,7 +325,7 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
     exit_code = cli.main(["smoke-test"])
 
     assert exit_code == cli.ExitCode.FAILED
-    assert len(api_requests) == 8
+    assert len(api_requests) == 9
     assert len(storage_requests) == 1
     summary = read_summary(capsys.readouterr().out)
     assert summary["data API"] == "failed"
@@ -329,7 +334,45 @@ def test_an_api_that_fails_its_health_fails_the_smoke_test_and_the_other_checks_
     log = read_kb_log(smoke_test_environment)
     assert "data API: /health failed: health_failed, HTTP 503" in log
     assert re.search(
-        r"INFO k_b\.cli: smoke test finished in \d+ s: 8 of 9 checks passed\n", log
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 10 checks passed\n", log
+    )
+
+
+@pytest.mark.parametrize(
+    ("answer", "description"),
+    [
+        (
+            httpx2.Response(503, content=b'{"error":"database_unavailable"}'),
+            "health_failed, HTTP 503",
+        ),
+        (httpx2.Response(200, content=b'{"status":"down"}'), "health_invalid_response"),
+    ],
+)
+def test_a_base_the_data_api_does_not_read_fails_the_smoke_test_and_the_other_checks_still_run(
+    monkeypatch, smoke_test_environment, capsys, answer, description
+):
+    def answer_without_the_base(request):
+        if request.url.path == "/health/database":
+            return answer
+        return answer_as_the_apis()(request)
+
+    api_requests, storage_requests = simulate(
+        monkeypatch, handle_api=answer_without_the_base
+    )
+
+    exit_code = cli.main(["smoke-test"])
+
+    assert exit_code == cli.ExitCode.FAILED
+    assert len(api_requests) == 9
+    assert len(storage_requests) == 1
+    summary = read_summary(capsys.readouterr().out)
+    assert summary["data API GET /health/database"] == "failed"
+    assert sum(result == "failed" for result in summary.values()) == 1
+    log = read_kb_log(smoke_test_environment)
+    assert f"ERROR k_b.cli: data API: /health/database failed: {description}\n" in log
+    assert TEST_DATA_API_HOST not in log
+    assert re.search(
+        r"INFO k_b\.cli: smoke test finished in \d+ s: 9 of 10 checks passed\n", log
     )
 
 
@@ -354,6 +397,7 @@ def test_smoke_test_reaches_the_compose_services_in_http_in_the_sandbox(
         "http://api-donnees:8000/items",
         "http://api-donnees:8000/docs",
         "http://api-donnees:8000/health",
+        "http://api-donnees:8000/health/database",
         "http://api-ia:8001/health",
         "http://api-ia:8001/digests",
         "http://api-ia:8001/docs",

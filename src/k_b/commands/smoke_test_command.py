@@ -1,6 +1,7 @@
-"""kb smoke-test: GET /health of both APIs and their probes without key, then the listing of the
-container of the test of the exchange storage by the identity of the job, the proof that a job
-online reaches all three and that both APIs refuse what they must; only counts are written."""
+"""kb smoke-test: GET /health of both APIs and their probes without key, GET /health/database of the
+data API, then the listing of the container of the test of the exchange storage by the identity of
+the job, the proof that a job online reaches all three, that the data API reads its base and that
+both APIs refuse what they must; only counts are written."""
 
 import logging
 from collections.abc import Mapping, Sequence
@@ -20,6 +21,7 @@ from k_b.commands.batch_summary import (
 )
 from k_b.commands.exit_codes import ExitCode
 from k_b.commands.run_log import LOGGER_NAME, value_or_log_refusal
+from k_b.core.api_health import DATABASE_HEALTH_PATH
 from k_b.core.api_settings import is_sandbox
 from k_b.core.config import AI_API_URL, DATA_API_URL, SMOKE_TEST_CONTAINER
 from k_b.core.outbound import find_internal_api_url_refusal
@@ -86,8 +88,9 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
     if settings is None:
         return ExitCode.NOT_STARTED
     logger.info(
-        "smoke test started: /health and the probes without key of 2 APIs, then the listing"
-        " of %s",
+        "smoke test started: /health and the probes without key of 2 APIs, %s of the data"
+        " API, then the listing of %s",
+        DATABASE_HEALTH_PATH,
         SMOKE_TEST_CONTAINER,
     )
     started = monotonic()
@@ -99,6 +102,7 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
             settings.data_api_url,
             list_probes(DATA_API_ROUTE_WITH_KEY, settings.is_sandbox),
         ),
+        check_data_api_database(settings.data_api_url),
         check_api(AI_API_NAME, settings.ai_api_url),
         *probe_api(
             AI_API_NAME,
@@ -152,6 +156,20 @@ def check_api(name: str, base_url: str) -> CheckResult:
         return CheckResult(name, CHECK_FAILED)
     logger.info("%s: /health answered", name)
     return CheckResult(name, CHECK_PASSED)
+
+
+def check_data_api_database(base_url: str) -> CheckResult:
+    """GET /health/database of the data API at base_url, by a client with the waits of a probe:
+    its /health has woken it."""
+    check = f"{DATA_API_NAME} GET {DATABASE_HEALTH_PATH}"
+    try:
+        with build_probe_client(base_url) as http_client:
+            check_health(http_client, DATABASE_HEALTH_PATH)
+    except HealthCheckError as error:
+        logger.error("%s: %s failed: %s", DATA_API_NAME, DATABASE_HEALTH_PATH, error)
+        return CheckResult(check, CHECK_FAILED)
+    logger.info("%s: %s answered", DATA_API_NAME, DATABASE_HEALTH_PATH)
+    return CheckResult(check, CHECK_PASSED)
 
 
 def probe_api(name: str, base_url: str, probes: Sequence[Probe]) -> list[CheckResult]:

@@ -22,6 +22,9 @@ from k_b.items import (
 )
 
 SELECT_RAW_FILE_PATHS = "SELECT raw_file_path FROM raw_data"
+# One row at most of the first table of the schema: a base without the tables of K-B fails as for a
+# data route (42P01 on PostgreSQL), where SELECT 1 would pass.
+SELECT_ONE_SOURCE = "SELECT 1 FROM source LIMIT 1"
 
 # One branch per ItemKind; its date is the one the source gives (docs/specs-api.md, "Date,
 # titre et résumé par sorte"). A kind without summary gives NULL: its title alone is searched.
@@ -320,6 +323,11 @@ class TrendWindow(NamedTuple):
     window_end: date
     # The most stars gained first, then the most forks, then by repository_id.
     trends: list[StoredTrend]
+
+
+def check_reading(connection: Connection) -> None:
+    """Read the base once, for GET /health/database: an error is the one a data route gets."""
+    connection.execute(SELECT_ONE_SOURCE).fetchall()
 
 
 def read_raw_file_paths(connection: Connection) -> frozenset[str]:

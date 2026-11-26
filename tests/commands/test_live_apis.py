@@ -345,6 +345,7 @@ def test_smoke_test_reaches_the_health_of_both_apis_served(
         "data API GET /items": "401 as expected",
         "data API GET /docs": "404 as expected",
         "data API HEAD /health": "405 as expected",
+        "data API GET /health/database": "ok",
         "AI API": "ok",
         "AI API POST /digests": "401 as expected",
         "AI API GET /docs": "404 as expected",

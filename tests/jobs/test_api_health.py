@@ -7,7 +7,7 @@ from functools import partial
 import httpx2
 import pytest
 
-from k_b.core.api_health import answer_health
+from k_b.core.api_health import DATABASE_HEALTH_PATH, answer_health
 from k_b.core.config import (
     HEALTH_CONNECT_TIMEOUT_SECONDS,
     HEALTH_READ_TIMEOUT_SECONDS,
@@ -46,6 +46,25 @@ def test_an_api_that_answers_its_health_passes(health_body):
 
     assert request.method == "GET"
     assert str(request.url) == f"{TEST_API_URL}/health"
+
+
+def test_the_health_of_the_base_is_asked_at_its_own_path(health_body):
+    requests_sent = []
+
+    def keep_and_answer(request):
+        requests_sent.append(request)
+        return httpx2.Response(200, content=health_body)
+
+    with build_health_client(
+        TEST_API_URL, transport=httpx2.MockTransport(keep_and_answer)
+    ) as http_client:
+        check_health(http_client, DATABASE_HEALTH_PATH)
+
+    [request] = requests_sent
+    assert (request.method, str(request.url)) == (
+        "GET",
+        f"{TEST_API_URL}/health/database",
+    )
 
 
 @pytest.mark.parametrize(

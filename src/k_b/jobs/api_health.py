@@ -1,5 +1,5 @@
-"""GET /health of an API of K-B from a job: its answer read within its bounds, then checked by a
-closed schema; no retry, the job fails."""
+"""GET /health of an API of K-B from a job, or /health/database of the data API: its answer read
+within its bounds, then checked by a closed schema; no retry, the job fails."""
 
 import time
 from collections.abc import Callable
@@ -46,7 +46,8 @@ class HealthCheckError(Exception):
 
 
 class HealthAnswer(BaseModel):
-    """The answer of GET /health of both APIs (core/api_health.py), and nothing else."""
+    """The answer of GET /health of both APIs and of GET /health/database (core/api_health.py),
+    and nothing else."""
 
     model_config = ConfigDict(extra="forbid", strict=True, frozen=True)
 
@@ -71,12 +72,15 @@ def build_health_client(
 
 
 def check_health(
-    http_client: httpx2.Client, clock: Callable[[], float] = time.monotonic
+    http_client: httpx2.Client,
+    path: str = HEALTH_PATH,
+    clock: Callable[[], float] = time.monotonic,
 ) -> None:
-    """GET /health, refused by HealthCheckError unless the API answers 200 and {"status": "ok"}."""
+    """GET of path, /health by default, refused by HealthCheckError unless the API answers 200 and
+    {"status": "ok"}."""
     deadline = clock() + HEALTH_REQUEST_DEADLINE_SECONDS
     try:
-        with http_client.stream("GET", HEALTH_PATH) as response:
+        with http_client.stream("GET", path) as response:
             if response.status_code != HEALTHY_STATUS:
                 raise HealthCheckError("health_failed", response.status_code)
             body = read_bounded_body(
