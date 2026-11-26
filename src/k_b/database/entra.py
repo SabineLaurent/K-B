@@ -38,15 +38,16 @@ def build_identity_transport() -> RequestsTransport:
 
 
 def build_database_credential(
-    client_id: str, transport: RequestsTransport | None = None
+    client_id: str, *, is_asked_once: bool, transport: RequestsTransport | None = None
 ) -> ManagedIdentityCredential:
     """The credential of the user-assigned identity of client_id; it keeps its token and asks for a
-    new one before it expires, and asks once only for each."""
-    return ManagedIdentityCredential(
-        client_id=client_id,
-        transport=transport or build_identity_transport(),
-        retry_total=DATABASE_TOKEN_RETRIES,
-    )
+    new one before it expires, once only for each if is_asked_once, else as azure-core retries."""
+    transport = transport or build_identity_transport()
+    if is_asked_once:
+        return ManagedIdentityCredential(
+            client_id=client_id, transport=transport, retry_total=DATABASE_TOKEN_RETRIES
+        )
+    return ManagedIdentityCredential(client_id=client_id, transport=transport)
 
 
 def fetch_database_token(credential: TokenCredential) -> str:

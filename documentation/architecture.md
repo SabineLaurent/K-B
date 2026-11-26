@@ -539,7 +539,7 @@ modules); le tableau suivant donne les principales.
 | `ca-kb-data-api` | lance `kb serve-data`, sur la base PostgreSQL en ligne, ouverte par l'identité managée (`KB_DATABASE_AUTH=entra`), et sur le conteneur `watch` | `infra/main.bicep:243-278` |
 | `ca-kb-ai-api` | lance `kb serve-ai`, qui lit `ca-kb-data-api` en HTTPS | `infra/main.bicep:280-317` |
 | `ca-kb-web` | lance `kb serve-web`, le site privé, qui lit `ca-kb-data-api` en HTTPS. La connexion Microsoft Entra de Container Apps n'admet que l'identifiant d'objet de l'opératrice, que le code vérifie aussi à chaque requête (`KB_WEB_OPERATOR_ID`, `web/operator_check.py:45`) | `infra/main.bicep:319-357` |
-| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test`; depuis #499, aussi leurs sondes sans clé; depuis #458, aussi `GET /health/database` de l'API de données | `infra/main.bicep:359-377`, `commands/smoke_test_command.py:68-81`, #499, #458 |
+| `caj-kb-smoke-test` | job manuel, lance `kb smoke-test`: `GET /health` des deux API, puis la liste du conteneur `smoke-test`; depuis #499, aussi leurs sondes sans clé; depuis #458, aussi `GET /health/database` de l'API de données | `infra/main.bicep:359-377`, `commands/smoke_test_command.py:68-81`, #499; `commands/smoke_test_command.py:112`, `:162-173`, #458 |
 | `caj-kb-migrate-database` | job manuel, lance `kb migrate-database` | `infra/main.bicep:453-469` |
 | `caj-kb-daily-routine` | job planifié chaque jour à 08:00 UTC, lance `kb daily-routine` | `infra/main.bicep:379-404`, `infra/modules/daily-routine-job.bicep:78` |
 | `caj-kb-digest-watch` | job planifié, par défaut le lundi et le jeudi à 10:00 UTC, lance `kb digest-watch` | `infra/main.bicep:32`, `:406-431` |

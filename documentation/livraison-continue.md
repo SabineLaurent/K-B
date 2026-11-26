@@ -362,8 +362,8 @@ toujours, et chaque échec a sa ligne, avec son état:
     `POST /digests`) qui doit rendre 401, `GET /docs` qui doit rendre 404, et `HEAD /health` qui doit rendre 405:
     `probe_unexpected_status` avec le statut reçu, `probe_timeout` ou `probe_unavailable`;
 - pour `GET /health/database` de l'API de données (#458), qui lit une ligne de sa base: les états du `/health`, dont
-    `health_failed` avec le statut reçu (503 `database_missing`, `database_unavailable` ou `query_timeout`, que la
-    ligne de l'API de données nomme);
+    `health_failed` avec le statut reçu (503 `database_missing`, `database_unavailable` ou `query_timeout`, 500
+    `database_error`, que la ligne de l'API de données nomme);
 - pour le stockage d'échange: `exchange_storage_no_token` (l'identité du job sans jeton, refusée ou injoignable),
     `exchange_storage_forbidden`, `exchange_storage_unauthorized`, `exchange_storage_not_found`,
     `exchange_storage_unavailable` ou `exchange_storage_failed`.

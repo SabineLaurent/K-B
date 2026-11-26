@@ -69,15 +69,20 @@ l'ordre des résultats, change la version.
     `database_unavailable: PoolTimeout`, et à chaque échec du pool à ouvrir une connexion, par une
     ligne qui nomme sa cause sans citer libpq : `database_connection_failed: <cause>`, la cause
     parmi `database_no_token` (l'identité n'a pas donné de jeton), `database_connect_timeout`,
-    `database_unreachable`, `database_tls_refused` et `database_authentication_refused`, lue dans
-    la classe de l'erreur ou dans une table fixe de fragments de son texte, sinon
+    `database_unreachable`, `database_tls_refused` (un serveur sans TLS, ou un texte qui nomme un
+    certificat ; une coupure pendant l'échange TLS reste `database_connection_failed`) et
+    `database_authentication_refused`, lue dans la classe de l'erreur ou dans une table fixe de fragments de son texte, sinon
     `database_connection_failed` (`ReaderConnection` et `name_connection_failure`,
     `database/postgresql.py`). Sous Entra, la demande d'un jeton attend 2 s la connexion au point
-    d'identité et 5 s sa réponse, sans nouvelle tentative (`DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS`,
-    `DATABASE_TOKEN_READ_TIMEOUT_SECONDS`, `DATABASE_TOKEN_RETRIES`, `core/config.py`) : un jeton
-    qui ne vient pas échoue sous les 10 s du client de l'API IA
-    (`test_a_failed_request_for_the_token_is_not_asked_again`,
-    `test_a_token_that_does_not_come_fails_before_the_client_of_the_ai_api_stops_waiting`).
+    d'identité et 5 s sa réponse, sans nouvelle tentative pour le pool
+    (`DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS`, `DATABASE_TOKEN_READ_TIMEOUT_SECONDS`,
+    `DATABASE_TOKEN_RETRIES`, `core/config.py`) : un jeton qui ne vient pas échoue sous les 10 s du
+    client de l'API IA (`test_a_failed_request_for_the_token_is_not_asked_again_when_asked_once`,
+    `test_under_entra_the_pool_asks_each_token_once`,
+    `test_a_token_that_does_not_come_fails_before_the_client_of_the_ai_api_stops_waiting`). Une
+    connexion directe de `kb`, qu'aucun client n'attend, garde les nouvelles tentatives d'azure-core
+    (`test_a_failed_request_for_the_token_is_asked_again_otherwise`,
+    `test_under_entra_a_direct_connection_lets_azure_core_ask_again_for_its_token`).
 - **Délai** : une requête a 5 s dans la base (`DATA_API_QUERY_TIMEOUT_SECONDS`, `core/config.py`).
   En SQLite, elles sont comptées depuis le premier contrôle de sa première lecture, le temps de
   Python entre deux lectures compris ; l'attente d'un fil (le pool de fils de Starlette), avant la
@@ -153,9 +158,10 @@ l'ordre des résultats, change la version.
   la première table du schéma (`SELECT 1 FROM source LIMIT 1`, `check_reading`,
   `database/reading.py`) par la connexion d'une route (`connect_reader`), sous les mêmes délais :
   2 s pour une connexion du pool, 5 s pour l'instruction. Elle répond 200 `{"status": "ok"}`, ou
-  l'erreur d'une route de données pour la même cause, avec sa ligne au journal : 503
-  `database_missing` (fichier SQLite absent ; en PostgreSQL, base sans les tables de K-B, là où
-  `SELECT 1` passerait), 503 `database_unavailable` (aucune connexion du pool en 2 s), 503
+  l'erreur d'une route de données pour la même cause, avec sa ligne au journal, sauf pour un
+  fichier SQLite absent, que seule la ligne de la requête dit : 503 `database_missing` (fichier
+  SQLite absent ; en PostgreSQL, la table `source` absente, la seule qu'elle lit, là où `SELECT 1`
+  passerait), 503 `database_unavailable` (aucune connexion du pool en 2 s), 503
   `query_timeout`, 500 `database_error` (`data_api/database_health.py`,
   `tests/data_api/test_database_health.py`). Un appel à la fois : un second pendant qu'un premier
   tourne reçoit 429 `request_already_running`, avec `Retry-After: 7`, le plus long du premier
@@ -713,7 +719,7 @@ valeur reçue.
 | `rate_limit_exceeded` | 429 | client au-delà de la limite de la route (« Débit »), avec `Retry-After` |
 | `request_already_running` | 429 | `GET /health/database` pendant qu'un autre tourne (« Santé de la base »), avec `Retry-After: 7` |
 | `query_timeout` | 503 | la requête a passé 5 s dans la base (« Délai »), sans détail |
-| `database_missing` | 503 | le fichier SQLite de la base n'existe pas ; en PostgreSQL, la base n'a pas les tables de K-B (SQLSTATE 42P01), journalisé `database_missing: UndefinedTable 42P01` |
+| `database_missing` | 503 | le fichier SQLite de la base n'existe pas ; en PostgreSQL, une table de K-B manque (SQLSTATE 42P01), journalisé `database_missing: UndefinedTable 42P01` |
 | `database_unavailable` | 503 | en PostgreSQL, le pool n'a prêté aucune connexion en 2 s : toutes prêtées, ou aucune qui joigne la base |
 | `database_error` | 500 | toute autre erreur de la base, sans détail |
 | `internal_error` | 500 | toute autre erreur, sans détail ; journalisée par son type seul, sans pile ni message |

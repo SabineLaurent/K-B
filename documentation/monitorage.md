@@ -602,7 +602,7 @@ Un avertissement nomme un état, un délai de la base dépassé par exemple (`qu
 `src/k_b/data_api/errors.py:55`). La trace d'une erreur imprévue suit sa ligne datée, sur des lignes sans date
 (`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` trouve la ligne
 de la requête et les autres lignes de la même requête (`database_error`, `query_timeout`, `internal_error`:
-`docs/specs-api.md:140-142`; depuis #458, aussi `database_missing` et `database_unavailable`: `docs/specs-api.md:175-177`,
+`docs/specs-api.md:140-142`; depuis #458, aussi `database_missing` et `database_unavailable`: `docs/specs-api.md:181-183`,
 #458; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
 une ligne de mesure porte `"request_id"`, sur la sortie standard.
 

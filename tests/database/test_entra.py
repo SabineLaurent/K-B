@@ -42,7 +42,9 @@ def test_the_token_is_asked_for_the_base_by_the_identity_of_its_client_id():
     transport = FakeTransport(answer_token)
 
     token = fetch_database_token(
-        build_database_credential(TEST_CLIENT_ID, transport=transport)
+        build_database_credential(
+            TEST_CLIENT_ID, is_asked_once=True, transport=transport
+        )
     )
 
     assert token == TEST_TOKEN
@@ -63,7 +65,7 @@ def test_the_token_is_asked_for_the_base_by_the_identity_of_its_client_id():
 )
 def test_an_identity_that_gives_no_token_is_named_without_what_it_answered(answer):
     credential = build_database_credential(
-        TEST_CLIENT_ID, transport=FakeTransport(answer)
+        TEST_CLIENT_ID, is_asked_once=True, transport=FakeTransport(answer)
     )
 
     with pytest.raises(EntraTokenError) as raised:
@@ -95,15 +97,40 @@ def raise_connection_refused(request):
     ],
     ids=["500", "503", "no answer", "refused"],
 )
-def test_a_failed_request_for_the_token_is_not_asked_again(answer):
+def test_a_failed_request_for_the_token_is_not_asked_again_when_asked_once(answer):
     """azure-core would ask three times more, and wait between them."""
     transport = FakeTransport(answer)
-    credential = build_database_credential(TEST_CLIENT_ID, transport=transport)
+    credential = build_database_credential(
+        TEST_CLIENT_ID, is_asked_once=True, transport=transport
+    )
 
     with pytest.raises(EntraTokenError):
         fetch_database_token(credential)
 
     assert len(transport.adapter.requests) == 1
+
+
+@pytest.mark.parametrize(
+    "answer",
+    [
+        answer_identity_with(500, "application/json", b"{}"),
+        answer_identity_with(503, "application/json", b"{}"),
+        raise_read_timeout,
+        raise_connection_refused,
+    ],
+    ids=["500", "503", "no answer", "refused"],
+)
+def test_a_failed_request_for_the_token_is_asked_again_otherwise(answer):
+    """The retries of azure-core, for a connection no client of an API waits for."""
+    transport = FakeTransport(answer)
+    credential = build_database_credential(
+        TEST_CLIENT_ID, is_asked_once=False, transport=transport
+    )
+
+    with pytest.raises(EntraTokenError):
+        fetch_database_token(credential)
+
+    assert len(transport.adapter.requests) > 1
 
 
 def test_a_token_that_does_not_come_fails_before_the_client_of_the_ai_api_stops_waiting():

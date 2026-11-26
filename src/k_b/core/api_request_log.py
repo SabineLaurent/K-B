@@ -7,8 +7,9 @@ import uuid
 from collections.abc import Awaitable, Callable
 
 from fastapi import Request, Response
+from starlette.routing import Route
 
-from k_b.core.api_health import DATABASE_HEALTH_PATH, HEALTH_PATH
+from k_b.core.api_health import HEALTH_PATH
 from k_b.core.config import MILLISECONDS_PER_SECOND
 from k_b.core.quoting import quote_value
 
@@ -56,16 +57,15 @@ def read_request_id(request: Request) -> str:
 def find_route_template(request: Request) -> str:
     """The template of the route matched (/items/{item_id}), never the path received.
 
-    FastAPI puts only its own routes in the scope: /docs, /openapi.json, /health and
-    /health/database, without parameter, are named by their path."""
+    FastAPI puts only its own routes in the scope: a route of Starlette the app has, without
+    parameter (/docs, /openapi.json, /health, /health/database), is named by its path."""
     route = request.scope.get("route")
     if route is not None:
         return str(route.path)
     if request.url.path in {
-        request.app.docs_url,
-        request.app.openapi_url,
-        HEALTH_PATH,
-        DATABASE_HEALTH_PATH,
+        candidate.path
+        for candidate in request.app.routes
+        if isinstance(candidate, Route)
     }:
         return request.url.path
     return NONE_SEEN

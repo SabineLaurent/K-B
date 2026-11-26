@@ -78,7 +78,8 @@ CONNECTION_FAILURE_FRAGMENTS = (
     ("authentication failed", DATABASE_AUTHENTICATION_REFUSED),
     ("pg_hba.conf", DATABASE_AUTHENTICATION_REFUSED),
     ("no password supplied", DATABASE_AUTHENTICATION_REFUSED),
-    ("SSL", DATABASE_TLS_REFUSED),
+    # "server does not support SSL, but SSL was required"; not "SSL SYSCALL error", a cut.
+    ("does not support SSL", DATABASE_TLS_REFUSED),
     # "root certificate file … does not exist", under verify-full.
     ("certificate", DATABASE_TLS_REFUSED),
     ("Connection refused", DATABASE_UNREACHABLE),
@@ -177,7 +178,8 @@ def connect_postgresql(location: PostgresUrl) -> PostgresConnection:
     check_url(location)
     try:
         connection = psycopg.connect(
-            location.value, **make_connection_parameters(location)()
+            location.value,
+            **make_connection_parameters(location, is_token_asked_once=False)(),
         )
     except psycopg.ProgrammingError:
         raise make_unreadable_url_error() from None
@@ -219,14 +221,17 @@ def find_entra_url_refusal(settings: Mapping[str, Any]) -> str | None:
 
 
 def make_connection_parameters(
-    location: PostgresUrl,
+    location: PostgresUrl, *, is_token_asked_once: bool
 ) -> Callable[[], dict[str, Any]]:
     """The parameters of each new connection besides the URL: the bound on the wait for its server
-    and, under Entra, a token of the identity, asked for at each call. A pool keeps its credential,
-    which keeps its token until it nears its end; a direct connection asks for a token of its own."""
+    and, under Entra, a token of the identity, asked for at each call, once only if
+    is_token_asked_once. A pool keeps its credential, which keeps its token until it nears its end;
+    a direct connection asks for a token of its own."""
     if location.entra_client_id is None:
         return lambda: {"connect_timeout": DATABASE_CONNECT_TIMEOUT_SECONDS}
-    credential = entra.build_database_credential(location.entra_client_id)
+    credential = entra.build_database_credential(
+        location.entra_client_id, is_asked_once=is_token_asked_once
+    )
 
     def with_token() -> dict[str, Any]:
         """The parameters of one new connection, its token asked for now."""
@@ -285,7 +290,11 @@ def open_reading_pool(
     pool: ReadingPool = ConnectionPool(
         location.value,
         connection_class=ReaderConnection,
-        kwargs=logging_token_failures(make_connection_parameters(location)),
+        # Asked once: a request waits READING_POOL_WAIT_SECONDS for a connection, and the pool
+        # tries again by itself.
+        kwargs=logging_token_failures(
+            make_connection_parameters(location, is_token_asked_once=True)
+        ),
         min_size=READING_POOL_MIN_SIZE,
         max_size=READING_POOL_MAX_SIZE,
         timeout=READING_POOL_WAIT_SECONDS,

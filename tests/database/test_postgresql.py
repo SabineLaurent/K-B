@@ -380,7 +380,7 @@ def token_sequence(monkeypatch):
     """The credential each connection under Entra gets."""
     credential = TokenSequence()
     monkeypatch.setattr(
-        entra, "build_database_credential", lambda client_id: credential
+        entra, "build_database_credential", lambda client_id, is_asked_once: credential
     )
     return credential
 
@@ -440,7 +440,9 @@ def test_under_entra_an_identity_without_token_is_a_named_error_of_the_base(
             raise ClientAuthenticationError("refused by the endpoint")
 
     monkeypatch.setattr(
-        entra, "build_database_credential", lambda client_id: RefusingCredential()
+        entra,
+        "build_database_credential",
+        lambda client_id, is_asked_once: RefusingCredential(),
     )
 
     with pytest.raises(DatabaseNoTokenError) as raised:
@@ -450,6 +452,28 @@ def test_under_entra_an_identity_without_token_is_a_named_error_of_the_base(
     assert describe_engine_error(raised.value) == "DatabaseNoTokenError"
     assert raised.value.__cause__ is None
     assert raised.value.__suppress_context__
+
+
+def test_under_entra_a_direct_connection_lets_azure_core_ask_again_for_its_token(
+    monkeypatch,
+):
+    """A job has no client of an API waiting: a token refused once is asked again."""
+    asked_once = []
+
+    class RefusingCredential:
+        def get_token(self, *scopes, **kwargs):
+            raise ClientAuthenticationError("refused by the endpoint")
+
+    def build_refusing_credential(client_id, is_asked_once):
+        asked_once.append(is_asked_once)
+        return RefusingCredential()
+
+    monkeypatch.setattr(entra, "build_database_credential", build_refusing_credential)
+
+    with pytest.raises(DatabaseNoTokenError):
+        postgresql.connect_postgresql(PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID))
+
+    assert asked_once == [False]
 
 
 @pytest.mark.postgresql
@@ -491,7 +515,9 @@ def test_without_entra_a_connection_sends_no_password_of_k_b(
     postgresql_base, monkeypatch
 ):
     monkeypatch.setattr(
-        entra, "build_database_credential", lambda client_id: pytest.fail("no token")
+        entra,
+        "build_database_credential",
+        lambda client_id, is_asked_once: pytest.fail("no token"),
     )
 
     connection = postgresql.connect_postgresql(postgresql_base)

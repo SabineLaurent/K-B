@@ -99,7 +99,8 @@ CLOSED_UNEXPECTEDLY = (
                 f"{AT_THE_SERVER}{CLOSED_UNEXPECTEDLY}\nSSL SYSCALL error: Connection"
                 " reset by peer"
             ),
-            "database_tls_refused",
+            # A cut seen in TLS, not a refusal of it.
+            "database_connection_failed",
         ),
         (
             OperationalError(
@@ -186,7 +187,9 @@ class RefusingCredential:
 def test_under_entra_the_pool_names_an_identity_without_token(monkeypatch, caplog):
     """The pool asks the token before it connects, out of its connection class."""
     monkeypatch.setattr(
-        entra, "build_database_credential", lambda client_id: RefusingCredential()
+        entra,
+        "build_database_credential",
+        lambda client_id, is_asked_once: RefusingCredential(),
     )
     location = PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID)
 
@@ -195,6 +198,23 @@ def test_under_entra_the_pool_names_an_identity_without_token(monkeypatch, caplo
 
     assert lines
     assert set(lines) == {"database_connection_failed: database_no_token"}
+
+
+def test_under_entra_the_pool_asks_each_token_once(monkeypatch, caplog):
+    """A request waits 2 s for a connection: the pool tries again, not azure-core."""
+    asked_once = []
+
+    def build_refusing_credential(client_id, is_asked_once):
+        asked_once.append(is_asked_once)
+        return RefusingCredential()
+
+    monkeypatch.setattr(entra, "build_database_credential", build_refusing_credential)
+    location = PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID)
+
+    with caplog.at_level(logging.WARNING), open_readers(location, TIMEOUT_SECONDS):
+        wait_for_lines_of_k_b(caplog)
+
+    assert asked_once == [True]
 
 
 @pytest.fixture

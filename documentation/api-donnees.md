@@ -77,7 +77,7 @@ local, le terminal ou un script appelle avec sa propre clé, par exemple celle d
 ([Utiliser K-B](utilisation.md), « La lancer et l'appeler »). Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
 (`commands/smoke_test_command.py:94-101`, `commands/digest_watch_command.py:43-48`); `kb smoke-test` y ajoute des
 sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`), et
-`GET /health/database`, sans clé, qui dit si l'API lit sa base (`commands/smoke_test_command.py:105`, `:161-172`, #458); ce trait est en
+`GET /health/database`, sans clé, qui dit si l'API lit sa base (`commands/smoke_test_command.py:112`, `:162-173`, #458); ce trait est en
 pointillés, prévu en ligne. L'API de données lit la base, SQLite
 ou PostgreSQL, en lecture seule, et le conteneur `watch` du stockage d'échange pour les tops et les comptes rendus
 (`data_api/watch_reading.py:1-4`).
@@ -325,9 +325,10 @@ Les quatre routes de `watch` lisent par le même lecteur, `WatchReader` (`data_a
     jamais pour les sondes du conteneur, qui feraient redémarrer l'API à chaque panne de la base (test
     `test_no_probe_of_azure_container_apps_asks_the_database_health`). Elle lit une ligne au plus de la première table
     du schéma, `SELECT 1 FROM source LIMIT 1`, par la connexion d'une route de données, sous ses délais
-    (`database/reading.py:24-27`, `:328-330`, `data_api/database_health.py:17-37`). Elle répond 200
+    (`database/reading.py:25-27`, `:328-330`, `data_api/database_health.py:17-37`). Elle répond 200
     `{"status": "ok"}`, sans aucune valeur de la base, ou l'erreur d'une route de données pour la même cause: 503
-    `database_missing`, même pour une base PostgreSQL sans les tables de K-B, où `SELECT 1` passerait, 503
+    `database_missing`, même pour une base PostgreSQL sans la table `source`, la seule qu'elle lit, où `SELECT 1`
+    passerait, 503
     `database_unavailable`, 503 `query_timeout` ou 500 `database_error` (`tests/data_api/test_database_health.py`).
     Un second appel pendant qu'un premier tourne reçoit 429 `request_already_running`, avec `Retry-After: 7`, les 2 s
     d'attente d'une connexion et les 5 s de l'instruction (`core/config.py:427-429`): sans clé, elle ne prend qu'une
@@ -368,7 +369,7 @@ quand il vient et sur quelles routes (`core/api_errors.py:58-63`, `data_api/erro
 | 502 | `watch_listing_too_long` | plus de 5 000 noms, ou plus de deux pages, dans le dossier | tops et comptes rendus |
 | 502 | `watch_production_refused` | jumeau refusé (section [La lecture de `watch`](#la-lecture-de-watch)) | tops et comptes rendus |
 | 502 | `exchange_storage_unavailable`, `exchange_storage_no_token`, `exchange_storage_unauthorized`, `exchange_storage_forbidden`, `exchange_storage_failed` | le stockage d'échange, ou l'identité, a échoué ou refusé | tops et comptes rendus |
-| 503 | `database_missing` | le fichier SQLite de la base n'existe pas; sur PostgreSQL, la base n'a pas les tables de K-B (#458) | items et tendances |
+| 503 | `database_missing` | le fichier SQLite de la base n'existe pas; sur PostgreSQL, une table de K-B manque (#458) | items et tendances |
 | 503 | `database_unavailable` | sur PostgreSQL, aucune connexion du <span lang="en">pool</span> en 2 s: toutes prêtées, ou aucune qui joigne la base (#458) | items et tendances |
 | 503 | `query_timeout` | la requête a passé sa borne de temps dans la base | items et tendances |
 | 503 | `watch_unconfigured` | `kb serve-data` n'a pas `KB_EXCHANGE_BLOB_URL` ou `AZURE_CLIENT_ID` | tops et comptes rendus |
@@ -590,9 +591,11 @@ KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:543
     `test_on_postgresql_a_base_without_its_tables_gives_503_database_missing_and_logs_its_state`, #458).
 - **Un échec de connexion.** Chaque échec du <span lang="en">pool</span> à ouvrir une connexion s'écrit au journal par sa
     cause, jamais par le texte de libpq, qui cite l'hôte, le port et l'utilisateur: `database_connection_failed: <cause>`,
-    la cause parmi `database_no_token`, `database_connect_timeout`, `database_unreachable`, `database_tls_refused` et
-    `database_authentication_refused`, lue dans la classe de l'erreur ou dans une table fixe de fragments de son texte,
-    sinon `database_connection_failed` (`database/postgresql.py:66-85`, `:320-367`; tests
+    la cause parmi `database_no_token`, `database_connect_timeout`, `database_unreachable`, `database_tls_refused` (un
+    serveur sans TLS, ou un texte qui nomme un certificat; une coupure pendant l'échange TLS reste
+    `database_connection_failed`) et `database_authentication_refused`, lue dans la classe de l'erreur ou dans une
+    table fixe de fragments de son texte, sinon `database_connection_failed` (`database/postgresql.py:66-88`,
+    `:329-376`; tests
     `test_the_cause_of_a_failed_connection_is_named_by_its_class_or_a_fragment_of_libpq`,
     `test_the_pool_names_the_cause_of_a_failed_connection_without_the_text_of_libpq`, #458).
 - **Plusieurs lectures, un seul état.** `begin_reading` ne fait rien sur PostgreSQL: psycopg ouvre la transaction à

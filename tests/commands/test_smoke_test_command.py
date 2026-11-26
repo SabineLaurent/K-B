@@ -157,11 +157,13 @@ def test_smoke_test_passes_once_both_apis_answer_and_the_container_is_listed(
         ("GET", f"{TEST_DATA_API_URL}/items"),
         ("GET", f"{TEST_DATA_API_URL}/docs"),
         ("HEAD", f"{TEST_DATA_API_URL}/health"),
-        ("GET", f"{TEST_DATA_API_URL}/health/database"),
         ("GET", f"{TEST_AI_API_URL}/health"),
         ("POST", f"{TEST_AI_API_URL}/digests"),
         ("GET", f"{TEST_AI_API_URL}/docs"),
         ("HEAD", f"{TEST_AI_API_URL}/health"),
+        # After the AI API: the wake of the AI API leaves the pool of the data API the time of
+        # its first connection.
+        ("GET", f"{TEST_DATA_API_URL}/health/database"),
     ]
     assert not any("authorization" in request.headers for request in api_requests)
     assert len(storage_requests) == 1
@@ -397,11 +399,11 @@ def test_smoke_test_reaches_the_compose_services_in_http_in_the_sandbox(
         "http://api-donnees:8000/items",
         "http://api-donnees:8000/docs",
         "http://api-donnees:8000/health",
-        "http://api-donnees:8000/health/database",
         "http://api-ia:8001/health",
         "http://api-ia:8001/digests",
         "http://api-ia:8001/docs",
         "http://api-ia:8001/health",
+        "http://api-donnees:8000/health/database",
     ]
 
 

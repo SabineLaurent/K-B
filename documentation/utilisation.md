@@ -524,7 +524,7 @@ KB_DATA_DIR=<dossier> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.ne
 et à l'API IA (`KB_AI_API_URL`), sans clé. Après le `/health` de chaque API, qui la réveille, trois sondes sans clé
 vérifient qu'elle refuse ce qu'elle doit refuser (`jobs/api_probes.py`): une route à clé rend 401 (`GET /items`,
 `POST /digests`), `GET /docs` rend 404 (200 avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, où les API le servent) et
-`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Depuis #458, il demande ensuite `GET /health/database` à l'API
+`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Depuis #458, il demande ensuite, après les sondes des deux API, `GET /health/database` à l'API
 de données, qui répond 200 quand elle lit sa base, sinon l'erreur d'une route de données (503 `database_missing`,
 `database_unavailable` ou `query_timeout`, 500 `database_error`). Puis il demande le jeton de l'identité managée
 attribuée au job (`AZURE_CLIENT_ID`, un GUID; sans lui, le SDK (<span lang="en">software development kit</span>) d'Azure chercherait l'identité système, que les jobs de K-B

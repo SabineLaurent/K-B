@@ -196,10 +196,10 @@ DATABASE_LOCK_TIMEOUT_SECONDS = 5
 # the local default; entra asks the managed identity for a token (database/location.py).
 DEFAULT_DATABASE_AUTH = "libpq"
 # The waits of a request for that token, to the identity endpoint of the container
-# (database/entra.py), and its retries: none. azure-core would otherwise wait 300 s for an answer,
-# and ask three times more: on a local endpoint, a failure took 45 s when it did not answer, and
-# 4.8 s when it refused the connection or answered 500. A token that does not come fails below the
-# DATA_API_READ_TIMEOUT_SECONDS of the client of the AI API.
+# (database/entra.py), and the retries of the pool: none; azure-core would wait 300 s, and ask three
+# times more (locally, 45 s for an endpoint that did not answer, 4.8 s for a refusal or a 500). A
+# token of the pool that does not come fails below the DATA_API_READ_TIMEOUT_SECONDS of the client
+# of the AI API; a direct connection of kb, which no such client waits for, keeps those retries.
 DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 2
 DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 5
 DATABASE_TOKEN_RETRIES = 0

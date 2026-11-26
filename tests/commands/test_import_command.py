@@ -144,7 +144,7 @@ def test_import_refuses_a_postgresql_base_without_its_tables_and_exits_2(
     assert exit_code == cli.ExitCode.NOT_STARTED
     assert (
         "the PostgreSQL base of KB_DATABASE_URL has no tables of K-B;"
-        " create it with kb create-db"
+        " create it with kb create-db, or online with kb migrate-database\n"
     ) in capsys.readouterr().err
 
 

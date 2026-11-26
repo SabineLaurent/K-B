@@ -94,7 +94,8 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
         SMOKE_TEST_CONTAINER,
     )
     started = monotonic()
-    # The /health of an API first: it wakes the API before its probes.
+    # The /health of an API first: it wakes the API before its probes. The base of the data API
+    # after the AI API: the pool of a data API just woken opens its first connection meanwhile.
     results = [
         check_api(DATA_API_NAME, settings.data_api_url),
         *probe_api(
@@ -102,13 +103,13 @@ def run_smoke_test(environ: Mapping[str, str]) -> int:
             settings.data_api_url,
             list_probes(DATA_API_ROUTE_WITH_KEY, settings.is_sandbox),
         ),
-        check_data_api_database(settings.data_api_url),
         check_api(AI_API_NAME, settings.ai_api_url),
         *probe_api(
             AI_API_NAME,
             settings.ai_api_url,
             list_probes(AI_API_ROUTE_WITH_KEY, settings.is_sandbox),
         ),
+        check_data_api_database(settings.data_api_url),
         check_exchange_storage(settings.exchange_storage),
     ]
     # A count, at INFO: each failed check has its own line already.

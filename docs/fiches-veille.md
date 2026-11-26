@@ -1430,10 +1430,10 @@ dépend que du code garde son état et sa preuve.
   stockage d'échange par l'identité du job. Depuis #499, il envoie aussi à chaque API, après son
   `/health`, trois sondes sans clé, et échoue sur tout autre statut : une route à clé (`GET /items`,
   `POST /digests`) doit rendre 401, `GET /docs` 404 hors `sandbox`, et `HEAD /health` 405
-  (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:98-113`). Il vérifie ainsi,
+  (`src/k_b/jobs/api_probes.py`, `src/k_b/commands/smoke_test_command.py:97-114`). Il vérifie ainsi,
   sur la version déployée, le refus sans clé, la documentation fermée et la méthode refusée.
   Depuis #458, il demande aussi `GET /health/database` à l'API de données, qui répond 200 quand
-  elle lit sa base (`src/k_b/commands/smoke_test_command.py:161-172`).
+  elle lit sa base (`src/k_b/commands/smoke_test_command.py:162-173`).
   Prouvé par les tests, sur des API simulées
   (`test_a_probe_that_gets_another_status_fails_and_the_other_checks_still_run`,
   `tests/commands/test_smoke_test_command.py`) et sur les apps elles-mêmes, en `sandbox` et hors
@@ -1643,7 +1643,7 @@ Hors de la grille : pas de `TrustedHostMiddleware`, écart voulu et justifié da
   « La base et le brut ») : des données de la même sorte. La mesure demande alors le même traitement
   que la production (« If this is unavoidable, these endpoints should get the same security
   treatment as the production ones. », API9:2023, lue le 2026-11-10), et la machine le leur donne :
-  le même code (`create_app`, `ai_api/app.py:41`, `data_api/app.py:40`), une clé exigée par client
+  le même code (`create_app`, `ai_api/app.py:42`, `data_api/app.py:40`), une clé exigée par client
   et refusée au démarrage si elle manque à la règle, les mêmes limites. Quatre différences. Deux sont
   sans donnée : `http` sur `127.0.0.1`, joignable de la machine seule, et, dans la préproduction
   locale, sur le réseau du projet compose (API8, « TLS, même pour une API

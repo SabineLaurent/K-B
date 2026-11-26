@@ -108,7 +108,9 @@ def test_purge_refuses_a_missing_database_does_not_create_it_and_exits_2(
     exit_code = cli.main(["purge"])
 
     assert exit_code == 2
-    assert "; create it with kb create-db" in capsys.readouterr().err
+    assert capsys.readouterr().err.endswith(
+        "; create it with kb create-db, or online with kb migrate-database\n"
+    )
     assert not (tmp_path / "k-b.sqlite").exists()
 
 
@@ -126,7 +128,7 @@ def test_purge_refuses_a_postgresql_base_without_its_tables_and_exits_2(
     assert exit_code == cli.ExitCode.NOT_STARTED
     assert (
         "the PostgreSQL base of KB_DATABASE_URL has no tables of K-B;"
-        " create it with kb create-db"
+        " create it with kb create-db, or online with kb migrate-database\n"
     ) in capsys.readouterr().err
 
 
