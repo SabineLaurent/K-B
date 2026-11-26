@@ -16,19 +16,22 @@ ci-dessus sont les seuls de la branche (`git log origin/main..HEAD`), et la note
 
 ## Le pourquoi
 
-Le journal de `kb` est la trace de chaque commande, de `kb collect` aux deux API : une ligne datée par événement, sur
-la sortie d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`. En ligne, la sortie d'erreur part dans Log Analytics, et c'est
-là qu'on lit l'échec d'un job. Chaque ligne a la forme `<date> <niveau> <module>: <message>`.
+Le journal de `kb` est la trace de chaque commande, de `kb collect` aux API et au site : une ligne datée par
+événement, sur la sortie d'erreur et dans un fichier de `<KB_DATA_DIR>/logs/` (`src/k_b/commands/run_log.py:24-34`). En
+ligne, la sortie d'erreur part dans Log Analytics, et c'est là qu'on lit l'échec d'un job (`documentation/monitorage.md`,
+« Ce que l'application écrit »). Chaque ligne a la forme `<date> <niveau> <module>: <message>`
+(`src/k_b/commands/run_log.py:37`).
 
-`kb` cite lui-même chaque valeur qu'il journalise par `quote_value` : tronquée, retours à la ligne et caractères de
-contrôle échappés (règle 3 de `.claude/rules/conventions.md`). Les bibliothèques qui tournent dans le même processus
-(uvicorn, OpenTelemetry, le client BigQuery, httpcore…) écrivent par les mêmes sorties, et leurs messages passaient
-tels quels. Une bibliothèque qui recopie à WARNING le texte d'une réponse de serveur pouvait y laisser un retour à la
+La règle 3 de `.claude/rules/conventions.md` veut que `kb` cite chaque valeur observée par `quote_value` : tronquée,
+retours à la ligne et caractères de contrôle échappés. Les bibliothèques qui tournent dans le même processus (uvicorn,
+OpenTelemetry, le client BigQuery, httpcore2 sous httpx2 : `uv.lock`) écrivent par les mêmes sorties : uvicorn, par
+exemple, n'a pas de configuration de journal à lui (`log_config=None`, `src/k_b/commands/serve_ai_command.py:113`). Leurs
+messages passaient tels quels. Une bibliothèque qui recopie à WARNING le texte d'une réponse de serveur pouvait y laisser un retour à la
 ligne suivi d'une fausse ligne datée, `… ERROR k_b.cli: …`. Dans le fichier comme dans Log Analytics, cette ligne se
 lit comme une vraie ligne de `kb` : c'est l'injection de journal que nomme l'OWASP (*Logging Cheat Sheet*, « Perform
-sanitization on all event data to prevent log injection attacks »).
+sanitization on all event data to prevent log injection attacks », citée par `.claude/rules/conventions.md`, règle 3).
 
-#412 avait déjà tenu `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) : à WARNING, `azure` cite le texte d'une
+#412 avait déjà tenu `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`, `src/k_b/commands/run_log.py:56-62`) : à WARNING, `azure` cite le texte d'une
 réponse, et `urllib3` peut citer une URL entière, celle d'un blob (`src/k_b/commands/run_log.py:41-48`).
 Une liste ne couvre que les bibliothèques qu'on a pensé à y mettre : #441 demande une seule règle, pour toutes.
 
@@ -36,8 +39,9 @@ Une liste ne couvre que les bibliothèques qu'on a pensé à y mettre : #441 dem
 
 ### Une seule règle, au formateur que partagent les deux sorties
 
-`logging_to` pose sur le logger racine un gestionnaire pour la sortie d'erreur et, sauf `KB_LOG_TO_FILE=false`, un
-pour le fichier, et leur donne le même formateur, `TracedFormatter` (`src/k_b/commands/run_log.py:82-107`). C'est là que la règle s'écrit, une fois (`src/k_b/commands/run_log.py:127-134`) :
+`logging_to` pose sur le logger racine un gestionnaire pour la sortie d'erreur et, sauf `KB_LOG_TO_FILE=false`
+(`src/k_b/cli.py:228-233`), un pour le fichier, et leur donne le même formateur, `TracedFormatter`
+(`src/k_b/commands/run_log.py:82-107`). C'est là que la règle s'écrit, une fois (`src/k_b/commands/run_log.py:127-134`) :
 
 ```python
 def format(self, record: logging.LogRecord) -> str:
@@ -49,13 +53,15 @@ def format(self, record: logging.LogRecord) -> str:
 ```
 
 Le formateur posait déjà l'identifiant de trace d'une requête en cours. Il formate désormais une ligne de
-bibliothèque à partir d'une copie dont le message est cité, puis laisse `logging.Formatter` faire le reste : la date
-en UTC, le niveau, le nom du logger.
+bibliothèque à partir d'une copie dont le message est cité, puis laisse `logging.Formatter` faire le reste : la date,
+en UTC par l'horloge que `logging_to` lui donne (`src/k_b/commands/run_log.py:97-99`), le niveau, le nom du logger.
 
 ### Qui est une bibliothèque : tout logger hors de `k_b`
 
 Chaque module de K-B journalise par `logging.getLogger(__name__)`, ou par `k_b.cli` pour la ligne de commande : son
-nom commence par `k_b.`. Tout autre nom vient d'une bibliothèque (`src/k_b/commands/run_log.py:137-139`) :
+nom commence par `k_b.` (`grep -rn "getLogger(" src/k_b` : les autres appels prennent le logger racine ou celui d'une
+bibliothèque, pour régler son niveau ou y poser un filtre, sans y écrire : `src/k_b/commands/run_log.py:100-116`,
+`src/k_b/ai_api/connectors/metrics_export.py:44-47`, `src/k_b/ai_api/connectors/trace_export.py:98`). Tout autre nom vient d'une bibliothèque (`src/k_b/commands/run_log.py:137-139`) :
 
 ```python
 def is_logged_by_kb(record: logging.LogRecord) -> bool:
@@ -69,7 +75,8 @@ paramétré le tient (`tests/commands/test_run_log.py:283-290`).
 
 Un enregistrement (`LogRecord`) est un seul objet, remis tour à tour à chaque gestionnaire du logger racine. En tests,
 pytest y pose le sien (`caplog`), qui garde l'objet lui-même. Si le formateur réécrivait le message en place, chaque
-gestionnaire servi après lui recevrait le texte cité, et pytest le relirait ainsi après coup. La copie évite cet effet
+gestionnaire servi après lui recevrait le texte cité, et pytest le relirait ainsi après coup : le test
+`tests/commands/test_run_log.py:261` échoue dans ce cas. La copie évite cet effet
 de bord (`src/k_b/commands/run_log.py:142-151`) :
 
 ```python
@@ -80,8 +87,8 @@ quoted_record.msg = quote_value(
 quoted_record.args = None
 ```
 
-`makeLogRecord` crée un enregistrement neuf et y recopie les attributs de l'original : son nom, son niveau, son heure,
-et le `trace_field` posé juste avant. `getMessage()` assemble le message et ses arguments (`"the server says: %s"` et
+`logging.makeLogRecord` (bibliothèque standard) crée un enregistrement neuf et y recopie les attributs de l'original,
+par `rv.__dict__.update(dict)` : son nom, son niveau, son heure, et le `trace_field` posé juste avant. `getMessage()` assemble le message et ses arguments (`"the server says: %s"` et
 sa valeur). Le texte assemblé est cité, puis `args = None` : `logging` ne tente pas un second assemblage, et un `%`
 venu du serveur dans le texte cité reste un caractère.
 
@@ -99,8 +106,9 @@ MAX_QUOTED_LIBRARY_MESSAGE_LENGTH = 300
 ```
 
 Une ligne de bibliothèque n'a pas d'autre copie que le journal, comme l'échec d'une source sans sa trace, que
-`etl/extract.py` coupe à 300 pour la même raison (`MAX_QUOTED_FAILURE_LENGTH`). Les deux constantes restent séparées :
-`commands/` n'importe pas `etl/extract.py`, car `etl/pipeline.py` est sa seule porte vers les deux parcours (règle 5
+`etl/extract.py` coupe à 300 pour la même raison (`MAX_QUOTED_FAILURE_LENGTH`, `src/k_b/etl/extract.py:38`). Les deux constantes restent séparées :
+`commands/` n'importe pas `etl/extract.py` (`grep -rnE "etl\.(extract|transform|load|normalize)" src/k_b/commands` ne
+renvoie rien), car `etl/pipeline.py` est sa seule porte vers les deux parcours (règle 5
 de `conventions.md`), et elles pourraient changer pour des raisons différentes.
 
 ### Ce qui se voit dans le journal
@@ -114,25 +122,28 @@ démarrage (`uvicorn/lifespan/on.py:62`), la seconde par le message du test du c
 2026-11-26T23:03:50Z WARNING a.library: 'the server says: refused\n2026-11-26T20:00:00Z ERROR k_b.cli: kb stopped by SIGTERM'
 ```
 
-La fausse ligne est devenue une partie du message, `\n` compris. Les lignes de l'exporteur OpenTelemetry, dont `QuotingFilter`
-(`src/k_b/ai_api/connectors/metrics_export.py:251-276`) cite déjà chaque argument texte et réduit une exception à son
-type, sont citées une seconde fois. Le
-message d'un échec d'envoi, sorti de même de `logging_to` avec `QuotingFilter` posé, une fois avec une raison sans `"`,
-une fois avec une raison qui en porte :
+La fausse ligne est devenue une partie du message, `\n` compris. Les lignes de l'exporteur OpenTelemetry, dont
+`QuotingFilter` (`src/k_b/ai_api/connectors/metrics_export.py:251-276`) cite déjà chaque argument texte et réduit une
+exception à son type, sont citées une seconde fois. Le message d'un échec d'envoi, que l'exporteur des métriques écrit
+par le logger de son module (`logger=_logger`, `opentelemetry/exporter/otlp/proto/http/metric_exporter/__init__.py:219` ;
+le texte : `opentelemetry/exporter/otlp/common/http.py:214`), est sorti de même de `logging_to`, avec `QuotingFilter`
+posé comme `build_exporter` le pose (`src/k_b/ai_api/connectors/metrics_export.py:300`) : une fois avec une raison
+sans `"`, une fois avec une raison qui en porte.
 
 ```text
-2026-11-26T23:08:37Z ERROR opentelemetry.exporter.otlp.common.http: "Failed to export 'metrics' batch code: 401, reason: 'Unauthorized'"
-2026-11-26T23:08:37Z ERROR opentelemetry.exporter.otlp.common.http: 'Failed to export \'metrics\' batch code: 401, reason: \'{"status":"error"}\''
+2026-11-26T23:14:26Z ERROR opentelemetry.exporter.otlp.proto.http.metric_exporter: "Failed to export 'metrics' batch code: 401, reason: 'Unauthorized'"
+2026-11-26T23:14:26Z ERROR opentelemetry.exporter.otlp.proto.http.metric_exporter: 'Failed to export \'metrics\' batch code: 401, reason: \'{"status":"error"}\''
 ```
 
 `repr` choisit ses guillemets selon le message : quand celui-ci porte à la fois `'` et `"`, il échappe les `'`. La fiche
 du monitorage citait `Failed to export 'metrics' batch code: 401`, qui ne se lit plus tel quel dans le second cas : elle
-cite désormais `Failed to export … batch code: 401`, qui se lit dans les deux.
+cite désormais `Failed to export … batch code: 401`, qui se lit dans les deux (`documentation/monitorage.md:353`).
 
 La fiche du monitorage le dit, section « Lire une ligne ». Comme le changement décale les lignes de `run_log.py`, ses
 renvois `run_log.py:` sont remis à jour dans cinq fiches, dont plusieurs pointaient déjà une ligne trop haut ou trop
 bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in use` d'uvicorn
-(`documentation/utilisation.md:221`), se lit tel quel dans le message cité.
+(`documentation/utilisation.md:221`), se lit tel quel dans le message cité : uvicorn journalise l'`OSError` d'asyncio
+(`uvicorn/server.py:189-190`), dont le texte ne porte que des `'`.
 
 ## Choix faits et options écartées
 
@@ -141,10 +152,10 @@ bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in u
 | Un `Formatter` | les deux sorties le partagent déjà, et il décore déjà l'enregistrement (`trace_field`) : une seule place | un `logging.Filter` par gestionnaire : depuis Python 3.12, il peut rendre une copie au lieu de modifier en place, mais c'est un second objet à poser sur chaque gestionnaire |
 | Une copie de l'enregistrement | les autres gestionnaires (pytest, et tout gestionnaire posé plus tard) reçoivent l'enregistrement tel que la bibliothèque l'a écrit | un filtre ou un formateur qui réécrit `msg` en place : effet de bord sur tous les gestionnaires servis après lui |
 | Citer les seuls loggers hors de `k_b` | `kb` cite déjà ses valeurs : citer ses lignes les citerait deux fois et changerait chaque ligne de `kb` | tout citer, `k_b.*` compris |
-| Une règle pour toutes les bibliothèques | aucune liste à tenir : une bibliothèque ajoutée est couverte d'office (le texte de #441) | étendre `LIBRARY_LOG_LEVELS` : une liste à tenir, bibliothèque par bibliothèque, et le niveau de chacune à vérifier à l'essai, comme pour `azure.identity` (#412) |
+| Une règle pour toutes les bibliothèques | aucune liste à tenir : une bibliothèque ajoutée est couverte d'office (le texte de #441) | étendre `LIBRARY_LOG_LEVELS` : une liste à tenir, bibliothèque par bibliothèque, et le niveau de chacune à vérifier à l'essai, comme pour `azure.identity` (#412, rappelé par le constat de #441) |
 | 300 caractères | la ligne est la seule copie du message, comme l'échec d'une source | 100, le défaut de `quote_value`, fait pour une seule valeur, quand une ligne de bibliothèque porte un message entier, qui cite lui-même ses valeurs ; aucune coupe : contraire à la règle 3 |
 | Garder `QuotingFilter` | il fait ce que le formateur ne fait pas : il cite chaque argument texte à 100, réduit une exception à son type et retire la trace de l'exporteur | le retirer : la trace de l'exporteur reviendrait dans le journal |
-| Le message seul, pas la trace d'une exception | la règle 3 veut que la trace suive sa ligne datée, sur ses lignes : la changer touche aussi les traces de `kb` ; c'est l'objet de #725 | échapper toute la sortie d'un enregistrement de bibliothèque, trace comprise : une trace d'uvicorn (« Exception in ASGI application ») deviendrait une seule ligne de 300 caractères, illisible pour qui cherche la cause |
+| Le message seul, pas la trace d'une exception | la règle 3 veut que la trace suive sa ligne datée, sur ses lignes : la changer touche aussi les traces de `kb` ; c'est l'objet de #725 | échapper toute la sortie d'un enregistrement de bibliothèque, trace comprise : une trace d'uvicorn (« Exception in ASGI application », `uvicorn/protocols/websockets/websockets_impl.py:262`) deviendrait une seule ligne de 300 caractères, illisible pour qui cherche la cause |
 
 ## Preuve
 
@@ -155,7 +166,7 @@ bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in u
 | `test_the_record_of_a_library_is_left_as_it_is_for_the_other_handlers` (`:261`) ; avec une réécriture en place simulée dans le processus : `1 failed` | la copie : `caplog` relit le message d'origine |
 | `test_only_a_line_of_kb_keeps_its_message_as_kb_wrote_it` (`:283`), trois cas ; avant le code, le cas `k_b_library` échouait | `k_b` et `k_b.test` gardent leur message, `k_b_library` est cité |
 | `uv run pytest` : 5866 passed, 365 deselected ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` : verts | rien d'autre ne casse : les tests qui lisent une ligne de bibliothèque la cherchent par une partie de son texte (`tests/ai_api/test_serve_ai.py:520`, `:552`) ou par `record.getMessage()`, que le formateur ne change pas (`tests/ai_api/test_metrics_export.py:468`, `tests/ai_api/test_trace_export.py:253`) |
-| `grep` d'`infra/` et d'`observability/` | aucune requête de Log Analytics ni alerte ne lit le texte d'une ligne de bibliothèque ; les requêtes d'`infra/README.md` filtrent par `JobName` |
+| `grep` d'`infra/` et d'`observability/` | aucune requête de Log Analytics ni alerte ne lit le texte d'une ligne de bibliothèque ; les requêtes d'`infra/README.md` filtrent par `JobName` (`infra/README.md:413`, `:827`, `:1250`, `:1430`) |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -184,9 +195,10 @@ bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in u
   `postgresql` lisent `kb.log` pour y vérifier l'absence d'une valeur que PostgreSQL cite
   (`tests/commands/test_postgresql_errors_in_logs.py:54-55`, `:74`) : citer un message n'ajoute aucun texte. Le job
   `tests-postgresql` de la CI les lance.
-- L'effet sur un gestionnaire OpenTelemetry posé sur le logger racine : K-B n'en pose aucun (`grep addHandler` ne
-  trouve que `logging_to`), et ses enregistrements partent par un `Logger` d'OpenTelemetry, hors de `logging`
-  (`src/k_b/ai_api/connectors/trace_export.py`).
+- L'effet sur un gestionnaire OpenTelemetry posé sur le logger racine : K-B n'en pose aucun (`grep -rn addHandler
+  src/k_b` ne trouve que `src/k_b/commands/run_log.py:107`), et ses enregistrements partent par un `Logger`
+  d'OpenTelemetry, hors de `logging` (`src/k_b/ai_api/tracing.py:14`,
+  `src/k_b/ai_api/connectors/trace_export.py:16-17`, `:91`).
 
 ## Ce qui reste
 
