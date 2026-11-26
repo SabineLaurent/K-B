@@ -98,7 +98,9 @@ def test_a_sigterm_once_the_base_has_committed_keeps_the_import_and_its_journal(
     unreadable_path.write_text("not json", encoding="utf-8")
     capsys.readouterr()
     monkeypatch.setattr(
-        load, "connect_database", connect_with_factory(SigtermAfterCommitConnection)
+        load,
+        "connect_existing_database",
+        connect_with_factory(SigtermAfterCommitConnection),
     )
 
     exit_code = cli.main(["import"])

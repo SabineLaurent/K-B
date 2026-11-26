@@ -46,6 +46,9 @@ OPEN_TRANSACTION_STATUSES = frozenset(
 WRITING_LOCK_KEY = int.from_bytes(b"k-b")
 SET_LOCK_TIMEOUT = "SELECT set_config('lock_timeout', ?, true)"
 LOCK_FOR_WRITING = "SELECT pg_advisory_xact_lock(?)"
+# The first table of the schema: kb create-db and kb migrate-database write every table in one
+# transaction, so a base has them all or none.
+SELECT_SOURCE_TABLE = "SELECT to_regclass('source') IS NOT NULL"
 # The deadline of every statement of a connection of the readers, for its whole session: set by
 # K-B, not by the server, so that a base set up without it is never read without a deadline.
 SET_STATEMENT_TIMEOUT = "SELECT set_config('statement_timeout', ?, false)"
@@ -219,6 +222,12 @@ def make_unreadable_url_error() -> UnreadableDatabaseUrlError:
     return UnreadableDatabaseUrlError(
         f"{DATABASE_URL_VARIABLE} is not a URL libpq reads"
     )
+
+
+def has_tables(connection: PostgresConnection) -> bool:
+    """Whether the base has the tables of K-B."""
+    (has_source_table,) = connection.execute(SELECT_SOURCE_TABLE).fetchone()
+    return bool(has_source_table)
 
 
 def lock_for_writing(connection: PostgresConnection) -> None:

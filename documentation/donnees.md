@@ -385,11 +385,12 @@ Texte équivalent du schéma: le paragraphe et la liste numérotée qui suivent.
 UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
 `journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`etl/pipeline.py:34-35`, `etl/pipeline.py:63-69`).
 
-1. **Le registre.** `read_imported_paths` vérifie que la base existe, puis lit les chemins des fichiers bruts déjà
-    importés, la table `raw_data` (`etl/load.py:50-57`, `database/schema.sql:28-35`). Un fichier SQLite absent sort
-    en 2 (`database/location.py:167-171`, `commands/import_command.py:45-47`). Une base PostgreSQL répond d'elle-même
-    à la première requête: absente, injoignable ou sans ses tables, elle répond par une erreur, et la commande sort
-    en 1 (`database/location.py:167-169`, `commands/import_command.py:54-56`).
+1. **Le registre.** `read_imported_paths` ouvre la base que `kb create-db` a créée, puis lit les chemins des fichiers
+    bruts déjà importés, la table `raw_data` (`etl/load.py:50-56`, `database/schema.sql:28-35`). Une base que
+    `kb create-db` n'a pas créée sort en 2, sur un message qui nomme `kb create-db`: un fichier SQLite absent, qui
+    n'est pas créé, ou une base PostgreSQL sans les tables de K-B, reconnue par `to_regclass('source')`
+    (`database/engine.py:41-60`, `database/postgresql.py:227-230`, `commands/import_command.py:45-47`). Une base
+    PostgreSQL injoignable répond par une erreur, et la commande sort en 1 (`commands/import_command.py:54-56`).
 2. **Le parcours de `raw/`.** `list_collections` parcourt `raw/automated_watch/` puis `raw/selected_library/`
     (`etl/raw_store.py:16-21`), chaque dossier de source dans l'ordre des noms (`etl/raw_reading.py:45-81`). La sorte
     d'un dossier se retrouve par son nom, égal au préfixe de la sorte ou qui commence par ce préfixe suivi de `_`

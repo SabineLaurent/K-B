@@ -43,7 +43,7 @@ def test_a_commit_that_fails_leaves_neither_the_import_nor_its_log(
     tables_before = dump_database(data_dir)
     monkeypatch.setattr(
         import_items_module,
-        "connect_database",
+        "connect_existing_database",
         connect_with_factory(CommitFailingConnection),
     )
 
@@ -68,7 +68,7 @@ def test_a_commit_undone_by_sqlite_leaves_neither_the_import_nor_its_log(
     tables_before = dump_database(data_dir)
     monkeypatch.setattr(
         import_items_module,
-        "connect_database",
+        "connect_existing_database",
         connect_with_factory(CommitUndoneBySqliteConnection),
     )
 
@@ -97,7 +97,7 @@ def test_a_ctrl_c_once_the_base_has_committed_keeps_the_import_and_its_journal(
     run_import(reference_dir)
     monkeypatch.setattr(
         import_items_module,
-        "connect_database",
+        "connect_existing_database",
         connect_with_factory(InterruptedAfterCommitConnection),
     )
 

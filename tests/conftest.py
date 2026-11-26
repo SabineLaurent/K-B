@@ -140,7 +140,8 @@ def pytest_collection_modifyitems(config, items):
 
 @pytest.fixture
 def connect_with_factory():
-    """connect_database, opening a subclass of sqlite3.Connection: the tests change its commit."""
+    """connect_existing_database, opening a subclass of sqlite3.Connection: the tests change its
+    commit."""
 
     def connect_with(factory):
         def connect(database_path):

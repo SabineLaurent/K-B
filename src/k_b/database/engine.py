@@ -9,7 +9,12 @@ from contextlib import contextmanager
 from pathlib import Path
 
 from k_b.database import postgresql
-from k_b.database.location import DatabaseLocation, check_database_exists
+from k_b.database.location import (
+    DatabaseLocation,
+    MissingDatabaseError,
+    check_database_exists,
+    describe_location,
+)
 from k_b.database.postgresql import PostgresConnection, ReadingPool
 
 # The class of sqlite3 itself, not a wrapper: the SQLite path stays as it is.
@@ -31,6 +36,28 @@ def connect_database(location: DatabaseLocation) -> Connection:
     if isinstance(location, Path):
         return connect_sqlite(location)
     return postgresql.connect_postgresql(location)
+
+
+def connect_existing_database(location: DatabaseLocation) -> Connection:
+    """Open the base of the location once kb create-db has created it, refused before: connecting
+    to a missing SQLite file would create it empty, and a PostgreSQL base without the tables of K-B
+    would fail at its first query, as any error of the base."""
+    if isinstance(location, Path):
+        check_database_exists(location)
+        return connect_sqlite(location)
+    connection = postgresql.connect_postgresql(location)
+    try:
+        if not postgresql.has_tables(connection):
+            raise MissingDatabaseError(
+                f"{describe_location(location)} has no tables of K-B"
+            )
+        # The reading ends here: the lock of a writer is the first statement of its transaction,
+        # as on a connection just opened.
+        connection.rollback()
+    except BaseException:
+        connection.close()
+        raise
+    return connection
 
 
 def connect_sqlite(database_path: Path) -> SqliteConnection:

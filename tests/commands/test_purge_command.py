@@ -112,6 +112,24 @@ def test_purge_refuses_a_missing_database_does_not_create_it_and_exits_2(
     assert not (tmp_path / "k-b.sqlite").exists()
 
 
+@pytest.mark.postgresql
+def test_purge_refuses_a_postgresql_base_without_its_tables_and_exits_2(
+    monkeypatch, tmp_path, capsys, postgresql_base
+):
+    """As kb import: the purges read the registry of the base first."""
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv(DATABASE_URL_VARIABLE, postgresql_base.value)
+    (tmp_path / "raw").mkdir()
+
+    exit_code = cli.main(["purge"])
+
+    assert exit_code == cli.ExitCode.NOT_STARTED
+    assert (
+        "the PostgreSQL base of KB_DATABASE_URL has no tables of K-B;"
+        " create it with kb create-db"
+    ) in capsys.readouterr().err
+
+
 def test_a_failed_purge_without_a_reason_names_its_type_only(
     monkeypatch, tmp_path, capsys
 ):
