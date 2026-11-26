@@ -88,9 +88,10 @@ TRACED_FINISH_REASONS = frozenset({"stop", "length", "content_filter"})
 OTHER_FINISH_REASON = "other"
 # The code and the param of an error of the provider go to a metric line in the shape of an
 # identifier, cut to this length; any other value as OTHER_PROVIDER_ERROR_FIELD, as it may hold a
-# line break or a control character that JSON leaves as it is.
+# character that json.dumps with ensure_ascii=False writes as it is: U+2028, U+2029, a C1 or a
+# bidirectional control.
 MAX_PROVIDER_ERROR_FIELD_LENGTH = 64
-PROVIDER_ERROR_FIELD = re.compile(r"[A-Za-z0-9_.\[\]-]*")
+PROVIDER_ERROR_FIELD = re.compile(r"[A-Za-z0-9_.\[\]-]+")
 OTHER_PROVIDER_ERROR_FIELD = "other"
 
 
@@ -136,12 +137,9 @@ def keep_provider_error_field(value: object) -> str | None:
     value; None when the provider gave none."""
     if value is None:
         return None
-    if not isinstance(value, str):
+    if not isinstance(value, str) or PROVIDER_ERROR_FIELD.fullmatch(value) is None:
         return OTHER_PROVIDER_ERROR_FIELD
-    cut_value = value[:MAX_PROVIDER_ERROR_FIELD_LENGTH]
-    if PROVIDER_ERROR_FIELD.fullmatch(cut_value) is None:
-        return OTHER_PROVIDER_ERROR_FIELD
-    return cut_value
+    return value[:MAX_PROVIDER_ERROR_FIELD_LENGTH]
 
 
 type ProviderErrorField = Annotated[
@@ -190,8 +188,8 @@ class LlmCall[OutputT: BaseModel]:
     retry_after_seconds: int | None
     # None when no answer came: a timeout, a failed connection.
     http_status: int | None
-    # The code and the param of the error of the last answer (keep_provider_error_field); None
-    # when it gave none, or was a 200.
+    # The code and the param of the error of the last attempt, as http_status
+    # (keep_provider_error_field); None when its answer gave none, was a 200, or did not come.
     provider_error_code: str | None
     provider_error_param: str | None
     # Whether an attempt got a 429: a retry that times out, gets a 5xx or is cut by the deadline

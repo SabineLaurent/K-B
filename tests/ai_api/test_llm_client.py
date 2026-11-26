@@ -6,6 +6,7 @@ from typing import get_args
 
 import httpx2
 import pytest
+from ai_api.provider_errors import MESSAGE_MARK, UNSUPPORTED_EFFORT
 from opentelemetry.trace import INVALID_SPAN_CONTEXT, SpanKind, StatusCode
 from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
@@ -841,22 +842,6 @@ def test_the_status_of_the_last_answer_is_kept(steps, http_status):
     assert llm_call.http_status == http_status
 
 
-# The answer of Azure to gpt-6.1-sol asked with the effort none (#710), its message given a mark:
-# a message may quote the input, so it is never kept.
-MESSAGE_MARK = "message-mark-of-the-test"
-UNSUPPORTED_EFFORT = json.dumps(
-    {
-        "error": {
-            "message": "Unsupported value: 'reasoning_effort' does not support 'none'"
-            f" with this model. {MESSAGE_MARK}",
-            "type": "invalid_request_error",
-            "param": "reasoning_effort",
-            "code": "unsupported_value",
-        }
-    }
-)
-
-
 def test_the_code_and_the_param_of_a_refused_request_are_kept_never_its_message():
     llm_call, transport, _ = call([response(400, UNSUPPORTED_EFFORT), completion()])
 
@@ -903,6 +888,8 @@ def test_the_code_and_the_param_of_any_answer_but_a_200_are_kept(steps):
     [
         ("messages[0].content-1", "messages[0].content-1"),
         ("x" * 65, "x" * 64),
+        ("x" * 64 + " input of the request", "other"),
+        ("", "other"),
         (
             "reasoning_effort\n2026-11-26T17:00:00Z ERROR k_b.cli: a forged line",
             "other",
@@ -917,6 +904,8 @@ def test_the_code_and_the_param_of_any_answer_but_a_200_are_kept(steps):
     ids=[
         "identifier",
         "too-long",
+        "too-long-then-text",
+        "empty",
         "line-break",
         "bidirectional-control",
         "c1-control",

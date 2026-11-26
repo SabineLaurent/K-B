@@ -17,6 +17,7 @@ from typing import get_args
 
 import httpx2
 import pytest
+from ai_api.provider_errors import MESSAGE_MARK, UNSUPPORTED_EFFORT
 from fastapi.routing import iter_route_contexts
 from fastapi.testclient import TestClient
 from opentelemetry.sdk.metrics import MeterProvider
@@ -675,20 +676,6 @@ def test_a_classification_that_fails_fails_the_request_with_its_lines(
         0,
         False,
     )
-
-
-# The answer of Azure to gpt-6.1-sol asked with the effort none (#710), its message given a mark.
-MESSAGE_MARK = "message-mark-of-the-test"
-UNSUPPORTED_EFFORT = json.dumps(
-    {
-        "error": {
-            "message": f"Unsupported value: 'reasoning_effort'. {MESSAGE_MARK}",
-            "type": "invalid_request_error",
-            "param": "reasoning_effort",
-            "code": "unsupported_value",
-        }
-    }
-)
 
 
 def test_a_request_refused_by_the_provider_writes_its_code_and_param_never_its_message(
