@@ -140,8 +140,8 @@ du monitorage citait `Failed to export 'metrics' batch code: 401`, qui ne se lit
 cite désormais `Failed to export … batch code: 401`, qui se lit dans les deux (`documentation/monitorage.md:353`).
 
 La fiche du monitorage le dit, section « Lire une ligne ». Comme le changement décale les lignes de `run_log.py`, ses
-renvois `run_log.py:` sont remis à jour dans cinq fiches, dont plusieurs pointaient déjà une ligne trop haut ou trop
-bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in use` d'uvicorn
+renvois `run_log.py:` sont remis à jour dans cinq fiches, dont plusieurs visaient déjà des lignes trop hautes dans
+le fichier. L'autre texte d'une bibliothèque que cite une fiche, `address already in use` d'uvicorn
 (`documentation/utilisation.md:221`), se lit tel quel dans le message cité : uvicorn journalise l'`OSError` d'asyncio
 (`uvicorn/server.py:189-190`), dont le texte ne porte que des `'`.
 
