@@ -28,15 +28,16 @@ ligne suivi d'une fausse ligne datée, `… ERROR k_b.cli: …`. Dans le fichier
 lit comme une vraie ligne de `kb` : c'est l'injection de journal que nomme l'OWASP (*Logging Cheat Sheet*, « Perform
 sanitization on all event data to prevent log injection attacks »).
 
-#412 avait déjà tenu `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`), où ils n'écrivent que des textes fixes.
+#412 avait déjà tenu `azure` et `urllib3` à ERROR (`LIBRARY_LOG_LEVELS`) : à WARNING, `azure` cite le texte d'une
+réponse, et `urllib3` peut citer une URL entière, celle d'un blob (`src/k_b/commands/run_log.py:41-48`).
 Une liste ne couvre que les bibliothèques qu'on a pensé à y mettre : #441 demande une seule règle, pour toutes.
 
 ## Le comment
 
 ### Une seule règle, au formateur que partagent les deux sorties
 
-`logging_to` pose deux gestionnaires sur le logger racine, la sortie d'erreur et le fichier, et leur donne le même
-formateur, `TracedFormatter`. C'est là que la règle s'écrit, une fois (`src/k_b/commands/run_log.py:127-134`) :
+`logging_to` pose sur le logger racine un gestionnaire pour la sortie d'erreur et, sauf `KB_LOG_TO_FILE=false`, un
+pour le fichier, et leur donne le même formateur, `TracedFormatter` (`src/k_b/commands/run_log.py:82-107`). C'est là que la règle s'écrit, une fois (`src/k_b/commands/run_log.py:127-134`) :
 
 ```python
 def format(self, record: logging.LogRecord) -> str:
@@ -99,8 +100,8 @@ MAX_QUOTED_LIBRARY_MESSAGE_LENGTH = 300
 
 Une ligne de bibliothèque n'a pas d'autre copie que le journal, comme l'échec d'une source sans sa trace, que
 `etl/extract.py` coupe à 300 pour la même raison (`MAX_QUOTED_FAILURE_LENGTH`). Les deux constantes restent séparées :
-`commands/` n'importe d'`etl` que `pipeline.py` (règle 5 de `conventions.md`), et elles pourraient changer pour des
-raisons différentes.
+`commands/` n'importe pas `etl/extract.py`, car `etl/pipeline.py` est sa seule porte vers les deux parcours (règle 5
+de `conventions.md`), et elles pourraient changer pour des raisons différentes.
 
 ### Ce qui se voit dans le journal
 
@@ -114,7 +115,8 @@ démarrage (`uvicorn/lifespan/on.py:62`), la seconde par le message du test du c
 ```
 
 La fausse ligne est devenue une partie du message, `\n` compris. Les lignes de l'exporteur OpenTelemetry, dont `QuotingFilter`
-(`src/k_b/ai_api/connectors/metrics_export.py:251-269`) cite déjà chaque argument, sont citées une seconde fois. Le
+(`src/k_b/ai_api/connectors/metrics_export.py:251-276`) cite déjà chaque argument texte et réduit une exception à son
+type, sont citées une seconde fois. Le
 message d'un échec d'envoi, sorti de même de `logging_to` avec `QuotingFilter` posé, une fois avec une raison sans `"`,
 une fois avec une raison qui en porte :
 
@@ -141,7 +143,7 @@ bas. L'autre texte d'une bibliothèque que cite une fiche, `address already in u
 | Citer les seuls loggers hors de `k_b` | `kb` cite déjà ses valeurs : citer ses lignes les citerait deux fois et changerait chaque ligne de `kb` | tout citer, `k_b.*` compris |
 | Une règle pour toutes les bibliothèques | aucune liste à tenir : une bibliothèque ajoutée est couverte d'office (le texte de #441) | étendre `LIBRARY_LOG_LEVELS` : une liste à tenir, bibliothèque par bibliothèque, et le niveau de chacune à vérifier à l'essai, comme pour `azure.identity` (#412) |
 | 300 caractères | la ligne est la seule copie du message, comme l'échec d'une source | 100, le défaut de `quote_value`, fait pour une seule valeur, quand une ligne de bibliothèque porte un message entier, qui cite lui-même ses valeurs ; aucune coupe : contraire à la règle 3 |
-| Garder `QuotingFilter` | il fait ce que le formateur ne fait pas : il cite chaque argument à 100 et retire la trace de l'exporteur | le retirer : la trace de l'exporteur reviendrait dans le journal |
+| Garder `QuotingFilter` | il fait ce que le formateur ne fait pas : il cite chaque argument texte à 100, réduit une exception à son type et retire la trace de l'exporteur | le retirer : la trace de l'exporteur reviendrait dans le journal |
 | Le message seul, pas la trace d'une exception | la règle 3 veut que la trace suive sa ligne datée, sur ses lignes : la changer touche aussi les traces de `kb` ; c'est l'objet de #725 | échapper toute la sortie d'un enregistrement de bibliothèque, trace comprise : une trace d'uvicorn (« Exception in ASGI application ») deviendrait une seule ligne de 300 caractères, illisible pour qui cherche la cause |
 
 ## Preuve

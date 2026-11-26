@@ -7770,7 +7770,7 @@ personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-ess
   message en place (effet de bord sur les autres gestionnaires) ; citer aussi les lignes de `k_b.*` (leurs valeurs,
   déjà citées par `kb`, le seraient deux fois) ; étendre `LIBRARY_LOG_LEVELS` (une liste à tenir, bibliothèque par
   bibliothèque) ; 100, le défaut de `quote_value`, fait pour une valeur seule. Limites assumées : les lignes des
-  exporteurs OpenTelemetry, dont `QuotingFilter` (`ai_api/connectors/metrics_export.py`) cite déjà les arguments,
+  exporteurs OpenTelemetry, dont `QuotingFilter` (`ai_api/connectors/metrics_export.py`) cite déjà les arguments texte,
   sont citées deux fois, et `QuotingFilter` reste, car il retire aussi la trace de l'exporteur ; la décision porte
   sur le message, et la trace d'une exception (`exc_info`) garde ses lignes après sa ligne datée (règle 3) :
   échapper le texte d'une exception dans sa trace vaut pour `kb` comme pour une bibliothèque, et se fait par #725.
