@@ -272,7 +272,7 @@ d'une *release* au détail. Appels à l'API : 0 pour l'index, 2 par compte rendu
 
 **La preuve de bout en bout** : `tests/web/test_site_on_the_data_api.py` dépose un jumeau dans un `watch`
 simulé, sert le site sur la vraie API de données de la base de test, puis suit le lien d'une source jusqu'à son
-item : le titre de la source, écrit comme `kb digest` l'écrit depuis le détail que lit l'API IA, retrouve l'item.
+item : la source, écrite comme `kb digest` l'écrit depuis le détail que lit l'API IA, retrouve l'item par son URL.
 
 ## Tendances
 

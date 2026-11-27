@@ -11,7 +11,8 @@
   `tests/web/test_digest_client.py`, `docs/site-web.md` (section « Comptes rendus »)
 - **Série** : suite de [Servir les comptes rendus au site depuis leur jumeau](2026-11-14-servir-les-comptes-rendus-au-site-depuis-leur-jumeau.md)
   (#560) et d'[Afficher le détail d'un item](2026-11-12-afficher-le-detail-d-un-item.md)
-- **Périmètre** : les quatre commits de la branche. Les autres fichiers de la liste de départ viennent de `main`,
+- **Périmètre** : les quatre commits de code de la branche, d'`ab6a3979` à `d0e652ae` ; la fusion d'`origin/main` et
+  les commits de doc qui suivent n'y entrent pas. Les autres fichiers de la liste de départ viennent de `main`,
   fusionnés par d'autres PR, chacune avec sa note.
 
 ## Le pourquoi
@@ -170,7 +171,7 @@ n'importe pas `post`. Un test les tient égaux à ceux de la fiche.
 | L'index sans appel à l'API | 0 requête à l'API pour la page la plus vue | le dernier jour de chaque sujet : 9 appels par affichage (RGESN) |
 | Les 30 jours les plus récents en liste de liens, le total dit au-delà | le site ne sait pas quels jours existent ; à deux comptes rendus par semaine, 30 jours en couvrent quinze | un formulaire de date, comme les tendances : on y taperait des jours sans compte rendu ; une pagination : une page de plus pour un besoin non observé |
 | Le texte du modèle affiché tel quel, espace avant « : » comprise | décision de Sabine : « garder la fiche telle quelle » ; la règle des espaces vaut pour le texte écrit par le site | réécrire le texte du modèle : le site ne montrerait plus ce que le modèle a écrit |
-| Le lien d'origine d'une source introuvable sans `lang` | le site ne connaît ni la sorte de la source ni la langue de sa page, comme pour l'article d'une newsletter | `lang="en"` (essayé, `47d2858f`) : une affirmation sans preuve |
+| Le lien d'origine d'une source introuvable sans `hreflang` | le site ne connaît ni la sorte de la source ni la langue de sa page, comme pour l'article d'une newsletter | `hreflang="en"` et la note « en anglais » (essayés, `47d2858f`) : une affirmation sans preuve |
 | `WatchKind`, `WATCH_KINDS` et `make_visible` dans `items.py` | le site n'importe que `core` et `items` (`test_layers.py`) | une copie dans `web` : deux listes à tenir égales |
 
 Imposés par une consigne du dépôt : le site sans JavaScript et ses gabarits sans `|safe` (`MEMORY.md`, « Interface ») ;
@@ -193,7 +194,7 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
 | `test_the_words_of_a_digest_without_claim_are_those_of_its_sheet` | les mots d'un compte rendu vide restent ceux de la fiche |
 | `test_the_screen_of_a_digest_holds_three_requests_and_30_kb_at_most` | un compte rendu à ses bornes (12 affirmations, 60 sources, 30 jours) tient le budget RGESN |
 | `test_the_claims_are_an_ordered_list_under_their_heading_each_source_a_list`, `test_each_list_of_sources_is_named_by_the_label_above_it` (`tests/web/test_accessibility.py`) | la structure lue par un lecteur d'écran |
-| `test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_title` (`tests/web/test_site_on_the_data_api.py`) | de bout en bout, sur la vraie API de données : un jumeau écrit comme `kb digest` l'écrit, puis le lien d'une source retrouve son item, en quatre appels |
+| `test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_url` (`tests/web/test_site_on_the_data_api.py`) | de bout en bout, sur la vraie API de données : un jumeau écrit comme `kb digest` l'écrit, puis le lien d'une source retrouve son item par son URL, en quatre appels |
 | `uv run pytest` sur `d0e652ae` : 6 061 tests verts ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
 | captures à 320 px et 200 % de texte, mot par mot | aucune affirmation ne déborde au fort zoom |
 

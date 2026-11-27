@@ -94,11 +94,11 @@ def test_the_trends_show_the_latest_window_then_the_window_asked_then_one_absent
     ] == [("/trends", None), ("/trends", "2026-10-09"), ("/trends", "2026-10-11")]
 
 
-def test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_title(
+def test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_url(
     site, data_api
 ):
-    """The twin holds the title of its source as kb digest writes it, from the detail the AI API
-    reads (post/digest_sheets.py, build_twin_source): the site finds it again on the item."""
+    """The twin holds its source as kb digest writes it, from the detail the AI API reads
+    (post/digest_sheets.py, build_twin_source): the site finds the item again by its URL."""
     paper = data_api.get("/items/1").json()
     source = build_twin_source(
         Source(item_id=1, title=paper["title"], url=paper["url"])
