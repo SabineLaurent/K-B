@@ -167,7 +167,7 @@ détail par le lien du titre d'une carte. Il tourne dans `uv run pytest`, donc e
 avec la clé du client `WEB` (#560). Aucun écran n'est maquetté : la page suit la mise en page du détail et la
 charte, sans couleur nouvelle. `web/digests.py` lit l'adresse et bâtit les pages, sans entrée ni sortie.
 
-| Chemin | Page | Appels à l'API |
+| Chemin | Page | Appels à l'API, au plus |
 |---|---|---|
 | `/comptes-rendus` | les 9 sujets, chacun une carte : son libellé en lien (`h2`), une ligne qui le décrit | 0 |
 | `/comptes-rendus/<sujet>` | le compte rendu le plus récent du sujet | 2 |
@@ -190,19 +190,20 @@ sa forme, la page 404, sans appel à l'API. Le journal des requêtes écrit le g
 
 **La page d'un compte rendu** (`digest.html`), dans l'ordre : « ← Tous les comptes rendus » ; « Compte rendu »
 encadré et la fenêtre, du jour de `since` au jour de `until`, en `<time>` ; le libellé et le jour en `h1` ; le
-bandeau « Compte rendu partiel » quand la lecture est coupée ; « Rédigé par le LLM (grand modèle de langage) … à
-partir des items du fil. Chaque affirmation cite ses sources. », le modèle lu dans la réponse (`model`), jamais
-écrit dans le site ; sous le `h2` « Affirmations », une liste numérotée dans l'ordre de la fiche, chaque
+bandeau « Compte rendu partiel » quand la lecture coupée a laissé de côté des items du sujet (ci-dessous) ; s'il a
+des affirmations, « Rédigé par le LLM (grand modèle de langage) … à partir des items du fil. Chaque affirmation
+cite ses sources. », le modèle lu dans la réponse (`model`), jamais écrit dans le site, puis sous le `h2`
+« Affirmations », une liste numérotée dans l'ordre de la fiche, chaque
 affirmation suivie de « Source: » ou « Sources: » et de la liste de ses sources dans l'ordre où elle les cite,
-chacune un lien qui porte son titre, en `lang="en"` (hypothèse, comme au fil), la liste nommée par son « Sources: »
-(`aria-labelledby`) ; sous le `h2` « Les jours du sujet », les 30 jours les plus récents, chacun un lien vers son compte rendu, le jour affiché marqué
+chacune un lien qui porte son titre, en `lang="en"` (hypothèse, comme au fil ; « Sans titre » sinon, ci-dessous), la liste nommée par son « Sources: »
+(`aria-labelledby`) ; sous le `h2` « Les jours du sujet », ses jours, 30 au plus, les plus récents d'abord, chacun un lien vers son compte rendu, le jour affiché marqué
 `aria-current="page"`, sans lien. Au-delà de 30 jours, la liste le dit (« Les 30 jours les plus récents sur 45. »),
 sans pagination : à deux comptes rendus par semaine, 30 jours en couvrent quinze. Aucun lien de la navigation n'est marqué courant, comme sur le détail d'un item ; l'index marque « Comptes rendus ».
 
 Les sources sont sous leur affirmation : on lit l'affirmation et ce qui l'appuie au même endroit, au clavier et au
 lecteur d'écran, sans aller-retour (écarté : les renvois numérotés de la fiche vers une liste en bas). Un seul lien
 par source, vers son item ; le lien vers la page d'origine reste sur la page de l'item (écarté : deux liens par
-source, jusqu'à 120 arrêts de Tab). Chaque lien d'une source ou d'un jour est une cible de 44 px par son
+source, jusqu'à 120 arrêts de Tab). Chaque lien d'une source ou d'un jour est une cible d'au moins 44 px de haut par son
 `padding` (Opquast 186), et un titre sans espace se coupe partout (320 px). Un lien de source ou de jour visité
 prend l'ardoise de la charte (Opquast 141). Les titres des sources sont à 14 px, comme le lien d'une carte : ils
 appuient l'affirmation, qui reste à la taille du texte.
@@ -224,11 +225,11 @@ laisse vide se lit « Sans texte. », un titre « Sans titre » (sans `lang`).
 **Le lien d'une source vers son item** (limite (d) de `GET /digests/{subject}`, `docs/specs-api.md`) : `item_id`
 est une clé de substitution, et une base refaite renumérote ses items. Le lien vise donc
 `/comptes-rendus/<sujet>/<jour>/sources/<id>`, jamais `/items/<id>` : au clic, le site relit le compte rendu, puis
-l'item, et compare l'URL de l'item à celle de la source, quand la source en a une (le jumeau l'écrit telle quelle,
+l'item, et compare l'URL de l'item à celle de la source, quand la source en a une (le jumeau l'écrit telle quelle quand la fiche peut l'écrire en lien, sinon sans URL,
 `find_writable_url`) ; sinon, le titre de l'item, mis sur une ligne comme l'écrit le jumeau (`make_visible`, passée
 de `post/vault_files.py` à `items.py` : une seule règle pour l'écrivain du jumeau et le site), au titre de la
-source. L'URL d'abord : les failles du catalogue KEV partagent leur titre (`vulnerabilityName`), jamais leur URL
-(NVD et le n° CVE), et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
+source. L'URL d'abord : les failles du catalogue KEV peuvent partager leur titre (`vulnerabilityName`, sans contrainte
+d'unicité dans le schéma), jamais leur URL (NVD et le n° CVE), et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
 (`database/writers/paper_writer.py`), jamais son URL (`abs/<id>`, sans version). Un même article TLDR, repris par
 deux éditions, est deux items d'une même URL : sa source mène alors à l'un ou à l'autre, le même article.
 
@@ -261,13 +262,13 @@ source absente du compte rendu (OWASP LLM07), une source listée deux fois, un `
 sa sorte ou sans sa date, une sorte coupée hors des cinq du fil, un modèle hors de la forme que `kb` écrit
 (`MODEL_NAME`), et au-delà des bornes de `items.py` et de `core/config.py` (12 affirmations, 400 caractères, 1 à 5
 sources par affirmation, 60 sources, un titre de 1 024 caractères, une URL de 2 000) ; pour les jours, au-delà de
-30, un jour listé deux fois ou un total plus petit que les jours servis. Le 503 `watch_unconfigured` (le Mac sans `AZURE_CLIENT_ID`) est la
-page 500.
+30, un jour listé deux fois ou un total plus petit que les jours servis. Le 503 `watch_unconfigured` (l'API de données sans `KB_EXCHANGE_BLOB_URL` ou sans
+`AZURE_CLIENT_ID`) est la page 500.
 
 **Le budget** (D4 de #564, RGESN 6.1) : 3 requêtes et 30 Ko transférés, cache vide, gzip compris, sur un compte
 rendu à ses bornes (12 affirmations de 400 caractères, 60 sources aux titres de 140 caractères) et 30 jours
 (`tests/web/test_digest_pages.py`). Hors budget : des titres à leur borne de 1 024 caractères, comme les notes
-d'une *release* au détail. Appels à l'API : 0 pour l'index, 2 par compte rendu, 2 par clic sur une source. RGESN
+d'une *release* au détail. Appels à l'API : 0 pour l'index, 2 au plus par compte rendu, 2 au plus par clic sur une source. RGESN
 7.1 n'est pas tenu, par décision (D1, le site ne garde aucune réponse de l'API).
 
 **La preuve de bout en bout** : `tests/web/test_site_on_the_data_api.py` dépose un jumeau dans un `watch`

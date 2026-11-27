@@ -7787,8 +7787,8 @@ au 2026-11-14), qui proposait de comparer le titre.
   l'item a l'URL de la source quand elle en a une, sinon son titre mis sur une ligne (`make_visible`, `items.py`) ;
   sinon, « Source introuvable » en 200, avec le titre de la source et son lien d'origine s'il est en `https`.**
   Pourquoi : `item_id` est une clé de substitution, qu'une base refaite renumérote (limite (d) de #560) ; un lien
-  direct mènerait sans erreur à un autre item. L'URL d'abord : les failles du catalogue KEV partagent leur titre
-  (`vulnerabilityName`), jamais leur URL, et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
+  direct mènerait sans erreur à un autre item. L'URL d'abord : les failles du catalogue KEV peuvent partager leur
+  titre (`vulnerabilityName`, sans contrainte d'unicité dans le schéma), jamais leur URL, et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
   (`UPSERT_PUBLICATION`, `database/writers/paper_writer.py`), jamais son URL. Le 200 : la source existe dans le
   compte rendu relu, seul l'item manque. Options écartées : un lien direct vers `/items/<id>` (une base refaite le
   mènerait à un autre item) ; contrôler chaque source à l'affichage (jusqu'à 60 `GET /items/{id}` par page, RGESN) ;

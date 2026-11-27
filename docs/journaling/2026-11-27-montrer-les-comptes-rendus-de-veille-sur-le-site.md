@@ -60,7 +60,7 @@ jour qui n'existe pas (`2026-02-30`) donne la page 404 avant tout appel à l'API
 ### 2. La réponse de l'API, validée à la frontière
 
 `WatchDigest` (`src/k_b/web/data_api_client.py`) reprend les bornes que `kb` écrit : 12 affirmations au plus, de 1 à 5
-sources chacune, 60 sources, un titre de 1 024 caractères, un modèle de la forme `MODEL_NAME`. Quatre validateurs
+sources chacune, 60 sources au plus, un titre de 1 024 caractères au plus, un modèle de la forme `MODEL_NAME`. Quatre validateurs
 ajoutent ce qu'un type seul ne dit pas, dont celui-ci (`src/k_b/web/data_api_client.py:295-300`) :
 
 ```python
@@ -95,9 +95,9 @@ def is_item_of_source(detail: ItemDetail, source: DigestSource) -> bool:
     return make_visible(detail.title) == source.title
 ```
 
-L'URL d'abord, parce que deux cas trompent le titre. Les failles du catalogue KEV de la CISA partagent souvent leur
-titre (`vulnerabilityName`), jamais leur URL (NVD et le n° CVE). L'import met à jour sur place le titre d'un papier
-qu'arXiv retitre (`UPSERT_PUBLICATION`, `src/k_b/database/writers/paper_writer.py:13-24`), jamais son URL. Sans URL, le
+L'URL d'abord, parce que deux cas trompent le titre. Les failles du catalogue KEV de la CISA peuvent partager leur
+titre (`vulnerabilityName`, sans contrainte d'unicité dans le schéma), jamais leur URL (NVD et le n° CVE). L'import
+met à jour sur place le titre d'un papier qu'arXiv retitre (`UPSERT_PUBLICATION`, `src/k_b/database/writers/paper_writer.py:13-24`), jamais son URL. Sans URL, le
 titre de l'item est mis sur une ligne par `make_visible`, comme le jumeau l'écrit, puis comparé à celui de la source.
 
 Si l'item n'a pas l'URL de la source (ou son titre, si la source n'a pas d'URL), si l'API répond `item_not_found`, ou
@@ -141,8 +141,8 @@ balise ou une adresse dans un texte reste du texte, jamais un lien. Un texte que
 
 Les affirmations forment une liste numérotée (`<ol>`) sous le `h2` « Affirmations ». Chaque liste de sources est
 nommée par son libellé (`aria-labelledby`, WCAG 1.3.1), et `role="list"` est posé parce que Safari retire la
-sémantique d'une liste sans puces. Le lien d'une source porte `lang="en"`, par hypothèse, comme les titres du fil.
-Chaque lien de source ou de jour est une cible de 44 px de haut par son `padding` (Opquast 186) et prend l'ardoise de
+sémantique d'une liste sans puces. Le lien d'une source porte `lang="en"` quand elle a un titre, par hypothèse, comme les titres du fil.
+Chaque lien de source ou de jour est une cible d'au moins 44 px de haut par son `padding` (Opquast 186) et prend l'ardoise de
 la charte une fois visité (Opquast 141). À 200 % de texte dès 320 px, le cadre des textes et la marge des numéros
 laissaient moins de dix lettres par ligne : la règle du fort zoom les réduit (`9c46c498`,
 `src/k_b/web/static/site.css`).
@@ -155,21 +155,21 @@ la veille, pour dire ce qu'une coupe a laissé, et la mise sur une ligne d'un ti
 `WatchKind` et `WATCH_KINDS` passent donc d'`ai_api/watch_items.py` à `items.py` (`src/k_b/items.py:49-55`), et
 `make_visible` de `post/vault_files.py` à `items.py` (`src/k_b/items.py:200-208`). L'écrivain du jumeau et le site
 appliquent ainsi une seule règle, au lieu de deux copies qui pourraient diverger. Les deux phrases d'un compte rendu sans
-affirmation (« Aucune affirmation retenue. », « Aucun item classé dans ce sujet. ») sont recopiés dans le site, qui
-n'importe pas `post`. Un test les tient égaux à ceux de la fiche.
+affirmation (« Aucune affirmation retenue. », « Aucun item classé dans ce sujet. ») sont recopiées dans le site, qui
+n'importe pas `post`. Un test les tient égales à celles de la fiche.
 
 ## Choix faits et options écartées
 
 | Choix retenu | Pourquoi | Écarté, et pourquoi |
 |---|---|---|
 | Le lien d'une source vise `/comptes-rendus/…/sources/<id>`, contrôlé au clic | une base refaite renumérote ses items | un lien direct vers `/items/<id>` : il mènerait sans erreur à un autre item ; contrôler chaque source à l'affichage : jusqu'à 60 `GET /items/{id}` par page (RGESN) |
-| La comparaison par l'URL quand la source en a une, sinon par le titre (`d0e652ae`) | les failles KEV partagent leur titre ; un papier retitré garde son URL | le titre seul (première version) : une autre faille du même titre passait ; le titre et l'URL (deuxième version) : un papier retitré devenait « Source introuvable » |
+| La comparaison par l'URL quand la source en a une, sinon par le titre (`d0e652ae`) | des failles KEV peuvent partager leur titre ; un papier retitré garde son URL | le titre seul (première version) : une autre faille du même titre passait ; le titre et l'URL (deuxième version) : un papier retitré devenait « Source introuvable » |
 | « Source introuvable » en 200 | la source existe dans le compte rendu relu, seul l'item manque | 404 : il dirait la page inexistante |
 | Les sources sous leur affirmation | on lit l'affirmation et ce qui l'appuie au même endroit, au clavier et au lecteur d'écran | les renvois numérotés de la fiche vers une liste en bas : un aller-retour par affirmation |
 | Un seul lien par source, vers son item | le lien d'origine reste sur la page de l'item | deux liens par source : jusqu'à 120 arrêts de Tab |
 | Le code d'API du sujet dans l'adresse, son libellé dans `SUBJECTS`, tenu égal à `DIGEST_SUBJECTS` par un test | une seule liste de codes | un code français par sujet : une seconde table à tenir |
-| L'index sans appel à l'API | 0 requête à l'API pour la page la plus vue | le dernier jour de chaque sujet : 9 appels par affichage (RGESN) |
-| Les 30 jours les plus récents en liste de liens, le total dit au-delà | le site ne sait pas quels jours existent ; à deux comptes rendus par semaine, 30 jours en couvrent quinze | un formulaire de date, comme les tendances : on y taperait des jours sans compte rendu ; une pagination : une page de plus pour un besoin non observé |
+| L'index sans appel à l'API | 0 requête à l'API pour la page d'entrée des comptes rendus | le dernier jour de chaque sujet : 9 appels par affichage (RGESN) |
+| Les jours du sujet en liste de liens, 30 au plus, les plus récents d'abord, le total dit au-delà | le site ne sait pas quels jours existent ; à deux comptes rendus par semaine, 30 jours en couvrent quinze | un formulaire de date, comme les tendances : on y taperait des jours sans compte rendu ; une pagination : une page de plus pour un besoin non observé |
 | Le texte du modèle affiché tel quel, espace avant « : » comprise | décision de Sabine : « garder la fiche telle quelle » ; la règle des espaces vaut pour le texte écrit par le site | réécrire le texte du modèle : le site ne montrerait plus ce que le modèle a écrit |
 | Le lien d'origine d'une source introuvable sans `hreflang` | le site ne connaît ni la sorte de la source ni la langue de sa page, comme pour l'article d'une newsletter | `hreflang="en"` et la note « en anglais » (essayés, `47d2858f`) : une affirmation sans preuve |
 | `WatchKind`, `WATCH_KINDS` et `make_visible` dans `items.py` | le site n'importe que `core` et `items` (`test_layers.py`) | une copie dans `web` : deux listes à tenir égales |
@@ -184,7 +184,7 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
 |---|---|
 | `test_a_source_whose_item_has_its_title_leads_to_the_page_of_the_item` (`tests/web/test_digest_pages.py`) | une source retrouvée mène à la page de l'item, « Retour au compte rendu » |
 | `test_a_source_whose_paper_was_retitled_leads_to_the_page_of_its_item` | une source qui a une URL se contrôle par l'URL seule |
-| `test_a_source_whose_item_has_its_title_under_another_url_is_not_found` | une autre faille du même titre n'est jamais montrée comme la source |
+| `test_a_source_whose_item_has_its_title_under_another_url_is_not_found` | une autre faille du même titre, sous une autre URL, n'est pas montrée comme la source |
 | `test_a_source_absent_from_the_digest_is_the_page_not_found_without_reading_an_item` | une source inventée dans l'adresse ne fait lire aucun item |
 | `test_a_digest_cut_says_in_words_what_was_read_and_what_was_not` (paramétré) et `test_a_cut_that_leaves_nothing_out_of_the_subject_has_no_banner` | le bandeau nomme la sorte coupée, les sortes non lues et les sortes lues en entier, et n'apparaît pas quand rien ne manque |
 | `test_an_answer_out_of_the_contract_is_refused` (`tests/web/test_digest_client.py`, paramétré) et `test_a_digest_of_another_subject_gives_the_page_500` | une réponse hors contrat n'est jamais affichée |
@@ -196,7 +196,7 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
 | `test_the_claims_are_an_ordered_list_under_their_heading_each_source_a_list`, `test_each_list_of_sources_is_named_by_the_label_above_it` (`tests/web/test_accessibility.py`) | la structure lue par un lecteur d'écran |
 | `test_a_digest_of_watch_shows_its_claims_then_a_source_leads_to_the_item_of_its_url` (`tests/web/test_site_on_the_data_api.py`) | de bout en bout, sur la vraie API de données : un jumeau écrit comme `kb digest` l'écrit, puis le lien d'une source retrouve son item par son URL, en quatre appels |
 | `uv run pytest` sur `d0e652ae` : 6 061 tests verts ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | les contrôles du dépôt |
-| captures à 320 px et 200 % de texte, mot par mot | aucune affirmation ne déborde au fort zoom |
+| captures à 320 px et 200 % de texte, mot par mot, sur les neuf pages, sur `d0e652ae` | aucune affirmation ne déborde au fort zoom |
 
 ## Ce que tu dois pouvoir défendre
 
@@ -204,17 +204,17 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
    sans erreur à un autre item, et la page dirait faux en silence. Le site relit donc le compte rendu et compare
    l'item à la source avant de le montrer (`is_item_of_source`, `src/k_b/web/digests.py:329`).
 2. **Pourquoi l'URL et pas le titre ?** Le titre trompe dans deux cas relevés dans le code : des failles KEV qui
-   partagent leur titre, et un papier qu'arXiv retitre sur place (`paper_writer.py:13-24`). L'URL d'un item de la
+   peuvent partager leur titre, et un papier qu'arXiv retitre sur place (`paper_writer.py:13-24`). L'URL d'un item de la
    veille ne change pas à l'import. Le titre ne sert qu'aux sources sans URL.
 3. **Que se passe-t-il si l'API renvoie un compte rendu dont une affirmation cite une source absente ?** Le
    validateur `check_each_claim_cites_a_source_listed` le refuse, et le site rend la page 500, sans rien afficher
    (`src/k_b/web/data_api_client.py:295`). Une affirmation sans sa source n'est jamais montrée (LLM07).
 4. **Où est la sécurité face à un texte piégé du modèle ou d'une source ?** Le texte est nettoyé
    (`clean_received_value`), puis échappé par Jinja2 ; aucun gabarit n'écrit `|safe`. Le seul lien vers l'extérieur
-   est celui d'une source introuvable, gardé s'il est en `https` (`keep_https_link`) et ouvert par `external_link`, qui
+   que ces pages ajoutent est celui d'une source introuvable, gardé s'il est en `https` (`keep_https_link`) et ouvert par `external_link`, qui
    annonce le nouvel onglet.
 5. **Comment le lecteur sait-il qu'un compte rendu est partiel ?** Par le bandeau, en mots : la couleur ne fait que
-   suivre (RGAA 3.1). Le moment de la coupe est donné à la seconde, en UTC, dans un `<time>`.
+   suivre (RGAA 3.1). Quand la coupe tombe dans la fenêtre du sujet, son moment est donné à la seconde, en UTC, dans un `<time>`.
 
 ## Zones non vérifiées
 
