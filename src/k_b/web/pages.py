@@ -211,8 +211,9 @@ def show_digest(request: Request, subject: str, day: date | None) -> Response:
 def show_digest_source(
     request: Request, subject: str, day: str, item_id: str
 ) -> Response:
-    """A source of a digest: the page of its item if the base holds it under its title and its URL,
-    else what is observed; the digest is read again, never the title of the address."""
+    """A source of a digest: the page of its item if the base holds it under the URL when the source
+    has one, else the title, otherwise what is observed; the digest is read again, never the title
+    of the address."""
     read_day = read_written_day(day)
     read_id = read_item_id(item_id)
     if subject not in SUBJECTS or read_day is None or read_id is None:
