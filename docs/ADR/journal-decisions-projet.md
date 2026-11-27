@@ -7796,7 +7796,11 @@ au 2026-11-14), qui proposait de comparer le titre.
   code) ; le titre et l'URL (un papier retitré devenait « Source introuvable », deuxième revue de code) ; un 404 (il
   dirait la page inexistante). Limites assumées : deux appels à l'API par clic sur une source ; un article TLDR repris
   par deux éditions est deux items de la même URL, et sa source mène à l'un ou à l'autre, le même article
-  (`docs/site-web.md`, « Comptes rendus »). — PR de #724
+  (`docs/site-web.md`, « Comptes rendus ») ; une source sans URL se vérifie par son titre seul : un item renommé donne
+  « Source introuvable » ; après une base refaite, un autre item du même titre sous le même numéro ouvrirait sa page,
+  le schéma ne rendant aucun titre unique. Seules une release, une alerte ou un article de newsletter peuvent arriver
+  sans URL, quand la fiche écarte une URL qu'elle ne peut écrire en lien ; un papier et une faille ont toujours la
+  leur. — PR de #724
 
 ## Décisions encore ouvertes
 
