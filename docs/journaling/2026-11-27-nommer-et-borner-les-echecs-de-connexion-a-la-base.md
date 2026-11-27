@@ -60,7 +60,7 @@ d'appeler `connection_class.connect` et hors de son `try` (`psycopg_pool/pool.py
 (`postgresql.py:343`) enveloppe pour cela les paramètres eux-mêmes et écrit la même ligne,
 `database_connection_failed: database_no_token`.
 
-### Deux réponses de plus : 503 `database_unavailable` et 503 `database_missing`
+### Deux cas de plus en 503 : `database_unavailable`, et `database_missing` sur PostgreSQL
 
 L'API de données traduit chaque erreur de la base en une réponse, au même endroit, quelle que soit la route :
 
@@ -168,8 +168,9 @@ contrôles de l'API IA, son pool ouvre sa première connexion.
 | Le journal des requêtes nomme le chemin d'une route de Starlette seulement si l'app l'a (`src/k_b/core/api_request_log.py:65-70`) | Sur l'API IA, `GET /health/database` est noté `route=- status=404` : aucune route que l'app n'a pas | Ajouter `/health/database` à la liste fixe de chemins : l'API IA, qui n'a pas la route, l'aurait nommée |
 | `check_connection` gardé (point 4), si la mesure sur Azure donne un p95 ≤ 20 ms | Le seuil est fixé avant de mesurer | Le retirer, ou le garder, sur une estimation |
 
-Le contrat de l'API de données passe en 0.15.0 (`docs/api/openapi-donnees.json`, `docs/specs-api.md`) : deux codes
-d'erreur nouveaux en 503, et une route.
+Le contrat de l'API de données passe en 0.15.0 (`docs/api/openapi-donnees.json`, `docs/specs-api.md`) : un code
+d'erreur nouveau en 503, `database_unavailable` ; `database_missing`, déjà rendu pour un fichier SQLite absent, l'est
+aussi pour une base PostgreSQL sans tables ; et une route.
 
 ## Preuve
 
