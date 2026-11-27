@@ -8,7 +8,7 @@
 
 Cette fiche décrit l'architecture applicative de K-B: le flux des données de bout en bout, en bref puis en détail, les
 couches du code, puis chaque partie, de la collecte au déploiement sur Azure. Elle est écrite d'après `main` au commit
-`fd956430`. Ce qu'elle dit du passage de la production à `gpt-6.1-sol` suit la fiche du service d'IA
+`fd956430`; ce qui porte « #458 », d'après le code de la demande de fusion de #458. Ce qu'elle dit du passage de la production à `gpt-6.1-sol` suit la fiche du service d'IA
 (#623). « Déployé » y veut dire déclaré en ligne par le Bicep d'`infra/` et par
 `infra/deployment.json` à ce commit; la version qui tourne en ligne n'a pas été relue (section
 [Limites](#limites)). Les chemins du code de K-B (`etl/…`, `commands/…`, `database/…`) partent de `src/k_b/`, les

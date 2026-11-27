@@ -80,7 +80,7 @@ ligne, écrite plus tôt. Le SQLSTATE 42P01 (`undefined_table`) dit qu'une table
 du code. Le message de PostgreSQL nomme la table : la ligne ne garde que la classe et le SQLSTATE
 (`describe_engine_error`).
 
-### Un jeton demandé une fois, en 7 s au plus, pour le pool seul
+### Un jeton demandé une fois, avec 2 s pour se connecter et 5 s pour lire, pour le pool seul
 
 azure-core réessaie trois fois une demande de jeton échouée, et attendrait 300 s chaque réponse sans délai fixé. Avant
 #458, K-B fixait déjà 5 s et 10 s, mais gardait ces nouvelles tentatives : la mesure locale a donné 44,82 s (4
@@ -95,12 +95,13 @@ requêtes) pour un point d'identité muet. Le pool reçoit maintenant un credent
 ```
 
 (`src/k_b/database/entra.py:46-50`.) `DATABASE_TOKEN_RETRIES` vaut 0, avec 2 s pour se connecter au point d'identité
-et 5 s pour lire sa réponse (`src/k_b/core/config.py:203-205`). Ces 7 s restent sous les 10 s du client de l'API IA
-(`DATA_API_READ_TIMEOUT_SECONDS`), comme l'issue le demande. Le pool n'a pas besoin des nouvelles tentatives
-d'azure-core : il retente seul d'ouvrir une connexion, et une requête n'attend que ses 2 s pour en obtenir une. Une
-connexion directe de `kb` (import, purge, `kb migrate-database` en job) garde les nouvelles tentatives, avec les
-mêmes délais : aucun client n'attend derrière elle, et une erreur passagère du point d'identité n'y fait pas échouer
-tout le job.
+et 5 s pour lire sa réponse (`src/k_b/core/config.py:203-205`). Leur somme, 7 s, reste sous les 10 s du client de
+l'API IA (`DATA_API_READ_TIMEOUT_SECONDS`), comme l'issue le demande. Ce sont des délais par tentative de connexion et
+par lecture, pas une borne de la durée totale (voir « Zones non vérifiées ») : la mesure locale donne 5,00 s pour un
+point d'identité muet. Le pool n'a pas besoin des nouvelles tentatives d'azure-core : il retente seul d'ouvrir une
+connexion, et une requête n'attend que ses 2 s pour en obtenir une. Une connexion directe de `kb` (import, purge, `kb
+migrate-database` en job) garde les nouvelles tentatives, avec les mêmes délais : aucun client n'attend derrière elle,
+et une erreur passagère du point d'identité n'y fait pas échouer tout le job.
 
 ### Une base sans tables refusée avant le premier SQL
 
@@ -187,7 +188,7 @@ d'erreur nouveaux en 503, et une route.
 | `test_no_probe_of_azure_container_apps_asks_the_database_health`, `test_the_database_health_is_out_of_the_openapi` | Aucune sonde d'ACA ne l'appelle ; elle n'est pas dans l'OpenAPI |
 | `test_a_base_the_data_api_does_not_read_fails_the_smoke_test_and_the_other_checks_still_run` | `kb smoke-test` échoue sur une base illisible, sans arrêter ses autres contrôles |
 | `test_a_route_of_starlette_refused_before_routing_is_logged_by_its_path`, `test_a_400_of_the_host_is_logged` | `route=/health status=400`, et `route=-` pour une route de FastAPI refusée avant le routage |
-| `uv run pytest` : 5 909 passés ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles du dépôt |
+| `uv run pytest` : 5 915 passés, après la fusion d'`origin/main` (`91b5efa5`) ; `ruff check --no-cache`, `ruff format --check`, `mypy --strict` verts | Les contrôles du dépôt |
 
 ## Ce que tu dois pouvoir défendre
 
