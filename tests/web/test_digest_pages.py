@@ -67,16 +67,32 @@ def read_claims(response):
 # --- The subjects.
 
 
-def test_the_subjects_are_those_of_the_digests_in_their_order():
+def test_the_subjects_are_those_of_the_digests():
     """Sabine names the subjects (2026-11-26): a subject added to DIGEST_SUBJECTS gets its label."""
-    assert tuple(SUBJECTS) == tuple(subject.name for subject in DIGEST_SUBJECTS)
+    assert sorted(SUBJECTS) == sorted(subject.name for subject in DIGEST_SUBJECTS)
+
+
+def test_the_subjects_are_in_the_alphabetical_order_of_their_labels():
+    """The order Sabine saw and chose (2026-11-27); DIGEST_SUBJECTS keeps the one the model reads."""
+    assert [subject.label for subject in SUBJECTS.values()] == [
+        "Assistants de code",
+        "Cybersécurité",
+        "Développement logiciel",
+        "Frameworks agentiques",
+        "Industrie de la tech",
+        "Industrie de l’IA",
+        "Modèles d’IA",
+        "Sécurité des LLM et des agents",
+        "Vulnérabilités",
+    ]
 
 
 def test_the_labels_are_those_sabine_gave():
-    """2026-11-26: Vulnérabilités, Frameworks agentiques; LLM stays LLM."""
+    """2026-11-26: Vulnérabilités, Frameworks agentiques; LLM stays LLM. 2026-11-27: Modèles d’IA."""
     assert SUBJECTS["vulnerabilities"].label == "Vulnérabilités"
     assert SUBJECTS["llm_security"].label == "Sécurité des LLM et des agents"
     assert SUBJECTS["agent_frameworks"].label == "Frameworks agentiques"
+    assert SUBJECTS["models"].label == "Modèles d’IA"
 
 
 def test_the_index_lists_each_subject_with_its_link_without_asking_the_data_api():

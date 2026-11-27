@@ -11,9 +11,10 @@
   `tests/web/test_digest_client.py`, `docs/site-web.md` (section « Comptes rendus »)
 - **Série** : suite de [Servir les comptes rendus au site depuis leur jumeau](2026-11-14-servir-les-comptes-rendus-au-site-depuis-leur-jumeau.md)
   (#560) et d'[Afficher le détail d'un item](2026-11-12-afficher-le-detail-d-un-item.md)
-- **Périmètre** : les quatre commits de code de la branche, d'`ab6a3979` à `d0e652ae` ; la fusion d'`origin/main` et
-  les commits de doc qui suivent n'y entrent pas. Les autres fichiers de la liste de départ viennent de `main`,
-  fusionnés par d'autres PR, chacune avec sa note.
+- **Périmètre** : les quatre commits de code de la branche, d'`ab6a3979` à `d0e652ae`, et le dernier, qui nomme
+  `models` « Modèles d’IA » et range l'index des sujets par ordre alphabétique ; la fusion d'`origin/main` et les
+  commits de doc n'y entrent pas. Les autres fichiers de la liste de départ viennent de `main`, fusionnés par
+  d'autres PR, chacune avec sa note.
 
 ## Le pourquoi
 
@@ -168,6 +169,7 @@ n'importe pas `post`. Un test les tient égales à celles de la fiche.
 | Les sources sous leur affirmation | on lit l'affirmation et ce qui l'appuie au même endroit, au clavier et au lecteur d'écran | les renvois numérotés de la fiche vers une liste en bas : un aller-retour par affirmation |
 | Un seul lien par source, vers son item | le lien d'origine reste sur la page de l'item | deux liens par source : jusqu'à 120 arrêts de Tab |
 | Le code d'API du sujet dans l'adresse, son libellé dans `SUBJECTS`, tenu égal à `DIGEST_SUBJECTS` par un test | une seule liste de codes | un code français par sujet : une seconde table à tenir |
+| L'index par ordre alphabétique du libellé, écrit tel quel dans `SUBJECTS` | l'ordre que Sabine a vu et choisi le 2026-11-27 ; `DIGEST_SUBJECTS` garde celui que lit le modèle | l'ordre de `DIGEST_SUBJECTS` (première version) ; un tri à l'exécution : par point de code, une initiale « É » passerait après « Z » |
 | L'index sans appel à l'API | 0 requête à l'API pour la page d'entrée des comptes rendus | le dernier jour de chaque sujet : 9 appels par affichage (RGESN) |
 | Les jours du sujet en liste de liens, 30 au plus, les plus récents d'abord, le total dit au-delà | le site ne sait pas quels jours existent ; à deux comptes rendus par semaine, 30 jours en couvrent quinze | un formulaire de date, comme les tendances : on y taperait des jours sans compte rendu ; une pagination : une page de plus pour un besoin non observé |
 | Le texte du modèle affiché tel quel, espace avant « : » comprise | décision de Sabine : « garder la fiche telle quelle » ; la règle des espaces vaut pour le texte écrit par le site | réécrire le texte du modèle : le site ne montrerait plus ce que le modèle a écrit |
@@ -190,7 +192,8 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
 | `test_an_answer_out_of_the_contract_is_refused` (`tests/web/test_digest_client.py`, paramétré) et `test_a_digest_of_another_subject_gives_the_page_500` | une réponse hors contrat n'est jamais affichée |
 | `test_a_text_of_the_model_or_of_a_source_is_shown_as_text_never_as_a_link` | une balise dans un texte reçu reste du texte (LLM10) |
 | `test_an_address_out_of_its_form_is_the_page_not_found_without_asking_the_data_api` | une adresse mal formée ne coûte aucun appel |
-| `test_the_subjects_are_those_of_the_digests_in_their_order` | un sujet ajouté à `DIGEST_SUBJECTS` fait échouer le site tant qu'il ne le nomme pas |
+| `test_the_subjects_are_those_of_the_digests` | un sujet ajouté à `DIGEST_SUBJECTS` fait échouer le site tant qu'il ne le nomme pas |
+| `test_the_subjects_are_in_the_alphabetical_order_of_their_labels` | l'index suit l'ordre choisi par Sabine, quel que soit celui de `DIGEST_SUBJECTS` |
 | `test_the_words_of_a_digest_without_claim_are_those_of_its_sheet` | les mots d'un compte rendu vide restent ceux de la fiche |
 | `test_the_screen_of_a_digest_holds_three_requests_and_30_kb_at_most` | un compte rendu à ses bornes (12 affirmations, 60 sources, 30 jours) tient le budget RGESN |
 | `test_the_claims_are_an_ordered_list_under_their_heading_each_source_a_list`, `test_each_list_of_sources_is_named_by_the_label_above_it` (`tests/web/test_accessibility.py`) | la structure lue par un lecteur d'écran |

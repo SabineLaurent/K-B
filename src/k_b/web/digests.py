@@ -50,36 +50,13 @@ class Subject:
     description: str
 
 
-# The subjects of DIGEST_SUBJECTS (core/config.py), in its order; a test keeps both lists equal.
-# Written for the site: the definitions of DIGEST_SUBJECTS are the ones
-# the model reads.
+# The subjects of DIGEST_SUBJECTS (core/config.py), in the alphabetical order of their labels,
+# written out; a test keeps both lists of subjects equal. Written for the site: the definitions
+# of DIGEST_SUBJECTS are the ones the model reads, in the order it reads them.
 SUBJECTS: dict[str, Subject] = {
-    "vulnerabilities": Subject(
-        "Vulnérabilités",
-        "Les failles répertoriées, exploitées ou signalées sur les paquets suivis, et les"
-        " articles qui les décrivent.",
-    ),
-    "llm_security": Subject(
-        "Sécurité des LLM et des agents",
-        "Les attaques et les défenses propres aux LLM et aux agents: injection"
-        " d’instructions, contournement, empoisonnement, porte dérobée.",
-    ),
-    "agent_frameworks": Subject(
-        "Frameworks agentiques",
-        "Les versions et les nouvelles de LangChain, LangGraph, LlamaIndex et des autres"
-        " frameworks agentiques.",
-    ),
     "coding_assistants": Subject(
         "Assistants de code",
         "Les assistants de code: leurs versions, leurs fonctions, leurs usages.",
-    ),
-    "models": Subject(
-        "Modèles",
-        "Les nouveaux modèles, leurs évaluations, leurs capacités et les limites annoncées.",
-    ),
-    "ai_industry": Subject(
-        "Industrie de l’IA",
-        "Les entreprises, les produits, les financements et la régulation de l’IA.",
     ),
     "cybersecurity": Subject(
         "Cybersécurité",
@@ -90,9 +67,32 @@ SUBJECTS: dict[str, Subject] = {
         "Développement logiciel",
         "Les outils, les langages et les pratiques du développement, hors IA.",
     ),
+    "agent_frameworks": Subject(
+        "Frameworks agentiques",
+        "Les versions et les nouvelles de LangChain, LangGraph, LlamaIndex et des autres"
+        " frameworks agentiques.",
+    ),
     "tech_industry": Subject(
         "Industrie de la tech",
         "Les entreprises, les produits, les plateformes et le matériel de la tech, hors IA.",
+    ),
+    "ai_industry": Subject(
+        "Industrie de l’IA",
+        "Les entreprises, les produits, les financements et la régulation de l’IA.",
+    ),
+    "models": Subject(
+        "Modèles d’IA",
+        "Les nouveaux modèles, leurs évaluations, leurs capacités et les limites annoncées.",
+    ),
+    "llm_security": Subject(
+        "Sécurité des LLM et des agents",
+        "Les attaques et les défenses propres aux LLM et aux agents: injection"
+        " d’instructions, contournement, empoisonnement, porte dérobée.",
+    ),
+    "vulnerabilities": Subject(
+        "Vulnérabilités",
+        "Les failles répertoriées, exploitées ou signalées sur les paquets suivis, et les"
+        " articles qui les décrivent.",
     ),
 }
 

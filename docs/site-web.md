@@ -174,14 +174,16 @@ charte, sans couleur nouvelle. `web/digests.py` lit l'adresse et bâtit les page
 | `/comptes-rendus/<sujet>/<AAAA-MM-JJ>` | le compte rendu de ce jour | 2 |
 | `/comptes-rendus/<sujet>/<AAAA-MM-JJ>/sources/<id>` | la page de l'item de la source, ou « Source introuvable » | 2 |
 
-**Les sujets** gardent leur code d'API dans l'adresse (`agent_frameworks`). Leur libellé et leur ligne, en
-français, sont dans `SUBJECTS` (`web/digests.py`), dans l'ordre de `DIGEST_SUBJECTS`, tenus égaux par un test : un
-sujet ajouté à `DIGEST_SUBJECTS` le fait échouer tant que le site ne le nomme pas. Corrections de Sabine du
-2026-11-26 : « Vulnérabilités », « Frameworks agentiques », LLM gardé tel quel. La ligne est écrite pour le
-site : les définitions de `DIGEST_SUBJECTS` sont celles que lit le modèle. Écartés : un code français par sujet
-dans l'adresse (une seconde table à tenir) ; le dernier jour de chaque sujet sur l'index (9 appels par affichage,
-RGESN) ; un formulaire de date, comme les tendances (le site ne sait pas quels jours existent : la liste des jours
-le dit).
+**Les sujets** gardent leur code d'API dans l'adresse (`agent_frameworks`). Leur libellé et leur ligne, en français,
+sont dans `SUBJECTS` (`web/digests.py`), avec les sujets de `DIGEST_SUBJECTS`, tenus égaux par un test : un sujet
+ajouté à `DIGEST_SUBJECTS` le fait échouer tant que le site ne le nomme pas. L'index les range par ordre alphabétique
+de leur libellé (choix de Sabine du 2026-11-27), écrit tel quel dans `SUBJECTS` et tenu par un test ;
+`DIGEST_SUBJECTS` garde l'ordre que lit le modèle. Corrections de Sabine du 2026-11-26 : « Vulnérabilités »,
+« Frameworks agentiques », LLM gardé tel quel ; du 2026-11-27 : « Modèles d’IA ». La ligne est écrite pour le site :
+les définitions de `DIGEST_SUBJECTS` sont celles que lit le modèle. Écartés : un code français par sujet dans
+l'adresse (une seconde table à tenir) ; un tri des libellés à l'exécution (par point de code, une initiale « É »
+passerait après « Z ») ; le dernier jour de chaque sujet sur l'index (9 appels par affichage, RGESN) ; un formulaire
+de date, comme les tendances (le site ne sait pas quels jours existent : la liste des jours le dit).
 
 **L'adresse** est lue en chaînes, jamais typée par FastAPI (sinon un 422 en JSON) : le sujet parmi `SUBJECTS`, le
 jour par `read_written_day` (`AAAA-MM-JJ`, un jour qui existe), le numéro de la source par `read_item_id`. Hors de
