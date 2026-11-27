@@ -1,20 +1,26 @@
 """The connections the data API reads PostgreSQL with: read only, in REPEATABLE READ, stopped past
-their deadline, given back to the pool without transaction, and never a part of the URL or a text
-of libpq in what kb writes."""
+their deadline, given back to the pool without transaction, a failure to connect named by its
+cause, and never a part of the URL or a text of libpq in what kb writes."""
 
 import logging
 import threading
+import time
 from pathlib import Path
 
 import psycopg
 import pytest
+from azure.core.exceptions import ClientAuthenticationError
 from database.connected_readers import open_connected_readers
+from database.test_postgresql import CLIENT_ID, ENTRA_URL
+from psycopg import OperationalError
+from psycopg.errors import ConnectionTimeout
 
-from k_b.database import reading
+from k_b.database import entra, reading
 from k_b.database.creation import create_database
 from k_b.database.engine import connect_database, connect_reader, open_readers
 from k_b.database.errors import is_query_timeout
 from k_b.database.location import PostgresUrl, UnreadableDatabaseUrlError
+from k_b.database.postgresql import DatabaseNoTokenError, name_connection_failure
 from k_b.database.reading import DetailBounds, read_item_detail, read_items
 
 ITEMS_DATABASE_SCRIPT = Path(__file__).parents[1] / "fixtures" / "items_database.sql"
@@ -49,6 +55,166 @@ def test_a_url_libpq_cannot_read_is_refused_before_the_pool_without_its_text():
     assert str(refusal.value) == "KB_DATABASE_URL is not a URL libpq reads"
     assert refusal.value.__cause__ is None
     assert refusal.value.__suppress_context__
+
+
+# The texts of libpq 18 and psycopg 3.3.8, observed on 2026-11-26 on 127.0.0.1: a port closed, a host
+# that does not resolve, an address without route, and a fake server that refuses TLS, closes the
+# connection, or answers as PostgreSQL does to a password refused, to a host pg_hba.conf does not
+# list and with a request for a password.
+AT_THE_SERVER = (
+    'connection failed: connection to server at "127.0.0.1", port 5432 failed: '
+)
+CLOSED_UNEXPECTEDLY = (
+    "server closed the connection unexpectedly\n\tThis probably means the server terminated"
+    " abnormally\n\tbefore or while processing the request."
+)
+
+
+@pytest.mark.parametrize(
+    ("error", "cause"),
+    [
+        (DatabaseNoTokenError("database_no_token"), "database_no_token"),
+        (ConnectionTimeout("connection timeout expired"), "database_connect_timeout"),
+        (
+            OperationalError(
+                f"{AT_THE_SERVER}could not receive data from server: Connection refused"
+            ),
+            "database_unreachable",
+        ),
+        (
+            OperationalError(
+                "failed to resolve host 'nonexistent.invalid': [Errno 8] nodename nor"
+                " servname provided, or not known"
+            ),
+            "database_unreachable",
+        ),
+        (
+            OperationalError(
+                f"{AT_THE_SERVER}server does not support SSL, but SSL was required"
+            ),
+            "database_tls_refused",
+        ),
+        (
+            OperationalError(
+                f"{AT_THE_SERVER}{CLOSED_UNEXPECTEDLY}\nSSL SYSCALL error: Connection"
+                " reset by peer"
+            ),
+            # A cut seen in TLS, not a refusal of it.
+            "database_connection_failed",
+        ),
+        (
+            OperationalError(
+                f'{AT_THE_SERVER}root certificate file "/nonexistent/root.crt" does not'
+                " exist\nEither provide the file, use the system's trusted roots with"
+                " sslrootcert=system, or change sslmode to disable server certificate"
+                " verification."
+            ),
+            "database_tls_refused",
+        ),
+        (
+            OperationalError(
+                f'{AT_THE_SERVER}FATAL:  password authentication failed for user "kb"'
+            ),
+            "database_authentication_refused",
+        ),
+        # The authentication first: pg_hba.conf names the encryption, SSL included.
+        (
+            OperationalError(
+                f'{AT_THE_SERVER}FATAL:  no pg_hba.conf entry for host "1.2.3.4", user'
+                ' "kb", database "kb", SSL encryption'
+            ),
+            "database_authentication_refused",
+        ),
+        (
+            OperationalError(f"{AT_THE_SERVER}fe_sendauth: no password supplied"),
+            "database_authentication_refused",
+        ),
+        (
+            OperationalError(f"{AT_THE_SERVER}{CLOSED_UNEXPECTEDLY}"),
+            "database_connection_failed",
+        ),
+    ],
+    ids=[
+        "no token",
+        "connect timeout",
+        "connection refused",
+        "host not resolved",
+        "server without TLS",
+        "TLS cut",
+        "root certificate absent",
+        "password refused",
+        "host refused by pg_hba.conf",
+        "no password",
+        "other",
+    ],
+)
+def test_the_cause_of_a_failed_connection_is_named_by_its_class_or_a_fragment_of_libpq(
+    error, cause
+):
+    assert name_connection_failure(error) == cause
+
+
+def wait_for_lines_of_k_b(caplog):
+    """The lines of K-B once there is one: the pool connects in threads of its own, after
+    open_readers returned."""
+    deadline = time.monotonic() + 5
+    while not lines_of_k_b(caplog) and time.monotonic() < deadline:
+        time.sleep(0.01)
+    return lines_of_k_b(caplog)
+
+
+def test_the_pool_names_the_cause_of_a_failed_connection_without_the_text_of_libpq(
+    caplog,
+):
+    """The pool logs the text of libpq under psycopg.pool, which kb holds at ERROR: K-B writes the
+    cause instead, never the host, the port nor the user."""
+    location = PostgresUrl(f"postgresql://kb_user:{PASSWORD}@127.0.0.1:1/kb_base")
+
+    with caplog.at_level(logging.WARNING), open_readers(location, TIMEOUT_SECONDS):
+        lines = wait_for_lines_of_k_b(caplog)
+
+    assert lines
+    assert set(lines) == {"database_connection_failed: database_unreachable"}
+
+
+class RefusingCredential:
+    """An identity the endpoint gives no token."""
+
+    def get_token(self, *scopes, **kwargs):
+        raise ClientAuthenticationError("refused by the endpoint")
+
+
+def test_under_entra_the_pool_names_an_identity_without_token(monkeypatch, caplog):
+    """The pool asks the token before it connects, out of its connection class."""
+    monkeypatch.setattr(
+        entra,
+        "build_database_credential",
+        lambda client_id, is_asked_once: RefusingCredential(),
+    )
+    location = PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID)
+
+    with caplog.at_level(logging.WARNING), open_readers(location, TIMEOUT_SECONDS):
+        lines = wait_for_lines_of_k_b(caplog)
+
+    assert lines
+    assert set(lines) == {"database_connection_failed: database_no_token"}
+
+
+def test_under_entra_the_pool_asks_each_token_once(monkeypatch, caplog):
+    """A request waits 2 s for a connection: the pool tries again, not azure-core."""
+    asked_once = []
+
+    def build_refusing_credential(client_id, is_asked_once):
+        asked_once.append(is_asked_once)
+        return RefusingCredential()
+
+    monkeypatch.setattr(entra, "build_database_credential", build_refusing_credential)
+    location = PostgresUrl(ENTRA_URL, entra_client_id=CLIENT_ID)
+
+    with caplog.at_level(logging.WARNING), open_readers(location, TIMEOUT_SECONDS):
+        wait_for_lines_of_k_b(caplog)
+
+    assert asked_once == [True]
 
 
 @pytest.fixture

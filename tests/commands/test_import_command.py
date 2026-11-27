@@ -5,6 +5,7 @@ import shutil
 import sqlite3
 from datetime import UTC, datetime
 
+import pytest
 from commands.cli_helpers import LOG_LINE_DATE
 from etl.test_transform import FIXTURES_DIR
 
@@ -12,6 +13,7 @@ from k_b import cli
 from k_b.commands import (
     import_command,
 )
+from k_b.database.location import DATABASE_URL_VARIABLE
 from k_b.database.writing import KindWithoutTableError, UnknownSourceError
 from k_b.etl import pipeline
 
@@ -127,6 +129,23 @@ def test_import_refuses_a_missing_database_and_does_not_create_it(
     assert exit_code == 2
     assert "kb create-db" in capsys.readouterr().err
     assert not (tmp_path / "k-b.sqlite").exists()
+
+
+@pytest.mark.postgresql
+def test_import_refuses_a_postgresql_base_without_its_tables_and_exits_2(
+    monkeypatch, tmp_path, capsys, postgresql_base
+):
+    """The base the server gives before kb create-db: the server answers, the tables are absent."""
+    monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
+    monkeypatch.setenv(DATABASE_URL_VARIABLE, postgresql_base.value)
+
+    exit_code = cli.main(["import"])
+
+    assert exit_code == cli.ExitCode.NOT_STARTED
+    assert (
+        "the PostgreSQL base of KB_DATABASE_URL has no tables of K-B;"
+        " create it with kb create-db, or online with kb migrate-database\n"
+    ) in capsys.readouterr().err
 
 
 def test_import_reports_a_failed_import_and_exits_1(monkeypatch, tmp_path, capsys):

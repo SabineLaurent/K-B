@@ -29,6 +29,8 @@ ENTRY_SQLSTATES = frozenset({"23514", "23505", "23502", "22003"})
 UNIQUE_VIOLATION = "23505"
 # The state of a statement PostgreSQL stopped past statement_timeout (database/postgresql.py).
 QUERY_CANCELED = "57014"
+# undefined_table: a base kb migrate-database has not created yet, where a table of K-B is absent.
+UNDEFINED_TABLE = "42P01"
 # The name PostgreSQL gives the constraint of a primary key, <table>_pkey: schema_postgresql.sql
 # names none itself (tests/test_schema_postgresql.py).
 PRIMARY_KEY_SUFFIX = "_pkey"
@@ -101,3 +103,9 @@ def is_query_timeout(error: EngineError) -> bool:
     if isinstance(error, psycopg.Error):
         return error.sqlstate == QUERY_CANCELED
     return getattr(error, "sqlite_errorcode", None) == sqlite3.SQLITE_INTERRUPT
+
+
+def is_missing_table(error: EngineError) -> bool:
+    """Whether PostgreSQL found no table of the statement (42P01); a SQLite base without its file
+    is refused before, by check_database_exists."""
+    return isinstance(error, psycopg.Error) and error.sqlstate == UNDEFINED_TABLE

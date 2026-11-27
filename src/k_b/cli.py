@@ -189,8 +189,9 @@ def read_command(argv: list[str] | None) -> tuple[str, bool]:
     )
     command_parsers.add_parser(
         "smoke-test",
-        help="check that both APIs answer GET /health and that the identity of the job lists"
-        f" the container {SMOKE_TEST_CONTAINER} of the exchange storage; writes counts only",
+        help="check that both APIs answer GET /health, that the data API reads its base and that"
+        f" the identity of the job lists the container {SMOKE_TEST_CONTAINER} of the exchange"
+        " storage; writes counts only",
     )
     command_parsers.add_parser(
         "openapi",

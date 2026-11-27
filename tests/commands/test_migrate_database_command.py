@@ -117,7 +117,9 @@ def test_an_identity_without_token_stops_kb_migrate_database_by_a_named_failure(
             raise ClientAuthenticationError(f"refused\n{FORGED_LOG_LINE}")
 
     monkeypatch.setattr(
-        entra, "build_database_credential", lambda client_id: RefusingCredential()
+        entra,
+        "build_database_credential",
+        lambda client_id, is_asked_once: RefusingCredential(),
     )
     monkeypatch.setenv("KB_DATA_DIR", str(tmp_path))
     monkeypatch.setenv(

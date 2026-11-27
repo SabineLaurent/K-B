@@ -23,7 +23,8 @@ Cette fiche dit ce qu'il faut pour lancer les scripts de la base, comment instal
 ce que font la collecte qui précède l'import (`kb collect`) et le script d'agrégation et d'import (`kb import`), pas à
 pas, chacun avec son logigramme, comment l'import nettoie et homogénéise les données, la commande qui le suit
 (`kb write-tops`), puis comment lire la base sans l'API. Elle est écrite d'après le code de `main` au commit `94e3f4e`;
-la collecte et les logigrammes, d'après le commit `36c1e02`. Les chemins du code de K-B (`etl/…`, `database/…`) partent de
+la collecte et les logigrammes, d'après le commit `36c1e02`; ce qui porte « #458 », d'après le code de la demande de
+fusion de #458. Les chemins du code de K-B (`etl/…`, `database/…`) partent de
 `src/k_b/`, les autres de la racine du dépôt. [Utiliser K-B](utilisation.md) donne chaque commande de `kb` en bref;
 cette fiche détaille celles de la base.
 
@@ -222,7 +223,10 @@ L'installation se fait en quatre temps, par la propriétaire du groupe de ressou
 4. **La connexion**: avec `KB_DATABASE_AUTH=entra`, un jeton de l'identité managée d'`AZURE_CLIENT_ID` sert de mot
     de passe (`database/location.py:13-14`, `database/entra.py:1-2`). Une connexion directe, celle de `kb import`,
     demande le sien; un pool, celui de l'API de données, garde le sien et en demande un nouveau avant qu'il expire
-    (`database/postgresql.py:198-200`, `database/entra.py:42-43`).
+    (`database/postgresql.py:198-200`, `database/entra.py:42-43`). La demande d'un jeton attend 2 s la connexion et
+    5 s la réponse, sans nouvelle tentative pour le pool de l'API de données; une connexion directe, qu'aucun client
+    n'attend, garde celles d'azure-core (`core/config.py:198-205`, `database/entra.py:33-37`, `:40-50`,
+    `database/postgresql.py:182`, `:293-297`, #458).
     K-B refuse alors une URL qui porte un mot de passe, ou qui ne pose pas `sslmode=verify-full`
     (`database/postgresql.py:178-192`).
 
@@ -385,11 +389,14 @@ Texte équivalent du schéma: le paragraphe et la liste numérotée qui suivent.
 UTC, à la seconde (`commands/import_command.py:38`), qui nomme son journal:
 `journals/import-journal-<AAAA-MM-JJTHHMMSSZ>.jsonl` (`etl/pipeline.py:34-35`, `etl/pipeline.py:63-69`).
 
-1. **Le registre.** `read_imported_paths` vérifie que la base existe, puis lit les chemins des fichiers bruts déjà
-    importés, la table `raw_data` (`etl/load.py:50-57`, `database/schema.sql:28-35`). Un fichier SQLite absent sort
-    en 2 (`database/location.py:167-171`, `commands/import_command.py:45-47`). Une base PostgreSQL répond d'elle-même
-    à la première requête: absente, injoignable ou sans ses tables, elle répond par une erreur, et la commande sort
-    en 1 (`database/location.py:167-169`, `commands/import_command.py:54-56`).
+1. **Le registre.** `read_imported_paths` ouvre la base que `kb create-db` a créée, puis lit les chemins des fichiers
+    bruts déjà importés, la table `raw_data` (`etl/load.py:50-56`, `database/schema.sql:28-35`, #458). Une base que
+    `kb create-db` n'a pas créée sort en 2, sur un message qui nomme `kb create-db` et, en ligne,
+    `kb migrate-database`: un fichier SQLite absent, qui
+    n'est pas créé, ou une base PostgreSQL sans les tables de K-B, reconnue par `to_regclass('source')`
+    (`database/engine.py:41-60`, `database/postgresql.py:52`, `:255-258`, `commands/import_command.py:45-49`, #458). Une
+    base PostgreSQL injoignable répond par une erreur, et la commande sort en 1 (`commands/import_command.py:56-58`,
+    #458).
 2. **Le parcours de `raw/`.** `list_collections` parcourt `raw/automated_watch/` puis `raw/selected_library/`
     (`etl/raw_store.py:16-21`), chaque dossier de source dans l'ordre des noms (`etl/raw_reading.py:45-81`). La sorte
     d'un dossier se retrouve par son nom, égal au préfixe de la sorte ou qui commence par ce préfixe suivi de `_`
@@ -466,7 +473,7 @@ Le tableau suivant donne les codes de sortie de `kb import`.
 |---|---|---|
 | 0 | l'import a réussi | `commands/import_command.py:60-65` |
 | 1 | l'import a échoué: il s'arrête sans garder de journal, et le prochain import relit chaque fichier que la base n'a pas inscrit; une base PostgreSQL absente ou injoignable en fait partie. Pour toute commande de `kb`, une exception que la commande ne traite pas: `kb` la journalise avec sa trace | `commands/import_command.py:54-59`, `cli.py:261-265` |
-| 2 | réglage de la base refusé ou fichier SQLite absent: rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-53`, `cli.py:113-117`, `cli.py:126-134`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
+| 2 | réglage de la base refusé, fichier SQLite absent, ou base PostgreSQL sans les tables de K-B (#458): rien n'est lu; journal de cette seconde déjà là: tout est lu, rien n'est gardé. Pour toute commande de `kb`, `KB_DATA_DIR` ou `KB_LOG_TO_FILE` refusée, le fichier du journal de fonctionnement qui ne s'ouvre pas, ou la ligne de commande refusée: rien n'est lancé | `commands/import_command.py:34-37`, `commands/import_command.py:45-55`, `cli.py:113-117`, `cli.py:126-134`, `cli.py:232-240`, `commands/exit_codes.py:33-39` |
 | 143, 130 | SIGTERM, SIGINT (Ctrl-C): reçu avant la validation, rien n'est gardé; reçu après, l'import et son journal sont gardés; reçu pendant, sur PostgreSQL, l'issue de l'import est inconnue et son journal est gardé. Un second Ctrl-C peut couper l'annulation, SIGTERM ignore un second signal | `etl/load.py:80-86`, `etl/load.py:139-160`, `commands/exit_codes.py:63-85` |
 
 ## Le nettoyage et l'homogénéisation des formats

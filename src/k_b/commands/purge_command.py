@@ -58,7 +58,9 @@ def run_purge(data_dir: Path, environ: Mapping[str, str]) -> int:
         )
     # Before OSError: a FileNotFoundError.
     except MissingDatabaseError as error:
-        logger.error("%s; create it with kb create-db", error)
+        logger.error(
+            "%s; create it with kb create-db, or online with kb migrate-database", error
+        )
         return ExitCode.NOT_STARTED
     except UnreadableDatabaseUrlError as error:
         logger.error("%s", error)

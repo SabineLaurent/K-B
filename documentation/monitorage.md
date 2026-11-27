@@ -58,7 +58,8 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
     [Journaux de l'application](#journaux-de-lapplication).
 - Le format accessible: [L'accessibilité de la documentation](accessibilite.md).
 
-Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`. Le monitorage du modèle tient dans deux
+Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`; ceux qui portent « #458 », et ceux de
+`src/k_b/commands/run_log.py` et de `tests/commands/test_run_log.py`, le code de la demande de fusion de #458. Le monitorage du modèle tient dans deux
 fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`,
 et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie
 en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »).
@@ -503,7 +504,7 @@ son renvoi au code ou aux règles.
 
 | Journal | Ce qu'il contient | En local | En ligne | Code |
 |---|---|---|---|---|
-| journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:24-26`, `:73-96` |
+| journal de `kb` | le déroulé d'une commande, réussites et échecs, une ligne datée par événement | sortie d'erreur et `<KB_DATA_DIR>/logs/kb.log` | sortie d'erreur du job, dans `log-kb` | `src/k_b/commands/run_log.py:24-26`, `:74-97` |
 | journal de `kb serve-data` | son démarrage, ses clients, son arrêt, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-data.log` | sortie d'erreur de `ca-kb-data-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_data_command.py:41-42`, `src/k_b/data_api/app.py:71` |
 | journal de `kb serve-ai` | de même, pour l'API IA | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-ai.log` | sortie d'erreur de `ca-kb-ai-api`, dans `log-kb` | `src/k_b/cli.py:66-71`, `src/k_b/commands/serve_ai_command.py:74-93`, `src/k_b/ai_api/app.py:96` |
 | journal de `kb serve-web` | son démarrage, le réveil de l'API de données, une ligne par requête | sortie d'erreur et `<KB_DATA_DIR>/logs/kb-serve-web.log` | sortie d'erreur de `ca-kb-web`, dans `log-kb` | `src/k_b/cli.py:72-76`, `src/k_b/core/config.py:172`, `src/k_b/commands/serve_web_command.py:27-33`, `:49-50`, `:64-66`, `src/k_b/web/app.py:64` |
@@ -521,17 +522,17 @@ enregistrements de l'API IA partent vers Grafana Cloud avec ses mesures, sous le
 
 Une ligne s'écrit `<date> <niveau> <module>: <message>`, et `<date> <niveau> <module>: trace_id=<identifiant> <message>`
 pendant une requête de l'une des deux API; la date en ISO 8601, en UTC, à la seconde, avec son `Z`
-(`src/k_b/commands/run_log.py:97-99`). Le niveau est INFO ou au-dessus (`:108`). Les bibliothèques n'écrivent
+(`src/k_b/commands/run_log.py:98-100`). Le niveau est INFO ou au-dessus (`:109`). Les bibliothèques n'écrivent
 qu'à partir d'un niveau supérieur, car aux niveaux inférieurs elles citent ce que `kb` ne journalise pas: `httpx2` dès
 WARNING (l'URL du fournisseur du modèle); `azure` et `urllib3` dès ERROR (l'URL d'un blob, qui porte le titre d'un
-clip); `psycopg` et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:38-62`, `:109-110`). uvicorn écrit
+clip); `psycopg` et `psycopg_pool` dès ERROR (l'hôte, l'utilisateur et la base) (`:38-63`, `:110-111`). uvicorn écrit
 par les mêmes sorties, sans son propre journal d'accès (`log_config=None`, `access_log=False`:
 `src/k_b/commands/serve_data_command.py:55-56`, `src/k_b/commands/serve_ai_command.py:113-114`). Le message d'une
 ligne écrite par une bibliothèque, uvicorn compris, est cité par `quote_value`, comme une valeur observée: ses
 retours à la ligne et ses caractères de contrôle échappés, coupé à 300 caractères
-(`src/k_b/commands/run_log.py:63-68`, `:122-151`). Son message tient donc sur sa seule ligne
-(`tests/commands/test_run_log.py:233`). Une ligne de `kb` garde son message tel quel
-(`tests/commands/test_run_log.py:283`): la règle 3 veut que `kb` cite lui-même chaque valeur qu'il journalise
+(`src/k_b/commands/run_log.py:64-69`, `:123-152`). Son message tient donc sur sa seule ligne
+(`tests/commands/test_run_log.py:237`). Une ligne de `kb` garde son message tel quel
+(`tests/commands/test_run_log.py:287`): la règle 3 veut que `kb` cite lui-même chaque valeur qu'il journalise
 (`.claude/rules/conventions.md`).
 
 La ligne d'une requête donne la méthode, le gabarit de la route (`/items/{item_id}`, jamais le chemin reçu), le
@@ -546,7 +547,7 @@ une même API. Chaque API tire le sien (`src/k_b/core/api_request_log.py:27`): u
 identifiant dans l'API IA, et chacune des requêtes que l'API IA fait alors à l'API de données (une liste par sorte,
 un détail par item) a le sien (`src/k_b/ai_api/connectors/data_api_client.py:211-214`). L'identifiant de trace les
 relie: chaque ligne écrite pendant une requête de l'une des deux API le porte après le nom de son journal (`trace_id=`,
-`src/k_b/commands/run_log.py:37`, `:122-134`). L'API IA le tire pour chaque demande et l'envoie à l'API de données
+`src/k_b/commands/run_log.py:37`, `:123-135`). L'API IA le tire pour chaque demande et l'envoie à l'API de données
 dans l'en-tête `traceparent` du W3C (<span lang="en">World Wide Web Consortium</span>) <span lang="en">Trace Context</span>,
 dont les lignes le reprennent (`src/k_b/core/trace_context.py:27-44`; `src/k_b/ai_api/connectors/data_api_client.py:345-352`).
 
@@ -572,7 +573,7 @@ de l'environnement, ou d'un fichier passé par `uv run --env-file .env kb …` (
     `error: KB_DATA_DIR must point to the data directory` (`src/k_b/commands/environment.py:32-37`); un chemin qui
     n'est pas un dossier, sur `error: KB_DATA_DIR is not an existing directory` (`:38-42`); les deux en code 2, sans
     rien lancer (`src/k_b/cli.py:110-111`). Les journaux vont dans son dossier `logs/`
-    (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:84-85`).
+    (`src/k_b/core/config.py:164-171`), créé au premier lancement (`src/k_b/commands/run_log.py:85-86`).
 - `KB_LOG_TO_FILE`, `true` par défaut (`src/k_b/core/config.py:223-225`), lue par
     `src/k_b/commands/environment.py:46-58`: `false` écrit sur la sortie d'erreur seule, sans fichier. Une autre
     valeur arrête la commande en code 2, sans rien lancer: `error: KB_LOG_TO_FILE: 'oui' neither true nor false`.
@@ -585,7 +586,7 @@ laisserait un processus long écrire dans le fichier de la veille (`src/k_b/cli.
 
 **Rotation et durée.** Chaque fichier tourne à la première ligne écrite après minuit UTC: ses lignes passent dans
 `kb.log.<AAAA-MM-JJ>`, au jour de ces lignes (de même pour les trois autres), et les nouvelles vont dans un `kb.log`
-neuf (`src/k_b/commands/run_log.py:86-96`; nom daté: `src/k_b/purge/run_records.py:20-30`). La rotation ne supprime
+neuf (`src/k_b/commands/run_log.py:87-97`; nom daté: `src/k_b/purge/run_records.py:20-30`). La rotation ne supprime
 rien. Le fichier courant, sans date dans son nom, n'est jamais purgé (`src/k_b/purge/run_records.py:60-65`).
 `kb purge`, dernière de ses purges, supprime les journaux et les journaux d'import dont le jour du nom a plus de
 6 mois (`src/k_b/purge/run_records.py:36-50`, appelée par `src/k_b/purge/all_purges.py:63`; durée:
@@ -607,7 +608,8 @@ Un avertissement nomme un état, un délai de la base dépassé par exemple (`qu
 `src/k_b/data_api/errors.py:55`). La trace d'une erreur imprévue suit sa ligne datée, sur des lignes sans date
 (`.claude/rules/conventions.md`, règle 3): `grep -A` la montre avec sa ligne. Le motif `request_id=` trouve la ligne
 de la requête et les autres lignes de la même requête (`database_error`, `query_timeout`, `internal_error`:
-`docs/specs-api.md:140-142`; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
+`docs/specs-api.md:140-142`; depuis #458, aussi `database_missing` et `database_unavailable`: `docs/specs-api.md:181-183`,
+#458; l'échec de lecture de l'API IA: `src/k_b/ai_api/routers/digest_router.py:173-175`);
 une ligne de mesure porte `"request_id"`, sur la sortie standard.
 
 Les lignes de mesure ne vont que sur la sortie standard de `kb serve-ai`: aucun fichier ne les garde

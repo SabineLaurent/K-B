@@ -3,7 +3,7 @@
 Cette page donne les commandes de `kb` dans l'ordre où elles servent: la base, la collecte et l'import, les deux API, les
 comptes rendus, le site, puis les commandes des jobs en ligne. Pour chacune, elle dit comment la lancer, ce qu'elle
 affiche et ses codes de sortie, et renvoie à la fiche qui la détaille. Elle est écrite d'après `main` au commit
-`39cb5eb9`. Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
+`39cb5eb9`; ce qui porte « #458 », d'après le code de la demande de fusion de #458. Les chemins du code de K-B (`commands/…`, `post/…`) partent de `src/k_b/`, les autres de la
 racine du dépôt. L'installation et chaque variable d'environnement sont dans
 [la fiche de l'installation](installation.md).
 
@@ -224,7 +224,7 @@ requête dans `<KB_DATA_DIR>/logs/kb-serve-data.log`, avec le nom du client, jam
     autres commandes. Pendant le démarrage, le code dépend du moment: 130 avec cette ligne, 3 ou 0.
 
 Avec une base PostgreSQL, `kb serve-data` démarre sans attendre la base: une base injoignable se voit à la requête,
-qui répond 500 `database_error`.
+qui répond 503 `database_unavailable` (#458).
 
 ### Ce que l'opératrice tient
 
@@ -524,10 +524,12 @@ KB_DATA_DIR=<dossier> KB_EXCHANGE_BLOB_URL=https://<compte>.blob.core.windows.ne
 et à l'API IA (`KB_AI_API_URL`), sans clé. Après le `/health` de chaque API, qui la réveille, trois sondes sans clé
 vérifient qu'elle refuse ce qu'elle doit refuser (`jobs/api_probes.py`): une route à clé rend 401 (`GET /items`,
 `POST /digests`), `GET /docs` rend 404 (200 avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox`, où les API le servent) et
-`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Puis il demande le jeton de l'identité managée
+`HEAD /health` rend 405; le corps d'une réponse n'est jamais lu. Depuis #458, il demande ensuite, après les sondes des deux API, `GET /health/database` à l'API
+de données, qui répond 200 quand elle lit sa base, sinon l'erreur d'une route de données (503 `database_missing`,
+`database_unavailable` ou `query_timeout`, 500 `database_error`). Puis il demande le jeton de l'identité managée
 attribuée au job (`AZURE_CLIENT_ID`, un GUID; sans lui, le SDK (<span lang="en">software development kit</span>) d'Azure chercherait l'identité système, que les jobs de K-B
 n'ont pas), et liste une page d'au plus 100 noms du conteneur `smoke-test` du stockage d'échange
-(`KB_EXCHANGE_BLOB_URL`, en `https`, sans défaut). Les neuf contrôles tournent toujours. Il n'écrit que des comptes:
+(`KB_EXCHANGE_BLOB_URL`, en `https`, sans défaut). Les contrôles, dix depuis #458, tournent toujours. Il n'écrit que des comptes:
 jamais le nom d'un blob (celui d'un clip est son titre), ni le message d'une erreur du SDK, mais son état
 (`exchange_storage_forbidden`…), son statut HTTP et son code; l'identité sans jeton, refusée ou injoignable, est
 `exchange_storage_no_token`.

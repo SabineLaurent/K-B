@@ -65,7 +65,7 @@ pas »).
   (règle 4 de `.claude/rules/conventions.md`).
 - **La transaction de l'import.** `kb import` écrit les dépôts suivis, puis inscrit chaque fichier
   lu au registre (`raw_data`) et écrit ses items, dans une seule transaction, sous le verrou des
-  écrivains (`src/k_b/etl/load.py:60-88`). Chaque item s'y écrit dans un `SAVEPOINT`
+  écrivains (`src/k_b/etl/load.py:59-86`). Chaque item s'y écrit dans un `SAVEPOINT`
   (`src/k_b/database/savepoint.py:19-40`) : une entrée que la base refuse pour ses propres valeurs
   (`CHECK`, `UNIQUE` hors clé primaire, `NOT NULL`), ou que Python ne peut pas lui passer (un entier
   au-delà de 64 bits, un surrogate isolé), est annulée seule et devient un rejet du journal
@@ -352,7 +352,7 @@ aucune issue ne les aligne :
   `tracked_repository.packages` et `advisory.packages`, ce que la 1FN refuse (une valeur non
   atomique). Raison : une liste n'est jamais cherchée ni filtrée en base ; elle s'écrit entière,
   avec sa ligne. Les auteurs et les paquets touchés se lisent entiers et sont servis en liste par
-  l'API (`src/k_b/database/reading.py:491` pour les auteurs, `:388` pour les paquets). Les paquets
+  l'API (`src/k_b/database/reading.py:499` pour les auteurs, `:396` pour les paquets). Les paquets
   suivis sont une copie de la liste du code (`GITHUB_TRACKED_REPOSITORIES` de `src/k_b/core/config.py`),
   réécrite entière à chaque import
   (`src/k_b/database/writers/release_writer.py:24-29`) et jamais relue en base. Un `CHECK` tient sa forme

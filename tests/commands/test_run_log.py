@@ -8,6 +8,8 @@ import subprocess
 import sys
 from datetime import UTC, datetime, time, timedelta
 
+import psycopg_pool.pool
+import psycopg_pool.sched
 import pytest
 from azure.core.credentials import AccessToken
 from azure.core.exceptions import HttpResponseError
@@ -111,7 +113,9 @@ def test_an_error_handled_by_kb_is_a_dated_log_line_of_the_log_file(
     # The line of the start of kb import, then the error.
     [_, file_line] = (tmp_path / "logs" / "kb.log").read_text("utf-8").splitlines()
     assert re.fullmatch(
-        rf"{LOG_LINE_DATE} ERROR k_b\.cli: .*; create it with kb create-db", file_line
+        rf"{LOG_LINE_DATE} ERROR k_b\.cli: .*; create it with kb create-db, or online"
+        r" with kb migrate-database",
+        file_line,
     )
     assert file_line in capsys.readouterr().err.splitlines()
 
@@ -297,3 +301,18 @@ def test_a_line_out_of_a_request_has_no_trace_id(tmp_path, capsys):
 
     [line] = capsys.readouterr().err.splitlines()
     assert line.endswith(" INFO k_b.cli: a line of the test")
+
+
+@pytest.mark.parametrize(
+    ("module", "logger_name"),
+    [(psycopg_pool.pool, "psycopg.pool"), (psycopg_pool.sched, "psycopg_pool.sched")],
+)
+def test_the_pool_and_its_scheduler_write_nothing_below_error(
+    tmp_path, module, logger_name
+):
+    """The pool logs under psycopg.pool, its scheduler under psycopg_pool.sched: at WARNING, both
+    quote the error of a connection, the text of libpq."""
+    assert module.logger.name == logger_name
+
+    with cli.logging_to(tmp_path, None):
+        assert module.logger.getEffectiveLevel() == logging.ERROR

@@ -1288,6 +1288,23 @@ def test_health_answers_without_key(make_ai_api):
     assert response.json() == {"status": "ok"}
 
 
+def test_the_health_of_the_base_of_the_data_api_is_no_route_of_the_ai_api(
+    make_ai_api, caplog
+):
+    client, _ = make_ai_api([])
+
+    with caplog.at_level(logging.INFO, logger=REQUEST_LOGGER):
+        response = client.get("/health/database")
+
+    assert response.status_code == 404
+    [line] = [
+        record.getMessage()
+        for record in caplog.records
+        if record.name == REQUEST_LOGGER
+    ]
+    assert "route=- status=404" in line
+
+
 def test_only_the_public_routes_answer_without_a_key(make_ai_api):
     client, _ = make_ai_api([])
     routes = {

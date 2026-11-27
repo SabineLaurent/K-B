@@ -9,6 +9,7 @@ from pathlib import Path
 from k_b.core.quoting import quote_value
 from k_b.database.engine import Connection, connect_database, connect_sqlite
 from k_b.database.location import DatabaseLocation, PostgresUrl
+from k_b.database.postgresql import SELECT_SOURCE_TABLE
 
 DATABASE_SCRIPTS = files("k_b.database")
 
@@ -18,7 +19,6 @@ SELECT_DATABASE_SETTINGS = """
 SELECT pg_encoding_to_char(encoding), datlocprovider, datcollate, datctype, datlocale
 FROM pg_database WHERE datname = current_database()
 """
-SELECT_SOURCE_TABLE = "SELECT to_regclass('source') IS NOT NULL"
 # UTF8: in SQL_ASCII, psycopg reads bytes and length() counts bytes. The collation C, of libc or
 # of the builtin provider: text sorts and compares byte by byte, as in SQLite, and citext folds
 # the case of ASCII letters alone, as COLLATE NOCASE (docs/stockage.md).

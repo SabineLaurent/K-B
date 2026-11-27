@@ -19,20 +19,34 @@ from k_b.core.api_errors import (
 )
 from k_b.core.api_request_log import read_request_id
 from k_b.data_api.watch_reading import WatchReadingError, WatchReadingState
-from k_b.database.errors import ENGINE_ERRORS, EngineError, is_query_timeout
+from k_b.database.errors import (
+    ENGINE_ERRORS,
+    EngineError,
+    describe_engine_error,
+    is_missing_table,
+    is_query_timeout,
+)
 from k_b.database.location import MissingDatabaseError
+from k_b.database.postgresql import is_pool_timeout
 from k_b.exchange.storage import ExchangeStorageError
 
 logger = logging.getLogger(__name__)
 
 # The state of a request past its deadline in the base (data_api/dependencies.py).
 QUERY_TIMEOUT = "query_timeout"
+# The base has no file on SQLite, no tables of K-B on PostgreSQL.
+DATABASE_MISSING = "database_missing"
+# The pool of a PostgreSQL base lent no connection within its wait.
+DATABASE_UNAVAILABLE = "database_unavailable"
 # The error bodies of a data route, declared in the OpenAPI.
 ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
     **API_ERROR_RESPONSES,
     429: {"model": ErrorSchema, "description": RATE_LIMIT_EXCEEDED},
     500: {"model": ErrorSchema, "description": "database_error, internal_error"},
-    503: {"model": ErrorSchema, "description": f"database_missing, {QUERY_TIMEOUT}"},
+    503: {
+        "model": ErrorSchema,
+        "description": f"{DATABASE_MISSING}, {DATABASE_UNAVAILABLE}, {QUERY_TIMEOUT}",
+    },
 }
 # The state of a route of watch when kb serve-data has no setting of the exchange storage.
 WATCH_UNCONFIGURED = "watch_unconfigured"
@@ -71,12 +85,30 @@ WATCH_ERROR_RESPONSES: dict[int | str, dict[str, Any]] = {
 async def handle_missing_database(
     request: Request, error: MissingDatabaseError
 ) -> Response:
-    return respond_with_error(503, "database_missing")
+    return respond_with_error(503, DATABASE_MISSING)
 
 
 async def handle_database_error(request: Request, error: EngineError) -> Response:
     if is_query_timeout(error):
         return respond_to_query_timeout(request)
+    if is_pool_timeout(error):
+        # The cause, if the base refused the connections, has its own line (database/postgresql.py).
+        logger.warning(
+            "%s: %s request_id=%s",
+            DATABASE_UNAVAILABLE,
+            type(error).__name__,
+            read_request_id(request),
+        )
+        return respond_with_error(503, DATABASE_UNAVAILABLE)
+    if is_missing_table(error):
+        # By its class and SQLSTATE: the message names the table.
+        logger.error(
+            "%s: %s request_id=%s",
+            DATABASE_MISSING,
+            describe_engine_error(error),
+            read_request_id(request),
+        )
+        return respond_with_error(503, DATABASE_MISSING)
     # The type only: the message of SQLite may hold a path or a part of the query.
     logger.error(
         "database_error: %s request_id=%s",

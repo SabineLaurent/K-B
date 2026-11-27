@@ -7,12 +7,13 @@ import re
 from collections.abc import Callable, Iterable, Iterator, Mapping, Sequence
 from contextlib import contextmanager
 from functools import partial
-from typing import Any
+from typing import Any, Self
 
 import psycopg
 from psycopg import IsolationLevel, pq
 from psycopg.conninfo import conninfo_to_dict
-from psycopg_pool import ConnectionPool
+from psycopg.errors import ConnectionTimeout
+from psycopg_pool import ConnectionPool, PoolTimeout
 
 from k_b.core.config import (
     DATABASE_CONNECT_TIMEOUT_SECONDS,
@@ -46,6 +47,9 @@ OPEN_TRANSACTION_STATUSES = frozenset(
 WRITING_LOCK_KEY = int.from_bytes(b"k-b")
 SET_LOCK_TIMEOUT = "SELECT set_config('lock_timeout', ?, true)"
 LOCK_FOR_WRITING = "SELECT pg_advisory_xact_lock(?)"
+# The first table of the schema: kb create-db and kb migrate-database write every table in one
+# transaction, so a base has them all or none.
+SELECT_SOURCE_TABLE = "SELECT to_regclass('source') IS NOT NULL"
 # The deadline of every statement of a connection of the readers, for its whole session: set by
 # K-B, not by the server, so that a base set up without it is never read without a deadline.
 SET_STATEMENT_TIMEOUT = "SELECT set_config('statement_timeout', ?, false)"
@@ -59,6 +63,29 @@ logger = logging.getLogger(__name__)
 
 # The state logged when the server ended the session of a reader before its rollback.
 READER_SESSION_LOST = "reader_session_lost"
+# The state logged when the pool could not open a connection, and its causes.
+DATABASE_CONNECTION_FAILED = "database_connection_failed"
+DATABASE_CONNECT_TIMEOUT = "database_connect_timeout"
+DATABASE_UNREACHABLE = "database_unreachable"
+DATABASE_TLS_REFUSED = "database_tls_refused"
+DATABASE_AUTHENTICATION_REFUSED = "database_authentication_refused"
+# The cause of a failed connection, read in its text, which is never logged: libpq quotes the host,
+# the port and the user. The first fragment the text holds, its case kept, names it; the
+# authentication first, as pg_hba.conf names the encryption of the client ("SSL encryption"). Texts
+# of libpq 18 and of psycopg 3.3.8 (tests/database/test_reading_pool.py, observed on 2026-11-26).
+CONNECTION_FAILURE_FRAGMENTS = (
+    # "password authentication failed for user", from the server.
+    ("authentication failed", DATABASE_AUTHENTICATION_REFUSED),
+    ("pg_hba.conf", DATABASE_AUTHENTICATION_REFUSED),
+    ("no password supplied", DATABASE_AUTHENTICATION_REFUSED),
+    # "server does not support SSL, but SSL was required"; not "SSL SYSCALL error", a cut.
+    ("does not support SSL", DATABASE_TLS_REFUSED),
+    # "root certificate file … does not exist", under verify-full.
+    ("certificate", DATABASE_TLS_REFUSED),
+    ("Connection refused", DATABASE_UNREACHABLE),
+    # psycopg resolves the host itself.
+    ("failed to resolve host", DATABASE_UNREACHABLE),
+)
 
 # The parameters of a statement: by position for ?, by name for :name.
 type Parameters = Sequence[Any] | Mapping[str, Any]
@@ -151,7 +178,8 @@ def connect_postgresql(location: PostgresUrl) -> PostgresConnection:
     check_url(location)
     try:
         connection = psycopg.connect(
-            location.value, **make_connection_parameters(location)()
+            location.value,
+            **make_connection_parameters(location, is_token_asked_once=False)(),
         )
     except psycopg.ProgrammingError:
         raise make_unreadable_url_error() from None
@@ -193,14 +221,17 @@ def find_entra_url_refusal(settings: Mapping[str, Any]) -> str | None:
 
 
 def make_connection_parameters(
-    location: PostgresUrl,
+    location: PostgresUrl, *, is_token_asked_once: bool
 ) -> Callable[[], dict[str, Any]]:
     """The parameters of each new connection besides the URL: the bound on the wait for its server
-    and, under Entra, a token of the identity, asked for at each call. A pool keeps its credential,
-    which keeps its token until it nears its end; a direct connection asks for a token of its own."""
+    and, under Entra, a token of the identity, asked for at each call, once only if
+    is_token_asked_once. A pool keeps its credential, which keeps its token until it nears its end;
+    a direct connection asks for a token of its own."""
     if location.entra_client_id is None:
         return lambda: {"connect_timeout": DATABASE_CONNECT_TIMEOUT_SECONDS}
-    credential = entra.build_database_credential(location.entra_client_id)
+    credential = entra.build_database_credential(
+        location.entra_client_id, is_asked_once=is_token_asked_once
+    )
 
     def with_token() -> dict[str, Any]:
         """The parameters of one new connection, its token asked for now."""
@@ -221,6 +252,12 @@ def make_unreadable_url_error() -> UnreadableDatabaseUrlError:
     )
 
 
+def has_tables(connection: PostgresConnection) -> bool:
+    """Whether the base has the tables of K-B."""
+    (has_source_table,) = connection.execute(SELECT_SOURCE_TABLE).fetchone()
+    return bool(has_source_table)
+
+
 def lock_for_writing(connection: PostgresConnection) -> None:
     """Wait for the lock of the writers, until the end of the transaction, for at most the
     timeout of sqlite3 (core/config.py): past it, PostgreSQL raises 55P03."""
@@ -239,7 +276,8 @@ def open_reading_pool(
 ) -> Iterator[ReadingPool]:
     """The pool of the readers of the base, open until the end of the block; it connects in the
     background, so that kb serve-data starts without waiting for the base, as on SQLite; under
-    Entra, each connection it opens gets a token of its own.
+    Entra, each connection it opens gets a token of its own; each failure to open one is logged
+    by its cause (ReaderConnection).
 
     The URL is checked before (check_url): the pool would otherwise fail on it in the
     background."""
@@ -251,7 +289,12 @@ def open_reading_pool(
     check_url(location)
     pool: ReadingPool = ConnectionPool(
         location.value,
-        kwargs=make_connection_parameters(location),
+        connection_class=ReaderConnection,
+        # Asked once: a request waits READING_POOL_WAIT_SECONDS for a connection, and the pool
+        # tries again by itself.
+        kwargs=logging_token_failures(
+            make_connection_parameters(location, is_token_asked_once=True)
+        ),
         min_size=READING_POOL_MIN_SIZE,
         max_size=READING_POOL_MAX_SIZE,
         timeout=READING_POOL_WAIT_SECONDS,
@@ -281,6 +324,62 @@ def configure_reader(
     reader.execute(SET_STATEMENT_TIMEOUT, (statement_timeout,))
     # A rollback would undo the setting.
     reader.commit()
+
+
+class ReaderConnection(psycopg.Connection[tuple[Any, ...]]):
+    """A connection of the pool of the readers, which logs the cause of a failure to open it: the
+    pool logs the text of libpq, under a logger kb holds at ERROR (LIBRARY_LOG_LEVELS)."""
+
+    @classmethod
+    def connect(cls, conninfo: str = "", **kwargs: Any) -> Self:
+        """Open a connection; a failure is logged by its cause, then raised to the pool."""
+        try:
+            return super().connect(conninfo, **kwargs)
+        except psycopg.OperationalError as error:
+            log_connection_failure(error)
+            raise
+
+
+def logging_token_failures(
+    parameters: Callable[[], dict[str, Any]],
+) -> Callable[[], dict[str, Any]]:
+    """The parameters of each new connection of the pool, an identity without token logged as a
+    failure to connect: the pool asks for them before its connection class connects."""
+
+    def logged() -> dict[str, Any]:
+        """The parameters of one new connection."""
+        try:
+            return parameters()
+        except DatabaseNoTokenError as error:
+            log_connection_failure(error)
+            raise
+
+    return logged
+
+
+def log_connection_failure(error: psycopg.Error) -> None:
+    """Log a failure of the pool to open a connection by its cause."""
+    logger.warning("%s: %s", DATABASE_CONNECTION_FAILED, name_connection_failure(error))
+
+
+def name_connection_failure(error: psycopg.Error) -> str:
+    """The cause of a failure to connect, by its class or by a fragment of its text, never quoted;
+    database_connection_failed when none names it."""
+    if isinstance(error, DatabaseNoTokenError):
+        return entra.DATABASE_NO_TOKEN
+    if isinstance(error, ConnectionTimeout):
+        return DATABASE_CONNECT_TIMEOUT
+    text = str(error)
+    for fragment, cause in CONNECTION_FAILURE_FRAGMENTS:
+        if fragment in text:
+            return cause
+    return DATABASE_CONNECTION_FAILED
+
+
+def is_pool_timeout(error: BaseException) -> bool:
+    """Whether the pool lent no connection within its wait: every one lent, or none that could
+    connect to the base."""
+    return isinstance(error, PoolTimeout)
 
 
 @contextmanager

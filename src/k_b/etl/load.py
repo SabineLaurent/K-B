@@ -14,12 +14,12 @@ from k_b.core.config import TrackedRepository
 from k_b.core.quoting import quote_value
 from k_b.database.engine import (
     Connection,
-    connect_database,
+    connect_existing_database,
     is_commit_finished_before_a_signal,
     lock_for_writing,
 )
 from k_b.database.errors import ENGINE_ERRORS
-from k_b.database.location import DatabaseLocation, check_database_exists
+from k_b.database.location import DatabaseLocation
 from k_b.database.reading import read_raw_file_paths
 from k_b.database.writing import write_tracked_repositories
 from k_b.etl.file_writing import FileWriting, write_file
@@ -49,8 +49,7 @@ class ImportSummary(NamedTuple):
 
 def read_imported_paths(database: DatabaseLocation) -> frozenset[str]:
     """Read the paths of the raw files already imported, from the registry of the database."""
-    check_database_exists(database)
-    connection = connect_database(database)
+    connection = connect_existing_database(database)
     try:
         return read_raw_file_paths(connection)
     finally:
@@ -69,8 +68,7 @@ def import_items(
     items and of trends in collection order, so that a rebuilt base registers them in the same
     order. The lock of the writers is taken first: on PostgreSQL, two imports write one after the
     other, as behind the write lock of SQLite."""
-    check_database_exists(database)
-    connection = connect_database(database)
+    connection = connect_existing_database(database)
     try:
         try:
             lock_for_writing(connection)

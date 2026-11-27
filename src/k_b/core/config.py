@@ -196,9 +196,13 @@ DATABASE_LOCK_TIMEOUT_SECONDS = 5
 # the local default; entra asks the managed identity for a token (database/location.py).
 DEFAULT_DATABASE_AUTH = "libpq"
 # The waits of a request for that token, to the identity endpoint of the container
-# (database/entra.py): azure-core would otherwise wait 300 s for it.
-DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 5
-DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 10
+# (database/entra.py), and the retries of the pool: none; azure-core would wait 300 s, and ask three
+# times more (locally, 45 s for an endpoint that did not answer, 4.8 s for a refusal or a 500). A
+# token of the pool that does not come fails below the DATA_API_READ_TIMEOUT_SECONDS of the client
+# of the AI API; a direct connection of kb, which no such client waits for, keeps those retries.
+DATABASE_TOKEN_CONNECT_TIMEOUT_SECONDS = 2
+DATABASE_TOKEN_READ_TIMEOUT_SECONDS = 5
+DATABASE_TOKEN_RETRIES = 0
 # The pool of connections the data API reads a PostgreSQL base with (database/postgresql.py): one
 # replica, a few clients. A request waits for a connection at most READING_POOL_WAIT_SECONDS, then
 # fails: that wait and one statement (DATA_API_QUERY_TIMEOUT_SECONDS) stay below the
@@ -418,6 +422,11 @@ DATA_API_STORAGE_READ_TIMEOUT_SECONDS = 10
 # an ordinary one 0.03 s. Below DATA_API_READ_TIMEOUT_SECONDS, the wait of the AI API for each
 # piece of an answer.
 DATA_API_QUERY_TIMEOUT_SECONDS = 5
+# What a GET /health/database refused while another runs is told to wait: the longest the one under
+# way takes, the wait for a connection of the pool, then its statement (data_api/database_health.py).
+DATABASE_HEALTH_RETRY_AFTER_SECONDS = (
+    READING_POOL_WAIT_SECONDS + DATA_API_QUERY_TIMEOUT_SECONDS
+)
 
 # The window of a digest request, in days (docs/fiches-veille.md, "Fenêtre"): the default, changed
 # by KB_DIGEST_WINDOW_DAYS, and the bounds of both the variable and window_days of a request.

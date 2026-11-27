@@ -59,8 +59,17 @@ def test_a_400_of_the_host_is_logged(client, authorization, request_lines):
     client.get("/items", headers={**authorization, "Host": "evil.example"})
 
     [line] = request_lines()
-    assert "status=400" in line
+    assert "route=- status=400" in line
     assert "evil.example" not in line
+
+
+def test_a_route_of_starlette_refused_before_routing_is_logged_by_its_path(
+    client, request_lines
+):
+    client.get("/health", headers={"Host": "evil.example"})
+
+    [line] = request_lines()
+    assert "route=/health status=400" in line
 
 
 def test_an_unknown_route_is_logged_without_its_path(

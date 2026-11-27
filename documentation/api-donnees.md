@@ -24,7 +24,8 @@ terminaison, qui peut l'appeler, comment une clé se change, ce que dit son cont
 base dans chaque environnement de K-B. Le contrat de ses sept routes est
 [l'OpenAPI versionnée de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json),
 `docs/api/openapi-donnees.json`: la fiche y renvoie et ne la remplace pas. Elle est écrite d'après le code de `main`
-au commit `39cb5eb9`. Les chemins du code de K-B (`data_api/…`, `core/…`, `database/…`, …) partent de
+au commit `39cb5eb9`; ce qui porte « #458 », d'après le code de la demande de fusion de #458. Les chemins du code de
+K-B (`data_api/…`, `core/…`, `database/…`, …) partent de
 `src/k_b/`, les autres de la racine du dépôt.
 
 ## Ce qu'est l'API de données
@@ -55,13 +56,14 @@ Le schéma suivant montre qui appelle l'API de données et ce qu'elle lit. Le pa
 ```mermaid
 flowchart LR
     accTitle: Les appelants de l'API de données et ce qu'elle lit
-    accDescr: kb digest et kb trend-report appellent l'API IA, qui lit les items et les tendances par l'API de données avec la clé du client AI_DIGEST. Le site appelle avec la clé du client WEB. En local, le terminal ou un script appelle avec sa propre clé. Les jobs kb smoke-test et kb digest-watch appellent GET /health sans clé. L'API de données lit la base en lecture seule, et le conteneur watch du stockage d'échange pour les tops et les comptes rendus.
+    accDescr: kb digest et kb trend-report appellent l'API IA, qui lit les items et les tendances par l'API de données avec la clé du client AI_DIGEST. Le site appelle avec la clé du client WEB. En local, le terminal ou un script appelle avec sa propre clé. Les jobs kb smoke-test et kb digest-watch appellent GET /health sans clé; kb smoke-test appelle aussi GET /health/database sans clé, en pointillés: prévu en ligne, avec #458. L'API de données lit la base en lecture seule, et le conteneur watch du stockage d'échange pour les tops et les comptes rendus.
     digest["kb digest"] -->|"POST /digests"| ai["API IA<br>kb serve-ai"]
     trend["kb trend-report"] -->|"POST /trend-reports"| ai
     ai -->|"GET /items, GET /items/{item_id}, GET /trends<br>clé AI_DIGEST"| data["API de données<br>kb serve-data"]
     web["site<br>kb serve-web"] -->|"clé WEB"| data
     other["terminal ou script<br>en local"] -->|"sa propre clé"| data
     jobs["kb smoke-test<br>kb digest-watch"] -->|"GET /health<br>sans clé"| data
+    jobs -.->|"GET /health/database, kb smoke-test<br>sans clé, prévu #458"| data
     data -->|"lecture seule"| base[("base<br>SQLite ou PostgreSQL")]
     data -->|"tops et comptes rendus"| watch[("conteneur watch<br>du stockage d'échange")]
 ```
@@ -74,7 +76,9 @@ par l'API de données, `GET /items`, `GET /items/{item_id}` et `GET /trends`
 local, le terminal ou un script appelle avec sa propre clé, par exemple celle du client `TERMINAL`
 ([Utiliser K-B](utilisation.md), « La lancer et l'appeler »). Les jobs `kb smoke-test` et `kb digest-watch` appellent `GET /health` sans clé
 (`commands/smoke_test_command.py:94-101`, `commands/digest_watch_command.py:43-48`); `kb smoke-test` y ajoute des
-sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`). L'API de données lit la base, SQLite
+sondes sans clé, qui attendent chacune son refus, hors du bac à sable, où `/docs` répond 200 (`jobs/api_probes.py:75-84`), et
+`GET /health/database`, sans clé, qui dit si l'API lit sa base (`commands/smoke_test_command.py:112`, `:162-173`, #458); ce trait est en
+pointillés, prévu en ligne. L'API de données lit la base, SQLite
 ou PostgreSQL, en lecture seule, et le conteneur `watch` du stockage d'échange pour les tops et les comptes rendus
 (`data_api/watch_reading.py:1-4`).
 
@@ -102,10 +106,10 @@ préfixe et ses étiquettes (`tags`): `items`, `trends`, `tops` et `digests`, qu
 
 ## Les points de terminaison
 
-L'API de données a dix chemins. Les sept routes de données sont dans le contrat, `docs/api/openapi-donnees.json`.
-`GET /health`, `/docs` et `/openapi.json` sont **hors du contrat**: ils sont décrits ici d'après le code (section
+L'API de données a onze chemins. Les sept routes de données sont dans le contrat, `docs/api/openapi-donnees.json`.
+`GET /health`, `GET /health/database`, `/docs` et `/openapi.json` sont **hors du contrat**: ils sont décrits ici d'après le code (section
 [Hors du contrat, d'après le code](#hors-du-contrat-dapres-le-code)). Le test `test_the_routes_are_listed` tient la
-liste des dix (`tests/data_api/test_api_keys.py:37-49`). Le tableau suivant donne, pour chaque chemin, s'il est dans
+liste des onze (`tests/data_api/test_api_keys.py:37-50`, #458). Le tableau suivant donne, pour chaque chemin, s'il est dans
 le contrat, ce qu'il rend, ce qu'il lit et les clients permis.
 
 | Chemin | Dans le contrat | Ce qu'il rend | Lit | Clients permis |
@@ -118,6 +122,7 @@ le contrat, ce qu'il rend, ce qu'il lit et les clients permis.
 | `GET /digests/{subject}` | oui | le compte rendu de veille d'un sujet d'un jour | `watch` | le client `WEB` seul |
 | `GET /digests/{subject}/days` | oui | les jours qui ont un compte rendu du sujet | `watch` | le client `WEB` seul |
 | `GET /health` | non | `{"status": "ok"}` | rien | sans clé |
+| `GET /health/database` | non | `{"status": "ok"}`, ou l'erreur d'une route de données | la base, une ligne au plus | sans clé, un appel à la fois |
 | `GET /openapi.json` | non | l'OpenAPI de l'app | rien | sans clé, avec `KB_DEPLOYMENT_ENVIRONMENT=sandbox` seulement; 404 sinon |
 | `GET /docs` | non | Swagger UI, qui lit `/openapi.json` | rien | comme `/openapi.json` |
 
@@ -316,6 +321,19 @@ Les quatre routes de `watch` lisent par le même lecteur, `WatchReader` (`data_a
     la base ni `watch` (`core/api_health.py:1-13`). C'est une route de Starlette, ajoutée hors du schéma, que la clé
     de l'app n'atteint pas (`data_api/app.py:80-82`). Une réponse 200 de `/health` n'est pas journalisée
     (`core/api_request_log.py:36-38`). En ligne, c'est la sonde du conteneur.
+- Depuis #458, `GET /health/database` dit si l'API lit sa base, sans clé, pour l'opératrice, `kb smoke-test` et la surveillance,
+    jamais pour les sondes du conteneur, qui feraient redémarrer l'API à chaque panne de la base (test
+    `test_no_probe_of_azure_container_apps_asks_the_database_health`). Elle lit une ligne au plus de la première table
+    du schéma, `SELECT 1 FROM source LIMIT 1`, par la connexion d'une route de données, sous ses délais
+    (`database/reading.py:25-27`, `:328-330`, `data_api/database_health.py:17-37`). Elle répond 200
+    `{"status": "ok"}`, sans aucune valeur de la base, ou l'erreur d'une route de données pour la même cause: 503
+    `database_missing`, même pour une base PostgreSQL sans la table `source`, la seule qu'elle lit, où `SELECT 1`
+    passerait, 503
+    `database_unavailable`, 503 `query_timeout` ou 500 `database_error` (`tests/data_api/test_database_health.py`).
+    Un second appel pendant qu'un premier tourne reçoit 429 `request_already_running`, avec `Retry-After: 7`, les 2 s
+    d'attente d'une connexion et les 5 s de l'instruction (`core/config.py:427-429`): sans clé, elle ne prend qu'une
+    des 4 connexions du <span lang="en">pool</span> à la fois. Chaque appel est journalisé, 200 compris: seul `/health` à 200 ne l'est pas
+    (`core/api_request_log.py:39`). C'est une route de Starlette, ajoutée hors du schéma (`data_api/app.py:89-94`).
 - `/openapi.json` et `/docs` ne sont servis que si `KB_DEPLOYMENT_ENVIRONMENT` vaut exactement `sandbox`; toute
     autre valeur, ou aucune, ne sert ni l'un ni l'autre (`core/api_settings.py:69-79`). ReDoc n'est pas servi
     (`data_api/app.py:58-59`, test `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`).
@@ -346,12 +364,13 @@ quand il vient et sur quelles routes (`core/api_errors.py:58-63`, `data_api/erro
 | 404 | `digest_not_found` | aucun jumeau du jour demandé, ou aucun jumeau | `GET /digests/{subject}` |
 | 422 | `invalid_parameter` | paramètre hors de ses bornes ou mal formé | toutes les routes de données |
 | 429 | `rate_limit_exceeded` | client au-delà du débit de la route, avec `Retry-After` | toutes les routes de données |
-| 500 | `database_error` | toute autre erreur de la base, sans détail; sur PostgreSQL, une base injoignable ou sans tables, ou aucune connexion libre en 2 s | items et tendances |
+| 500 | `database_error` | toute autre erreur de la base, sans détail | items et tendances |
 | 500 | `internal_error` | erreur imprévue, journalisée par son type seul | toutes les routes de données |
 | 502 | `watch_listing_too_long` | plus de 5 000 noms, ou plus de deux pages, dans le dossier | tops et comptes rendus |
 | 502 | `watch_production_refused` | jumeau refusé (section [La lecture de `watch`](#la-lecture-de-watch)) | tops et comptes rendus |
 | 502 | `exchange_storage_unavailable`, `exchange_storage_no_token`, `exchange_storage_unauthorized`, `exchange_storage_forbidden`, `exchange_storage_failed` | le stockage d'échange, ou l'identité, a échoué ou refusé | tops et comptes rendus |
-| 503 | `database_missing` | le fichier SQLite de la base n'existe pas | items et tendances |
+| 503 | `database_missing` | le fichier SQLite de la base n'existe pas; sur PostgreSQL, une table de K-B manque (#458) | items et tendances |
+| 503 | `database_unavailable` | sur PostgreSQL, aucune connexion du <span lang="en">pool</span> en 2 s: toutes prêtées, ou aucune qui joigne la base (#458) | items et tendances |
 | 503 | `query_timeout` | la requête a passé sa borne de temps dans la base | items et tendances |
 | 503 | `watch_unconfigured` | `kb serve-data` n'a pas `KB_EXCHANGE_BLOB_URL` ou `AZURE_CLIENT_ID` | tops et comptes rendus |
 | 503 | `watch_production_changed` | le jumeau a changé depuis la liste gardée | tops et comptes rendus |
@@ -435,8 +454,9 @@ celle de `GET /trends` un compte rendu des tendances (test
 pas: un 401 ne compte pas
 (`test_a_request_without_a_valid_key_counts_for_nothing`). Une requête admise par le débit compte, même refusée
 ensuite: un 422 compte (`test_a_parameter_refused_counts`, `tests/data_api/test_rate_limit.py:58-72`), et un 403
-aussi, le débit passant avant le client de la route. `/health`, `/docs` et `/openapi.json` n'ont pas de limite (test
-`test_the_public_routes_have_no_limit`).
+aussi, le débit passant avant le client de la route. `/health`, `/health/database`, `/docs` et `/openapi.json` n'ont
+pas de limite par client (test `test_the_public_routes_have_no_limit`, #458); `/health/database` en a une d'un appel à la
+fois.
 
 ## Expiration et changement d'une clé
 
@@ -484,8 +504,8 @@ ce secret ([le README de l'infrastructure](https://github.com/SabineLaurent/K-B/
 ## Le contrat OpenAPI
 
 [L'OpenAPI versionnée de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/api/openapi-donnees.json),
-`docs/api/openapi-donnees.json`, est la référence de l'API au standard OpenAPI 3.1.0. Sa version, `0.14.0`, est celle
-de l'app (`data_api/app.py:28-29`) et de
+`docs/api/openapi-donnees.json`, est la référence de l'API au standard OpenAPI 3.1.0. Sa version, `0.15.0`, est celle
+de l'app (`data_api/app.py:31-32`, #458) et de
 [la spécification de l'API de données](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-api.md)
 (`docs/specs-api.md:11`); un changement visible par un client change les trois. Il décrit les sept routes, leurs
 paramètres et leurs bornes, leurs réponses, chaque état d'erreur dans la description de chaque statut, et le schéma
@@ -559,15 +579,25 @@ KB_DATA_DIR=~/.knowledge_base KB_DATABASE_URL=postgresql://<rôle>@127.0.0.1:543
 - **Le <span lang="en">pool</span>.** `kb serve-data` ouvre au démarrage un <span lang="en">pool</span> de 1 à 4 connexions, par `psycopg-pool`, qui se connecte
     en arrière-plan: l'API démarre sans attendre la base (`database/postgresql.py:236-268`,
     `core/config.py:207-208`). Une requête attend une connexion 2 s au plus (`core/config.py:209`,
-    `database/postgresql.py:286-290`), puis reçoit 500 `database_error`.
+    `database/postgresql.py:286-290`), puis reçoit 503 `database_unavailable` (`data_api/errors.py:94-102`, #458).
 - **La lecture seule et la borne de temps.** `configure_reader` fait de chaque connexion neuve une lectrice: chaque
     transaction en `REPEATABLE READ READ ONLY`, si bien que le serveur refuse toute écriture et que les lectures d'une
     requête voient un seul état de la base, et un `statement_timeout` de 5 s par instruction, posé par K-B et non par
     le serveur (`database/postgresql.py:51`, `:271-284`). Au-delà, le serveur arrête l'instruction, et l'API répond
     le même 503 `query_timeout` (`database/errors.py:97-103`, `data_api/errors.py:77-79`). Un délai de moins d'1 ms
     est refusé au démarrage: à 0, `statement_timeout` n'arrêterait rien (`database/postgresql.py:246-250`).
-- **Une base absente.** Une base injoignable, ou sans tables, reçoit 500 `database_error`, sans détail (test
-    `test_serve_on_a_base_out_of_reach_answers_500_and_writes_no_text_of_libpq`).
+- **Une base absente.** Une base injoignable reçoit 503 `database_unavailable`, une base sans les tables de K-B 503
+    `database_missing`, sans détail (tests `test_serve_on_a_base_out_of_reach_answers_503_and_writes_no_text_of_libpq`,
+    `test_on_postgresql_a_base_without_its_tables_gives_503_database_missing_and_logs_its_state`, #458).
+- **Un échec de connexion.** Chaque échec du <span lang="en">pool</span> à ouvrir une connexion s'écrit au journal par sa
+    cause, jamais par le texte de libpq, qui cite l'hôte, le port et l'utilisateur: `database_connection_failed: <cause>`,
+    la cause parmi `database_no_token`, `database_connect_timeout`, `database_unreachable`, `database_tls_refused` (un
+    serveur sans TLS, ou un texte qui nomme un certificat; une coupure pendant l'échange TLS reste
+    `database_connection_failed`) et `database_authentication_refused`, lue dans la classe de l'erreur ou dans une
+    table fixe de fragments de son texte, sinon `database_connection_failed` (`database/postgresql.py:66-88`,
+    `:329-376`; tests
+    `test_the_cause_of_a_failed_connection_is_named_by_its_class_or_a_fragment_of_libpq`,
+    `test_the_pool_names_the_cause_of_a_failed_connection_without_the_text_of_libpq`, #458).
 - **Plusieurs lectures, un seul état.** `begin_reading` ne fait rien sur PostgreSQL: psycopg ouvre la transaction à
     la première instruction, en `REPEATABLE READ READ ONLY` (`database/engine.py:90-95`).
 
@@ -599,7 +629,8 @@ Pour lire la base sans passer par l'API, en local ou en ligne, la fiche de l'imp
     seul hôte permis (`infra/main.bicep:293-294`). Le trafic entre les apps de l'environnement est chiffré
     (`infra/modules/container-apps-environment.bicep:30-36`).
 - Ses clients en ligne sont l'API IA, `ca-kb-ai-api` (`infra/main.bicep:332`), le site, `ca-kb-web` (`:367`), et les
-    jobs `caj-kb-smoke-test` et `caj-kb-digest-watch`, qui appellent `GET /health` (`:397`, `:447`).
+    jobs `caj-kb-smoke-test` et `caj-kb-digest-watch`, qui appellent `GET /health` (`:397`, `:447`). Depuis #458, `caj-kb-smoke-test` appelle aussi
+    `GET /health/database`. En ligne, l'appel part au premier tag qui porte ce code.
 - Ses variables, des valeurs qui ne sont pas des secrets (`infra/main.bicep:283-296`): `KB_DATA_DIR`,
     `KB_DATABASE_URL`, `KB_DATABASE_AUTH=entra`, `AZURE_CLIENT_ID`, `KB_EXCHANGE_BLOB_URL`,
     `KB_DATA_API_HOST=0.0.0.0`, `KB_DATA_API_PORT=8000`, `KB_DATA_API_ALLOWED_HOSTS` et
@@ -656,6 +687,17 @@ sed -n 270,300p infra/main.bicep
 grep -n "KB_DATA_API_KEY_AI_DIGEST: 'kb\|KB_DATA_API_KEY_WEB: 'kb" infra/main.bicep
 # Son entrée interne, sans HTTP, de 0 à 1 réplique.
 grep -n "external:\|allowInsecure\|minReplicas\|maxReplicas" infra/modules/api-container-app.bicep
+```
+
+Ce qui porte « #458 », depuis la racine du dépôt, au code de la demande de fusion de #458:
+
+```bash
+# Le contrat: version 0.15.0.
+python3 -c "import json; print(json.load(open('docs/api/openapi-donnees.json'))['info']['version'])"
+# GET /health/database: ses réponses, un appel à la fois, hors des sondes d'ACA: 13 tests passent, 3 écartés (marqués postgresql).
+uv run pytest tests/data_api/test_database_health.py
+# La cause d'un échec de connexion du pool, jamais le texte de libpq: 12 tests passent.
+uv run pytest tests/database/test_reading_pool.py -k cause
 ```
 
 Un `fichier:ligne` se relit sans changer de commit: `git show 39cb5eb9:<chemin> | sed -n '<début>,<fin>p'`, avec

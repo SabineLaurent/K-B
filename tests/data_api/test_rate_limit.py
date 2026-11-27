@@ -9,7 +9,7 @@ from k_b.core.config import (
     RateLimit,
 )
 
-PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health"}
+PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health", "/health/database"}
 # The most a trend report reads (core/config.py, "The bound of a trend report request").
 TREND_REPORT_READINGS = 32
 
@@ -77,6 +77,7 @@ def test_the_public_routes_have_no_limit(client):
 
     for _ in range(3):
         assert client.get("/health").status_code == 200
+        assert client.get("/health/database").status_code == 200
 
 
 def test_a_digest_and_a_trend_report_at_their_caps_stay_under_the_limits():

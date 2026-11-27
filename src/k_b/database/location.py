@@ -165,7 +165,7 @@ def describe_location(location: DatabaseLocation) -> str:
 
 
 def check_database_exists(location: DatabaseLocation) -> None:
-    """Connecting to a missing file would create an empty base; the server of a PostgreSQL base
-    answers for it at the first query."""
+    """Connecting to a missing file would create an empty base; a PostgreSQL base without its
+    tables is refused by connect_existing_database (database/engine.py)."""
     if isinstance(location, Path) and not location.is_file():
         raise MissingDatabaseError(f"{location} does not exist")

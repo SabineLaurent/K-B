@@ -19,7 +19,8 @@ lui-même. Le déroulé de `kb collect`, pas à pas, avec son logigramme et ses 
 [la fiche de l'import et de la base, « La commande qui précède l'import: `kb collect` »](donnees.md#la-commande-qui-precede-limport-kb-collect);
 le détail de chaque source est dans
 [les spécifications de la collecte](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md). Elle est
-écrite d'après le code de `main` au commit `39cb5eb9`. Les chemins du code de K-B (`etl/…`, `core/…`,
+écrite d'après le code de `main` au commit `39cb5eb9`, ses renvois à `commands/run_log.py` d'après le code de la demande
+de fusion de #458. Les chemins du code de K-B (`etl/…`, `core/…`,
 `commands/…`, `post/…`, `purge/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Le périmètre
@@ -236,8 +237,8 @@ l'import (`etl/raw_store.py:120-132`).
 ### Les journaux
 
 - **Chaque ligne est datée en UTC**, à la seconde, avec sa zone: `<date> <niveau> <module>: <message>`, au format
-    `%Y-%m-%dT%H:%M:%SZ` (`commands/run_log.py:37`, `:97-99`, `core/dates.py:7`). Le journal va sur la sortie
-    d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC (`commands/run_log.py:73-96`).
+    `%Y-%m-%dT%H:%M:%SZ` (`commands/run_log.py:37`, `:98-100`, `core/dates.py:7`). Le journal va sur la sortie
+    d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC (`commands/run_log.py:74-97`).
 - **Une valeur observée est citée par `quote_value`**, échappée (retours à la ligne et caractères de contrôle) et
     coupée à 100 caractères (`core/quoting.py:9-19`); le message d'échec d'une source et ses notes, à 300
     (`etl/extract.py:35-38`, `:103-109`).

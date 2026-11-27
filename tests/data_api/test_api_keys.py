@@ -16,7 +16,7 @@ from k_b.jobs.api_probes import DATA_API_ROUTE_WITH_KEY, list_probes
 
 INVALID_API_KEY = {"error": "invalid_api_key"}
 # Served without key: they hold no data.
-PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health"}
+PUBLIC_ROUTES = {"/docs", "/openapi.json", "/health", "/health/database"}
 
 
 def list_routes(items_database, api_keys):
@@ -40,6 +40,7 @@ def test_the_routes_are_listed(items_database, api_keys):
         "/digests/{subject}/days",
         "/docs",
         "/health",
+        "/health/database",
         "/items",
         "/items/{item_id}",
         "/openapi.json",
@@ -167,5 +168,6 @@ def test_docs_openapi_and_health_are_public_and_no_other_page_is_served(client):
     assert client.get("/docs").status_code == 200
     assert client.get("/openapi.json").status_code == 200
     assert client.get("/health").status_code == 200
+    assert client.get("/health/database").status_code == 200
     assert client.get("/redoc").status_code == 404
     assert client.get("/docs/oauth2-redirect").status_code == 404

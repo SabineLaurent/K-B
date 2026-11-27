@@ -43,7 +43,9 @@ def run_import(data_dir: Path, environ: Mapping[str, str]) -> int:
             data_dir, database, SOURCE_KINDS, GITHUB_TRACKED_REPOSITORIES, imported_at
         )
     except MissingDatabaseError as error:
-        logger.error("%s; create it with kb create-db", error)
+        logger.error(
+            "%s; create it with kb create-db, or online with kb migrate-database", error
+        )
         return ExitCode.NOT_STARTED
     except ImportJournalExistsError as error:
         logger.error("%s; run kb import again", error)

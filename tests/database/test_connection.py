@@ -1,12 +1,14 @@
-"""The read-only connection the readers of the base use."""
+"""The read-only connection the readers of the base use, and the connection of the commands to a base
+kb create-db has created."""
 
 import sqlite3
 
 import pytest
 
+from k_b.database import postgresql
 from k_b.database.creation import create_database
-from k_b.database.engine import connect_database_read_only
-from k_b.database.location import MissingDatabaseError
+from k_b.database.engine import connect_database_read_only, connect_existing_database
+from k_b.database.location import MissingDatabaseError, PostgresUrl
 
 INSERT_SOURCE = (
     "INSERT INTO source (source_code, label, source_type, acquisition_mode)"
@@ -53,3 +55,32 @@ def test_a_relative_database_path_is_read(monkeypatch, tmp_path):
         assert connection.execute("SELECT count(*) FROM source").fetchone() == (7,)
     finally:
         connection.close()
+
+
+class BaseWithoutTables:
+    """A connection to a PostgreSQL base whose catalog has no table source."""
+
+    def __init__(self):
+        self.closed = False
+
+    def execute(self, sql, parameters=()):
+        return self
+
+    def fetchone(self):
+        return (False,)
+
+    def close(self):
+        self.closed = True
+
+
+def test_a_postgresql_base_without_its_tables_is_refused_and_its_connection_closed(
+    monkeypatch,
+):
+    """The base of kb import and kb purge: the server answers, but kb create-db has not run."""
+    connection = BaseWithoutTables()
+    monkeypatch.setattr(postgresql, "connect_postgresql", lambda location: connection)
+
+    with pytest.raises(MissingDatabaseError, match="has no tables of K-B"):
+        connect_existing_database(PostgresUrl("postgresql://kb@127.0.0.1/kb"))
+
+    assert connection.closed
