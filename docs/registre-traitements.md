@@ -75,7 +75,7 @@ entreprise.
 
 Pour rédiger les comptes rendus de veille (`docs/fiches-veille.md`), l'API IA envoie des champs des items
 au modèle, chez Microsoft. C'est un traitement de la fiche 1 ; la fiche 2 n'envoie rien : ni
-`zotero_entry` ni clip ne sont lus pour les fiches (`WatchKind`, `src/k_b/ai_api/watch_items.py`).
+`zotero_entry` ni clip ne sont lus pour les fiches (`WatchKind`, `src/k_b/items.py`).
 Sources datées : section « Sources de l'envoi au modèle ».
 
 | Rubrique | Contenu |

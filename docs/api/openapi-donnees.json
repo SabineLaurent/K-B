@@ -2505,7 +2505,7 @@
           "item_id": {
             "type": "integer",
             "title": "Item Id",
-            "description": "The item of the base: a base made again numbers its items anew, so lead to it only when its title is the one of the source."
+            "description": "The item of the base: a base made again numbers its items anew, so lead to it only when its URL is the one of the source, or its title when the source has no URL."
           },
           "title": {
             "type": "string",

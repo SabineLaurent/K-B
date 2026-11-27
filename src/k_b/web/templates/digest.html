@@ -1,0 +1,75 @@
+{#- A kind in the words of the form of the feed, in its language. -#}
+{%- macro write_kind(kind) -%}
+{%- if kind.lang %}<span lang="{{ kind.lang }}">{{ kind.label }}</span>{% else %}{{ kind.label }}{% endif -%}
+{%- endmacro -%}
+{#- The kinds as a sentence starts them: « Les failles, les alertes et les papiers ». -#}
+{%- macro write_kinds(kinds) -%}
+{%- for kind in kinds %}{% if loop.first %}Les{% elif loop.last %} et les{% else %}, les{% endif %} {{ write_kind(kind) }}{% endfor -%}
+{%- endmacro -%}
+{% extends "base.html" %}
+{% block title %}{{ digest.page_title }}{% endblock %}
+{% block main_class %}page item-page{% endblock %}
+{% block content %}
+<a class="back-link" href="/comptes-rendus"><span aria-hidden="true">←</span> Tous les comptes rendus</a>
+<article class="item">
+<p class="item-meta"><span class="card-kind">Compte rendu</span> <span class="item-line">Fenêtre du <time datetime="{{ digest.window_start.iso }}">{{ digest.window_start.text }}</time> au <time datetime="{{ digest.window_end.iso }}">{{ digest.window_end.text }}</time></span></p>
+<h1>{{ digest.heading }}</h1>
+{#- A digest cut must not look whole (OWASP LLM07): said in words, the colour following (RGAA 3.1);
+each sentence only if it has kinds to name. -#}
+{% if digest.cap %}
+{%- set cap = digest.cap %}
+<div class="banner banner-neutral">
+<p class="banner-title">Compte rendu partiel</p>
+<p class="banner-text">
+{%- if cap.cut -%}
+Parmi les {{ write_kind(cap.cut.name) }}, K-B n’a lu que les items publiés après le <time datetime="{{ cap.cut.after.iso }}">{{ cap.cut.after.text }}</time> (temps universel coordonné): les plus anciens de la fenêtre n’y sont pas.
+{%- endif -%}
+{%- if cap.unread -%}
+{{ " " if cap.cut else "" }}{{ write_kinds(cap.unread) }} n’ont pas été lus.
+{%- endif -%}
+{%- if cap.whole -%}
+{{ " " if cap.cut or cap.unread else "" }}{{ write_kinds(cap.whole) }} ont été {{ cap.whole_participle }} en entier.
+{%- endif -%}
+</p>
+</div>
+{% endif %}
+{% if digest.claims %}
+<p>Rédigé par le LLM (grand modèle de langage) <span class="item-code">{{ digest.model }}</span> à partir des items du fil. Chaque affirmation cite ses sources.</p>
+<section class="item-text" aria-labelledby="affirmations">
+<h2 id="affirmations">Affirmations</h2>
+{#- Each claim and its sources in one place, in the order of the sheet (RGAA 9.3): the keyboard and a
+screen reader read what supports a claim without going back and forth. -#}
+<ol class="claims">
+{% for claim in digest.claims %}
+<li class="claim">
+<p class="claim-text">{{ claim.text }}</p>
+{#- The label names the list, reached alone from list to list (WCAG 1.3.1). -#}
+<p class="claim-sources-label" id="sources-{{ loop.index }}">{{ "Source" if claim.sources|length == 1 else "Sources" }}:</p>
+{#- role="list": Safari drops the semantics of a list whose list-style is none. -#}
+<ul class="claim-sources" role="list" aria-labelledby="sources-{{ loop.index }}">
+{% for source in claim.sources %}
+<li><a href="{{ source.href }}"{% if source.title_lang %} lang="{{ source.title_lang }}"{% endif %}>{{ source.title }}</a></li>
+{% endfor %}
+</ul>
+</li>
+{% endfor %}
+</ol>
+</section>
+{% else %}
+<p class="results-line">{{ digest.empty_text }}</p>
+{% endif %}
+{% if digest.days %}
+<section aria-labelledby="jours">
+<h2 id="jours">Les jours du sujet</h2>
+{% if digest.days_note %}
+<p class="table-note">{{ digest.days_note }}</p>
+{% endif %}
+<ul class="days" role="list">
+{% for listed in digest.days %}
+<li>{% if listed.is_current %}<span aria-current="page"><time datetime="{{ listed.day.iso }}">{{ listed.day.text }}</time></span>{% else %}<a href="{{ listed.href }}"><time datetime="{{ listed.day.iso }}">{{ listed.day.text }}</time></a>{% endif %}</li>
+{% endfor %}
+</ul>
+</section>
+{% endif %}
+</article>
+{% endblock %}

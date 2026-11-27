@@ -7776,6 +7776,32 @@ personnelles des revues, décidés par Sabine le 2026-11-22. Essai et contre-ess
   échapper le texte d'une exception dans sa trace vaut pour `kb` comme pour une bibliothèque, et se fait par #725.
   Plan validé par Sabine le 2026-11-26. — PR de #441
 
+### Site : le lien d'une source d'un compte rendu vers son item (#724)
+
+Plan validé par Sabine le 2026-11-26 (« ok plan #724 ») ; la règle de comparaison, révisée par les deux tris des
+constats de revue du 2026-11-26 (délégation de Sabine du 15/10). Précise la parade de la limite (d) de #560 (ci-dessus
+au 2026-11-14), qui proposait de comparer le titre.
+
+- **Le lien d'une source d'un compte rendu vise `/comptes-rendus/<sujet>/<jour>/sources/<id>`, jamais
+  `/items/<id>` : au clic, le site relit le compte rendu, y trouve la source, lit l'item, et ne montre sa page que si
+  l'item a l'URL de la source quand elle en a une, sinon son titre mis sur une ligne (`make_visible`, `items.py`) ;
+  sinon, « Source introuvable » en 200, avec le titre de la source et son lien d'origine s'il est en `https`.**
+  Pourquoi : `item_id` est une clé de substitution, qu'une base refaite renumérote (limite (d) de #560) ; un lien
+  direct mènerait sans erreur à un autre item. L'URL d'abord : les failles du catalogue KEV peuvent partager leur
+  titre (`vulnerabilityName`, sans contrainte d'unicité dans le schéma), jamais leur URL, et l'import met à jour sur place le titre d'un papier qu'arXiv retitre
+  (`UPSERT_PUBLICATION`, `database/writers/paper_writer.py`), jamais son URL. Le 200 : la source existe dans le
+  compte rendu relu, seul l'item manque. Options écartées : un lien direct vers `/items/<id>` (une base refaite le
+  mènerait à un autre item) ; contrôler chaque source à l'affichage (jusqu'à 60 `GET /items/{id}` par page, RGESN) ;
+  le titre seul, la parade de #560 et la règle du plan (une autre faille KEV du même titre passait, première revue de
+  code) ; le titre et l'URL (un papier retitré devenait « Source introuvable », deuxième revue de code) ; un 404 (il
+  dirait la page inexistante). Limites assumées : deux appels à l'API par clic sur une source ; un article TLDR repris
+  par deux éditions est deux items de la même URL, et sa source mène à l'un ou à l'autre, le même article
+  (`docs/site-web.md`, « Comptes rendus ») ; une source sans URL se vérifie par son titre seul : un item renommé donne
+  « Source introuvable » ; après une base refaite, un autre item du même titre sous le même numéro ouvrirait sa page,
+  le schéma ne rendant aucun titre unique. Seules une release, une alerte ou un article de newsletter peuvent arriver
+  sans URL, quand la fiche écarte une URL qu'elle ne peut écrire en lien ; un papier et une faille ont toujours la
+  leur. — PR de #724
+
 ## Décisions encore ouvertes
 
 - **Le rôle Log Analytics Reader d'`id-kb-data-api` sur `log-kb`** (2026-11-11, #571) : il donnerait au back office

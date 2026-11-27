@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Comptes rendus de veille{% endblock %}
+{% block content %}
+<h1>Comptes rendus de veille</h1>
+{#- LLM at its first occurrence, before the label of a subject that holds it (Opquast 2025, rule 5). -#}
+<p class="page-intro">Pour chaque sujet, un LLM (grand modèle de langage) rédige à partir des items du fil un compte rendu en courtes affirmations, chacune avec ses sources.</p>
+{#- The cards of the feed, a title of level 2 for each subject. role="list": Safari drops the semantics
+of a list whose list-style is none. -#}
+<ul class="cards" role="list">
+{% for subject in subjects %}
+<li class="card">
+<h2 class="card-title"><a href="{{ subject.href }}">{{ subject.label }}</a></h2>
+<p>{{ subject.description }}</p>
+</li>
+{% endfor %}
+</ul>
+{% endblock %}

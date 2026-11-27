@@ -8,20 +8,11 @@ import re
 from collections.abc import Iterable, Mapping
 from dataclasses import dataclass, replace
 from datetime import datetime
-from typing import Literal, get_args
 
 from pydantic import BaseModel, ConfigDict
 
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING, MAX_ITEMS_PER_DIGEST
-from k_b.items import RansomwareUse
-
-# The kinds of the watch, in the order of the reading: the rare ones first, so that a cap cuts
-# the newsletter articles before a vulnerability. Neither zotero_entry nor clip: no library in
-# the digests on 25/10 (Sabine, 2026-10-15).
-type WatchKind = Literal[
-    "vulnerability", "advisory", "paper", "release", "newsletter_article"
-]
-WATCH_KINDS: tuple[WatchKind, ...] = get_args(WatchKind.__value__)
+from k_b.items import RansomwareUse, WatchKind
 
 # Any URL, with a scheme or from www.: replaced as a whole, its parameters included.
 URL = re.compile(r"(?i)[a-z][a-z0-9+.-]*://\S+|www\.\S+")

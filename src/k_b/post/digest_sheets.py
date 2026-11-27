@@ -18,6 +18,7 @@ from k_b.items import (
     DigestProduction,
     convert_to_utc,
     is_writable_url,
+    make_visible,
     parse_aware_datetime,
 )
 from k_b.post.ai_api_client import Digest, DigestsResponse, Source
@@ -25,7 +26,6 @@ from k_b.post.vault_files import (
     VaultEntryRefusedError,
     has_sheet,
     list_sheet_names,
-    make_visible,
     neutralize_digest_text,
     read_sheet_head,
     refuse_linked_folders,

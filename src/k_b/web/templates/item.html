@@ -3,7 +3,7 @@
 {% block title %}{{ detail.page_title }}{% endblock %}
 {% block main_class %}page item-page{% endblock %}
 {% block content %}
-<a class="back-link" href="/"><span aria-hidden="true">←</span> Retour au fil</a>
+<a class="back-link" href="{{ back_link.href }}"><span aria-hidden="true">←</span> {{ back_link.label }}</a>
 <article class="item">
 <p class="item-meta"><span class="card-kind"{% if detail.kind_lang %} lang="{{ detail.kind_lang }}"{% endif %}>{{ detail.kind_label }}</span> <span class="item-line">{% for part in detail.line %}{% if not loop.first %} · {% endif %}{% if part.is_code %}<span class="item-code">{{ part.text }}</span>{% elif part.day %}{{ part.text }} <time datetime="{{ part.day.iso }}">{{ part.day.text }}</time>{% else %}{{ part.text }}{% endif %}{% endfor %}</span></p>
 <h1{% if detail.title_lang %} lang="{{ detail.title_lang }}"{% endif %}>{{ detail.title }}</h1>

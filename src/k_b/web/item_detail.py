@@ -61,6 +61,18 @@ EMPTY_TEXT_BY_KIND = {
 
 
 @dataclass(frozen=True)
+class BackLink:
+    """The link above the detail, back to the page it was reached from."""
+
+    href: str
+    label: str
+
+
+# The detail reached from the feed; the one reached from a digest leads back to it (web/digests.py).
+FEED_BACK_LINK = BackLink("/", "Retour au fil")
+
+
+@dataclass(frozen=True)
 class Day:
     """A day as its time element gives it: ISO for the machine, the month in letters for people."""
 

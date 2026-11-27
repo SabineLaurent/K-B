@@ -16,7 +16,6 @@ from pathlib import Path
 
 from k_b.core.atomic_write import TemporaryFileFoundError, write_file_atomically
 from k_b.core.config import BIDI_CONTROLS, CHARACTER_REFERENCE
-from k_b.items import is_hidden_character
 
 # The characters a text loses: the controls (Cc) and the lone surrogates (Cs), which UTF-8
 # cannot encode.
@@ -152,16 +151,6 @@ def neutralize_text(text: str, escaped_characters: frozenset[str]) -> str:
         if character in escaped_characters or position in references
         else character
         for position, character in enumerate(line)
-    )
-
-
-def make_visible(text: str) -> str:
-    """The text on one line, each character a reader would not see a space
-    (is_hidden_character)."""
-    return " ".join(
-        "".join(
-            " " if is_hidden_character(character) else character for character in text
-        ).split()
     )
 
 

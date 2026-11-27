@@ -20,7 +20,7 @@ from k_b.ai_api.connectors.data_api_client import (
 )
 from k_b.ai_api.connectors.data_api_settings import DataApiSettings
 from k_b.ai_api.deadline import Deadline
-from k_b.ai_api.watch_items import WATCH_KINDS, NewsletterArticleFields, PaperFields
+from k_b.ai_api.watch_items import NewsletterArticleFields, PaperFields
 from k_b.core.config import (
     DATA_API_CONNECT_TIMEOUT_SECONDS,
     DATA_API_POOL_TIMEOUT_SECONDS,
@@ -28,6 +28,7 @@ from k_b.core.config import (
     DATA_API_WRITE_TIMEOUT_SECONDS,
 )
 from k_b.data_api.app import create_app
+from k_b.items import WATCH_KINDS
 
 # Made for the test: never a real key.
 TEST_API_KEY = secrets.token_urlsafe(32)

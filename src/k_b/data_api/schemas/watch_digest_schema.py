@@ -37,7 +37,7 @@ class WatchDigestClaimSchema(BaseModel):
 class WatchDigestSourceSchema(BaseModel):
     item_id: int = Field(
         description="The item of the base: a base made again numbers its items anew, so lead to"
-        " it only when its title is the one of the source."
+        " it only when its URL is the one of the source, or its title when the source has no URL."
     )
     title: str = Field(description=SHOWN_AS_TEXT)
     url: str | None = Field(

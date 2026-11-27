@@ -9,8 +9,9 @@ from typing import Literal
 
 from k_b.ai_api.repository_texts import MASKED_EMAIL
 from k_b.ai_api.stages.writing import Claim, Fact
-from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem, WatchKind
+from k_b.ai_api.watch_items import MASKED_LOGIN, MASKED_URL, WatchItem
 from k_b.core.config import MAX_FIELD_CHARS_FOR_WRITING
+from k_b.items import WatchKind
 
 # Dashes U+2010 to U+2015 and the minus sign U+2212 become "-", the typographic quotes "'" and '"'.
 PUNCTUATION = str.maketrans(
