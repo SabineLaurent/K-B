@@ -15,6 +15,7 @@ from k_b.core.config import (
     SERVE_WEB_LOG_FILE_NAME,
 )
 from k_b.core.dates import DATABASE_DATE_FORMAT
+from k_b.core.quoting import quote_value
 from k_b.core.trace_context import read_current_trace_id
 
 # The name of the logger of cli.py and of every module of commands/, written in each line: one
@@ -60,6 +61,12 @@ LIBRARY_LOG_LEVELS = {
     POSTGRESQL_DRIVER_LOGGER_NAME: logging.ERROR,
     POSTGRESQL_POOL_LOGGER_NAME: logging.ERROR,
 }
+# The logger of every module of K-B: a line of any other comes from a library, which may log the
+# text of an answer.
+KB_LOGGER_NAME = "k_b"
+# The length the message of a line of a library is cut to, quotes and escapes included: the line
+# is the only copy of the message, as for the failure of a source (etl/extract.py).
+MAX_QUOTED_LIBRARY_MESSAGE_LENGTH = 300
 
 logger = logging.getLogger(LOGGER_NAME)
 
@@ -115,13 +122,34 @@ def logging_to(
 
 class TracedFormatter(logging.Formatter):
     """The format of a log line, with the trace id of the request under way, read in the thread
-    that logs (core/trace_context.py); nothing out of a request."""
+    that logs (core/trace_context.py), nothing out of a request; the message of a library
+    quoted."""
 
     def format(self, record: logging.LogRecord) -> str:
-        """The line of the record, its trace field set first."""
+        """The line of the record, its trace field set first; a line of a library from a copy
+        with its message quoted."""
         trace_id = read_current_trace_id()
         record.trace_field = "" if trace_id is None else f" trace_id={trace_id}"
+        if not is_logged_by_kb(record):
+            record = with_message_quoted(record)
         return super().format(record)
+
+
+def is_logged_by_kb(record: logging.LogRecord) -> bool:
+    """Whether a logger of K-B wrote the record: kb quotes the values it logs itself."""
+    return record.name == KB_LOGGER_NAME or record.name.startswith(f"{KB_LOGGER_NAME}.")
+
+
+def with_message_quoted(record: logging.LogRecord) -> logging.LogRecord:
+    """A copy of the record, its message escaped and cut by quote_value: a line break a library
+    logs writes no line of its own (conventions.md, rule 3). The record itself is left as it is
+    for the other handlers."""
+    quoted_record = logging.makeLogRecord(record.__dict__)
+    quoted_record.msg = quote_value(
+        record.getMessage(), MAX_QUOTED_LIBRARY_MESSAGE_LENGTH
+    )
+    quoted_record.args = None
+    return quoted_record
 
 
 def value_or_log_refusal[ValueT](value_or_refusal: ValueT | str) -> ValueT | None:

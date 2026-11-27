@@ -236,8 +236,8 @@ l'import (`etl/raw_store.py:120-132`).
 ### Les journaux
 
 - **Chaque ligne est datée en UTC**, à la seconde, avec sa zone: `<date> <niveau> <module>: <message>`, au format
-    `%Y-%m-%dT%H:%M:%SZ` (`commands/run_log.py:33`, `:87-89`, `core/dates.py:7`). Le journal va sur la sortie
-    d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC (`commands/run_log.py:63-86`).
+    `%Y-%m-%dT%H:%M:%SZ` (`commands/run_log.py:37`, `:98-100`, `core/dates.py:7`). Le journal va sur la sortie
+    d'erreur et dans `<KB_DATA_DIR>/logs/kb.log`, tourné chaque jour à minuit UTC (`commands/run_log.py:74-97`).
 - **Une valeur observée est citée par `quote_value`**, échappée (retours à la ligne et caractères de contrôle) et
     coupée à 100 caractères (`core/quoting.py:9-19`); le message d'échec d'une source et ses notes, à 300
     (`etl/extract.py:35-38`, `:103-109`).

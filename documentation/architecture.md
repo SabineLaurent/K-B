@@ -343,7 +343,7 @@ Les deux schémas se lisent ainsi, dans l'ordre des flux:
 
 Les journaux restent hors des dessins: aucune commande ne les relit, sauf la purge, qui les supprime d'après la date de
 leur nom (`purge/run_records.py:38`, `:75`). Ce sont les journaux de fonctionnement, sous `KB_DATA_DIR/logs/`
-(`commands/run_log.py:24`, `:28`, `:30`, `:32`), le journal d'import,
+(`commands/run_log.py:26`, `:30`, `:32`, `:34`), le journal d'import,
 `KB_DATA_DIR/journals/import-journal-<date>.jsonl` (`etl/pipeline.py:35`, `:63-68`), et la ligne JSON que l'API IA
 écrit sur sa sortie standard pour chaque appel au modèle (`ai_api/observability/metrics.py:50`). Restent hors des
 dessins aussi quatre appels qui ne portent pas de donnée de la veille: `GET /health`, par lequel `kb smoke-test` vérifie
@@ -487,7 +487,7 @@ Les quatre routes de l'API de données réservées au client `WEB` (`core/config
 `GET /digests/{subject}/days` (`data_api/routers/watch_digest_router.py:34`, `:47`).
 
 Les deux API n'écrivent rien de durable, hors du journal de fonctionnement que tient leur commande
-(`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:28`, `:30`): l'API de données ne peut pas
+(`logs/kb-serve-data.log`, `logs/kb-serve-ai.log`, `commands/run_log.py:30`, `:32`): l'API de données ne peut pas
 importer les écrivains de la base (`tests/architecture/test_apis.py:42`), et l'API IA ne peut importer ni la base ni
 l'écriture d'un fichier (`:120`). Le parcours d'une demande à l'API IA, ses contrôles et ses couches sont dans
 [la fiche de l'API IA](api-ia.md).
