@@ -333,7 +333,7 @@ Les quatre routes de `watch` lisent par le même lecteur, `WatchReader` (`data_a
     Un second appel pendant qu'un premier tourne reçoit 429 `request_already_running`, avec `Retry-After: 7`, les 2 s
     d'attente d'une connexion et les 5 s de l'instruction (`core/config.py:427-429`): sans clé, elle ne prend qu'une
     des 4 connexions du <span lang="en">pool</span> à la fois. Chaque appel est journalisé, 200 compris: seul `/health` à 200 ne l'est pas
-    (`core/api_request_log.py:38`). C'est une route de Starlette, ajoutée hors du schéma (`data_api/app.py:89-94`).
+    (`core/api_request_log.py:39`). C'est une route de Starlette, ajoutée hors du schéma (`data_api/app.py:89-94`).
 - `/openapi.json` et `/docs` ne sont servis que si `KB_DEPLOYMENT_ENVIRONMENT` vaut exactement `sandbox`; toute
     autre valeur, ou aucune, ne sert ni l'un ni l'autre (`core/api_settings.py:69-79`). ReDoc n'est pas servi
     (`data_api/app.py:58-59`, test `test_docs_openapi_and_health_are_public_and_no_other_page_is_served`).

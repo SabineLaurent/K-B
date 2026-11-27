@@ -48,10 +48,10 @@ resource job 'Microsoft.App/jobs@2026-01-01' = {
       }
       // The bounds of the job must fall before this one, or the replica is killed before its summary:
       // the two /health of 65 s at most each, the six probes without key of 15 s at most each (#499),
-      // the /health/database of the data API of 15 s at most, as a probe (#458), then the retries of
-      // the storage SDK, about 7 min (core/config.py), about 681 s with the start of the job; the
-      // retries of azure-identity are not counted there. 900 s leaves them a margin, and costs only
-      // when the job is stuck.
+      // the /health/database of the data API of 65 s at most, the deadline of a /health (#458), then
+      // the retries of the storage SDK, about 7 min (core/config.py), about 731 s with the start of the
+      // job; the retries of azure-identity are not counted there. 900 s leaves them a margin, and costs
+      // only when the job is stuck.
       replicaTimeout: 900
       // A failed smoke test must show: it is run again by hand, never retried.
       replicaRetryLimit: 0
