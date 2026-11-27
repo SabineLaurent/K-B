@@ -19,7 +19,8 @@ lui-même. Le déroulé de `kb collect`, pas à pas, avec son logigramme et ses 
 [la fiche de l'import et de la base, « La commande qui précède l'import: `kb collect` »](donnees.md#la-commande-qui-precede-limport-kb-collect);
 le détail de chaque source est dans
 [les spécifications de la collecte](https://github.com/SabineLaurent/K-B/blob/main/docs/specs-collecte.md). Elle est
-écrite d'après le code de `main` au commit `39cb5eb9`. Les chemins du code de K-B (`etl/…`, `core/…`,
+écrite d'après le code de `main` au commit `39cb5eb9`, ses renvois à `commands/run_log.py` d'après le code de la demande
+de fusion de #458. Les chemins du code de K-B (`etl/…`, `core/…`,
 `commands/…`, `post/…`, `purge/…`) partent de `src/k_b/`, les autres de la racine du dépôt.
 
 ## Le périmètre

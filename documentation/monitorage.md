@@ -58,8 +58,8 @@ La liste suivante donne, pour chaque phrase de l'encadré, les sections de cette
     [Journaux de l'application](#journaux-de-lapplication).
 - Le format accessible: [L'accessibilité de la documentation](accessibilite.md).
 
-Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`, et ceux qui portent « #458 » le
-code de la demande de fusion de #458. Le monitorage du modèle tient dans deux
+Les renvois `fichier:ligne` de cette fiche visent `main` au commit `a1a01efd`; ceux qui portent « #458 », et ceux de
+`src/k_b/commands/run_log.py` et de `tests/commands/test_run_log.py`, le code de la demande de fusion de #458. Le monitorage du modèle tient dans deux
 fichiers du dépôt, que Grafana Cloud importe tels quels: le tableau de bord, `observability/grafana/dashboard.json`,
 et les cinq règles d'alerte, `observability/grafana/alert-rules.yaml`. Les mesures viennent de l'API IA, qui les envoie
 en OpenTelemetry (`docs/fiches-veille.md`, « Les mêmes mesures en OpenTelemetry (#162) »).
