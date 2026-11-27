@@ -74,8 +74,10 @@ L'API de données traduit chaque erreur de la base en une réponse, au même end
 ```
 
 (extrait resserré de `src/k_b/data_api/errors.py:94-111`.) Un `PoolTimeout` dit que le pool n'a prêté aucune
-connexion dans son attente de 2 s : toutes sont prêtées, ou aucune n'a pu s'ouvrir, et la cause a alors sa propre
-ligne, écrite plus tôt. Le SQLSTATE 42P01 (`undefined_table`) dit qu'une table de K-B manque : c'est une base que
+connexion dans son attente de 2 s : toutes sont prêtées, ou aucune n'a pu s'ouvrir. Une tentative qui échoue a sa
+propre ligne, `database_connection_failed`, écrite à la fin de la tentative : avant ou après le `PoolTimeout`, car une
+tentative peut durer jusqu'au délai de connexion, 10 s (`DATABASE_CONNECT_TIMEOUT_SECONDS`), au-delà des 2 s
+d'attente. Le SQLSTATE 42P01 (`undefined_table`) dit qu'une table de K-B manque : c'est une base que
 `kb migrate-database` n'a pas encore créée. Les deux sont des 503, une indisponibilité, et non des 500, des défauts
 du code. Le message de PostgreSQL nomme la table : la ligne ne garde que la classe et le SQLSTATE
 (`describe_engine_error`).
