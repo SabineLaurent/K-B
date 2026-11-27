@@ -50,8 +50,8 @@ class Subject:
     description: str
 
 
-# The subjects of DIGEST_SUBJECTS (core/config.py), in its order, named by Sabine (2026-11-26); a
-# test keeps both lists equal. Written for the site: the definitions of DIGEST_SUBJECTS are those
+# The subjects of DIGEST_SUBJECTS (core/config.py), in its order; a test keeps both lists equal.
+# Written for the site: the definitions of DIGEST_SUBJECTS are the ones
 # the model reads.
 SUBJECTS: dict[str, Subject] = {
     "vulnerabilities": Subject(

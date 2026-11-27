@@ -176,8 +176,8 @@ charte, sans couleur nouvelle. `web/digests.py` lit l'adresse et bâtit les page
 
 **Les sujets** gardent leur code d'API dans l'adresse (`agent_frameworks`). Leur libellé et leur ligne, en
 français, sont dans `SUBJECTS` (`web/digests.py`), dans l'ordre de `DIGEST_SUBJECTS`, tenus égaux par un test : un
-sujet ajouté à `DIGEST_SUBJECTS` le fait échouer tant que le site ne le nomme pas. Les libellés sont ceux de Sabine
-(2026-11-26 : « Vulnérabilités », « Frameworks agentiques », LLM gardé tel quel). La ligne est écrite pour le
+sujet ajouté à `DIGEST_SUBJECTS` le fait échouer tant que le site ne le nomme pas. Corrections de Sabine du
+2026-11-26 : « Vulnérabilités », « Frameworks agentiques », LLM gardé tel quel. La ligne est écrite pour le
 site : les définitions de `DIGEST_SUBJECTS` sont celles que lit le modèle. Écartés : un code français par sujet
 dans l'adresse (une seconde table à tenir) ; le dernier jour de chaque sujet sur l'index (9 appels par affichage,
 RGESN) ; un formulaire de date, comme les tendances (le site ne sait pas quels jours existent : la liste des jours
