@@ -44,7 +44,7 @@ SOURCE_PATH = "/comptes-rendus/{subject}/{day}/sources/{item_id}"
 `web/digests.py` ne fait aucun appel : il reçoit des réponses déjà validées et rend des *dataclasses* figées
 (`DigestPage`, `CapNotice`, `MissingSourcePage`) que les gabarits affichent. Les appels à l'API et le choix de la page
 sont dans `pages.py`, comme pour le fil et les tendances (`code.md`, « Séparation des responsabilités »). L'adresse est
-lue en chaînes, jamais typée par FastAPI (`src/k_b/web/pages.py:188-191`) :
+lue en chaînes, jamais typée par FastAPI (`src/k_b/web/pages.py:189-192`) :
 
 ```python
     read_day = read_written_day(day)
@@ -203,8 +203,8 @@ aucune espace avant « : » dans le texte du site (`tests/web/test_accessibility
    sans erreur à un autre item, et la page dirait faux en silence. Le site relit donc le compte rendu et compare
    l'item à la source avant de le montrer (`is_item_of_source`, `src/k_b/web/digests.py:329`).
 2. **Pourquoi l'URL et pas le titre ?** Le titre trompe dans deux cas relevés dans le code : des failles KEV qui
-   partagent leur titre, et un papier qu'arXiv retitre sur place (`paper_writer.py:13-24`). L'URL d'un item ne change
-   pas à l'import. Le titre ne sert qu'aux sources sans URL.
+   partagent leur titre, et un papier qu'arXiv retitre sur place (`paper_writer.py:13-24`). L'URL d'un item de la
+   veille ne change pas à l'import. Le titre ne sert qu'aux sources sans URL.
 3. **Que se passe-t-il si l'API renvoie un compte rendu dont une affirmation cite une source absente ?** Le
    validateur `check_each_claim_cites_a_source_listed` le refuse, et le site rend la page 500, sans rien afficher
    (`src/k_b/web/data_api_client.py:295`). Une affirmation sans sa source n'est jamais montrée (LLM07).
